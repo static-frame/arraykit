@@ -1,0 +1,7 @@
+*.egg-info
+*.o
+*.pyc
+*.so
+.vscode
+.mypy_cache
+.pytest_cache
