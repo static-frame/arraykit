@@ -1,9 +1,11 @@
 # pylint: disable = all
 
-
 import typing
 
 import numpy  # type: ignore
+
+
+_T = typing.TypeVar('_T')
 
 
 class ArrayGO:
@@ -20,6 +22,17 @@ class ArrayGO:
 
     def append(self, __value: object) -> None: ...
 
-    def copy(self) -> 'ArrayGO': ...
+    def copy(self: _T) -> _T: ...
 
     def extend(self, __values: typing.Iterable[object]) -> None: ...
+
+
+def immutable_filter(__array: numpy.array) -> numpy.array: ...
+
+def mloc(__array: numpy.array) -> int: ...
+
+def name_filter(__name: typing.Hashable) -> typing.Hashable: ...
+
+def resolve_dtype(__d1: numpy.dtype, __d2: numpy.dtype) -> numpy.dtype: ...
+
+def resolve_dtype_iter(__dtypes: typing.Iterable[numpy.dtype]) -> numpy.dtype: ...
