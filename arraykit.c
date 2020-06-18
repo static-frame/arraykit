@@ -8,7 +8,8 @@
 
 // Bug in NumPy < 1.16 (https://github.com/numpy/numpy/pull/12131):
 # undef PyDataType_ISBOOL
-# define PyDataType_ISBOOL(obj) PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
+# define PyDataType_ISBOOL(obj) \
+    PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
 
 # define AK_CHECK_NUMPY_ARRAY(O)                                              \
     if (!PyArray_Check(O)) {                                                  \
@@ -26,9 +27,8 @@
 
 typedef struct {
     PyObject_VAR_HEAD
-    PyArrayObject *array;
+    PyObject *array;
     PyObject *list;
-    PyArray_Descr* dtype;
 } ArrayGOObject;
 
 static PyTypeObject ArrayGOType;
@@ -172,17 +172,17 @@ update_array_cache(ArrayGOObject *self)
 {
     if (self->list) {
         if (self->array) {
-            PyObject *container = PyTuple_Pack(2, (PyObject *)self->array, self->list);
+            PyObject *container = PyTuple_Pack(2, self->array, self->list);
             if (!container) {
                 return -1;
             }
-            Py_SETREF(self->array, (PyArrayObject *)PyArray_Concatenate(container, 0));
+            Py_SETREF(self->array, PyArray_Concatenate(container, 0));
             Py_DECREF(container);
         }
         else {
-            self->array = (PyArrayObject *) PyArray_FROM_OT(self->list, self->dtype->type_num);
+            self->array = PyArray_FROM_OT(self->list, NPY_OBJECT);
         }
-        PyArray_CLEARFLAGS(self->array, NPY_ARRAY_WRITEABLE);
+        PyArray_CLEARFLAGS((PyArrayObject *)self->array, NPY_ARRAY_WRITEABLE);
         Py_CLEAR(self->list);
     }
     return 0;
@@ -194,41 +194,30 @@ update_array_cache(ArrayGOObject *self)
 static int
 ArrayGO_init(ArrayGOObject *self, PyObject *args, PyObject *kwargs)
 {
-
     PyObject *temp;
+    char* argnames[] = {"iterable", "own_iterable", NULL};
     PyObject *iterable;
     int own_iterable;
-    int parsed;
-
-    char* argnames[] = {"iterable", "dtype", "own_iterable", NULL};
-
-    Py_CLEAR(self->dtype);
-    parsed = PyArg_ParseTupleAndKeywords(
-        args, kwargs, "O|$O&p:ArrayGO", argnames,
-        &iterable, PyArray_DescrConverter, &self->dtype, &own_iterable
+    int parsed = PyArg_ParseTupleAndKeywords(
+        args, kwargs, "O|$p:ArrayGO", argnames, &iterable, &own_iterable
     );
     if (!parsed) {
         return -1;
     }
-    if (!self->dtype) {
-        self->dtype = PyArray_DescrFromType(NPY_OBJECT);
-    }
     if (PyArray_Check(iterable)) {
-        temp = (PyObject *) self->array;
+        temp = self->array;
         if (own_iterable) {
             PyArray_CLEARFLAGS((PyArrayObject *) iterable, NPY_ARRAY_WRITEABLE);
             Py_INCREF(iterable);
         } else {
             iterable = (PyObject *)AK_ImmutableFilter((PyArrayObject *) iterable);
         }
-        if (!PyArray_EquivTypes(PyArray_DESCR((PyArrayObject *) iterable), self->dtype)) {
-            PyErr_Format(
-                PyExc_TypeError, "bad dtype given to ArrayGO initializer (expected '%S', got '%S')",
-                PyArray_DESCR((PyArrayObject *) iterable), self->dtype
-            );
+        if (!PyDataType_ISOBJECT(PyArray_DESCR((PyArrayObject *)iterable))) {
+            PyErr_SetString(PyExc_NotImplementedError,
+                            "only object arrays are supported");
             return -1;
         }
-        self->array = (PyArrayObject *) iterable;
+        self->array = iterable;
         Py_XDECREF(temp);
 
     } else {
@@ -291,9 +280,7 @@ ArrayGO_copy(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
     ArrayGOObject *copy = PyObject_New(ArrayGOObject, &ArrayGOType);
     copy->array = self->array;
     copy->list = self->list ? PySequence_List(self->list) : NULL;
-    copy->dtype = self->dtype;
     Py_XINCREF(copy->array);
-    Py_INCREF(copy->dtype);
     return (PyObject *)copy;
 }
 
@@ -303,7 +290,7 @@ ArrayGO_iter(ArrayGOObject *self)
     if (self->list && update_array_cache(self)) {
         return NULL;
     }
-    return PyObject_GetIter((PyObject *)self->array);
+    return PyObject_GetIter(self->array);
 }
 
 static PyObject *
@@ -312,13 +299,13 @@ ArrayGO_mp_subscript(ArrayGOObject *self, PyObject *key)
     if (self->list && update_array_cache(self)) {
         return NULL;
     }
-    return PyObject_GetItem((PyObject *)self->array, key);
+    return PyObject_GetItem(self->array, key);
 }
 
 static Py_ssize_t
 ArrayGO_mp_length(ArrayGOObject *self)
 {
-    return ((self->array ? PyArray_SIZE(self->array) : 0)
+    return ((self->array ? PyArray_SIZE((PyArrayObject *)self->array) : 0)
             + (self->list ? PyList_Size(self->list) : 0));
 }
 
@@ -329,13 +316,12 @@ ArrayGO_values_getter(ArrayGOObject *self, void* Py_UNUSED(closure))
         return NULL;
     }
     Py_INCREF(self->array);
-    return (PyObject *)self->array;
+    return self->array;
 }
 
 static void
 ArrayGO_dealloc(ArrayGOObject *self)
 {
-    Py_XDECREF(self->dtype);
     Py_XDECREF(self->array);
     Py_XDECREF(self->list);
     Py_TYPE(self)->tp_free((PyObject *)self);
