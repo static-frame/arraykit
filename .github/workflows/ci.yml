@@ -11,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
+      - run: pip install -r requirements.txt
       - run: python setup.py sdist
       - uses: actions/upload-artifact@master
         with:
@@ -29,8 +30,9 @@ jobs:
       - run: pip install cibuildwheel
       - run: cibuildwheel --output-dir dist
         env:
+          CIBW_BEFORE_BUILD: pip install -r {project}/requirements.txt
           CIBW_BUILD: cp3${{ matrix.minor }}-*
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements.txt
+          CIBW_BEFORE_TEST: pip install -r {project}/requirements-test.txt
           CIBW_TEST_COMMAND: pytest {project}
       - uses: actions/upload-artifact@master
         with:
