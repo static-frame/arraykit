@@ -380,7 +380,7 @@ PyInit_arraykit(void)
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
     if (!m ||
-        PyModule_AddStringConstant(m, "__version__", AK_VERSION) ||
+        PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType))
     {

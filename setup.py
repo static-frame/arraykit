@@ -48,7 +48,7 @@ setup(
             name='arraykit',
             sources=['arraykit.c'],
             include_dirs=[np.get_include()],
-            define_macros=[("AK_VERSION", f'"{AK_VERSION}"')],
+            define_macros=[("AK_VERSION", AK_VERSION)],
         ),
     ],
 )
