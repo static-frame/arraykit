@@ -7,7 +7,7 @@ AK_VERSION = '0.1.0'
 
 
 def get_long_description() -> str:
-    return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance critical StaticFrame operations as Python C extensions.
+    return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
 
 Code: https://github.com/InvestmentSystems/arraykit
 
