@@ -4,7 +4,11 @@
 arraykit
 =============
 
-Tools for NumPy and StaticFrame.
+The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
+
+Code: https://github.com/InvestmentSystems/arraykit
+
+Packages: https://pypi.org/project/arraykit
 
 
 Dependencies

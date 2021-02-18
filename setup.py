@@ -11,8 +11,6 @@ def get_long_description() -> str:
 
 Code: https://github.com/InvestmentSystems/arraykit
 
-Docs: http://arraykit.readthedocs.io
-
 Packages: https://pypi.org/project/arraykit
 '''
 
@@ -25,7 +23,7 @@ setup(
     python_requires='>3.6.0',
     install_requires=['numpy>=1.14.2'],
     url='https://github.com/InvestmentSystems/arraykit',
-    author='Christopher Ariza',
+    author='Christopher Ariza, Brandt Bucher',
     license='MIT',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
