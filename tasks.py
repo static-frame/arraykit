@@ -4,26 +4,24 @@ import typing as tp
 
 import invoke
 
-# -------------------------------------------------------------------------------
 
 
 @invoke.task
 def clean(context):
     '''Clean doc and build artifacts
     '''
-    # context.run('rm -rf htmlcov')
-    # context.run('rm -rf doc/build')
-    context.run('rm -rf build')
-    context.run('rm -rf dist')
-    context.run('rm -rf *.egg-info')
-    context.run('rm -rf .mypy_cache')
-    context.run('rm -rf .pytest_cache')
-    context.run('rm -rf .hypothesis')
-    context.run('rm -rf .ipynb_checkpoints')
+    context.run(f"{sys.executable} setup.py develop --uninstall", echo=True)
+
+    for artifact in ("*.egg-info", "*.so", "build", "dist"):
+        context.run(f"rm -rf {artifact}", echo=True)
+
+    # context.run("black .", echo=True)@task(clean)
 
 
-@invoke.task(pre=(clean,))
+@invoke.task
 def build(context):
-    '''Build packages
-    '''
-    context.run(f'{sys.executable} setup.py sdist bdist_wheel')
+    context.run(f"pip install -r requirements.txt", echo=True)
+    context.run(f"{sys.executable} setup.py develop", echo=True)
+
+
+
