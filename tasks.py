@@ -24,4 +24,10 @@ def build(context):
     context.run(f"{sys.executable} setup.py develop", echo=True)
 
 
+@invoke.task(pre=(clean, build))
+def test(context):
+    cmd = f'pytest -s --color no --disable-pytest-warnings --tb=native'
+    context.run(cmd)
+
+
 

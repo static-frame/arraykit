@@ -56,6 +56,8 @@ def test_array_len_a() -> None:
     assert len(ag1) == 5
 
 
+#-------------------------------------------------------------------------------
+
 def test_resolve_dtype_a() -> None:
     a1 = np.array([1, 2, 3])
     a2 = np.array([False, True, False])
@@ -73,12 +75,10 @@ def test_resolve_dtype_a() -> None:
     assert ak.resolve_dtype(a1.dtype, a6.dtype) == np.float64
     assert ak.resolve_dtype(a4.dtype, a6.dtype) == np.float64
 
-
 def test_resolve_dtype_b() -> None:
     a1 = np.array('a').dtype
     a3 = np.array('aaa').dtype
     assert ak.resolve_dtype(a1, a3) == np.dtype(('U', 3))
-
 
 def test_resolve_dtype_c() -> None:
     a1 = np.array(['2019-01', '2019-02'], dtype=np.datetime64)
@@ -89,7 +89,19 @@ def test_resolve_dtype_c() -> None:
     assert ak.resolve_dtype(a1.dtype, a3.dtype) == np.dtype('<M8[ns]')
     assert ak.resolve_dtype(a1.dtype, a4.dtype) == np.dtype('O')
 
+def test_resolve_dtype_d() -> None:
+    dt1 = np.array(1).dtype
+    dt2 = np.array(2.3).dtype
+    assert ak.resolve_dtype(dt1, dt2) == np.dtype(float)
 
+def test_resolve_dtype_e() -> None:
+    dt1 = np.array(1, dtype='timedelta64[D]').dtype
+    dt2 = np.array(2, dtype='timedelta64[Y]').dtype
+    assert ak.resolve_dtype(dt1, dt2) == np.dtype(object)
+    assert ak.resolve_dtype(dt1, dt1) == dt1
+
+
+#-------------------------------------------------------------------------------
 def test_resolve_dtype_iter_a() -> None:
     a1 = np.array([1, 2, 3])
     a2 = np.array([False, True, False])

@@ -25,30 +25,9 @@
 # define AK_UNLIKELY(X) (!!(X))
 # endif
 
-typedef struct {
-    PyObject_VAR_HEAD
-    PyObject *array;
-    PyObject *list;
-} ArrayGOObject;
 
-static PyTypeObject ArrayGOType;
-
-PyDoc_STRVAR(
-    ArrayGO_doc,
-    "\n"
-    "A grow only, one-dimensional, object type array, "
-    "specifically for usage in IndexHierarchy IndexLevel objects.\n"
-    "\n"
-    "Args:\n"
-    "    own_iterable: flag iterable as ownable by this instance.\n"
-);
-
-PyDoc_STRVAR(
-    ArrayGO_copy_doc,
-    "Return a new ArrayGO with an immutable array from this ArrayGO\n"
-);
-
-PyDoc_STRVAR(ArrayGO_values_doc, "Return the immutable labels array\n");
+//------------------------------------------------------------------------------
+// C-level utility functions
 
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
@@ -122,12 +101,9 @@ AK_ResolveDTypesIter(PyObject *dtypes)
     return resolved;
 }
 
-static PyObject *
-immutable_filter(PyObject *Py_UNUSED(m), PyObject *a)
-{
-    AK_CHECK_NUMPY_ARRAY(a);
-    return (PyObject *)AK_ImmutableFilter((PyArrayObject *)a);
-}
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// AK moudule public methods
 
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
@@ -136,6 +112,25 @@ mloc(PyObject *Py_UNUSED(m), PyObject *a)
     return PyLong_FromVoidPtr(PyArray_DATA((PyArrayObject *)a));
 }
 
+
+static PyObject *
+immutable_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY(a);
+    return (PyObject *)AK_ImmutableFilter((PyArrayObject *)a);
+}
+
+
+static PyObject *
+name_filter(PyObject *Py_UNUSED(m), PyObject *n)
+{
+    if (AK_UNLIKELY(PyObject_Hash(n) == -1)) {
+        return PyErr_Format(PyExc_TypeError, "unhashable name (type '%s')",
+                            Py_TYPE(n)->tp_name);
+    }
+    Py_INCREF(n);
+    return n;
+}
 
 static PyObject *
 resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
@@ -156,16 +151,36 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
     return (PyObject *)AK_ResolveDTypes(d1, d2);
 }
 
-static PyObject *
-name_filter(PyObject *Py_UNUSED(m), PyObject *n)
-{
-    if (AK_UNLIKELY(PyObject_Hash(n) == -1)) {
-        return PyErr_Format(PyExc_TypeError, "unhashable name (type '%s')",
-                            Py_TYPE(n)->tp_name);
-    }
-    Py_INCREF(n);
-    return n;
-}
+//------------------------------------------------------------------------------
+// ArrayGO
+
+typedef struct {
+    PyObject_VAR_HEAD
+    PyObject *array;
+    PyObject *list;
+} ArrayGOObject;
+
+static PyTypeObject ArrayGOType;
+
+PyDoc_STRVAR(
+    ArrayGO_doc,
+    "\n"
+    "A grow only, one-dimensional, object type array, "
+    "specifically for usage in IndexHierarchy IndexLevel objects.\n"
+    "\n"
+    "Args:\n"
+    "    own_iterable: flag iterable as ownable by this instance.\n"
+);
+
+PyDoc_STRVAR(
+    ArrayGO_copy_doc,
+    "Return a new ArrayGO with an immutable array from this ArrayGO\n"
+);
+
+PyDoc_STRVAR(ArrayGO_values_doc, "Return the immutable labels array\n");
+
+//------------------------------------------------------------------------------
+// ArrayGO utility functions
 
 static int
 update_array_cache(ArrayGOObject *self)
@@ -188,8 +203,8 @@ update_array_cache(ArrayGOObject *self)
     return 0;
 }
 
-// Methods:
-
+//------------------------------------------------------------------------------
+// ArrayGO Methods:
 
 static int
 ArrayGO_init(ArrayGOObject *self, PyObject *args, PyObject *kwargs)
@@ -344,6 +359,8 @@ static PyMappingMethods ArrayGO_as_mapping = {
     .mp_subscript = (binaryfunc) ArrayGO_mp_subscript,
 };
 
+// ArrayGo PyTypeObject
+
 static PyTypeObject ArrayGOType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_as_mapping = &ArrayGO_as_mapping,
@@ -359,7 +376,8 @@ static PyTypeObject ArrayGOType = {
     .tp_new = PyType_GenericNew,
 };
 
-// Boilerplate:
+//------------------------------------------------------------------------------
+// ArrayKit module definition
 
 static PyMethodDef arraykit_methods[] =  {
     {"immutable_filter", immutable_filter, METH_O, NULL},
