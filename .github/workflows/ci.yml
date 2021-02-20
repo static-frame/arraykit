@@ -11,6 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
+        with:
+          python-version: 3.8
       - run: pip install -r requirements.txt
       - run: python setup.py sdist
       - uses: actions/upload-artifact@master
