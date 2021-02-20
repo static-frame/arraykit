@@ -87,13 +87,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(ag2.values.tolist(),
                 ['a', 'b', 'c', 'd', 'e'])
 
-    @unittest.skip("cannot pickle 'ArrayGO' object")
     def test_array_deepcopy_a(self) -> None:
         ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), dtype=object))
         ag1.append('e')
         ag1.extend(('f', 'g'))
         ag2 = copy.deepcopy(ag1)
-        self.assertEqual(ag1._array.tolist(), ag2._array.tolist()) #type: ignore
+        self.assertEqual(ag1.values.tolist(), ag2.values.tolist()) #type: ignore
 
     def test_array_len_a(self) -> None:
 

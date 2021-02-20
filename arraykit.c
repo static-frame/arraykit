@@ -219,6 +219,7 @@ ArrayGO_init(ArrayGOObject *self, PyObject *args, PyObject *kwargs)
     if (!parsed) {
         return -1;
     }
+
     if (PyArray_Check(iterable)) {
         temp = self->array;
         if (own_iterable) {
@@ -288,6 +289,22 @@ ArrayGO_extend(ArrayGOObject *self, PyObject *values)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+ArrayGO_getnewargs(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
+{
+    if (self->list && update_array_cache(self)) {
+        return NULL;
+    }
+    PyObject *args = PyTuple_New(1);
+    if (!args) {
+        return NULL;
+    }
+    PyTuple_SET_ITEM(args, 0, self->array);
+    Py_INCREF(args);
+    return args;
+    // Py_INCREF(Py_None);
+    // return Py_None;
+}
 
 static PyObject *
 ArrayGO_copy(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
@@ -334,6 +351,7 @@ ArrayGO_values_getter(ArrayGOObject *self, void* Py_UNUSED(closure))
     return self->array;
 }
 
+
 static void
 ArrayGO_dealloc(ArrayGOObject *self)
 {
@@ -341,6 +359,8 @@ ArrayGO_dealloc(ArrayGOObject *self)
     Py_XDECREF(self->list);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
+
+// ArrayGo method bundles
 
 static struct PyGetSetDef ArrayGO_getset[] = {
     {"values", (getter)ArrayGO_values_getter, NULL, ArrayGO_values_doc, NULL},
@@ -351,6 +371,7 @@ static PyMethodDef ArrayGO_methods[] = {
     {"append", (PyCFunction)ArrayGO_append, METH_O, NULL},
     {"copy", (PyCFunction)ArrayGO_copy, METH_NOARGS, ArrayGO_copy_doc},
     {"extend", (PyCFunction)ArrayGO_extend, METH_O, NULL},
+    {"__getnewargs__", (PyCFunction)ArrayGO_getnewargs, METH_NOARGS, NULL},
     {NULL},
 };
 
@@ -360,6 +381,7 @@ static PyMappingMethods ArrayGO_as_mapping = {
 };
 
 // ArrayGo PyTypeObject
+// https://docs.python.org/3/c-api/typeobj.html
 
 static PyTypeObject ArrayGOType = {
     PyVarObject_HEAD_INIT(NULL, 0)
