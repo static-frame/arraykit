@@ -103,7 +103,7 @@ AK_ResolveDTypesIter(PyObject *dtypes)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-// AK moudule public methods
+// AK module public methods
 
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
