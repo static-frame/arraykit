@@ -11,7 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
-      - run: pip install --upgrade pip wheel setuptools
+        with:
+          python-version: 3.8
       - run: pip install -r requirements.txt
       - run: python setup.py sdist
       - uses: actions/upload-artifact@master
