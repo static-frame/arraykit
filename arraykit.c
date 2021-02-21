@@ -181,8 +181,16 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     if (PyArray_NDIM(array) == 1 ) {
         npy_intp dim[2] = {PyArray_DIM(array, 0), 1};
         PyArray_Dims shape = {dim, sizeof(dim)/sizeof(dim[0])};
+
         PyObject *array_new;
         array_new = PyArray_Newshape(array, &shape, NPY_ANYORDER);
+
+        if (!array_new) {
+            Py_DECREF(array_new);
+            PyErr_SetString(PyExc_RuntimeError,  "Unable to reshape array.");
+            return NULL;
+        }
+
         return array_new; // already a PyObject*
     }
     Py_INCREF(a); // found through experimentation
