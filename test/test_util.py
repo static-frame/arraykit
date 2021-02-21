@@ -118,8 +118,8 @@ class TestUnit(unittest.TestCase):
 
         a1 = np.arange(10)
         self.assertEqual(column_2d_filter(a1).shape, (10, 1))
-        # self.assertEqual(column_2d_filter(a1.reshape(2, 5)).shape, (2, 5))
-        # self.assertEqual(column_2d_filter(a1.reshape(1, 10)).shape, (1, 10))
+        self.assertEqual(column_2d_filter(a1.reshape(2, 5)).shape, (2, 5))
+        self.assertEqual(column_2d_filter(a1.reshape(1, 10)).shape, (1, 10))
 
 
 

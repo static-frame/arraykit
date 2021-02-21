@@ -7,11 +7,14 @@ import numpy as np
 from performance.reference.util import immutable_filter as immutable_filter_ref
 from performance.reference.util import name_filter as name_filter_ref
 from performance.reference.util import shape_filter as shape_filter_ref
+from performance.reference.util import column_2d_filter as column_2d_filter_ref
+
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
 from arraykit import immutable_filter as immutable_filter_ak
 from arraykit import name_filter as name_filter_ak
 from arraykit import shape_filter as shape_filter_ak
+from arraykit import column_2d_filter as column_2d_filter_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -53,6 +56,24 @@ class ShapeFilterREF(ShapeFilter):
     entry = staticmethod(shape_filter_ref)
 
 #-------------------------------------------------------------------------------
+class Column2DFilter(Perf):
+
+    def pre(self):
+        self.array1 = np.arange(100)
+        self.array2 = self.array1.reshape(20, 5)
+
+    def main(self):
+        _ = self.entry(self.array1)
+        _ = self.entry(self.array2)
+
+class Column2DFilterAK(Column2DFilter):
+    entry = staticmethod(column_2d_filter_ak)
+
+class Column2DFilterREF(Column2DFilter):
+    entry = staticmethod(column_2d_filter_ref)
+
+
+#-------------------------------------------------------------------------------
 class NameFilter(Perf):
 
     def pre(self):
@@ -74,7 +95,7 @@ class NameFilterREF(NameFilter):
 
 #-------------------------------------------------------------------------------
 class ArrayGOPerf(Perf):
-    NUMBER = 5000
+    NUMBER = 1000
 
     def pre(self):
         self.array = np.arange(100).astype(object)

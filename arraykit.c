@@ -183,9 +183,9 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
         PyArray_Dims shape = {dim, sizeof(dim)/sizeof(dim[0])};
         PyObject *array_new;
         array_new = PyArray_Newshape(array, &shape, NPY_ANYORDER);
-        Py_DECREF(array);
         return array_new; // already a PyObject*
     }
+    Py_INCREF(a); // found through experimentation
     return a;
 
 }
