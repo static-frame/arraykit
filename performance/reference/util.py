@@ -117,3 +117,27 @@ def resolve_dtype_iter(dtypes: tp.Iterable[np.dtype]) -> np.dtype:
             return dt_resolve
     return dt_resolve
 
+
+
+def array_deepcopy(
+        array: np.ndarray,
+        memo: tp.Optional[tp.Dict[int, tp.Any]],
+        ) -> np.ndarray:
+    '''
+    Create a deepcopy of an array, handling memo lookup, insertion, and object arrays.
+    '''
+    ident = id(array)
+    if memo is not None and ident in memo:
+        return memo[ident]
+
+    if array.dtype == DTYPE_OBJECT:
+        post = deepcopy(array, memo)
+    else:
+        post = array.copy()
+
+    if post.ndim > 0:
+        post.flags.writeable = array.flags.writeable
+
+    if memo is not None:
+        memo[ident] = post
+    return post
