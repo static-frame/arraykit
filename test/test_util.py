@@ -6,6 +6,7 @@ import numpy as np  # type: ignore
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
 from arraykit import shape_filter
+from arraykit import column_2d_filter
 
 # from arraykit import mloc
 
@@ -110,6 +111,17 @@ class TestUnit(unittest.TestCase):
         a2 = np.arange(4)
         self.assertEqual(shape_filter(a2), (4, 1))
         self.assertEqual(shape_filter(a2.reshape(2, 2)), (2, 2))
+
+    #---------------------------------------------------------------------------
+
+    def test_columns_2d_filter_a(self) -> None:
+
+        a1 = np.arange(10)
+        self.assertEqual(column_2d_filter(a1).shape, (10, 1))
+        # self.assertEqual(column_2d_filter(a1.reshape(2, 5)).shape, (2, 5))
+        # self.assertEqual(column_2d_filter(a1.reshape(1, 10)).shape, (1, 10))
+
+
 
 
 if __name__ == '__main__':

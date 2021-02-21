@@ -136,7 +136,7 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n)
 static PyObject *
 shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    // If array is ndim 1, return (shape[0], 1), else return shape
+    // If array is ndim 1, return (shape[0], 1), else return shape.
     // https://numpy.org/doc/stable/reference/c-api/array.html
     // https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
 
@@ -155,7 +155,6 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
 
     // handle 1 dimensional array
     if (PyArray_NDIM(array) == 1 ) {
-        // https://docs.python.org/3/c-api/long.html
         PyObject *cols = PyLong_FromLong(1);
         PyTuple_SET_ITEM(shape, 1, cols);
         return shape;
@@ -167,6 +166,40 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
     PyTuple_SET_ITEM(shape, 1, cols);
     return shape;
 
+}
+
+
+static PyObject *
+column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    // If array ndim is 1, reshape into ndim 2 with 1 column
+    // related example: https://github.com/RhysU/ar/blob/master/ar-python.cpp
+
+    PyArrayObject *array;
+    array = (PyArrayObject *)a;
+
+    if (PyArray_NDIM(array) == 1 ) {
+        npy_intp dim[2] = {PyArray_DIM(array, 0), 1};
+        PyArray_Dims shape = {dim, sizeof(dim)/sizeof(dim[0])};
+        PyObject *array_new;
+        array_new = PyArray_Newshape(array, &shape, NPY_ANYORDER);
+        Py_DECREF(array);
+        return array_new; // already a PyObject*
+    }
+    return a;
+
+}
+
+static PyObject *
+column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    return NULL;
+}
+
+static PyObject *
+row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    return NULL;
 }
 
 
@@ -423,6 +456,9 @@ static PyMethodDef arraykit_methods[] =  {
     {"mloc", mloc, METH_O, NULL},
     {"name_filter", name_filter, METH_O, NULL},
     {"shape_filter", shape_filter, METH_O, NULL},
+    {"column_2d_filter", column_2d_filter, METH_O, NULL},
+    {"column_1d_filter", column_1d_filter, METH_O, NULL},
+    {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {NULL},
