@@ -132,6 +132,45 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n)
     return n;
 }
 
+
+static PyObject *
+shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    // If array is ndim 1, return (shape[0], 1), else return shape
+    // https://numpy.org/doc/stable/reference/c-api/array.html
+    // https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
+
+    PyObject *shape = PyTuple_New(2);
+    if (!shape) {
+        return NULL;
+    }
+
+    PyArrayObject *array;
+    array = (PyArrayObject *)a;
+
+    // get size at dimension 0, set in tuple position 0
+    int size0 = PyArray_DIM(array, 0);
+    PyObject *rows = PyLong_FromLong(size0);
+    PyTuple_SET_ITEM(shape, 0, rows);
+
+    // handle 1 dimensional array
+    if (PyArray_NDIM(array) == 1 ) {
+        // https://docs.python.org/3/c-api/long.html
+        PyObject *cols = PyLong_FromLong(1);
+        PyTuple_SET_ITEM(shape, 1, cols);
+        return shape;
+    }
+
+    // get size at dimension 1, set in tuple position 1
+    int size1 = PyArray_DIM(array, 1);
+    PyObject *cols = PyLong_FromLong(size1);
+    PyTuple_SET_ITEM(shape, 1, cols);
+    return shape;
+
+}
+
+
+
 static PyObject *
 resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 {
@@ -383,6 +422,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"immutable_filter", immutable_filter, METH_O, NULL},
     {"mloc", mloc, METH_O, NULL},
     {"name_filter", name_filter, METH_O, NULL},
+    {"shape_filter", shape_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {NULL},

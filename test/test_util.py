@@ -5,6 +5,8 @@ import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
+from arraykit import shape_filter
+
 # from arraykit import mloc
 
 class TestUnit(unittest.TestCase):
@@ -95,6 +97,19 @@ class TestUnit(unittest.TestCase):
         # mixed strings go to the largest
         self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)), np.dtype('<U10'))
 
+    #---------------------------------------------------------------------------
+
+    def test_shape_filter_a(self) -> None:
+
+        a1 = np.arange(10)
+        self.assertEqual(shape_filter(a1), (10, 1))
+        self.assertEqual(shape_filter(a1.reshape(2, 5)), (2, 5))
+        self.assertEqual(shape_filter(a1.reshape(1, 10)), (1, 10))
+        self.assertEqual(shape_filter(a1.reshape(10, 1)), (10, 1))
+
+        a2 = np.arange(4)
+        self.assertEqual(shape_filter(a2), (4, 1))
+        self.assertEqual(shape_filter(a2.reshape(2, 2)), (2, 2))
 
 
 if __name__ == '__main__':
