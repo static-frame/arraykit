@@ -179,6 +179,7 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 1 ) {
+        // https://numpy.org/doc/stable/reference/c-api/types-and-structures.html#c.PyArray_Dims
         npy_intp dim[2] = {PyArray_DIM(array, 0), 1};
         PyArray_Dims shape = {dim, sizeof(dim)/sizeof(dim[0])};
 
