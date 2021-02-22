@@ -46,8 +46,8 @@ class ShapeFilter(Perf):
         self.array2 = self.array1.reshape(20, 5)
 
     def main(self):
-        _ = self.entry(self.array1)
-        _ = self.entry(self.array2)
+        self.entry(self.array1)
+        self.entry(self.array2)
 
 class ShapeFilterAK(ShapeFilter):
     entry = staticmethod(shape_filter_ak)
@@ -63,8 +63,8 @@ class Column2DFilter(Perf):
         self.array2 = self.array1.reshape(20, 5)
 
     def main(self):
-        _ = self.entry(self.array1)
-        _ = self.entry(self.array2)
+        self.entry(self.array1)
+        self.entry(self.array2)
 
 class Column2DFilterAK(Column2DFilter):
     entry = staticmethod(column_2d_filter_ak)
@@ -105,7 +105,7 @@ class ArrayGOPerf(Perf):
         for i in range(100):
             ag.append(i)
             if i % 20:
-                _ = ag.values
+                ag.values
 
 class ArrayGOPerfAK(ArrayGOPerf):
     entry = staticmethod(ArrayGOAK)

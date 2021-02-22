@@ -6,6 +6,7 @@
 
 # include "numpy/arrayobject.h"
 
+
 // Bug in NumPy < 1.16 (https://github.com/numpy/numpy/pull/12131):
 # undef PyDataType_ISBOOL
 # define PyDataType_ISBOOL(obj) \
@@ -28,6 +29,7 @@
 
 //------------------------------------------------------------------------------
 // C-level utility functions
+//------------------------------------------------------------------------------
 
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
@@ -102,8 +104,8 @@ AK_ResolveDTypesIter(PyObject *dtypes)
 }
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 // AK module public methods
+//------------------------------------------------------------------------------
 
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
@@ -112,6 +114,9 @@ mloc(PyObject *Py_UNUSED(m), PyObject *a)
     return PyLong_FromVoidPtr(PyArray_DATA((PyArrayObject *)a));
 }
 
+
+//------------------------------------------------------------------------------
+// filter functions
 
 static PyObject *
 immutable_filter(PyObject *Py_UNUSED(m), PyObject *a)
@@ -145,29 +150,37 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
         return NULL;
     }
 
-    PyArrayObject *array;
-    array = (PyArrayObject *)a;
+    PyArrayObject *array = (PyArrayObject *)a;
 
     // get size at dimension 0, set in tuple position 0
     int size0 = PyArray_DIM(array, 0);
     PyObject *rows = PyLong_FromLong(size0);
+    if (!rows) {
+        Py_DECREF(shape);
+        return NULL;
+    }
     PyTuple_SET_ITEM(shape, 0, rows);
 
     // handle 1 dimensional array
-    if (PyArray_NDIM(array) == 1 ) {
+    if (PyArray_NDIM(array) == 1) {
         PyObject *cols = PyLong_FromLong(1);
+        if (!cols) {
+            Py_DECREF(shape);
+            return NULL;
+        }
         PyTuple_SET_ITEM(shape, 1, cols);
         return shape;
     }
-
     // get size at dimension 1, set in tuple position 1
     int size1 = PyArray_DIM(array, 1);
     PyObject *cols = PyLong_FromLong(size1);
+    if (!cols) {
+        Py_DECREF(shape);
+        return NULL;
+    }
     PyTuple_SET_ITEM(shape, 1, cols);
     return shape;
-
 }
-
 
 static PyObject *
 column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
@@ -175,26 +188,16 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     // If array ndim is 1, reshape into ndim 2 with 1 column
     // related example: https://github.com/RhysU/ar/blob/master/ar-python.cpp
 
-    PyArrayObject *array;
-    array = (PyArrayObject *)a;
+    PyArrayObject *array = (PyArrayObject *)a;
 
-    if (PyArray_NDIM(array) == 1 ) {
+    if (PyArray_NDIM(array) == 1) {
         // https://numpy.org/doc/stable/reference/c-api/types-and-structures.html#c.PyArray_Dims
         npy_intp dim[2] = {PyArray_DIM(array, 0), 1};
-        PyArray_Dims shape = {dim, sizeof(dim)/sizeof(dim[0])};
-
-        PyObject *array_new;
-        array_new = PyArray_Newshape(array, &shape, NPY_ANYORDER);
-
-        if (!array_new) {
-            Py_DECREF(array_new);
-            PyErr_SetString(PyExc_RuntimeError,  "Unable to reshape array.");
-            return NULL;
-        }
-
-        return array_new; // already a PyObject*
+        PyArray_Dims shape = {dim, 2};
+        // PyArray_Newshape might return NULL and set PyErr, so no handling to do here
+        return PyArray_Newshape(array, &shape, NPY_ANYORDER); // already a PyObject*
     }
-    Py_INCREF(a); // found through experimentation
+    Py_INCREF(a); // returning borrowed ref, must increment
     return a;
 
 }
@@ -202,16 +205,19 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 static PyObject *
 column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
+    PyErr_SetNone(PyExc_NotImplementedError);
     return NULL;
 }
 
 static PyObject *
 row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
+    PyErr_SetNone(PyExc_NotImplementedError);
     return NULL;
 }
 
-
+//------------------------------------------------------------------------------
+// type resolution
 
 static PyObject *
 resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
@@ -234,6 +240,7 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 
 //------------------------------------------------------------------------------
 // ArrayGO
+//------------------------------------------------------------------------------
 
 typedef struct {
     PyObject_VAR_HEAD
@@ -440,6 +447,7 @@ static PyMappingMethods ArrayGO_as_mapping = {
     .mp_subscript = (binaryfunc) ArrayGO_mp_subscript,
 };
 
+//------------------------------------------------------------------------------
 // ArrayGo PyTypeObject
 
 static PyTypeObject ArrayGOType = {
@@ -459,6 +467,7 @@ static PyTypeObject ArrayGOType = {
 
 //------------------------------------------------------------------------------
 // ArrayKit module definition
+//------------------------------------------------------------------------------
 
 static PyMethodDef arraykit_methods[] =  {
     {"immutable_filter", immutable_filter, METH_O, NULL},
