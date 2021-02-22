@@ -8,6 +8,8 @@ from performance.reference.util import immutable_filter as immutable_filter_ref
 from performance.reference.util import name_filter as name_filter_ref
 from performance.reference.util import shape_filter as shape_filter_ref
 from performance.reference.util import column_2d_filter as column_2d_filter_ref
+from performance.reference.util import column_1d_filter as column_1d_filter_ref
+from performance.reference.util import row_1d_filter as row_1d_filter_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -15,6 +17,8 @@ from arraykit import immutable_filter as immutable_filter_ak
 from arraykit import name_filter as name_filter_ak
 from arraykit import shape_filter as shape_filter_ak
 from arraykit import column_2d_filter as column_2d_filter_ak
+from arraykit import column_1d_filter as column_1d_filter_ak
+from arraykit import row_1d_filter as row_1d_filter_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -71,6 +75,41 @@ class Column2DFilterAK(Column2DFilter):
 
 class Column2DFilterREF(Column2DFilter):
     entry = staticmethod(column_2d_filter_ref)
+
+
+#-------------------------------------------------------------------------------
+class Column1DFilter(Perf):
+
+    def pre(self):
+        self.array1 = np.arange(100)
+        self.array2 = self.array1.reshape(100, 1)
+
+    def main(self):
+        self.entry(self.array1)
+        self.entry(self.array2)
+
+class Column1DFilterAK(Column1DFilter):
+    entry = staticmethod(column_1d_filter_ak)
+
+class Column1DFilterREF(Column1DFilter):
+    entry = staticmethod(column_1d_filter_ref)
+
+#-------------------------------------------------------------------------------
+class Row1DFilter(Perf):
+
+    def pre(self):
+        self.array1 = np.arange(100)
+        self.array2 = self.array1.reshape(1, 100)
+
+    def main(self):
+        self.entry(self.array1)
+        self.entry(self.array2)
+
+class Row1DFilterAK(Row1DFilter):
+    entry = staticmethod(row_1d_filter_ak)
+
+class Row1DFilterREF(Row1DFilter):
+    entry = staticmethod(row_1d_filter_ref)
 
 
 #-------------------------------------------------------------------------------
