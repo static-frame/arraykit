@@ -21,9 +21,12 @@
                             Py_TYPE(O)->tp_name);                             \
     }
 
+// Placeholder of not implemented functions.
 # define AK_NOT_IMPLEMENTED                                                   \
-    PyErr_SetNone(PyExc_NotImplementedError);                                 \
-    return NULL;                                                              \
+    do {                                                                      \
+        PyErr_SetNone(PyExc_NotImplementedError);                             \
+        return NULL;                                                          \
+    } while (0)
 
 
 # if defined __GNUC__ || defined __clang__
