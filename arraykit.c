@@ -6,6 +6,9 @@
 
 # include "numpy/arrayobject.h"
 
+//------------------------------------------------------------------------------
+// Macros
+//------------------------------------------------------------------------------
 
 // Bug in NumPy < 1.16 (https://github.com/numpy/numpy/pull/12131):
 # undef PyDataType_ISBOOL
@@ -17,6 +20,11 @@
         return PyErr_Format(PyExc_TypeError, "expected numpy array (got %s)", \
                             Py_TYPE(O)->tp_name);                             \
     }
+
+# define AK_NOT_IMPLEMENTED                                                   \
+    PyErr_SetNone(PyExc_NotImplementedError);                                 \
+    return NULL;                                                              \
+
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
@@ -138,55 +146,26 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n)
 }
 
 
+// Represent a 1D array as a 2D array with length as rows of a single-column array.
+// https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
 static PyObject *
 shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    // Represent a 1D array as a 2D array with length as rows of a single-column array.
-    // https://numpy.org/doc/stable/reference/c-api/array.html
-    // https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
-
-    PyObject *shape = PyTuple_New(2);
-    if (!shape) {
-        return NULL;
-    }
-
+    AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
-    // get size at dimension 0, set in tuple position 0
     int size0 = PyArray_DIM(array, 0);
-    PyObject *rows = PyLong_FromLong(size0);
-    if (!rows) {
-        Py_DECREF(shape);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(shape, 0, rows);
-
-    // handle 1 dimensional array
-    if (PyArray_NDIM(array) == 1) {
-        PyObject *cols = PyLong_FromLong(1);
-        if (!cols) {
-            Py_DECREF(shape);
-            return NULL;
-        }
-        PyTuple_SET_ITEM(shape, 1, cols);
-        return shape;
-    }
-    // get size at dimension 1, set in tuple position 1
-    int size1 = PyArray_DIM(array, 1);
-    PyObject *cols = PyLong_FromLong(size1);
-    if (!cols) {
-        Py_DECREF(shape);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(shape, 1, cols);
-    return shape;
+    // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
+    int size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    return Py_BuildValue("ii", size0, size1);
 }
 
+// Reshape if necessary a flat ndim 1 array into a 2D array with one columns and rows of length.
+// related example: https://github.com/RhysU/ar/blob/master/ar-python.cpp
 static PyObject *
 column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    // Reshape a flat ndim 1 array into a 2D array with one columns and rows of length.
-    // related example: https://github.com/RhysU/ar/blob/master/ar-python.cpp
+    AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 1) {
@@ -200,14 +179,15 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     return a;
 }
 
+// Reshape if necessary a column that might be 2D or 1D is returned as a 1D array.
 static PyObject *
 column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    // Ensure that a column that might be 2D or 1D is returned as a 1D array.
+    AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 2) {
-        npy_intp dim[1] = {PyArray_DIM(array, 0),};
+        npy_intp dim[1] = {PyArray_DIM(array, 0)};
         PyArray_Dims shape = {dim, 1};
         // NOTE: this will set PyErr if shape is not compatible
         return PyArray_Newshape(array, &shape, NPY_ANYORDER);
@@ -216,10 +196,11 @@ column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     return a;
 }
 
+// Reshape if necessary a row that might be 2D or 1D is returned as a 1D array.
 static PyObject *
 row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    // Ensure that a row that might be 2D or 1D is returned as a 1D array.
+    AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 2) {
@@ -231,10 +212,6 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     Py_INCREF(a);
     return a;
 }
-
-// raising not implemented
-// PyErr_SetNone(PyExc_NotImplementedError);
-// return NULL;
 
 //------------------------------------------------------------------------------
 // type resolution
