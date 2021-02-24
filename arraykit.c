@@ -508,7 +508,7 @@ static PyTypeObject ArrayGOType = {
     .tp_getset = ArrayGO_getset,
     .tp_iter = (getiterfunc)ArrayGO_iter,
     .tp_methods = ArrayGO_methods,
-    .tp_name = "ArrayGO",
+    .tp_name = "arraykit.ArrayGO",
     .tp_new = ArrayGO_new,
     .tp_traverse = (traverseproc)ArrayGO_traverse,
 };
