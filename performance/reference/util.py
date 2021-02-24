@@ -52,6 +52,45 @@ def name_filter(name):
 
 
 
+def shape_filter(array: np.ndarray) -> tp.Tuple[int, int]:
+    '''Represent a 1D array as a 2D array with length as rows of a single-column array.
+
+    Return:
+        row, column count for a block of ndim 1 or ndim 2.
+    '''
+    if array.ndim == 1:
+        return array.shape[0], 1
+    return array.shape #type: ignore
+
+def column_2d_filter(array: np.ndarray) -> np.ndarray:
+    '''Reshape a flat ndim 1 array into a 2D array with one columns and rows of length. This is used (a) for getting string representations and (b) for using np.concatenate and np binary operators on 1D arrays.
+    '''
+    # it is not clear when reshape is a copy or a view
+    if array.ndim == 1:
+        return np.reshape(array, (array.shape[0], 1))
+    return array
+
+def column_1d_filter(array: np.ndarray) -> np.ndarray:
+    '''
+    Ensure that a column that might be 2D or 1D is returned as a 1D array.
+    '''
+    if array.ndim == 2:
+        # could assert that array.shape[1] == 1, but this will raise if does not fit
+        return np.reshape(array, array.shape[0])
+    return array
+
+def row_1d_filter(array: np.ndarray) -> np.ndarray:
+    '''
+    Ensure that a row that might be 2D or 1D is returned as a 1D array.
+    '''
+    if array.ndim == 2:
+        # could assert that array.shape[0] == 1, but this will raise if does not fit
+        return np.reshape(array, array.shape[1])
+    return array
+
+
+#-------------------------------------------------------------------------------
+
 def resolve_dtype(dt1: np.dtype, dt2: np.dtype) -> np.dtype:
     '''
     Given two dtypes, return a compatible dtype that can hold both contents without truncation.

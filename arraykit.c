@@ -6,16 +6,41 @@
 
 # include "numpy/arrayobject.h"
 
+//------------------------------------------------------------------------------
+// Macros
+//------------------------------------------------------------------------------
+
 // Bug in NumPy < 1.16 (https://github.com/numpy/numpy/pull/12131):
 # undef PyDataType_ISBOOL
 # define PyDataType_ISBOOL(obj) \
     PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
 
+// Given a PyObject, raise if not an array.
 # define AK_CHECK_NUMPY_ARRAY(O)                                              \
     if (!PyArray_Check(O)) {                                                  \
         return PyErr_Format(PyExc_TypeError, "expected numpy array (got %s)", \
                             Py_TYPE(O)->tp_name);                             \
     }
+
+// Given a PyObject, raise if not an array or is not one or two dimensional.
+# define AK_CHECK_NUMPY_ARRAY_1D_2D(O) \
+    do {\
+        AK_CHECK_NUMPY_ARRAY(O)\
+        int ndim = PyArray_NDIM((PyArrayObject *)O);\
+        if (ndim != 1 && ndim != 2) {\
+            return PyErr_Format(PyExc_NotImplementedError,\
+                    "expected 1D or 2D array (got %i)",\
+                    ndim);\
+        }\
+    } while (0)
+
+// Placeholder of not implemented functions.
+# define AK_NOT_IMPLEMENTED\
+    do {\
+        PyErr_SetNone(PyExc_NotImplementedError);\
+        return NULL;\
+    } while (0)
+
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
@@ -25,9 +50,9 @@
 # define AK_UNLIKELY(X) (!!(X))
 # endif
 
-
 //------------------------------------------------------------------------------
 // C-level utility functions
+//------------------------------------------------------------------------------
 
 // Takes and returns a PyArrayObject, optionally copying a mutable array and setting it as immutable
 PyArrayObject *
@@ -104,8 +129,8 @@ AK_ResolveDTypesIter(PyObject *dtypes)
 }
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 // AK module public methods
+//------------------------------------------------------------------------------
 
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
@@ -115,6 +140,8 @@ mloc(PyObject *Py_UNUSED(m), PyObject *a)
     return PyLong_FromVoidPtr(PyArray_DATA((PyArrayObject *)a));
 }
 
+//------------------------------------------------------------------------------
+// filter functions
 
 static PyObject *
 immutable_filter(PyObject *Py_UNUSED(m), PyObject *a)
@@ -134,6 +161,76 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n)
     Py_INCREF(n);
     return n;
 }
+
+// Represent a 1D array as a 2D array with length as rows of a single-column array.
+// https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
+static PyObject *
+shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
+    PyArrayObject *array = (PyArrayObject *)a;
+
+    int size0 = PyArray_DIM(array, 0);
+    // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
+    int size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    return Py_BuildValue("ii", size0, size1);
+}
+
+// Reshape if necessary a flat ndim 1 array into a 2D array with one columns and rows of length.
+// related example: https://github.com/RhysU/ar/blob/master/ar-python.cpp
+static PyObject *
+column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
+    PyArrayObject *array = (PyArrayObject *)a;
+
+    if (PyArray_NDIM(array) == 1) {
+        // https://numpy.org/doc/stable/reference/c-api/types-and-structures.html#c.PyArray_Dims
+        npy_intp dim[2] = {PyArray_DIM(array, 0), 1};
+        PyArray_Dims shape = {dim, 2};
+        // PyArray_Newshape might return NULL and set PyErr, so no handling to do here
+        return PyArray_Newshape(array, &shape, NPY_ANYORDER); // already a PyObject*
+    }
+    Py_INCREF(a); // returning borrowed ref, must increment
+    return a;
+}
+
+// Reshape if necessary a column that might be 2D or 1D is returned as a 1D array.
+static PyObject *
+column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
+    PyArrayObject *array = (PyArrayObject *)a;
+
+    if (PyArray_NDIM(array) == 2) {
+        npy_intp dim[1] = {PyArray_DIM(array, 0)};
+        PyArray_Dims shape = {dim, 1};
+        // NOTE: this will set PyErr if shape is not compatible
+        return PyArray_Newshape(array, &shape, NPY_ANYORDER);
+    }
+    Py_INCREF(a);
+    return a;
+}
+
+// Reshape if necessary a row that might be 2D or 1D is returned as a 1D array.
+static PyObject *
+row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
+    PyArrayObject *array = (PyArrayObject *)a;
+
+    if (PyArray_NDIM(array) == 2) {
+        npy_intp dim[1] = {PyArray_DIM(array, 1)};
+        PyArray_Dims shape = {dim, 1};
+        // NOTE: this will set PyErr if shape is not compatible
+        return PyArray_Newshape(array, &shape, NPY_ANYORDER);
+    }
+    Py_INCREF(a);
+    return a;
+}
+
+//------------------------------------------------------------------------------
+// type resolution
 
 static PyObject *
 resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
@@ -156,6 +253,7 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 
 //------------------------------------------------------------------------------
 // ArrayGO
+//------------------------------------------------------------------------------
 
 typedef struct {
     PyObject_VAR_HEAD
@@ -383,6 +481,7 @@ static PyMappingMethods ArrayGO_as_mapping = {
     .mp_subscript = (binaryfunc) ArrayGO_mp_subscript,
 };
 
+//------------------------------------------------------------------------------
 // ArrayGo PyTypeObject
 
 static PyTypeObject ArrayGOType = {
@@ -403,11 +502,16 @@ static PyTypeObject ArrayGOType = {
 
 //------------------------------------------------------------------------------
 // ArrayKit module definition
+//------------------------------------------------------------------------------
 
 static PyMethodDef arraykit_methods[] =  {
     {"immutable_filter", immutable_filter, METH_O, NULL},
     {"mloc", mloc, METH_O, NULL},
     {"name_filter", name_filter, METH_O, NULL},
+    {"shape_filter", shape_filter, METH_O, NULL},
+    {"column_2d_filter", column_2d_filter, METH_O, NULL},
+    {"column_1d_filter", column_1d_filter, METH_O, NULL},
+    {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {NULL},
