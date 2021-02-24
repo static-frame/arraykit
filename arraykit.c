@@ -15,17 +15,28 @@
 # define PyDataType_ISBOOL(obj) \
     PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
 
+// Given a PyObject, raise if not an array.
 # define AK_CHECK_NUMPY_ARRAY(O)                                              \
     if (!PyArray_Check(O)) {                                                  \
         return PyErr_Format(PyExc_TypeError, "expected numpy array (got %s)", \
                             Py_TYPE(O)->tp_name);                             \
     }
 
+// Given a PyObject, raise if not an array or is not one or two dimensional.
+# define AK_CHECK_NUMPY_ARRAY_1D_2D(O) \
+    AK_CHECK_NUMPY_ARRAY(O)\
+    int ndim = PyArray_NDIM((PyArrayObject *)O);\
+    if (ndim != 1 && ndim != 2) {\
+        return PyErr_Format(PyExc_NotImplementedError,\
+                "expected 1D or 2D array (got %i)",\
+                ndim);\
+    }
+
 // Placeholder of not implemented functions.
-# define AK_NOT_IMPLEMENTED                                                   \
-    do {                                                                      \
-        PyErr_SetNone(PyExc_NotImplementedError);                             \
-        return NULL;                                                          \
+# define AK_NOT_IMPLEMENTED\
+    do {\
+        PyErr_SetNone(PyExc_NotImplementedError);\
+        return NULL;\
     } while (0)
 
 
@@ -36,7 +47,6 @@
 # define AK_LIKELY(X) (!!(X))
 # define AK_UNLIKELY(X) (!!(X))
 # endif
-
 
 //------------------------------------------------------------------------------
 // C-level utility functions
@@ -125,7 +135,6 @@ mloc(PyObject *Py_UNUSED(m), PyObject *a)
     return PyLong_FromVoidPtr(PyArray_DATA((PyArrayObject *)a));
 }
 
-
 //------------------------------------------------------------------------------
 // filter functions
 
@@ -148,13 +157,12 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n)
     return n;
 }
 
-
 // Represent a 1D array as a 2D array with length as rows of a single-column array.
 // https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
 static PyObject *
 shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY(a);
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     int size0 = PyArray_DIM(array, 0);
@@ -168,7 +176,7 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
 static PyObject *
 column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY(a);
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 1) {
@@ -186,7 +194,7 @@ column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 static PyObject *
 column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY(a);
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 2) {
@@ -203,7 +211,7 @@ column_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 static PyObject *
 row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY(a);
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 2) {

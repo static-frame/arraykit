@@ -114,6 +114,9 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(shape_filter(a2), (4, 1))
         self.assertEqual(shape_filter(a2.reshape(2, 2)), (2, 2))
 
+        with self.assertRaises(NotImplementedError):
+            shape_filter(a1.reshape(1,2,5))
+
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:
@@ -122,6 +125,10 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(column_2d_filter(a1).shape, (10, 1))
         self.assertEqual(column_2d_filter(a1.reshape(2, 5)).shape, (2, 5))
         self.assertEqual(column_2d_filter(a1.reshape(1, 10)).shape, (1, 10))
+
+        with self.assertRaises(NotImplementedError):
+            column_2d_filter(a1.reshape(1,2,5))
+
 
     #---------------------------------------------------------------------------
 
@@ -134,6 +141,9 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             column_1d_filter(a1.reshape(2, 5))
 
+        with self.assertRaises(NotImplementedError):
+            column_1d_filter(a1.reshape(1,2,5))
+
     #---------------------------------------------------------------------------
 
     def test_row_1d_filter_a(self) -> None:
@@ -145,6 +155,8 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             row_1d_filter(a1.reshape(2, 5))
 
+        with self.assertRaises(NotImplementedError):
+            row_1d_filter(a1.reshape(1,2,5))
 
 if __name__ == '__main__':
     unittest.main()
