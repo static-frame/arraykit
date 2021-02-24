@@ -307,8 +307,6 @@ ArrayGO_getnewargs(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
     Py_INCREF(self->array); // set_item steals a ref count, so inc before setting
     PyTuple_SET_ITEM(args, 0, self->array);
     return args;
-    // Py_INCREF(Py_None);
-    // return Py_None;
 }
 
 static PyObject *
