@@ -1,4 +1,3 @@
-import pytest  # type: ignore
 import unittest
 
 import numpy as np  # type: ignore
