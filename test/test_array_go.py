@@ -1,6 +1,7 @@
 
 import unittest
 import copy
+import pickle
 
 import numpy as np
 
@@ -87,13 +88,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(ag2.values.tolist(),
                 ['a', 'b', 'c', 'd', 'e'])
 
-    @unittest.skip("cannot pickle 'ArrayGO' object")
     def test_array_deepcopy_a(self) -> None:
         ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), dtype=object))
         ag1.append('e')
         ag1.extend(('f', 'g'))
         ag2 = copy.deepcopy(ag1)
-        self.assertEqual(ag1._array.tolist(), ag2._array.tolist()) #type: ignore
+        self.assertEqual(ag1.values.tolist(), ag2.values.tolist()) #type: ignore
 
     def test_array_len_a(self) -> None:
 
@@ -101,6 +101,20 @@ class TestUnit(unittest.TestCase):
         ag1.append('e')
 
         self.assertEqual(len(ag1), 5)
+
+    def test_array_getnewargs_a(self) -> None:
+        ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), object))
+        self.assertEqual(
+                ag1.__getnewargs__()[0].tolist(),
+                ag1.values.tolist(),
+                )
+
+    def test_array_pickle_a(self) -> None:
+        ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), object))
+        msg = pickle.dumps(ag1)
+        ag2 = pickle.loads(msg)
+        self.assertEqual(ag1.values.tolist(), ag2.values.tolist())
+
 
 
 if __name__ == '__main__':
