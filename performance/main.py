@@ -163,7 +163,7 @@ class ArrayGOPerf(Perf):
         for i in range(100):
             ag.append(i)
             if i % 20:
-                ag.values
+                _ = ag.values
 
 class ArrayGOPerfAK(ArrayGOPerf):
     entry = staticmethod(ArrayGOAK)
