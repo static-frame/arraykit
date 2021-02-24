@@ -24,13 +24,15 @@
 
 // Given a PyObject, raise if not an array or is not one or two dimensional.
 # define AK_CHECK_NUMPY_ARRAY_1D_2D(O) \
-    AK_CHECK_NUMPY_ARRAY(O)\
-    int ndim = PyArray_NDIM((PyArrayObject *)O);\
-    if (ndim != 1 && ndim != 2) {\
-        return PyErr_Format(PyExc_NotImplementedError,\
-                "expected 1D or 2D array (got %i)",\
-                ndim);\
-    }
+    do {\
+        AK_CHECK_NUMPY_ARRAY(O)\
+        int ndim = PyArray_NDIM((PyArrayObject *)O);\
+        if (ndim != 1 && ndim != 2) {\
+            return PyErr_Format(PyExc_NotImplementedError,\
+                    "expected 1D or 2D array (got %i)",\
+                    ndim);\
+        }\
+    } while (0)
 
 // Placeholder of not implemented functions.
 # define AK_NOT_IMPLEMENTED\
@@ -218,7 +220,7 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     PyArrayObject *array = (PyArrayObject *)a;
 
     if (PyArray_NDIM(array) == 2) {
-        npy_intp dim[1] = {PyArray_DIM(array, 1),};
+        npy_intp dim[1] = {PyArray_DIM(array, 1)};
         PyArray_Dims shape = {dim, 1};
         // NOTE: this will set PyErr if shape is not compatible
         return PyArray_Newshape(array, &shape, NPY_ANYORDER);
