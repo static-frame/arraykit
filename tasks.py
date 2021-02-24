@@ -26,8 +26,12 @@ def build(context):
 
 @invoke.task(pre=(clean, build))
 def test(context):
-    cmd = f'pytest -s --color no --disable-pytest-warnings --tb=native'
+    cmd = 'pytest -s --color no --disable-pytest-warnings --tb=native'
     context.run(cmd)
+
+@invoke.task(pre=(clean, build))
+def performance(context):
+    context.run(f"{sys.executable} performance/main.py", echo=True)
 
 
 

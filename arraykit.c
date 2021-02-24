@@ -206,51 +206,56 @@ update_array_cache(ArrayGOObject *self)
 //------------------------------------------------------------------------------
 // ArrayGO Methods:
 
-static int
-ArrayGO_init(ArrayGOObject *self, PyObject *args, PyObject *kwargs)
+static PyObject *
+ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
 {
-    PyObject *temp;
     char* argnames[] = {"iterable", "own_iterable", NULL};
     PyObject *iterable;
-    int own_iterable;
+    int own_iterable = 0;
     int parsed = PyArg_ParseTupleAndKeywords(
         args, kwargs, "O|$p:ArrayGO", argnames, &iterable, &own_iterable
     );
     if (!parsed) {
-        return -1;
+        return NULL;
+    }
+    ArrayGOObject *self = (ArrayGOObject *)cls->tp_alloc(cls, 0);
+    if (!self) {
+        return NULL;
     }
 
     if (PyArray_Check(iterable)) {
-        temp = self->array;
-        if (own_iterable) {
-            PyArray_CLEARFLAGS((PyArrayObject *) iterable, NPY_ARRAY_WRITEABLE);
-            Py_INCREF(iterable);
-        } else {
-            iterable = (PyObject *)AK_ImmutableFilter((PyArrayObject *) iterable);
-        }
         if (!PyDataType_ISOBJECT(PyArray_DESCR((PyArrayObject *)iterable))) {
             PyErr_SetString(PyExc_NotImplementedError,
                             "only object arrays are supported");
-            return -1;
+            Py_DECREF(self);
+            return NULL;
         }
-        self->array = iterable;
-        Py_XDECREF(temp);
-
-    } else {
-
-        temp = self->list;
-
-        if (PyList_Check(iterable) && own_iterable) {
+        if (own_iterable) {
+            // ArrayGO(np.array(...), own_iterable=True)
+            PyArray_CLEARFLAGS((PyArrayObject *)iterable, NPY_ARRAY_WRITEABLE);
+            self->array = iterable;
             Py_INCREF(iterable);
-        } else {
-            iterable = PySequence_List(iterable);
+            return (PyObject *)self;
         }
-
-        self->list = iterable;
-        Py_XDECREF(temp);
+        // ArrayGO(np.array(...))
+        self->array = (PyObject *)AK_ImmutableFilter((PyArrayObject *)iterable);
+        if (!self->array) {
+            Py_CLEAR(self);
+        }
+        return (PyObject *)self;
     }
-
-    return 0;
+    if (PyList_CheckExact(iterable) && own_iterable) {
+        // ArrayGO([...], own_iterable=True)
+        self->list = iterable;
+        Py_INCREF(iterable);
+        return (PyObject *)self;
+    }
+    // ArrayGO([...])
+    self->list = PySequence_List(iterable);
+    if (!self->list) {
+        Py_CLEAR(self);
+    }
+    return (PyObject *)self;
 }
 
 
@@ -309,7 +314,7 @@ ArrayGO_getnewargs(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
 static PyObject *
 ArrayGO_copy(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
 {
-    ArrayGOObject *copy = PyObject_New(ArrayGOObject, &ArrayGOType);
+    ArrayGOObject *copy = PyObject_GC_New(ArrayGOObject, &ArrayGOType);
     copy->array = self->array;
     copy->list = self->list ? PySequence_List(self->list) : NULL;
     Py_XINCREF(copy->array);
@@ -351,6 +356,21 @@ ArrayGO_values_getter(ArrayGOObject *self, void* Py_UNUSED(closure))
     return self->array;
 }
 
+static int
+ArrayGO_traverse(ArrayGOObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->array);
+    Py_VISIT(self->list);
+    return 0;
+}
+
+static int
+ArrayGO_clear(ArrayGOObject *self)
+{
+    Py_CLEAR(self->array);
+    Py_CLEAR(self->list);
+    return 0;
+}
 
 static void
 ArrayGO_dealloc(ArrayGOObject *self)
@@ -387,15 +407,16 @@ static PyTypeObject ArrayGOType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_as_mapping = &ArrayGO_as_mapping,
     .tp_basicsize = sizeof(ArrayGOObject),
+    .tp_clear = (inquiry)ArrayGO_clear,
     .tp_dealloc = (destructor)ArrayGO_dealloc,
     .tp_doc = ArrayGO_doc,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_getset = ArrayGO_getset,
-    .tp_init = (initproc)ArrayGO_init,
     .tp_iter = (getiterfunc)ArrayGO_iter,
     .tp_methods = ArrayGO_methods,
     .tp_name = "ArrayGO",
-    .tp_new = PyType_GenericNew,
+    .tp_new = ArrayGO_new,
+    .tp_traverse = (traverseproc)ArrayGO_traverse,
 };
 
 //------------------------------------------------------------------------------

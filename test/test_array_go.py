@@ -1,6 +1,7 @@
 
 import unittest
 import copy
+import pickle
 
 import numpy as np
 
@@ -100,6 +101,16 @@ class TestUnit(unittest.TestCase):
         ag1.append('e')
 
         self.assertEqual(len(ag1), 5)
+
+
+    def test_array_pickle_a(self) -> None:
+
+        ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), object))
+        msg = pickle.dumps(ag1)
+        ag2 = pickle.loads(msg)
+        print(ag2)
+
+
 
 
 if __name__ == '__main__':
