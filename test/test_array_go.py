@@ -113,8 +113,7 @@ class TestUnit(unittest.TestCase):
         ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), object))
         msg = pickle.dumps(ag1)
         ag2 = pickle.loads(msg)
-        print(ag2)
-
+        self.assertEqual(ag1.values.tolist(), ag2.values.tolist())
 
 
 
