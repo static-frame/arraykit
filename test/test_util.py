@@ -9,11 +9,21 @@ from arraykit import shape_filter
 from arraykit import column_2d_filter
 from arraykit import column_1d_filter
 from arraykit import row_1d_filter
+from arraykit import mloc
+from arraykit import immutable_filter
 
-# from arraykit import mloc
+from performance.reference.util import mloc as mloc_ref
+
 
 class TestUnit(unittest.TestCase):
 
+    def test_mloc_a(self) -> None:
+        a1 = np.arange(10)
+        self.assertEqual(mloc(a1), mloc_ref(a1))
+
+    def test_immutable_filter_a(self) -> None:
+        a1 = np.arange(10)
+        self.assertFalse(immutable_filter(a1).flags.writeable)
 
     def test_resolve_dtype_a(self) -> None:
 

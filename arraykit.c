@@ -52,9 +52,11 @@
 // C-level utility functions
 //------------------------------------------------------------------------------
 
+// Takes and returns a PyArrayObject, optionally copying a mutable array and setting it as immutable
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
 {
+    // https://numpy.org/devdocs/reference/c-api/array.html#array-flags
     if (PyArray_FLAGS(a) & NPY_ARRAY_WRITEABLE) {
         if ((a = (PyArrayObject *)PyArray_NewCopy(a, NPY_ANYORDER))) {
             PyArray_CLEARFLAGS(a, NPY_ARRAY_WRITEABLE);
@@ -128,6 +130,7 @@ AK_ResolveDTypesIter(PyObject *dtypes)
 // AK module public methods
 //------------------------------------------------------------------------------
 
+// Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
 {
