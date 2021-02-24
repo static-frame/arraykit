@@ -4,6 +4,10 @@ import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
+from arraykit import shape_filter
+from arraykit import column_2d_filter
+from arraykit import column_1d_filter
+from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 
@@ -105,7 +109,63 @@ class TestUnit(unittest.TestCase):
         # mixed strings go to the largest
         self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)), np.dtype('<U10'))
 
+    #---------------------------------------------------------------------------
 
+    def test_shape_filter_a(self) -> None:
+
+        a1 = np.arange(10)
+        self.assertEqual(shape_filter(a1), (10, 1))
+        self.assertEqual(shape_filter(a1.reshape(2, 5)), (2, 5))
+        self.assertEqual(shape_filter(a1.reshape(1, 10)), (1, 10))
+        self.assertEqual(shape_filter(a1.reshape(10, 1)), (10, 1))
+
+        a2 = np.arange(4)
+        self.assertEqual(shape_filter(a2), (4, 1))
+        self.assertEqual(shape_filter(a2.reshape(2, 2)), (2, 2))
+
+        with self.assertRaises(NotImplementedError):
+            shape_filter(a1.reshape(1,2,5))
+
+    #---------------------------------------------------------------------------
+
+    def test_column_2d_filter_a(self) -> None:
+
+        a1 = np.arange(10)
+        self.assertEqual(column_2d_filter(a1).shape, (10, 1))
+        self.assertEqual(column_2d_filter(a1.reshape(2, 5)).shape, (2, 5))
+        self.assertEqual(column_2d_filter(a1.reshape(1, 10)).shape, (1, 10))
+
+        with self.assertRaises(NotImplementedError):
+            column_2d_filter(a1.reshape(1,2,5))
+
+
+    #---------------------------------------------------------------------------
+
+    def test_column_1d_filter_a(self) -> None:
+
+        a1 = np.arange(10)
+        self.assertEqual(column_1d_filter(a1).shape, (10,))
+        self.assertEqual(column_1d_filter(a1.reshape(10, 1)).shape, (10,))
+
+        with self.assertRaises(ValueError):
+            column_1d_filter(a1.reshape(2, 5))
+
+        with self.assertRaises(NotImplementedError):
+            column_1d_filter(a1.reshape(1,2,5))
+
+    #---------------------------------------------------------------------------
+
+    def test_row_1d_filter_a(self) -> None:
+
+        a1 = np.arange(10)
+        self.assertEqual(row_1d_filter(a1).shape, (10,))
+        self.assertEqual(row_1d_filter(a1.reshape(1, 10)).shape, (10,))
+
+        with self.assertRaises(ValueError):
+            row_1d_filter(a1.reshape(2, 5))
+
+        with self.assertRaises(NotImplementedError):
+            row_1d_filter(a1.reshape(1,2,5))
 
 if __name__ == '__main__':
     unittest.main()
