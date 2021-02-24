@@ -5,10 +5,21 @@ import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
-# from arraykit import mloc
+from arraykit import mloc
+from arraykit import immutable_filter
+
+from performance.reference.util import mloc as mloc_ref
+
 
 class TestUnit(unittest.TestCase):
 
+    def test_mloc_a(self) -> None:
+        a1 = np.arange(10)
+        self.assertEqual(mloc(a1), mloc_ref(a1))
+
+    def test_immutable_filter_a(self) -> None:
+        a1 = np.arange(10)
+        self.assertFalse(immutable_filter(a1).flags.writeable)
 
     def test_resolve_dtype_a(self) -> None:
 
