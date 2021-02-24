@@ -300,13 +300,7 @@ ArrayGO_getnewargs(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
     if (self->list && update_array_cache(self)) {
         return NULL;
     }
-    PyObject *args = PyTuple_New(1); // gets ref count of 1, will pass on to caller
-    if (!args) {
-        return NULL;
-    }
-    Py_INCREF(self->array); // set_item steals a ref count, so inc before setting
-    PyTuple_SET_ITEM(args, 0, self->array);
-    return args;
+    return PyTuple_Pack(1, self->array);
 }
 
 static PyObject *

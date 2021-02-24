@@ -102,9 +102,14 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(len(ag1), 5)
 
+    def test_array_getnewargs_a(self) -> None:
+        ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), object))
+        self.assertEqual(
+                ag1.__getnewargs__()[0].tolist(),
+                ag1.values.tolist(),
+                )
 
     def test_array_pickle_a(self) -> None:
-
         ag1 = ArrayGO(np.array(('a', 'b', 'c', 'd'), object))
         msg = pickle.dumps(ag1)
         ag2 = pickle.loads(msg)
