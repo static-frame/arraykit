@@ -4,10 +4,12 @@
 import timeit
 import numpy as np
 
+from performance.reference.util import mloc as mloc_ref
 from performance.reference.util import immutable_filter as immutable_filter_ref
 from performance.reference.util import name_filter as name_filter_ref
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
+from arraykit import mloc as mloc_ak
 from arraykit import immutable_filter as immutable_filter_ak
 from arraykit import name_filter as name_filter_ak
 from arraykit import ArrayGO as ArrayGOAK
@@ -15,7 +17,23 @@ from arraykit import ArrayGO as ArrayGOAK
 
 class Perf:
     FUNCTIONS = ('main',)
-    NUMBER = 100000
+    NUMBER = 500000
+
+#-------------------------------------------------------------------------------
+class MLoc(Perf):
+
+    def pre(self):
+        self.array = np.arange(100)
+
+    def main(self):
+        self.entry(self.array)
+
+class MLocAK(MLoc):
+    entry = staticmethod(mloc_ak)
+
+class MLocREF(MLoc):
+    entry = staticmethod(mloc_ref)
+
 
 #-------------------------------------------------------------------------------
 class ImmutableFilter(Perf):
@@ -24,7 +42,8 @@ class ImmutableFilter(Perf):
         self.array = np.arange(100)
 
     def main(self):
-        self.entry(self.array)
+        a2 = self.entry(self.array)
+        a3 = self.entry(a2)
 
 class ImmutableFilterAK(ImmutableFilter):
     entry = staticmethod(immutable_filter_ak)
@@ -102,3 +121,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
