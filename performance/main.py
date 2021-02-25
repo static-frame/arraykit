@@ -11,6 +11,8 @@ from performance.reference.util import shape_filter as shape_filter_ref
 from performance.reference.util import column_2d_filter as column_2d_filter_ref
 from performance.reference.util import column_1d_filter as column_1d_filter_ref
 from performance.reference.util import row_1d_filter as row_1d_filter_ref
+from performance.reference.util import resolve_dtype as resolve_dtype_ref
+from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -21,13 +23,15 @@ from arraykit import shape_filter as shape_filter_ak
 from arraykit import column_2d_filter as column_2d_filter_ak
 from arraykit import column_1d_filter as column_1d_filter_ak
 from arraykit import row_1d_filter as row_1d_filter_ak
+from arraykit import resolve_dtype as resolve_dtype_ak
+from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
 
 class Perf:
     FUNCTIONS = ('main',)
-    NUMBER = 500000
+    NUMBER = 500_000
 
 #-------------------------------------------------------------------------------
 class MLoc(Perf):
@@ -44,7 +48,6 @@ class MLocAK(MLoc):
 class MLocREF(MLoc):
     entry = staticmethod(mloc_ref)
 
-
 #-------------------------------------------------------------------------------
 class ImmutableFilter(Perf):
 
@@ -60,6 +63,26 @@ class ImmutableFilterAK(ImmutableFilter):
 
 class ImmutableFilterREF(ImmutableFilter):
     entry = staticmethod(immutable_filter_ref)
+
+#-------------------------------------------------------------------------------
+class NameFilter(Perf):
+
+    def pre(self):
+        self.name1 = ('foo', None, ['bar'])
+        self.name2 = 'foo'
+
+    def main(self):
+        try:
+            self.entry(self.name1)
+        except TypeError:
+            pass
+        self.entry(self.name2)
+
+class NameFilterAK(NameFilter):
+    entry = staticmethod(name_filter_ak)
+
+class NameFilterREF(NameFilter):
+    entry = staticmethod(name_filter_ref)
 
 #-------------------------------------------------------------------------------
 class ShapeFilter(Perf):
@@ -132,24 +155,48 @@ class Row1DFilterREF(Row1DFilter):
 
 
 #-------------------------------------------------------------------------------
-class NameFilter(Perf):
+class ResolveDType(Perf):
 
     def pre(self):
-        self.name1 = ('foo', None, ['bar'])
-        self.name2 = 'foo'
+        self.dtype1 = np.arange(100).dtype
+        self.dtype2 = np.array(('a', 'b')).dtype
 
     def main(self):
-        try:
-            self.entry(self.name1)
-        except TypeError:
-            pass
-        self.entry(self.name2)
+        self.entry(self.dtype1, self.dtype2)
 
-class NameFilterAK(NameFilter):
-    entry = staticmethod(name_filter_ak)
+class ResolveDTypeAK(ResolveDType):
+    entry = staticmethod(resolve_dtype_ak)
 
-class NameFilterREF(NameFilter):
-    entry = staticmethod(name_filter_ref)
+class ResolveDTypeREF(ResolveDType):
+    entry = staticmethod(resolve_dtype_ref)
+
+
+#-------------------------------------------------------------------------------
+class ResolveDTypeIter(Perf):
+
+    FUNCTIONS = ('iter10', 'iter100000')
+    NUMBER = 1000
+
+    def pre(self):
+        self.dtypes10 = [np.dtype(int)] * 9 + [np.dtype(float)]
+        self.dtypes100000 = (
+                [np.dtype(int)] * 50000 +
+                [np.dtype(float)] * 49999 +
+                [np.dtype(bool)]
+                )
+
+    def iter10(self):
+        self.entry(self.dtypes10)
+
+    def iter100000(self):
+        self.entry(self.dtypes100000)
+
+class ResolveDTypeIterAK(ResolveDTypeIter):
+    entry = staticmethod(resolve_dtype_iter_ak)
+
+class ResolveDTypeIterREF(ResolveDTypeIter):
+    entry = staticmethod(resolve_dtype_iter_ref)
+
 
 #-------------------------------------------------------------------------------
 class ArrayGOPerf(Perf):
@@ -160,9 +207,9 @@ class ArrayGOPerf(Perf):
 
     def main(self):
         ag = self.entry(self.array)
-        for i in range(100):
+        for i in range(1000):
             ag.append(i)
-            if i % 20:
+            if i % 50:
                 _ = ag.values
 
 class ArrayGOPerfAK(ArrayGOPerf):

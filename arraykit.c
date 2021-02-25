@@ -95,7 +95,7 @@ AK_ResolveDTypes(PyArray_Descr *d1, PyArray_Descr *d2)
 }
 
 PyArray_Descr*
-AK_ResolveDTypesIter(PyObject *dtypes)
+AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
     if (iterator == NULL) {
@@ -106,8 +106,9 @@ AK_ResolveDTypesIter(PyObject *dtypes)
     while ((dtype = (PyArray_Descr*) PyIter_Next(iterator))) {
         if (!PyArray_DescrCheck(dtype)) {
             PyErr_Format(
-                PyExc_TypeError, "argument must be an iterable over %s, not %s",
-                ((PyTypeObject *) &PyArrayDescr_Type)->tp_name, Py_TYPE(dtype)->tp_name
+                    PyExc_TypeError, "argument must be an iterable over %s, not %s",
+                    ((PyTypeObject *) &PyArrayDescr_Type)->tp_name,
+                    Py_TYPE(dtype)->tp_name
             );
             Py_DECREF(iterator);
             Py_DECREF(dtype);
@@ -233,13 +234,6 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 // type resolution
 
 static PyObject *
-resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
-{
-    return (PyObject *)AK_ResolveDTypesIter(arg);
-}
-
-
-static PyObject *
 resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
@@ -249,6 +243,12 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
         return NULL;
     }
     return (PyObject *)AK_ResolveDTypes(d1, d2);
+}
+
+static PyObject *
+resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
 //------------------------------------------------------------------------------
