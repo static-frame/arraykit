@@ -1,5 +1,7 @@
 import typing as tp
+import os
 import unittest
+
 from importlib.util import spec_from_loader
 from importlib.util import module_from_spec
 
@@ -45,7 +47,9 @@ class TestUnit(unittest.TestCase):
 
     def test_interface(self) -> None:
 
-        with open('arraykit.pyi') as f:
+        fp = os.path.join(os.path.dirname(ak.__file__), 'arraykit.pyi')
+
+        with open(fp) as f:
             msg = f.read()
 
         spec = spec_from_loader('', loader=None)
