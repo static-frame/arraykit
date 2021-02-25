@@ -231,6 +231,24 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 }
 
 //------------------------------------------------------------------------------
+// array utility
+
+static PyObject *
+array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    PyObject *array, *memo;
+    if (!PyArg_ParseTuple(args, "O!O!:array_deepcopy",
+            &PyObject_Type,
+            &array,
+            &PyObject_Type,
+            &memo))
+    {
+        return NULL;
+    }
+    AK_NOT_IMPLEMENTED;
+}
+
+//------------------------------------------------------------------------------
 // type resolution
 
 static PyObject *
@@ -525,6 +543,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"column_2d_filter", column_2d_filter, METH_O, NULL},
     {"column_1d_filter", column_1d_filter, METH_O, NULL},
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
+    {"array_deepcopy", array_deepcopy, METH_VARARGS, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {NULL},
