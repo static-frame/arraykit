@@ -250,9 +250,7 @@ array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
     if (memo) {
         PyObject *id = PyLong_FromVoidPtr(array);
         PyObject *found = PyDict_GetItem(memo, id);
-        // found will be NULL if not in dict
-        if (found) {
-            // AK_NOT_IMPLEMENTED_SENTINEL("found id in dict");
+        if (found) { // found will be NULL if not in dict
             Py_INCREF(found); // got a borrowed ref
             return found;
         }
