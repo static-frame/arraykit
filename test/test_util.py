@@ -170,11 +170,25 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
 
-    def test_array_deepcopy_a(self) -> None:
+    def test_array_deepcopy_a1(self) -> None:
         a1 = np.arange(10)
         a2 = array_deepcopy(a1)
 
+        self.assertTrue(id(a1) != id(a2))
         self.assertTrue(mloc(a1) != mloc(a2))
+        self.assertFalse(a2.flags.writeable)
+        self.assertEqual(a1.dtype, a2.dtype)
+
+    def test_array_deepcopy_a2(self) -> None:
+        a1 = np.arange(10)
+        memo = {}
+        a2 = array_deepcopy(a1, memo)
+
+        self.assertTrue(id(a1) != id(a2))
+        self.assertTrue(mloc(a1) != mloc(a2))
+        self.assertTrue(id(a1) in memo)
+        self.assertTrue(memo[id(a1)].tolist() == a2.tolist())
+        self.assertFalse(a2.flags.writeable)
 
 
     def test_array_deepcopy_b(self) -> None:
@@ -185,10 +199,26 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(mloc(a1) == mloc(a2))
 
 
-    def test_array_deepcopy_c(self) -> None:
-        a1 = np.array((None, 'foo', True))
+    def test_array_deepcopy_c1(self) -> None:
+        mutable = [np.nan]
+        a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1)
+        self.assertTrue(id(a1) != id(a2))
+        self.assertTrue(mloc(a1) != mloc(a2))
+        self.assertTrue(id(a1[3]) != id(a2[3]))
+        self.assertFalse(a2.flags.writeable)
 
+    def test_array_deepcopy_c2(self) -> None:
+        memo = {}
+        mutable = [np.nan]
+        a1 = np.array((None, 'foo', True, mutable))
+        a2 = array_deepcopy(a1, memo)
+#
+        self.assertTrue(id(a1) != id(a2))
+        self.assertTrue(mloc(a1) != mloc(a2))
+        self.assertTrue(id(a1[3]) != id(a2[3]))
+        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(id(a1) in memo)
 
 
 
