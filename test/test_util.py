@@ -185,6 +185,12 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(mloc(a1) == mloc(a2))
 
 
+    def test_array_deepcopy_c(self) -> None:
+        a1 = np.array((None, 'foo', True))
+        a2 = array_deepcopy(a1)
+
+
+
 
 
 

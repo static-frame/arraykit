@@ -37,7 +37,7 @@
 // Placeholder of not implemented pathways / debugging.
 # define AK_NOT_IMPLEMENTED(msg)\
     do {\
-        PyErr_Format(PyExc_ValueError,\
+        PyErr_Format(PyExc_NotImplementedError,\
                 msg);\
         return NULL;\
     } while (0)
@@ -257,11 +257,22 @@ array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
         // found is null; ignore it
     }
     // if dtype is object, call deepcopy with memo
-    // else copy array
-    // set immutable if ndim > 0
+    PyArray_Descr *dtype = PyArray_DESCR((PyArrayObject *)array);
 
+    if PyDataType_ISOBJECT(dtype) {
+        AK_NOT_IMPLEMENTED("found object array");
+    }
+    // else copy array
+    Py_INCREF(dtype);
+
+    PyObject *array_new = PyArray_FromArray(
+            (PyArrayObject*) array,
+            dtype,
+            NPY_ARRAY_ENSURECOPY);
+    // set immutable if ndim > 0
     // add copy to memo dict
-    AK_NOT_IMPLEMENTED("handle array copy");
+    return array_new;
+    // AK_NOT_IMPLEMENTED("handle array copy");
 }
 
 //------------------------------------------------------------------------------
