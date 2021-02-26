@@ -34,10 +34,11 @@
         }\
     } while (0)
 
-// Placeholder of not implemented functions.
-# define AK_NOT_IMPLEMENTED\
+// Placeholder of not implemented pathways / debugging.
+# define AK_NOT_IMPLEMENTED(msg)\
     do {\
-        PyErr_SetNone(PyExc_NotImplementedError);\
+        PyErr_Format(PyExc_ValueError,\
+                msg);\
         return NULL;\
     } while (0)
 
@@ -237,15 +238,32 @@ static PyObject *
 array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyObject *array, *memo;
-    if (!PyArg_ParseTuple(args, "O!O!:array_deepcopy",
-            &PyObject_Type,
+    memo = NULL; // is this needed?
+
+    if (!PyArg_ParseTuple(args, "O|O:array_deepcopy",
             &array,
-            &PyObject_Type,
             &memo))
     {
         return NULL;
     }
-    AK_NOT_IMPLEMENTED;
+    // if we have memo, check if in dict
+    if (memo) {
+        PyObject *id = PyLong_FromVoidPtr(array);
+        PyObject *found = PyDict_GetItem(memo, id);
+        // found will be NULL if not in dict
+        if (found) {
+            // AK_NOT_IMPLEMENTED_SENTINEL("found id in dict");
+            Py_INCREF(found); // got a borrowed ref
+            return found;
+        }
+        // found is null; ignore it
+    }
+    // if dtype is object, call deepcopy with memo
+    // else copy array
+    // set immutable if ndim > 0
+
+    // add copy to memo dict
+    AK_NOT_IMPLEMENTED("handle array copy");
 }
 
 //------------------------------------------------------------------------------

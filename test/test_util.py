@@ -10,6 +10,7 @@ from arraykit import column_1d_filter
 from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
+from arraykit import array_deepcopy
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -166,6 +167,26 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             row_1d_filter(a1.reshape(1,2,5))
+
+    #---------------------------------------------------------------------------
+
+    def test_array_deepcopy_a(self) -> None:
+        a1 = np.arange(10)
+        a2 = array_deepcopy(a1)
+
+        self.assertTrue(mloc(a1) != mloc(a2))
+
+
+    def test_array_deepcopy_b(self) -> None:
+        a1 = np.arange(10)
+        memo = {id(a1): a1}
+        a2 = array_deepcopy(a1, memo)
+
+        self.assertTrue(mloc(a1) == mloc(a2))
+
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
