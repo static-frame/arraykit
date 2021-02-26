@@ -130,6 +130,62 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
+// Numpy implementation: https://github.com/numpy/numpy/blob/a14c41264855e44ebd6187d7541b5b8d59bb32cb/numpy/core/src/multiarray/methods.c#L1557
+PyObject*
+AK_ArrayCopy(PyObject *array, PyObject *memo)
+{
+    PyObject *id = PyLong_FromVoidPtr(array);
+    PyObject *found = PyDict_GetItem(memo, id);
+    if (found) { // found will be NULL if not in dict
+        Py_DECREF(id);
+        Py_INCREF(found); // got a borrowed ref
+        return found;
+    }
+
+    // if dtype is object, call deepcopy with memo
+    PyObject *array_new;
+    PyArray_Descr *dtype = PyArray_DESCR((PyArrayObject *)array); // borrowed ref
+
+    if PyDataType_ISOBJECT(dtype)
+    {
+        PyObject *copy = PyImport_ImportModule("copy");
+        if (!copy) {
+            Py_DECREF(id);
+            return NULL;
+        }
+        PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
+        Py_DECREF(copy);
+        if (!deepcopy) {
+            Py_DECREF(id);
+            return NULL;
+        }
+        array_new = PyObject_CallFunctionObjArgs(deepcopy, array, memo, NULL);
+        Py_DECREF(deepcopy);
+        if (!array_new) {
+            Py_DECREF(id);
+            return NULL;
+        }
+    }
+    else {
+        Py_INCREF(dtype); // PyArray_FromArray steals a reference
+        array_new = PyArray_FromArray(
+                (PyArrayObject*) array,
+                dtype,
+                NPY_ARRAY_ENSURECOPY);
+        if (PyDict_SetItem(memo, id, array_new))
+        {
+            Py_DECREF(array_new);
+            Py_DECREF(id);
+            return NULL;
+        }
+    }
+    // set immutable
+    PyArray_CLEARFLAGS((PyArrayObject *)array_new, NPY_ARRAY_WRITEABLE);
+    Py_DECREF(id);
+    return array_new;
+}
+
+
 //------------------------------------------------------------------------------
 // AK module public methods
 //------------------------------------------------------------------------------
@@ -235,69 +291,17 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 // array utility
 
 // Specialized array deepcopy that stores immutable arrays in memo dict.
-// Numpy implementation: https://github.com/numpy/numpy/blob/a14c41264855e44ebd6187d7541b5b8d59bb32cb/numpy/core/src/multiarray/methods.c#L1557
 static PyObject *
 array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyObject *array, *memo;
-    memo = NULL;
-    if (!PyArg_ParseTuple(args, "O|O:array_deepcopy",
+    if (!PyArg_ParseTuple(args, "OO:array_deepcopy",
             &array,
             &memo))
     {
         return NULL;
     }
-
-    PyObject *id = PyLong_FromVoidPtr(array);
-    if (memo) // if we have memo, can return immediatelyh
-    {
-        PyObject *found = PyDict_GetItem(memo, id);
-        if (found) { // found will be NULL if not in dict
-            Py_DECREF(id);
-            Py_INCREF(found); // got a borrowed ref
-            return found;
-        }
-    }
-    // if dtype is object, call deepcopy with memo
-    PyObject *array_new;
-    PyArray_Descr *dtype = PyArray_DESCR((PyArrayObject *)array); // borrowed ref
-
-    if PyDataType_ISOBJECT(dtype)
-    {
-        PyObject *copy = PyImport_ImportModule("copy");
-        if (!copy) {
-            Py_DECREF(id);
-            return NULL;
-        }
-        PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
-        Py_DECREF(copy);
-        if (!deepcopy) {
-            Py_DECREF(id);
-            return NULL;
-        }
-        array_new = PyObject_CallFunctionObjArgs(deepcopy, array, memo, NULL);
-        Py_DECREF(deepcopy);
-    }
-    else {
-        Py_INCREF(dtype); // PyArray_FromArray steals a reference
-        array_new = PyArray_FromArray(
-                (PyArrayObject*) array,
-                dtype,
-                NPY_ARRAY_ENSURECOPY);
-        if (memo) // update memo if we have it
-        { // store new object under old objects ID
-            if (PyDict_SetItem(memo, id, array_new))
-            {
-                Py_DECREF(array_new);
-                Py_DECREF(id);
-                return NULL;
-            }
-        }
-    }
-    // set immutable
-    PyArray_CLEARFLAGS((PyArrayObject *)array_new, NPY_ARRAY_WRITEABLE);
-    Py_DECREF(id);
-    return array_new; // got a new ref to pass on?
+    return AK_ArrayCopy(array, memo);
 }
 
 //------------------------------------------------------------------------------

@@ -172,7 +172,8 @@ class TestUnit(unittest.TestCase):
 
     def test_array_deepcopy_a1(self) -> None:
         a1 = np.arange(10)
-        a2 = array_deepcopy(a1)
+        memo = {}
+        a2 = array_deepcopy(a1, memo)
 
         self.assertTrue(id(a1) != id(a2))
         self.assertTrue(mloc(a1) != mloc(a2))
@@ -201,8 +202,10 @@ class TestUnit(unittest.TestCase):
 
     def test_array_deepcopy_c1(self) -> None:
         mutable = [np.nan]
+        memo = {}
         a1 = np.array((None, 'foo', True, mutable))
-        a2 = array_deepcopy(a1)
+        a2 = array_deepcopy(a1, memo)
+
         self.assertTrue(id(a1) != id(a2))
         self.assertTrue(mloc(a1) != mloc(a2))
         self.assertTrue(id(a1[3]) != id(a2[3]))
