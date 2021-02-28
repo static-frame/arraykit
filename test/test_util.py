@@ -24,10 +24,10 @@ class TestUnit(unittest.TestCase):
     def test_delimited_to_arrays_a(self) -> None:
 
         parsed = [
-            ['1', '-2', '54'],
-            ['1', '-2', '54'],
-            ['True', 'False', 'true'],
-            ['a', 'bb', 'cc'],
+            '1,-2,54',
+            '1,-2,54',
+            'True,False,true',
+            'a,bb,cc',
         ]
         dtypes = [None, np.dtype(float), bool, str]
         post = delimited_to_arrays(parsed, dtypes)

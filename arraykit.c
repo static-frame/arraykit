@@ -145,10 +145,34 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         return NULL;
     }
 
-    PyObject* arrays = PyList_New(0);
+    // List to be returned
 
-    PyObject *lines = PyObject_GetIter(file_like);
+    // Parse text
+    PyObject *module_csv = PyImport_ImportModule("csv");
+    if (!module_csv) {
+        return NULL;
+    }
+    PyObject *reader = PyObject_GetAttrString(module_csv, "reader");
+    Py_DECREF(module_csv);
+    if (!reader) {
+        return NULL;
+    }
+    PyObject *reader_instance = PyObject_CallFunctionObjArgs(reader, file_like, NULL);
+    Py_DECREF(reader);
+    if (!reader_instance) {
+        return NULL;
+    }
+
+    PyObject *lines = PyObject_GetIter(reader_instance);
     if (lines == NULL) {
+        Py_DECREF(reader_instance);
+        return NULL;
+    }
+
+    PyObject* arrays = PyList_New(0);
+    if (!arrays) {
+        Py_DECREF(lines);
+        Py_DECREF(reader_instance);
         return NULL;
     }
 
