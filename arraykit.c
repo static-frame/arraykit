@@ -185,6 +185,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 
         PyObject* dtype_specifier = PyList_GetItem(dtypes, line_count);
         if (!dtype_specifier) {
+            Py_DECREF(lines);
+            Py_DECREF(reader_instance);
             return NULL;
         }
 
@@ -215,14 +217,19 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         if (PyList_Append(arrays, array))
         {
             PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
+            Py_DECREF(lines);
+            Py_DECREF(reader_instance);
             Py_DECREF(array);
             Py_DECREF(arrays);
             return NULL;
         }
+        Py_DECREF(array);
         line_count += 1;
 
     }
 
+    Py_DECREF(lines);
+    Py_DECREF(reader_instance);
     return arrays;
 
 }
