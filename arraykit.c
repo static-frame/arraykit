@@ -157,16 +157,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 
     while ((line = PyIter_Next(lines))) {
 
-        // npy_intp dims = 4;
-        // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_DOUBLE);
-        // PyObject* array = PyArray_Empty(1, //nd
-        //         &dims, // dims
-        //         dtype, // dtype, steals a ref
-        //         0); // C ordering
-        // Py_DECREF(dtype);
-        // Py_INCREF(line);
-        // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_DOUBLE);
-
         // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_OBJECT);
 
         PyObject* dtype_specifier = PyList_GetItem(dtypes, line_count);
@@ -174,7 +164,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             return NULL;
         }
 
-        // convert specifier into a dtype
+        // Convert specifier into a dtype if necessary
         PyArray_Descr* dtype;
         if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
         {
@@ -186,7 +176,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         }
 
         if (dtype)
-        { // only incref if dtype is not NULL
+        { // Only incref if dtype is not NULL
             Py_INCREF(dtype);
         }
         PyObject* array = PyArray_FromAny(line,
@@ -197,7 +187,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
                 NULL);
 
         PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
-        // TODO: must check result of append
+
         if (PyList_Append(arrays, array))
         {
             PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
