@@ -10,11 +10,23 @@ from arraykit import column_1d_filter
 from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
+from arraykit import delimited_to_arrays
 
 from performance.reference.util import mloc as mloc_ref
 
 
 class TestUnit(unittest.TestCase):
+
+
+
+
+
+    def test_delimited_to_arrays_a(self) -> None:
+
+        post = delimited_to_arrays(['1|-2|54'])
+
+
+
 
     def test_mloc_a(self) -> None:
         a1 = np.arange(10)

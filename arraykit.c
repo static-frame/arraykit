@@ -133,6 +133,29 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 // AK module public methods
 //------------------------------------------------------------------------------
 
+static PyObject *
+delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    PyObject *line_iter, *unused;
+    if (!PyArg_ParseTuple(args, "O|O:delimited_to_arrays",
+            &line_iter,
+            &unused))
+    {
+        return NULL;
+    }
+
+    AK_NOT_IMPLEMENTED;
+
+}
+
+
+
+
+
+
+
+
+
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
@@ -527,6 +550,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
     {NULL},
 };
 
