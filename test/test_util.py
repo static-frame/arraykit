@@ -23,9 +23,18 @@ class TestUnit(unittest.TestCase):
 
     def test_delimited_to_arrays_a(self) -> None:
 
-        post = delimited_to_arrays(['1|-2|54'])
+        parsed = [
+            ['1', '-2', '54'],
+            ['1', '-2', '54'],
+            ['True', 'False', 'true'],
+            ['a', 'bb', 'cc'],
+        ]
+        dtypes = [None, np.dtype(float), bool, str]
+        post = delimited_to_arrays(parsed, dtypes)
+        print(post)
 
-
+        self.assertTrue(isinstance(post, list))
+        # import ipdb; ipdb.set_trace()
 
 
     def test_mloc_a(self) -> None:

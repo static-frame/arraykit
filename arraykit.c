@@ -34,10 +34,11 @@
         }\
     } while (0)
 
-// Placeholder of not implemented functions.
-# define AK_NOT_IMPLEMENTED\
+// Placeholder of not implemented pathways / debugging.
+# define AK_NOT_IMPLEMENTED(msg)\
     do {\
-        PyErr_SetNone(PyExc_NotImplementedError);\
+        PyErr_Format(PyExc_NotImplementedError,\
+                msg);\
         return NULL;\
     } while (0)
 
@@ -136,15 +137,79 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 static PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 {
-    PyObject *line_iter, *unused;
-    if (!PyArg_ParseTuple(args, "O|O:delimited_to_arrays",
-            &line_iter,
-            &unused))
+    PyObject *file_like, *dtypes;
+    if (!PyArg_ParseTuple(args, "OO:delimited_to_arrays",
+            &file_like,
+            &dtypes))
     {
         return NULL;
     }
 
-    AK_NOT_IMPLEMENTED;
+    PyObject* arrays = PyList_New(0);
+
+    PyObject *lines = PyObject_GetIter(file_like);
+    if (lines == NULL) {
+        return NULL;
+    }
+
+    Py_ssize_t line_count = 0;
+    PyObject *line;
+
+    while ((line = PyIter_Next(lines))) {
+
+        // npy_intp dims = 4;
+        // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_DOUBLE);
+        // PyObject* array = PyArray_Empty(1, //nd
+        //         &dims, // dims
+        //         dtype, // dtype, steals a ref
+        //         0); // C ordering
+        // Py_DECREF(dtype);
+        // Py_INCREF(line);
+        // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_DOUBLE);
+
+        // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_OBJECT);
+
+        PyObject* dtype_specifier = PyList_GetItem(dtypes, line_count);
+        if (!dtype_specifier) {
+            return NULL;
+        }
+
+        // convert specifier into a dtype
+        PyArray_Descr* dtype;
+        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
+        {
+            dtype = (PyArray_Descr* )dtype_specifier;
+        }
+        else {
+            // Use converter2 here so that None returns NULL (as opposed to default dtype float); NULL will leave strings unchanged
+            PyArray_DescrConverter2(dtype_specifier, &dtype);
+        }
+
+        if (dtype)
+        { // only incref if dtype is not NULL
+            Py_INCREF(dtype);
+        }
+        PyObject* array = PyArray_FromAny(line,
+                dtype, // can be NULL, object: strings will remain
+                1,
+                1,
+                NPY_ARRAY_FORCECAST,
+                NULL);
+
+        PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+        // TODO: must check result of append
+        if (PyList_Append(arrays, array))
+        {
+            PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
+            Py_DECREF(array);
+            Py_DECREF(arrays);
+            return NULL;
+        }
+        line_count += 1;
+
+    }
+
+    return arrays;
 
 }
 
