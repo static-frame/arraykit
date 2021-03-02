@@ -141,30 +141,35 @@ AK_IterableStrToArray1DBoolean(PyObject* iterable)
         return NULL;
     }
 
+    PyObject *lower = PyUnicode_FromString("lower");
     PyObject *converted = PyList_New(0); // give a hint to size?
     PyObject *element;
     while ((element = PyIter_Next(iter)))
     {
+        PyObject* element_lower = PyObject_CallMethodObjArgs(element, lower, NULL);
+        if (!element_lower) {
+            return NULL;
+        }
+        Py_DECREF(element);
         // Retrun 0 on match, otherwise -1 or 1
-        int match = (
-                PyUnicode_CompareWithASCIIString(element, "true") == 0
-                || PyUnicode_CompareWithASCIIString(element, "True") == 0
-                || PyUnicode_CompareWithASCIIString(element, "TRUE") == 0
-                );
         // Store a truthy int in the converted list
-        PyObject *bool_int = PyLong_FromLong(match);
-        if (PyList_Append(converted, bool_int))
+        PyObject *is_true = PyLong_FromLong(
+                PyUnicode_CompareWithASCIIString(element_lower, "true") == 0);
+        if (!is_true) {
+            return NULL;
+        }
+        Py_DECREF(element_lower);
+
+        if (PyList_Append(converted, is_true))
         {
             // might use int PyArray_BoolConverter(PyObject* obj, Bool* value)
             PyErr_SetString(PyExc_NotImplementedError, "could not append to list.");
-            Py_DECREF(bool_int);
-            Py_DECREF(element);
+            Py_DECREF(is_true);
             Py_DECREF(converted);
             Py_DECREF(iter);
             return NULL;
         }
-        Py_DECREF(bool_int);
-        Py_DECREF(element);
+        Py_DECREF(is_true);
     }
     Py_DECREF(iter);
 
