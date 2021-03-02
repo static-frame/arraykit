@@ -1,5 +1,5 @@
 import unittest
-
+import datetime
 import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
@@ -11,6 +11,7 @@ from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import delimited_to_arrays
+from arraykit import iterable_str_to_array_1d
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -19,6 +20,48 @@ class TestUnit(unittest.TestCase):
 
 
 
+    def test_iterable_str_to_array_1d_a(self) -> None:
+        a1 = iterable_str_to_array_1d(['1', '3', '4'], int)
+        self.assertEqual(a1.tolist(), [1, 3, 4])
+        self.assertEqual(a1.dtype, np.dtype(int))
+
+        a2 = iterable_str_to_array_1d(['1', '30', '4'], str)
+        self.assertEqual(a2.tolist(), ['1', '30', '4'])
+        self.assertEqual(a2.dtype, np.dtype('<U2'))
+
+        # with dtype_discover set to True, this should return integers in an object array
+        a3 = iterable_str_to_array_1d(['1', '3', '4'], object)
+        self.assertEqual(a3.tolist(), ['1', '3', '4'])
+        self.assertEqual(a3.dtype, np.dtype('O'))
+
+    def test_iterable_str_to_array_1d_b(self) -> None:
+        # NOTE: truthyness of strings is being used to determine boolean types
+        a1 = iterable_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
+        self.assertEqual(a1.tolist(), [True, False, True, False])
+        self.assertEqual(a1.dtype, np.dtype(bool))
+
+    def test_iterable_str_to_array_1d_c(self) -> None:
+        with self.assertRaises(ValueError):
+            _ = iterable_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
+
+        a1 = iterable_str_to_array_1d(['3.2', 'nan', 'inf', 'NaN'], float)
+        self.assertEqual(str(a1.tolist()), '[3.2, nan, inf, nan]')
+        self.assertEqual(a1.dtype, np.dtype(float))
+
+
+    @unittest.skip('complex handling not implemented yet')
+    def test_iterable_str_to_array_1d_d(self) -> None:
+
+        a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
+
+
+    def test_iterable_str_to_array_1d_e(self) -> None:
+
+        a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
+        self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
+        self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+        # import ipdb; ipdb.set_trace()
 
 
     def test_delimited_to_arrays_a(self) -> None:
@@ -29,12 +72,9 @@ class TestUnit(unittest.TestCase):
             'True,False,true',
             'a,bb,cc',
         ]
-        dtypes = [None, np.dtype(float), bool, str]
+        dtypes = [str, np.dtype(float), bool, str]
         post = delimited_to_arrays(parsed, dtypes)
-        print(post)
-
         self.assertTrue(isinstance(post, list))
-        # import ipdb; ipdb.set_trace()
 
 
     def test_mloc_a(self) -> None:

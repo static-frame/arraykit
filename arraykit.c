@@ -130,6 +130,109 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
+
+// NP's Boolean conversion in genfromtxt
+// https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
+PyObject*
+AK_IterableStrToArray1DBoolean(PyObject* iterable)
+{
+    PyObject *iter = PyObject_GetIter(iterable);
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    PyObject *converted = PyList_New(0); // give a hint to size?
+    PyObject *element;
+    while ((element = PyIter_Next(iter)))
+    {
+        // Retrun 0 on match, otherwise -1 or 1
+        int match = (
+                PyUnicode_CompareWithASCIIString(element, "true") == 0
+                || PyUnicode_CompareWithASCIIString(element, "True") == 0
+                || PyUnicode_CompareWithASCIIString(element, "TRUE") == 0
+                );
+        // Store a truthy int in the converted list
+        PyObject *bool_int = PyLong_FromLong(match);
+        if (PyList_Append(converted, bool_int))
+        {
+            // might use int PyArray_BoolConverter(PyObject* obj, Bool* value)
+            PyErr_SetString(PyExc_NotImplementedError, "could not append to list.");
+            Py_DECREF(bool_int);
+            Py_DECREF(element);
+            Py_DECREF(converted);
+            Py_DECREF(iter);
+            return NULL;
+        }
+        Py_DECREF(bool_int);
+        Py_DECREF(element);
+    }
+    Py_DECREF(iter);
+
+    PyArray_Descr* dtype = PyArray_DescrFromType(NPY_BOOL);
+    PyObject* array = PyArray_FromAny(converted,
+            dtype, // will steal this reference
+            1,
+            1,
+            NPY_ARRAY_FORCECAST, // not sure this is best
+            NULL);
+
+    Py_DECREF(converted);
+    if (!array) {
+        return NULL;
+    }
+    return array;
+}
+
+// Convert an iterable of strings to a 1D array.
+PyObject*
+AK_IterableStrToArray1D(
+        PyObject *iterable,
+        PyObject *dtype_specifier)
+{
+        // Convert specifier into a dtype if necessary
+        PyArray_Descr* dtype;
+        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
+        {
+            dtype = (PyArray_Descr* )dtype_specifier;
+        }
+        else {
+            // Use converter2 here so that None returns NULL (as opposed to default dtype float); NULL will leave strings unchanged
+            PyArray_DescrConverter2(dtype_specifier, &dtype);
+        }
+
+        if (dtype)
+        { // Only incref if dtype is not NULL
+            Py_INCREF(dtype);
+        }
+
+        // NOTE: Some types can be converted directly from strings.
+        // int, float, dt64, variously sized strings: will convert from strings correctly
+        // bool dtypes: will treat string as truthy/falsy
+
+        PyObject* array;
+        if (!dtype) {
+            AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
+        }
+        else if (PyDataType_ISBOOL(dtype)) {
+            array = AK_IterableStrToArray1DBoolean(iterable);
+        }
+        else {
+            array = PyArray_FromAny(iterable,
+                    dtype, // can be NULL, object: strings will remain
+                    1,
+                    1,
+                    NPY_ARRAY_FORCECAST, // not sure this is best
+                    NULL);
+        }
+        if (!array) {
+            return NULL;
+        }
+        PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+        return array;
+
+}
+
+
 //------------------------------------------------------------------------------
 // AK module public methods
 //------------------------------------------------------------------------------
@@ -144,8 +247,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     {
         return NULL;
     }
-
-    // List to be returned
 
     // Parse text
     PyObject *module_csv = PyImport_ImportModule("csv");
@@ -169,6 +270,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         return NULL;
     }
 
+    // List to be returned
     PyObject* arrays = PyList_New(0);
     if (!arrays) {
         Py_DECREF(lines);
@@ -190,29 +292,13 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             return NULL;
         }
 
-        // Convert specifier into a dtype if necessary
-        PyArray_Descr* dtype;
-        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
-        {
-            dtype = (PyArray_Descr* )dtype_specifier;
-        }
-        else {
-            // Use converter2 here so that None returns NULL (as opposed to default dtype float); NULL will leave strings unchanged
-            PyArray_DescrConverter2(dtype_specifier, &dtype);
+        // Py_INCREF(line);
+        // Py_INCREF(dtype_specifier);
+        PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
+        if (!array) {
+            return NULL;
         }
 
-        if (dtype)
-        { // Only incref if dtype is not NULL
-            Py_INCREF(dtype);
-        }
-        PyObject* array = PyArray_FromAny(line,
-                dtype, // can be NULL, object: strings will remain
-                1,
-                1,
-                NPY_ARRAY_FORCECAST,
-                NULL);
-
-        PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
 
         if (PyList_Append(arrays, array))
         {
@@ -231,16 +317,26 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     Py_DECREF(lines);
     Py_DECREF(reader_instance);
     return arrays;
-
 }
 
+// If dtype_specifier is given, always try to return that dtype
+// If dtype of object is given, convert bools and numerics, leave strings
+// Only if dtype is not given is dtype_discover examined; if False, no dtype returns str
+// If true, determine types, only pre-convert to objects if necessary
+static PyObject *
+iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    PyObject *iterable, *dtype_specifier;
 
-
-
-
-
-
-
+    if (!PyArg_ParseTuple(args, "OO:iterable_str_to_array_1d",
+            &iterable,
+            &dtype_specifier))
+    {
+        return NULL;
+    }
+    PyObject* array = AK_IterableStrToArray1D(iterable, dtype_specifier);
+    return array;
+}
 
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
@@ -637,6 +733,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
+    {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
     {NULL},
 };
 
