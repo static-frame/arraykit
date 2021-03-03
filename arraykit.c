@@ -141,12 +141,14 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 
 
 PyObject*
-AK_IterableStrToArray1DBoolean(PyObject* iterable)
+AK_SequenceStrToArray1DBoolean(PyObject* sequence)
 {
-    PyObject *iter = PyObject_GetIter(iterable);
+    PyObject *iter = PyObject_GetIter(sequence);
     if (iter == NULL) {
         return NULL;
     }
+
+    // TODO: create all-False Boolean array and just updated Trues
 
     PyObject *lower = PyUnicode_FromString("lower");
     PyObject *converted = PyList_New(0); // give a hint to size?
@@ -182,7 +184,7 @@ AK_IterableStrToArray1DBoolean(PyObject* iterable)
 
     PyArray_Descr* dtype = PyArray_DescrFromType(NPY_BOOL);
     PyObject* array = PyArray_FromAny(converted,
-            dtype, // will steal this reference
+            dtype, // steals ref
             1,
             1,
             NPY_ARRAY_FORCECAST, // not sure this is best
@@ -192,13 +194,14 @@ AK_IterableStrToArray1DBoolean(PyObject* iterable)
     if (!array) {
         return NULL;
     }
+    // NOTE: will be made immutable in caller
     return array;
 }
 
-// Convert an iterable of strings to a 1D array.
+// Convert an sequence of strings to a 1D array.
 PyObject*
-AK_IterableStrToArray1D(
-        PyObject *iterable,
+AK_SequenceStrToArray1D(
+        PyObject *sequence,
         PyObject *dtype_specifier)
 {
         // Convert specifier into a dtype if necessary
@@ -217,19 +220,17 @@ AK_IterableStrToArray1D(
             Py_INCREF(dtype);
         }
 
-        // NOTE: Some types can be converted directly from strings.
-        // int, float, dt64, variously sized strings: will convert from strings correctly
-        // bool dtypes: will treat string as truthy/falsy
 
         PyObject* array;
         if (!dtype) {
             AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
         }
         else if (PyDataType_ISBOOL(dtype)) {
-            array = AK_IterableStrToArray1DBoolean(iterable);
+            array = AK_SequenceStrToArray1DBoolean(sequence);
         }
         else {
-            array = PyArray_FromAny(iterable,
+            // NOTE: Some types can be converted directly from strings. int, float, dt64, variously sized strings: will convert from strings correctly. bool dtypes: will treat string as truthy/falsy
+            array = PyArray_FromAny(sequence,
                     dtype, // can be NULL, object: strings will remain
                     1,
                     1,
@@ -241,9 +242,7 @@ AK_IterableStrToArray1D(
         }
         PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
         return array;
-
 }
-
 
 //------------------------------------------------------------------------------
 // AK module public methods
@@ -256,10 +255,11 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
             &file_like,
             &dtypes,
-            &axis)) // TODO: inforce this is an int?
+            &axis)) // TODO: enforce this is an int?
     {
         return NULL;
     }
+    // NOTE: consider taking shape_estimate as a tuple to pre-size lists?
 
     // Parse text
     // For now, we import and use the CSV module directly; in the future, can vend code from here and implement support for an axis argument to collect data columnwise rather than rowwise
@@ -272,6 +272,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     if (!reader) {
         return NULL;
     }
+    // TODO: pass in full parameters for parsing
     PyObject *reader_instance = PyObject_CallFunctionObjArgs(reader, file_like, NULL);
     Py_DECREF(reader);
     if (!reader_instance) {
@@ -354,7 +355,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             return NULL;
         }
 
-        PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
+        PyObject* array = AK_SequenceStrToArray1D(line, dtype_specifier);
         if (!array) {
             return NULL;
         }
@@ -378,21 +379,20 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 }
 
 // If dtype_specifier is given, always try to return that dtype
-// If dtype of object is given, convert bools and numerics, leave strings
-// Only if dtype is not given is dtype_discover examined; if False, no dtype returns str
-// If true, determine types, only pre-convert to objects if necessary
+// If dtype of object is given, leave strings
+// If dtype of None is given, discover
 static PyObject *
-iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
+sequence_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyObject *iterable, *dtype_specifier;
 
-    if (!PyArg_ParseTuple(args, "OO:iterable_str_to_array_1d",
+    if (!PyArg_ParseTuple(args, "OO:sequence_str_to_array_1d",
             &iterable,
             &dtype_specifier))
     {
         return NULL;
     }
-    PyObject* array = AK_IterableStrToArray1D(iterable, dtype_specifier);
+    PyObject* array = AK_SequenceStrToArray1D(iterable, dtype_specifier);
     return array;
 }
 
@@ -791,7 +791,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
-    {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
+    {"sequence_str_to_array_1d", sequence_str_to_array_1d, METH_VARARGS, NULL},
     {NULL},
 };
 
