@@ -278,18 +278,17 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         return NULL;
     }
 
-    PyObject *axis0_sequences = PyObject_GetIter(reader_instance);
-    if (!axis0_sequences) {
+    // Get the an iterator for the appropriate axis
+    PyObject *axis_sequence_iter; // for generic assignment
+    PyObject *axis0_sequence_iter = PyObject_GetIter(reader_instance);
+    if (!axis0_sequence_iter) {
         Py_DECREF(reader_instance);
         return NULL;
     }
-
-    PyObject *axis_sequences;
-
     if (PyLong_AsLong(axis) == 1) {
         PyObject* axis1_sequences = PyList_New(0);
         if (!axis1_sequences) {
-            Py_DECREF(axis0_sequences);
+            Py_DECREF(axis0_sequence_iter);
             return NULL;
         }
         // get first size
@@ -298,13 +297,13 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 
         PyObject *row;
         PyObject* column;
-        while ((row = PyIter_Next(axis0_sequences))) {
+        while ((row = PyIter_Next(axis0_sequence_iter))) {
             // get count of columns from first row
             if (count_row == 0) {
                 count_columns = PyList_Size(row);
                 for (int i=0; i < count_columns; ++i) {
                     column = PyList_New(0);
-                    if (PyList_Append(axis1_sequences, column))
+                    if (PyList_Append(axis1_sequences, column)) // does not steal
                     {
                         PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
                         Py_DECREF(row);
@@ -317,35 +316,28 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             // walk through row and append to columns
             for (int i=0; i < count_columns; ++i) {
                 PyObject* element = PyList_GetItem(row, i);
-                column = PyList_GetItem(axis1_sequences, i);
+                column = PyList_GetItem(axis1_sequences, i); // borrowed?
                 if (PyList_Append(column, element))
                     {
                         PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
-                        Py_DECREF(column);
                         Py_DECREF(axis1_sequences);
                         return NULL;
                     }
-                    Py_DECREF(element);
-
+                Py_DECREF(element);
             }
             ++count_row;
         }
-        // Py_DECREF(row); // causes seg fault
-        Py_DECREF(axis0_sequences);
-        return axis1_sequences;
-        AK_NOT_IMPLEMENTED("found axis 1");
-        // PyObject* row1 =
-        // Py_ssize_t count_columns = PyList_Size();
-
+        axis_sequence_iter = PyObject_GetIter(axis1_sequences);
+        Py_DECREF(axis0_sequence_iter);
+        Py_DECREF(axis1_sequences);
     } else {
-        axis_sequences = axis0_sequences;
+        axis_sequence_iter = axis0_sequence_iter;
     }
 
-
-    // List to be returned
+    // List to be return constructer arrays
     PyObject* arrays = PyList_New(0);
     if (!arrays) {
-        Py_DECREF(axis_sequences);
+        Py_DECREF(axis_sequence_iter);
         Py_DECREF(reader_instance);
         return NULL;
     }
@@ -353,13 +345,11 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     Py_ssize_t count_sequence = 0;
     PyObject *line;
 
-    while ((line = PyIter_Next(axis_sequences))) {
-
-        // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_OBJECT);
+    while ((line = PyIter_Next(axis_sequence_iter))) {
 
         PyObject* dtype_specifier = PyList_GetItem(dtypes, count_sequence);
         if (!dtype_specifier) {
-            Py_DECREF(axis_sequences);
+            Py_DECREF(axis_sequence_iter);
             Py_DECREF(reader_instance);
             return NULL;
         }
@@ -372,7 +362,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         if (PyList_Append(arrays, array))
         {
             PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
-            Py_DECREF(axis_sequences);
+            Py_DECREF(axis_sequence_iter);
             Py_DECREF(reader_instance);
             Py_DECREF(array);
             Py_DECREF(arrays);
@@ -380,10 +370,9 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         }
         Py_DECREF(array);
         ++count_sequence;
-
     }
 
-    Py_DECREF(axis_sequences);
+    Py_DECREF(axis_sequence_iter);
     Py_DECREF(reader_instance);
     return arrays;
 }

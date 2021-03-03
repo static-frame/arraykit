@@ -76,7 +76,10 @@ class TestUnit(unittest.TestCase):
         dtypes = [str, np.dtype(float), bool, str]
         post = delimited_to_arrays(msg, dtypes, 0)
         self.assertTrue(isinstance(post, list))
-
+        self.assertTrue(post[0].dtype, np.dtype(str))
+        self.assertTrue(post[1].dtype, np.dtype(float))
+        self.assertTrue(post[2].dtype, np.dtype(bool))
+        self.assertTrue(post[4].dtype, np.dtype(str))
 
     def test_delimited_to_arrays_a(self) -> None:
 
@@ -88,8 +91,11 @@ class TestUnit(unittest.TestCase):
         ]
         dtypes = [int, bool, str]
         post = delimited_to_arrays(msg, dtypes, 1)
-        print(post)
         self.assertTrue(isinstance(post, list))
+        self.assertTrue(post[0].dtype, np.dtype(int))
+        self.assertTrue(post[1].dtype, np.dtype(bool))
+        self.assertTrue(post[2].dtype, np.dtype(str))
+
 
 
 
