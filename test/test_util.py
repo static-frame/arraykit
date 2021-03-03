@@ -88,6 +88,7 @@ class TestUnit(unittest.TestCase):
         ]
         dtypes = [int, bool, str]
         post = delimited_to_arrays(msg, dtypes, 1)
+        print(post)
         self.assertTrue(isinstance(post, list))
 
 

@@ -297,12 +297,13 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         Py_ssize_t count_columns = -1;
 
         PyObject *row;
+        PyObject* column;
         while ((row = PyIter_Next(axis0_sequences))) {
             // get count of columns from first row
             if (count_row == 0) {
                 count_columns = PyList_Size(row);
                 for (int i=0; i < count_columns; ++i) {
-                    PyObject* column = PyList_New(0);
+                    column = PyList_New(0);
                     if (PyList_Append(axis1_sequences, column))
                     {
                         PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
@@ -314,6 +315,19 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
                 }
             }
             // walk through row and append to columns
+            for (int i=0; i < count_columns; ++i) {
+                PyObject* element = PyList_GetItem(row, i);
+                column = PyList_GetItem(axis1_sequences, i);
+                if (PyList_Append(column, element))
+                    {
+                        PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
+                        Py_DECREF(column);
+                        Py_DECREF(axis1_sequences);
+                        return NULL;
+                    }
+                    Py_DECREF(element);
+
+            }
             ++count_row;
         }
         // Py_DECREF(row); // causes seg fault
