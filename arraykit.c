@@ -131,8 +131,15 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 
+// Complex Numbers
+// Python `complex()` will take any string that looks a like a float; if a "+"" is present the second component must have a "j", otherwise a "complex() arg is a malformed string" is raised. Outer parenthesis are optional, but must be balanced if present
+// NP genfromtxt will not interpret complex numbers with dtype None. With dtype complex, complex notations will be interpreted. Balanced parenthesis are not required; unbalanced parenthesis, as well as missing "j", do not raise and instead result in NaNs.
+
+// Booleans
 // NP's Boolean conversion in genfromtxt
 // https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
+
+
 PyObject*
 AK_IterableStrToArray1DBoolean(PyObject* iterable)
 {
@@ -245,15 +252,17 @@ AK_IterableStrToArray1D(
 static PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 {
-    PyObject *file_like, *dtypes;
-    if (!PyArg_ParseTuple(args, "OO:delimited_to_arrays",
+    PyObject *file_like, *dtypes, *axis;
+    if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
             &file_like,
-            &dtypes))
+            &dtypes,
+            &axis)) // TODO: inforce this is an int?
     {
         return NULL;
     }
 
     // Parse text
+    // For now, we import and use the CSV module directly; in the future, can vend code from here and implement support for an axis argument to collect data columnwise rather than rowwise
     PyObject *module_csv = PyImport_ImportModule("csv");
     if (!module_csv) {
         return NULL;
@@ -269,57 +278,98 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         return NULL;
     }
 
-    PyObject *lines = PyObject_GetIter(reader_instance);
-    if (lines == NULL) {
+    PyObject *axis0_sequences = PyObject_GetIter(reader_instance);
+    if (!axis0_sequences) {
         Py_DECREF(reader_instance);
         return NULL;
     }
+
+    PyObject *axis_sequences;
+
+    if (PyLong_AsLong(axis) == 1) {
+        PyObject* axis1_sequences = PyList_New(0);
+        if (!axis1_sequences) {
+            Py_DECREF(axis0_sequences);
+            return NULL;
+        }
+        // get first size
+        Py_ssize_t count_row = 0;
+        Py_ssize_t count_columns = -1;
+
+        PyObject *row;
+        while ((row = PyIter_Next(axis0_sequences))) {
+            // get count of columns from first row
+            if (count_row == 0) {
+                count_columns = PyList_Size(row);
+                for (int i=0; i < count_columns; ++i) {
+                    PyObject* column = PyList_New(0);
+                    if (PyList_Append(axis1_sequences, column))
+                    {
+                        PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
+                        Py_DECREF(row);
+                        Py_DECREF(axis1_sequences);
+                        return NULL;
+                    }
+                    Py_DECREF(column);
+                }
+            }
+            // walk through row and append to columns
+            ++count_row;
+        }
+        // Py_DECREF(row); // causes seg fault
+        Py_DECREF(axis0_sequences);
+        return axis1_sequences;
+        AK_NOT_IMPLEMENTED("found axis 1");
+        // PyObject* row1 =
+        // Py_ssize_t count_columns = PyList_Size();
+
+    } else {
+        axis_sequences = axis0_sequences;
+    }
+
 
     // List to be returned
     PyObject* arrays = PyList_New(0);
     if (!arrays) {
-        Py_DECREF(lines);
+        Py_DECREF(axis_sequences);
         Py_DECREF(reader_instance);
         return NULL;
     }
 
-    Py_ssize_t line_count = 0;
+    Py_ssize_t count_sequence = 0;
     PyObject *line;
 
-    while ((line = PyIter_Next(lines))) {
+    while ((line = PyIter_Next(axis_sequences))) {
 
         // PyArray_Descr* dtype = PyArray_DescrFromType(NPY_OBJECT);
 
-        PyObject* dtype_specifier = PyList_GetItem(dtypes, line_count);
+        PyObject* dtype_specifier = PyList_GetItem(dtypes, count_sequence);
         if (!dtype_specifier) {
-            Py_DECREF(lines);
+            Py_DECREF(axis_sequences);
             Py_DECREF(reader_instance);
             return NULL;
         }
 
-        // Py_INCREF(line);
-        // Py_INCREF(dtype_specifier);
         PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
         if (!array) {
             return NULL;
         }
 
-
         if (PyList_Append(arrays, array))
         {
             PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
-            Py_DECREF(lines);
+            Py_DECREF(axis_sequences);
             Py_DECREF(reader_instance);
             Py_DECREF(array);
             Py_DECREF(arrays);
             return NULL;
         }
         Py_DECREF(array);
-        line_count += 1;
+        ++count_sequence;
 
     }
 
-    Py_DECREF(lines);
+    Py_DECREF(axis_sequences);
     Py_DECREF(reader_instance);
     return arrays;
 }

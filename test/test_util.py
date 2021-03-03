@@ -63,19 +63,38 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
         # import ipdb; ipdb.set_trace()
 
+    #---------------------------------------------------------------------------
 
     def test_delimited_to_arrays_a(self) -> None:
 
-        parsed = [
+        msg = [
             '1,-2,54',
             '1,-2,54',
             'True,False,true',
             'a,bb,cc',
         ]
         dtypes = [str, np.dtype(float), bool, str]
-        post = delimited_to_arrays(parsed, dtypes)
+        post = delimited_to_arrays(msg, dtypes, 0)
         self.assertTrue(isinstance(post, list))
 
+
+    def test_delimited_to_arrays_a(self) -> None:
+
+        msg = [
+            '1,True,foo',
+            '1,False,baz',
+            '20,True,bar',
+            '-4,False,34',
+        ]
+        dtypes = [int, bool, str]
+        post = delimited_to_arrays(msg, dtypes, 1)
+        self.assertTrue(isinstance(post, list))
+
+
+
+
+
+    #---------------------------------------------------------------------------
 
     def test_mloc_a(self) -> None:
         a1 = np.arange(10)
