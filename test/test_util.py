@@ -10,8 +10,10 @@ from arraykit import column_1d_filter
 from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
+from arraykit import isna_element
 
 from performance.reference.util import mloc as mloc_ref
+from performance.reference.util import isna_element as isna_element_ref
 
 
 class TestUnit(unittest.TestCase):
@@ -166,6 +168,42 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             row_1d_filter(a1.reshape(1,2,5))
+
+
+    def test_isna_element(self) -> None:
+        # from datetime import date
+        self.assertTrue(isna_element(None))
+
+        self.assertTrue(isna_element(float('NaN')))
+        self.assertTrue(isna_element(np.nan))
+        self.assertFalse(isna_element(float('inf')))
+        self.assertFalse(isna_element(np.inf))
+        self.assertFalse(isna_element(-float('inf')))
+        self.assertFalse(isna_element(-np.inf))
+
+        # Test a wide range of float values, with different precision, across types
+        for val in (
+                1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
+            ):
+            for sign in (1, -1):
+                self.assertFalse(isna_element_ref(np.float16(sign * val)))
+                self.assertFalse(isna_element_ref(np.float32(sign * val)))
+                self.assertFalse(isna_element_ref(np.float64(sign * val)))
+                self.assertFalse(isna_element_ref(np.float128(sign * val)))
+                self.assertFalse(isna_element_ref(sign * val))
+                self.assertFalse(isna_element_ref(float(sign * val)))
+
+        # self.assertTrue(isna_element_ref(np.datetime64('NaT')))
+
+        # self.assertTrue(isna_element_ref(None))
+
+        # self.assertFalse(isna_element_ref(1))
+        # self.assertFalse(isna_element(1))
+        # self.assertFalse(isna_element_ref('str'))
+        # self.assertFalse(isna_element_ref(np.datetime64('2020-12-31')))
+        # self.assertFalse(isna_element_ref(date(2020, 12, 31)))
+        # self.assertFalse(isna_element_ref(False))
+
 
 if __name__ == '__main__':
     unittest.main()

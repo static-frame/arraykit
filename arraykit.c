@@ -1,5 +1,6 @@
 # include "Python.h"
 # include "structmember.h"
+# include "math.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -249,6 +250,30 @@ static PyObject *
 resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     return (PyObject *)AK_ResolveDTypeIter(arg);
+}
+
+//------------------------------------------------------------------------------
+// general utility
+
+static PyObject *
+isna_element(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    // Check for None
+    if (a == Py_None) {
+        return Py_True;
+    }
+
+    // Check float types
+    if (PyFloat_Check(a)) {
+        double v = PyFloat_AsDouble(a);
+
+        if (isnan(v)) {
+            return Py_True;
+        }
+        return Py_False;
+    }
+
+    return NULL;
 }
 
 //------------------------------------------------------------------------------
@@ -527,6 +552,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"isna_element", isna_element, METH_O, NULL},
     {NULL},
 };
 
