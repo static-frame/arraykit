@@ -34,11 +34,17 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a3.tolist(), ['1', '3', '4'])
         self.assertEqual(a3.dtype, np.dtype('O'))
 
-    def test_sequence_str_to_array_1d_b(self) -> None:
-        # NOTE: truthyness of strings is being used to determine boolean types
+
+    def test_sequence_str_to_array_1d_b1(self) -> None:
         a1 = sequence_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
         self.assertEqual(a1.tolist(), [True, False, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
+
+    def test_sequence_str_to_array_1d_b2(self) -> None:
+        a1 = sequence_str_to_array_1d(['true', 'True', 'TRUE', 't'], bool)
+        self.assertEqual(a1.tolist(), [True, True, True, False])
+        self.assertEqual(a1.dtype, np.dtype(bool))
+
 
     def test_sequence_str_to_array_1d_c(self) -> None:
         with self.assertRaises(ValueError):
@@ -49,11 +55,11 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(float))
 
 
-    @unittest.skip('complex handling not implemented yet')
+    # @unittest.skip('complex handling not implemented yet')
     def test_sequence_str_to_array_1d_d(self) -> None:
-
         a1 = sequence_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
         self.assertEqual(a1.dtype, np.dtype(complex))
+        self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
 
 
     def test_sequence_str_to_array_1d_e(self) -> None:
@@ -76,10 +82,10 @@ class TestUnit(unittest.TestCase):
         dtypes = [str, np.dtype(float), bool, str]
         post = delimited_to_arrays(msg, dtypes, 0)
         self.assertTrue(isinstance(post, list))
-        self.assertTrue(post[0].dtype, np.dtype(str))
-        self.assertTrue(post[1].dtype, np.dtype(float))
-        self.assertTrue(post[2].dtype, np.dtype(bool))
-        self.assertTrue(post[3].dtype, np.dtype(str))
+        self.assertEqual(post[0].dtype, np.dtype('<U2'))
+        self.assertEqual(post[1].dtype, np.dtype(float))
+        self.assertEqual(post[2].dtype, np.dtype(bool))
+        self.assertEqual(post[3].dtype, np.dtype('<U2'))
 
     def test_delimited_to_arrays_b(self) -> None:
 
@@ -92,9 +98,9 @@ class TestUnit(unittest.TestCase):
         dtypes = [int, bool, str]
         post = delimited_to_arrays(msg, dtypes, 1)
         self.assertTrue(isinstance(post, list))
-        self.assertTrue(post[0].dtype, np.dtype(int))
-        self.assertTrue(post[1].dtype, np.dtype(bool))
-        self.assertTrue(post[2].dtype, np.dtype(str))
+        self.assertEqual(post[0].dtype, np.dtype(int))
+        self.assertEqual(post[1].dtype, np.dtype(bool))
+        self.assertEqual(post[2].dtype, np.dtype('<U3'))
 
 
 

@@ -133,67 +133,78 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 
 // Complex Numbers
 // Python `complex()` will take any string that looks a like a float; if a "+"" is present the second component must have a "j", otherwise a "complex() arg is a malformed string" is raised. Outer parenthesis are optional, but must be balanced if present
-// NP genfromtxt will not interpret complex numbers with dtype None. With dtype complex, complex notations will be interpreted. Balanced parenthesis are not required; unbalanced parenthesis, as well as missing "j", do not raise and instead result in NaNs.
+// NP genfromtxt will interpret complex numbers with dtype None; Parenthesis are optional. With dtype complex, complex notations will be interpreted. Balanced parenthesis are not required; unbalanced parenthesis, as well as missing "j", do not raise and instead result in NaNs.
+PyObject*
+AK_SequenceStrToArray1DComplex(PyObject* sequence)
+{
+    Py_ssize_t size = PyList_Size(sequence);
+    if (!size) {
+        return NULL;
+    }
+
+    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
+
+    npy_intp dims[] = {size};
+    PyObject* array = PyArray_SimpleNew(1, dims, NPY_COMPLEX128);
+
+    PyObject *element;
+    for (Py_ssize_t pos = 0; pos < size; ++pos)
+    {
+        element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
+        if (!element) {
+            return NULL;
+        }
+        PyObject *v = PyObject_CallFunctionObjArgs((PyObject *)&PyComplex_Type, element, NULL);
+        PyArray_SETITEM((PyArrayObject *)array,
+                PyArray_GETPTR1((PyArrayObject *)array, pos),
+                v);
+    }
+    // NOTE: will be made immutable in caller
+    return array;
+}
 
 // Booleans
 // NP's Boolean conversion in genfromtxt
 // https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-
-
 PyObject*
 AK_SequenceStrToArray1DBoolean(PyObject* sequence)
 {
-    PyObject *iter = PyObject_GetIter(sequence);
-    if (iter == NULL) {
+    Py_ssize_t size = PyList_Size(sequence);
+    if (!size) {
         return NULL;
     }
 
-    // TODO: create all-False Boolean array and just updated Trues
+    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
 
+    npy_intp dims[] = {size};
+    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     PyObject *lower = PyUnicode_FromString("lower");
-    PyObject *converted = PyList_New(0); // give a hint to size?
+    if (!lower) {
+        return NULL;
+    }
+
     PyObject *element;
-    while ((element = PyIter_Next(iter)))
+    for (Py_ssize_t pos = 0; pos < size; ++pos)
     {
+        element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
+        if (!element) {
+            return NULL;
+        }
         PyObject* element_lower = PyObject_CallMethodObjArgs(element, lower, NULL);
         if (!element_lower) {
             return NULL;
         }
-        Py_DECREF(element);
-        // Retrun 0 on match, otherwise -1 or 1
-        // Store a truthy int in the converted list
-        PyObject *is_true = PyLong_FromLong(
-                PyUnicode_CompareWithASCIIString(element_lower, "true") == 0);
-        if (!is_true) {
-            return NULL;
+        if (PyUnicode_CompareWithASCIIString(element_lower, "true") == 0) {
+            *(npy_bool *) PyArray_GETPTR1((PyArrayObject *)array, pos) = 1;
+            // this does not work; not sure why!
+            // PyArray_SETITEM((PyArrayObject *)array,
+            //         PyArray_GETPTR1((PyArrayObject *)array, pos),
+            //         1);
         }
-        Py_DECREF(element_lower);
-
-        if (PyList_Append(converted, is_true))
-        {
-            // might use int PyArray_BoolConverter(PyObject* obj, Bool* value)
-            PyErr_SetString(PyExc_NotImplementedError, "could not append to list.");
-            Py_DECREF(is_true);
-            Py_DECREF(converted);
-            Py_DECREF(iter);
-            return NULL;
-        }
-        Py_DECREF(is_true);
     }
-    Py_DECREF(iter);
-
-    PyArray_Descr* dtype = PyArray_DescrFromType(NPY_BOOL);
-    PyObject* array = PyArray_FromAny(converted,
-            dtype, // steals ref
-            1,
-            1,
-            NPY_ARRAY_FORCECAST, // not sure this is best
-            NULL);
-
-    Py_DECREF(converted);
-    if (!array) {
-        return NULL;
-    }
+    Py_DECREF(sequence_fast);
+    Py_DECREF(lower);
     // NOTE: will be made immutable in caller
     return array;
 }
@@ -215,12 +226,6 @@ AK_SequenceStrToArray1D(
             PyArray_DescrConverter2(dtype_specifier, &dtype);
         }
 
-        if (dtype)
-        { // Only incref if dtype is not NULL
-            Py_INCREF(dtype);
-        }
-
-
         PyObject* array;
         if (!dtype) {
             AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
@@ -228,8 +233,12 @@ AK_SequenceStrToArray1D(
         else if (PyDataType_ISBOOL(dtype)) {
             array = AK_SequenceStrToArray1DBoolean(sequence);
         }
+        else if (PyDataType_ISCOMPLEX(dtype)) {
+            array = AK_SequenceStrToArray1DComplex(sequence);
+        }
         else {
             // NOTE: Some types can be converted directly from strings. int, float, dt64, variously sized strings: will convert from strings correctly. bool dtypes: will treat string as truthy/falsy
+            Py_XINCREF(dtype); // will steal
             array = PyArray_FromAny(sequence,
                     dtype, // can be NULL, object: strings will remain
                     1,
@@ -286,7 +295,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         Py_DECREF(reader_instance);
         return NULL;
     }
-    if (PyLong_AsLong(axis) == 1) {
+    if (PyLong_AsLong(axis) == 1) { // this can fail
         PyObject* axis1_sequences = PyList_New(0);
         if (!axis1_sequences) {
             Py_DECREF(axis0_sequence_iter);
@@ -302,11 +311,11 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             // get count of columns from first row
             if (count_row == 0) {
                 count_columns = PyList_Size(row);
+                // use Py_ssize_t?
                 for (int i=0; i < count_columns; ++i) {
                     column = PyList_New(0);
                     if (PyList_Append(axis1_sequences, column)) // does not steal
                     {
-                        PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
                         Py_DECREF(row);
                         Py_DECREF(axis1_sequences);
                         return NULL;
@@ -320,7 +329,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
                 column = PyList_GetItem(axis1_sequences, i); // borrowed?
                 if (PyList_Append(column, element))
                     {
-                        PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
                         Py_DECREF(axis1_sequences);
                         return NULL;
                     }
@@ -347,7 +355,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     PyObject *line;
 
     while ((line = PyIter_Next(axis_sequence_iter))) {
-
         PyObject* dtype_specifier = PyList_GetItem(dtypes, count_sequence);
         if (!dtype_specifier) {
             Py_DECREF(axis_sequence_iter);
@@ -372,6 +379,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         Py_DECREF(array);
         ++count_sequence;
     }
+    // check if PyErr occured
 
     Py_DECREF(axis_sequence_iter);
     Py_DECREF(reader_instance);
