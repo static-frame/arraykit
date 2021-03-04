@@ -155,11 +155,15 @@ AK_SequenceStrToArray1DComplex(PyObject* sequence)
             return NULL;
         }
         PyObject *v = PyObject_CallFunctionObjArgs((PyObject *)&PyComplex_Type, element, NULL);
+        if (!v) {
+            return NULL;
+        }
         PyArray_SETITEM((PyArrayObject *)array,
                 PyArray_GETPTR1((PyArrayObject *)array, pos),
                 v);
     }
     // NOTE: will be made immutable in caller
+    Py_DECREF(sequence_fast);
     return array;
 }
 

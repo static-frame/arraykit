@@ -55,11 +55,23 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(float))
 
 
-    # @unittest.skip('complex handling not implemented yet')
-    def test_sequence_str_to_array_1d_d(self) -> None:
+    def test_sequence_str_to_array_1d_d1(self) -> None:
         a1 = sequence_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
         self.assertEqual(a1.dtype, np.dtype(complex))
         self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
+
+    def test_sequence_str_to_array_1d_d2(self) -> None:
+        a1 = sequence_str_to_array_1d(['3+0j', '100+nanj'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
+
+    def test_sequence_str_to_array_1d_d3(self) -> None:
+        a1 = sequence_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
+        self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
+
+    def test_sequence_str_to_array_1d_d4(self) -> None:
+        with self.assertRaises(ValueError):
+            a1 = sequence_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
 
 
     def test_sequence_str_to_array_1d_e(self) -> None:
