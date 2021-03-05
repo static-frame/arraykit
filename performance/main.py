@@ -3,6 +3,7 @@
 
 import timeit
 import numpy as np
+import io
 
 from performance.reference.util import mloc as mloc_ref
 from performance.reference.util import immutable_filter as immutable_filter_ref
@@ -25,6 +26,7 @@ from arraykit import column_1d_filter as column_1d_filter_ak
 from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
+from arraykit import delimited_to_arrays as delimited_to_arrays_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -32,6 +34,70 @@ from arraykit import ArrayGO as ArrayGOAK
 class Perf:
     FUNCTIONS = ('main',)
     NUMBER = 500_000
+
+
+#-------------------------------------------------------------------------------
+class DelimitedToArraysPandas(Perf):
+    NUMBER = 20
+
+    def pre(self):
+        records = [','.join(str(x) for x in range(1000))] * 1000
+        self.file_like = io.StringIO('\n'.join(records))
+
+class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
+    entry = staticmethod(delimited_to_arrays_ak)
+
+    def pre(self):
+        super().pre()
+        self.dtypes = [int] * 1000
+
+    def main(self):
+        self.file_like.seek(0)
+        _ = self.entry(self.file_like, self.dtypes, 0)
+
+class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
+    import pandas
+    entry = staticmethod(pandas.read_csv)
+
+    def pre(self):
+        super().pre()
+        self.dtypes = {i: int for i in range(1000)}
+
+    def main(self):
+        self.file_like.seek(0)
+        _ = self.entry(self.file_like, dtype=self.dtypes)
+
+
+#-------------------------------------------------------------------------------
+class DelimitedToArraysGenft(Perf):
+    NUMBER = 20
+
+    def pre(self):
+        records = [','.join(str(x) for x in range(1000))] * 1000
+        self.file_like = io.StringIO('\n'.join(records))
+
+class DelimitedToArraysGenftAK(DelimitedToArraysGenft):
+    entry = staticmethod(delimited_to_arrays_ak)
+
+    def pre(self):
+        super().pre()
+        self.dtypes = [int] * 1000
+
+    def main(self):
+        self.file_like.seek(0)
+        _ = self.entry(self.file_like, self.dtypes, 0)
+
+class DelimitedToArraysGenftREF(DelimitedToArraysGenft):
+    import numpy
+    entry = staticmethod(np.genfromtxt)
+
+    def pre(self):
+        super().pre()
+        self.dtypes = {i: int for i in range(1000)}
+
+    def main(self):
+        self.file_like.seek(0)
+        _ = self.entry(self.file_like, delimiter=',')
 
 #-------------------------------------------------------------------------------
 class MLoc(Perf):
@@ -175,7 +241,7 @@ class ResolveDTypeREF(ResolveDType):
 class ResolveDTypeIter(Perf):
 
     FUNCTIONS = ('iter10', 'iter100000')
-    NUMBER = 1000
+    NUMBER = 500
 
     def pre(self):
         self.dtypes10 = [np.dtype(int)] * 9 + [np.dtype(float)]
@@ -200,7 +266,7 @@ class ResolveDTypeIterREF(ResolveDTypeIter):
 
 #-------------------------------------------------------------------------------
 class ArrayGOPerf(Perf):
-    NUMBER = 1000
+    NUMBER = 500
 
     def pre(self):
         self.array = np.arange(100).astype(object)
@@ -220,11 +286,29 @@ class ArrayGOPerfREF(ArrayGOPerf):
 
 
 #-------------------------------------------------------------------------------
+import argparse
+
+def get_arg_parser():
+
+    p = argparse.ArgumentParser(
+        description='ArrayKit performance tool.',
+        )
+    p.add_argument("--names",
+        nargs='+',
+        help='Provide one or more performance tests by name.')
+    return p
+
 
 def main():
+    options = get_arg_parser().parse_args()
+    match = None if not options.names else set(options.names)
+
     records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
     for cls_perf in Perf.__subclasses__(): # only get one level
         cls_map = {}
+        if match and cls_perf.__name__ not in match:
+            continue
+        print(cls_perf)
         for cls_runner in cls_perf.__subclasses__():
             if cls_runner.__name__.endswith('AK'):
                 cls_map['ak'] = cls_runner
@@ -241,9 +325,10 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
+    width = 24
     for record in records:
         print(''.join(
-            (r.ljust(18) if isinstance(r, str) else str(round(r, 8)).ljust(18)) for r in record
+            (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
             ))
 
 if __name__ == '__main__':
