@@ -182,8 +182,11 @@ class TestUnit(unittest.TestCase):
                 1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
             ):
             for sign in (1, -1):
-                for ctor in (np.float16, np.float32, np.float64, np.float128, float):
+                for ctor in (np.float16, np.float32, np.float64, float):
                     self.assertFalse(isna_element((ctor(sign * val))))
+
+                if hasattr(np, 'float128'):
+                    self.assertFalse(isna_element((float128(sign * val))))
 
         self.assertFalse(isna_element(1))
         self.assertFalse(isna_element('str'))

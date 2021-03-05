@@ -237,8 +237,11 @@ class IsNaElementPerf(Perf):
                 1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
             ):
             for sign in (1, -1):
-                for ctor in (np.float16, np.float32, np.float64, np.float128, float):
+                for ctor in (np.float16, np.float32, np.float64, float):
                     self.values.append(ctor(sign * val))
+
+                if hasattr(np, 'float128'):
+                    self.values.append(float128(sign * val))
 
     def main(self):
         for _ in range(10):
