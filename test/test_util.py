@@ -175,8 +175,8 @@ class TestUnit(unittest.TestCase):
         memo = {}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertTrue(id(a1) != id(a2))
-        self.assertTrue(mloc(a1) != mloc(a2))
+        self.assertNotEqual(id(a1), id(a2))
+        self.assertNotEqual(mloc(a1), mloc(a2))
         self.assertFalse(a2.flags.writeable)
         self.assertEqual(a1.dtype, a2.dtype)
 
@@ -185,10 +185,10 @@ class TestUnit(unittest.TestCase):
         memo = {}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertTrue(id(a1) != id(a2))
-        self.assertTrue(mloc(a1) != mloc(a2))
-        self.assertTrue(id(a1) in memo)
-        self.assertTrue(memo[id(a1)].tolist() == a2.tolist())
+        self.assertNotEqual(id(a1), id(a2))
+        self.assertNotEqual(mloc(a1), mloc(a2))
+        self.assertIn(id(a1), memo)
+        self.assertEqual(memo[id(a1)].tolist(), a2.tolist())
         self.assertFalse(a2.flags.writeable)
 
 
@@ -216,15 +216,11 @@ class TestUnit(unittest.TestCase):
         mutable = [np.nan]
         a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
-#
         self.assertTrue(id(a1) != id(a2))
         self.assertTrue(mloc(a1) != mloc(a2))
         self.assertTrue(id(a1[3]) != id(a2[3]))
         self.assertFalse(a2.flags.writeable)
         self.assertTrue(id(a1) in memo)
-
-
-
 
 
 if __name__ == '__main__':

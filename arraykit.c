@@ -37,8 +37,7 @@
 // Placeholder of not implemented pathways / debugging.
 # define AK_NOT_IMPLEMENTED(msg)\
     do {\
-        PyErr_Format(PyExc_NotImplementedError,\
-                msg);\
+        PyErr_Format(PyExc_NotImplementedError, msg);\
         return NULL;\
     } while (0)
 
@@ -132,57 +131,57 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 
 // Numpy implementation: https://github.com/numpy/numpy/blob/a14c41264855e44ebd6187d7541b5b8d59bb32cb/numpy/core/src/multiarray/methods.c#L1557
 PyObject*
-AK_ArrayCopy(PyObject *array, PyObject *memo)
+AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
 {
-    PyObject *id = PyLong_FromVoidPtr(array);
+    PyObject *id = PyLong_FromVoidPtr((PyObject*)array);
+    if (!id) {
+        return NULL;
+    }
     PyObject *found = PyDict_GetItem(memo, id);
     if (found) { // found will be NULL if not in dict
+        Py_INCREF(found); // got a borrowed ref, increment first
         Py_DECREF(id);
-        Py_INCREF(found); // got a borrowed ref
         return found;
     }
 
     // if dtype is object, call deepcopy with memo
     PyObject *array_new;
-    PyArray_Descr *dtype = PyArray_DESCR((PyArrayObject *)array); // borrowed ref
+    PyArray_Descr *dtype = PyArray_DESCR(array); // borrowed ref
 
-    if PyDataType_ISOBJECT(dtype)
-    {
+    if (PyDataType_ISOBJECT(dtype)) {
         PyObject *copy = PyImport_ImportModule("copy");
         if (!copy) {
-            Py_DECREF(id);
-            return NULL;
+            goto error;
         }
         PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
         Py_DECREF(copy);
         if (!deepcopy) {
-            Py_DECREF(id);
-            return NULL;
+            goto error;
         }
         array_new = PyObject_CallFunctionObjArgs(deepcopy, array, memo, NULL);
         Py_DECREF(deepcopy);
         if (!array_new) {
-            Py_DECREF(id);
-            return NULL;
+            goto error;
         }
     }
     else {
         Py_INCREF(dtype); // PyArray_FromArray steals a reference
         array_new = PyArray_FromArray(
-                (PyArrayObject*) array,
+                array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
-        if (PyDict_SetItem(memo, id, array_new))
-        {
+        if (PyDict_SetItem(memo, id, array_new)) {
             Py_DECREF(array_new);
-            Py_DECREF(id);
-            return NULL;
+            goto error;
         }
     }
     // set immutable
     PyArray_CLEARFLAGS((PyArrayObject *)array_new, NPY_ARRAY_WRITEABLE);
     Py_DECREF(id);
     return array_new;
+error:
+    Py_DECREF(id);
+    return NULL;
 }
 
 
@@ -295,13 +294,16 @@ static PyObject *
 array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyObject *array, *memo;
-    if (!PyArg_ParseTuple(args, "OO:array_deepcopy",
-            &array,
-            &memo))
-    {
+    if (!PyArg_UnpackTuple(args, "array_deepcopy", 2, 2, &array, &memo)) {
         return NULL;
     }
-    return AK_ArrayCopy(array, memo);
+    AK_CHECK_NUMPY_ARRAY(array);
+    if (!PyDict_CheckExact(memo)) {
+        PyErr_Format(PyExc_TypeError, "expected a dict (got %s)",
+                Py_TYPE(memo)->tp_name);
+        return NULL;
+    }
+    return AK_ArrayDeepCopy((PyArrayObject*)array, memo);
 }
 
 //------------------------------------------------------------------------------
