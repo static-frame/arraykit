@@ -226,7 +226,7 @@ class IsNaElementPerf(Perf):
     def pre(self):
         self.values = [
                 # Na-elements
-                np.nan, np.datetime64('NaT'), None, float('NaN'),
+                np.nan, np.datetime64('NaT'), np.timedelta64('NaT'), None, float('NaN'),
 
                 # Non-float, Non-na elements
                 1, 'str', np.datetime64('2020-12-31'), datetime.date(2020, 12, 31), False,

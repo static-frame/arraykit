@@ -172,6 +172,7 @@ class TestUnit(unittest.TestCase):
 
     def test_isna_element_true(self) -> None:
         self.assertTrue(isna_element(np.datetime64('NaT')))
+        self.assertTrue(isna_element(np.timedelta64('NaT')))
         self.assertTrue(isna_element(float('NaN')))
         self.assertTrue(isna_element(np.nan))
         self.assertTrue(isna_element(None))

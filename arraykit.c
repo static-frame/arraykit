@@ -270,9 +270,15 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *a)
         return PyBool_FromLong(isnan(v));
     }
 
-    // NaT
+    // NaT - Datetime
     if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
         int isnat = PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
+        return PyBool_FromLong(isnat);
+    }
+
+    // NaT - Timedelta
+    if (PyArray_IsScalar(a, Timedelta)) { // Cannot fail
+        int isnat = PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
         return PyBool_FromLong(isnat);
     }
 
