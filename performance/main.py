@@ -1,3 +1,4 @@
+import collections
 import datetime
 import timeit
 import argparse
@@ -13,6 +14,7 @@ from performance.reference.util import column_1d_filter as column_1d_filter_ref
 from performance.reference.util import row_1d_filter as row_1d_filter_ref
 from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
+from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import isna_element as isna_element_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
@@ -26,6 +28,7 @@ from arraykit import column_1d_filter as column_1d_filter_ak
 from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
+from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import isna_element as isna_element_ak
 
 from arraykit import ArrayGO as ArrayGOAK
@@ -255,6 +258,45 @@ class IsNaElementPerfAK(IsNaElementPerf):
 
 class IsNaElementPerfREF(IsNaElementPerf):
     entry = staticmethod(isna_element_ref)
+
+
+#-------------------------------------------------------------------------------
+class DtypeFromElementPerf(Perf):
+    NUMBER = 1000
+
+    def pre(self):
+        NT = collections.namedtuple('NT', tuple('abc'))
+
+        self.values = [
+                np.longlong(-1), np.int_(-1), np.intc(-1), np.short(-1), np.byte(-1),
+                np.ubyte(1), np.ushort(1), np.uintc(1), np.uint(1), np.ulonglong(1),
+                np.half(1.0), np.single(1.0), np.float_(1.0), np.longfloat(1.0),
+                np.csingle(1.0j), np.complex_(1.0j), np.clongfloat(1.0j),
+                np.bool_(0), np.str_('1'), np.unicode_('1'), np.void(1),
+                np.object(), np.datetime64('NaT'), np.timedelta64('NaT'), np.nan,
+                12, 12.0, True, None, float('NaN'), object(), (1, 2, 3),
+                NT(1, 2, 3), datetime.date(2020, 12, 31), datetime.timedelta(14),
+        ]
+
+        # Datetime & Timedelta
+        for precision in ['ns', 'us', 'ms', 's', 'm', 'h', 'D', 'M', 'Y']:
+            for kind, ctor in (('m', np.timedelta64), ('M', np.datetime64)):
+                self.values.append(ctor(12, precision))
+
+        for size in (1, 8, 16, 32, 64, 128, 256, 512):
+            self.values.append(bytes(size))
+            self.values.append('x' * size)
+
+    def main(self):
+        for _ in range(40):
+            for val in self.values:
+                self.entry(val)
+
+class DtypeFromElementPerfAK(DtypeFromElementPerf):
+    entry = staticmethod(dtype_from_element_ak)
+
+class DtypeFromElementPerfREF(DtypeFromElementPerf):
+    entry = staticmethod(dtype_from_element_ref)
 
 
 #-------------------------------------------------------------------------------
