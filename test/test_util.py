@@ -170,16 +170,15 @@ class TestUnit(unittest.TestCase):
             row_1d_filter(a1.reshape(1,2,5))
 
 
-    def test_isna_element(self) -> None:
-        # from datetime import date
+    def test_isna_element_true(self) -> None:
+        self.assertTrue(isna_element(np.datetime64('NaT')))
         self.assertTrue(isna_element(None))
-
         self.assertTrue(isna_element(float('NaN')))
         self.assertTrue(isna_element(np.nan))
-        self.assertFalse(isna_element(float('inf')))
-        self.assertFalse(isna_element(np.inf))
-        self.assertFalse(isna_element(-float('inf')))
-        self.assertFalse(isna_element(-np.inf))
+        self.assertTrue(isna_element_ref(None))
+
+    def test_isna_element_false(self) -> None:
+        from datetime import date
 
         # Test a wide range of float values, with different precision, across types
         for val in (
@@ -193,16 +192,12 @@ class TestUnit(unittest.TestCase):
                 self.assertFalse(isna_element_ref(sign * val))
                 self.assertFalse(isna_element_ref(float(sign * val)))
 
-        # self.assertTrue(isna_element_ref(np.datetime64('NaT')))
-
-        # self.assertTrue(isna_element_ref(None))
-
-        # self.assertFalse(isna_element_ref(1))
-        # self.assertFalse(isna_element(1))
-        # self.assertFalse(isna_element_ref('str'))
-        # self.assertFalse(isna_element_ref(np.datetime64('2020-12-31')))
-        # self.assertFalse(isna_element_ref(date(2020, 12, 31)))
-        # self.assertFalse(isna_element_ref(False))
+        self.assertFalse(isna_element_ref(1))
+        self.assertFalse(isna_element(1))
+        self.assertFalse(isna_element_ref('str'))
+        self.assertFalse(isna_element_ref(np.datetime64('2020-12-31')))
+        self.assertFalse(isna_element_ref(date(2020, 12, 31)))
+        self.assertFalse(isna_element_ref(False))
 
 
 if __name__ == '__main__':

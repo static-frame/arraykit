@@ -1,11 +1,11 @@
 # include "Python.h"
 # include "structmember.h"
-# include "math.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 # include "numpy/arrayobject.h"
+# include "numpy/arrayscalars.h" // Needed for Datetime scalar expansions
 
 //------------------------------------------------------------------------------
 // Macros
@@ -258,22 +258,26 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 static PyObject *
 isna_element(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    // Check for None
-    if (a == Py_None) {
-        return Py_True;
-    }
-
-    // Check float types
+    // NaN
     if (PyFloat_Check(a)) {
         double v = PyFloat_AsDouble(a);
 
-        if (isnan(v)) {
-            return Py_True;
+        // Need to disambiguate, since v could be -1 and no failure happened
+        if (v == -1 && PyErr_Occurred()) {
+            return NULL;
         }
-        return Py_False;
+
+        return PyBool_FromLong(isnan(v));
     }
 
-    return NULL;
+    // NaT
+    if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
+        int isnat = PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
+        return PyBool_FromLong(isnat);
+    }
+
+    // None
+    return PyBool_FromLong(a == Py_None);
 }
 
 //------------------------------------------------------------------------------
