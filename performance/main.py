@@ -2,6 +2,8 @@
 
 
 import timeit
+import argparse
+
 import numpy as np
 import io
 
@@ -299,6 +301,17 @@ def get_arg_parser():
     return p
 
 
+def get_arg_parser():
+
+    p = argparse.ArgumentParser(
+        description='ArrayKit performance tool.',
+        )
+    p.add_argument("--names",
+        nargs='+',
+        help='Provide one or more performance tests by name.')
+    return p
+
+
 def main():
     options = get_arg_parser().parse_args()
     match = None if not options.names else set(options.names)
@@ -333,5 +346,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
