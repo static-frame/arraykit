@@ -36,12 +36,11 @@
     } while (0)
 
 // Placeholder of not implemented functions.
-# define AK_NOT_IMPLEMENTED\
+# define AK_NOT_IMPLEMENTED \
     do {\
         PyErr_SetNone(PyExc_NotImplementedError);\
         return NULL;\
     } while (0)
-
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
@@ -252,15 +251,86 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
+static PyObject *
+dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    // -------------------------------------------------------------------------
+    // 1. Handle fast, exact type checks first.
+
+    // None
+    if (arg == Py_None) {
+        return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+    }
+
+    // Float
+    if (PyFloat_CheckExact(arg)) {
+        return (PyObject*)PyArray_DescrFromType(NPY_DOUBLE);
+    }
+
+    // Integers
+    if (PyLong_CheckExact(arg)) {
+        return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+    }
+
+    // Bool
+    if (PyBool_Check(arg)) {
+        return (PyObject*)PyArray_DescrFromType(NPY_BOOL);
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Construct dtype (slightly more complicated)
+
+    PyObject* dtype = NULL;
+
+    // Already known
+    dtype = PyObject_GetAttrString(arg, "dtype");
+    if (dtype) {
+        return dtype;
+    }
+    PyErr_Clear();
+
+    // String
+    if (PyUnicode_CheckExact(arg)) {
+        PyArray_Descr* descr = PyArray_DescrFromType(NPY_UNICODE);
+        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
+        if (!dtype) {
+            return NULL;
+        }
+        return dtype;
+    }
+
+    // Bytes
+    if (PyBytes_CheckExact(arg)) {
+        PyArray_Descr* descr = PyArray_DescrFromType(NPY_STRING);
+        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
+        if (!dtype) {
+            return NULL;
+        }
+        return dtype;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Handles everything else.
+
+    // Is this check necessary? (i.e. can a non-object dtype get here?)
+    // dtype = (PyObject*)PyArray_DescrFromScalar(arg);
+    // if (!dtype) {
+    //     return NULL;
+    // }
+    // return dtype;
+    return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+
+}
+
 //------------------------------------------------------------------------------
 // general utility
 
 static PyObject *
-isna_element(PyObject *Py_UNUSED(m), PyObject *a)
+isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     // NaN
-    if (PyFloat_Check(a)) {
-        double v = PyFloat_AsDouble(a);
+    if (PyFloat_Check(arg)) {
+        double v = PyFloat_AsDouble(arg);
 
         // Need to disambiguate, since v could be -1 and no failure happened
         if (v == -1 && PyErr_Occurred()) {
@@ -271,19 +341,19 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *a)
     }
 
     // NaT - Datetime
-    if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
-        int isnat = PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
+    if (PyArray_IsScalar(arg, Datetime)) { // Cannot fail
+        int isnat = PyArrayScalar_VAL(arg, Datetime) == NPY_DATETIME_NAT;
         return PyBool_FromLong(isnat);
     }
 
     // NaT - Timedelta
-    if (PyArray_IsScalar(a, Timedelta)) { // Cannot fail
-        int isnat = PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
+    if (PyArray_IsScalar(arg, Timedelta)) { // Cannot fail
+        int isnat = PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT;
         return PyBool_FromLong(isnat);
     }
 
     // None
-    return PyBool_FromLong(a == Py_None);
+    return PyBool_FromLong(arg == Py_None);
 }
 
 //------------------------------------------------------------------------------
@@ -562,6 +632,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {NULL},
 };
