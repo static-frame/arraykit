@@ -2,6 +2,8 @@
 
 
 import timeit
+import argparse
+
 import numpy as np
 
 from performance.reference.util import mloc as mloc_ref
@@ -220,7 +222,6 @@ class ArrayGOPerfREF(ArrayGOPerf):
 
 
 #-------------------------------------------------------------------------------
-import argparse
 
 def get_arg_parser():
 
