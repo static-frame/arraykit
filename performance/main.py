@@ -1,5 +1,7 @@
 import datetime
 import timeit
+import argparse
+
 import numpy as np
 
 from performance.reference.util import mloc as mloc_ref
@@ -257,10 +259,27 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 #-------------------------------------------------------------------------------
 
+def get_arg_parser():
+
+    p = argparse.ArgumentParser(
+        description='ArrayKit performance tool.',
+        )
+    p.add_argument("--names",
+        nargs='+',
+        help='Provide one or more performance tests by name.')
+    return p
+
+
 def main():
+    options = get_arg_parser().parse_args()
+    match = None if not options.names else set(options.names)
+
     records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
     for cls_perf in Perf.__subclasses__(): # only get one level
         cls_map = {}
+        if match and cls_perf.__name__ not in match:
+            continue
+        print(cls_perf)
         for cls_runner in cls_perf.__subclasses__():
             if cls_runner.__name__.endswith('AK'):
                 cls_map['ak'] = cls_runner
@@ -277,12 +296,12 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
+    width = 24
     for record in records:
         print(''.join(
-            (r.ljust(18) if isinstance(r, str) else str(round(r, 8)).ljust(18)) for r in record
+            (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
             ))
 
 if __name__ == '__main__':
     main()
-
 
