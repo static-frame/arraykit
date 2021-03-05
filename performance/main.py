@@ -241,7 +241,7 @@ class IsNaElementPerf(Perf):
                     self.values.append(ctor(sign * val))
 
                 if hasattr(np, 'float128'):
-                    self.values.append(float128(sign * val))
+                    self.values.append(np.float128(sign * val))
 
     def main(self):
         for _ in range(10):
