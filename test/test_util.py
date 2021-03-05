@@ -12,7 +12,6 @@ from arraykit import column_1d_filter
 from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
-from arraykit import isna_element
 from arraykit import dtype_from_element
 
 from performance.reference.util import mloc as mloc_ref
@@ -170,32 +169,6 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             row_1d_filter(a1.reshape(1,2,5))
-
-
-    def test_isna_element_true(self) -> None:
-        self.assertTrue(isna_element(np.datetime64('NaT')))
-        self.assertTrue(isna_element(np.timedelta64('NaT')))
-        self.assertTrue(isna_element(float('NaN')))
-        self.assertTrue(isna_element(np.nan))
-        self.assertTrue(isna_element(None))
-
-    def test_isna_element_false(self) -> None:
-        # Test a wide range of float values, with different precision, across types
-        for val in (
-                1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
-            ):
-            for sign in (1, -1):
-                for ctor in (np.float16, np.float32, np.float64, float):
-                    self.assertFalse(isna_element((ctor(sign * val))))
-
-                if hasattr(np, 'float128'):
-                    self.assertFalse(isna_element((np.float128(sign * val))))
-
-        self.assertFalse(isna_element(1))
-        self.assertFalse(isna_element('str'))
-        self.assertFalse(isna_element(np.datetime64('2020-12-31')))
-        self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
-        self.assertFalse(isna_element(False))
 
     def test_dtype_from_element(self) -> None:
         NT = collections.namedtuple('NT', tuple('abc'))

@@ -15,7 +15,6 @@ from performance.reference.util import row_1d_filter as row_1d_filter_ref
 from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
-from performance.reference.util import isna_element as isna_element_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -29,7 +28,6 @@ from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
-from arraykit import isna_element as isna_element_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -222,42 +220,6 @@ class ArrayGOPerfAK(ArrayGOPerf):
 
 class ArrayGOPerfREF(ArrayGOPerf):
     entry = staticmethod(ArrayGOREF)
-
-
-#-------------------------------------------------------------------------------
-class IsNaElementPerf(Perf):
-    NUMBER = 1000
-
-    def pre(self):
-        self.values = [
-                # Na-elements
-                np.nan, np.datetime64('NaT'), np.timedelta64('NaT'), None, float('NaN'),
-
-                # Non-float, Non-na elements
-                1, 'str', np.datetime64('2020-12-31'), datetime.date(2020, 12, 31), False,
-        ]
-
-        # Append a wide range of float values, with different precision, across types
-        for val in (
-                1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
-            ):
-            for sign in (1, -1):
-                for ctor in (np.float16, np.float32, np.float64, float):
-                    self.values.append(ctor(sign * val))
-
-                if hasattr(np, 'float128'):
-                    self.values.append(np.float128(sign * val))
-
-    def main(self):
-        for _ in range(10):
-            for val in self.values:
-                self.entry(val)
-
-class IsNaElementPerfAK(IsNaElementPerf):
-    entry = staticmethod(isna_element_ak)
-
-class IsNaElementPerfREF(IsNaElementPerf):
-    entry = staticmethod(isna_element_ref)
 
 
 #-------------------------------------------------------------------------------

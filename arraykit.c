@@ -323,40 +323,6 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
-// general utility
-
-static PyObject *
-isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
-{
-    // NaN
-    if (PyFloat_Check(arg)) {
-        double v = PyFloat_AsDouble(arg);
-
-        // Need to disambiguate, since v could be -1 and no failure happened
-        if (v == -1 && PyErr_Occurred()) {
-            return NULL;
-        }
-
-        return PyBool_FromLong(isnan(v));
-    }
-
-    // NaT - Datetime
-    if (PyArray_IsScalar(arg, Datetime)) { // Cannot fail
-        int isnat = PyArrayScalar_VAL(arg, Datetime) == NPY_DATETIME_NAT;
-        return PyBool_FromLong(isnat);
-    }
-
-    // NaT - Timedelta
-    if (PyArray_IsScalar(arg, Timedelta)) { // Cannot fail
-        int isnat = PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT;
-        return PyBool_FromLong(isnat);
-    }
-
-    // None
-    return PyBool_FromLong(arg == Py_None);
-}
-
-//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -633,7 +599,6 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
-    {"isna_element", isna_element, METH_O, NULL},
     {NULL},
 };
 
