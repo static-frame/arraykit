@@ -131,6 +131,23 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 
+// AK_SequenceStrToArray1DAuto(PyObject* sequence)
+// Determine the type dynamically
+// Ideas: keep the same sequence and mutate it in-place with Python objects when necessary
+//      track observations through iteration to determine type to give to PyArray_FromAny
+
+// Only identify things that are not true strings and need conversion: bools, int, float, complex
+// genfromtxt behavior:
+// if one complex and the rest are floats: complex
+// if any non-numeric strings (other than nan) found with other numerics: str
+// if all bool str (case insensitive): bool
+// if all integer (no decimal: is this local dependent?): int
+// if intger with nan: float
+// nans interpreted as: empty cell, any case of "nan"; not "na"
+// None is never converted to object; None and True go to string (even with dtype object)
+//      'None' and 'True' given in array construction is the same, same for astype(object)
+
+
 // Complex Numbers
 // Python `complex()` will take any string that looks a like a float; if a "+"" is present the second component must have a "j", otherwise a "complex() arg is a malformed string" is raised. Outer parenthesis are optional, but must be balanced if present
 // NP genfromtxt will interpret complex numbers with dtype None; Parenthesis are optional. With dtype complex, complex notations will be interpreted. Balanced parenthesis are not required; unbalanced parenthesis, as well as missing "j", do not raise and instead result in NaNs.
