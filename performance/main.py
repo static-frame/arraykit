@@ -41,21 +41,33 @@ class Perf:
 #-------------------------------------------------------------------------------
 class DelimitedToArraysPandas(Perf):
     NUMBER = 20
+    FUNCTIONS = ('int_uniform', 'bool_uniform')
 
     def pre(self):
-        records = [','.join(str(x) for x in range(1000))] * 1000
-        self.file_like = io.StringIO('\n'.join(records))
+        records_int = [','.join(str(x) for x in range(1000))] * 1000
+        self.file_like_int = io.StringIO('\n'.join(records_int))
+
+        records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * 1000
+        self.file_like_bool = io.StringIO('\n'.join(records_bool))
+
 
 class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
     entry = staticmethod(delimited_to_arrays_ak)
 
     def pre(self):
         super().pre()
-        self.dtypes = [int] * 1000
+        self.dtypes_int = [int] * 1000
+        self.dtypes_bool = [bool] * 1000
+        self.axis = 0
 
-    def main(self):
-        self.file_like.seek(0)
-        _ = self.entry(self.file_like, self.dtypes, 0)
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, self.dtypes_int, self.axis)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, self.dtypes_bool, self.axis)
+
 
 class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
     import pandas
@@ -63,31 +75,37 @@ class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
 
     def pre(self):
         super().pre()
-        self.dtypes = {i: int for i in range(1000)}
+        self.dtypes_int = {i: int for i in range(1000)}
+        self.dtypes_bool = {i: bool for i in range(1000)}
 
-    def main(self):
-        self.file_like.seek(0)
-        _ = self.entry(self.file_like, dtype=self.dtypes)
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtype=self.dtypes_int)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtype=self.dtypes_bool)
 
 
 #-------------------------------------------------------------------------------
 class DelimitedToArraysGenft(Perf):
     NUMBER = 20
+    FUNCTIONS = ('int_uniform',)
 
     def pre(self):
-        records = [','.join(str(x) for x in range(1000))] * 1000
-        self.file_like = io.StringIO('\n'.join(records))
+        records_int = [','.join(str(x) for x in range(1000))] * 1000
+        self.file_like_int = io.StringIO('\n'.join(records_int))
 
 class DelimitedToArraysGenftAK(DelimitedToArraysGenft):
     entry = staticmethod(delimited_to_arrays_ak)
 
     def pre(self):
         super().pre()
-        self.dtypes = [int] * 1000
+        self.dtypes_int = [int] * 1000
 
-    def main(self):
-        self.file_like.seek(0)
-        _ = self.entry(self.file_like, self.dtypes, 0)
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, self.dtypes_int, 0)
 
 class DelimitedToArraysGenftREF(DelimitedToArraysGenft):
     import numpy
@@ -95,11 +113,11 @@ class DelimitedToArraysGenftREF(DelimitedToArraysGenft):
 
     def pre(self):
         super().pre()
-        self.dtypes = {i: int for i in range(1000)}
+        self.dtypes_int = {i: int for i in range(1000)}
 
-    def main(self):
-        self.file_like.seek(0)
-        _ = self.entry(self.file_like, delimiter=',')
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, delimiter=',')
 
 #-------------------------------------------------------------------------------
 class MLoc(Perf):

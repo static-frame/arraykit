@@ -114,6 +114,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post[1].dtype, np.dtype(bool))
         self.assertEqual(post[2].dtype, np.dtype('<U3'))
 
+        # import ipdb; ipdb.set_trace()
+
 
 
 

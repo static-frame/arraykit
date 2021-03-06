@@ -206,8 +206,7 @@ AK_SequenceStrToArray1DBoolean(PyObject* sequence)
     }
 
     PyObject *element;
-    for (Py_ssize_t pos = 0; pos < size; ++pos)
-    {
+    for (Py_ssize_t pos = 0; pos < size; ++pos) {
         element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
         if (!element) {
             return NULL;
@@ -310,12 +309,15 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     }
 
     // Get the an iterator for the appropriate axis
-    PyObject *axis_sequence_iter; // for generic assignment
+    PyObject *axis_sequence_fast; // for generic assignment
+    Py_ssize_t count_columns = -1;
+
     PyObject *axis0_sequence_iter = PyObject_GetIter(reader_instance);
     if (!axis0_sequence_iter) {
         Py_DECREF(reader_instance);
         return NULL;
     }
+
     if (PyLong_AsLong(axis) == 1) { // this can fail
         PyObject* axis1_sequences = PyList_New(0);
         if (!axis1_sequences) {
@@ -324,7 +326,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         }
         // get first size
         Py_ssize_t count_row = 0;
-        Py_ssize_t count_columns = -1;
 
         PyObject *row;
         PyObject* column;
@@ -357,32 +358,39 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             }
             ++count_row;
         }
-        axis_sequence_iter = PyObject_GetIter(axis1_sequences);
-        Py_DECREF(axis0_sequence_iter);
+        axis_sequence_fast = PySequence_Fast(axis1_sequences,
+                "failed to create sequence");
+        // axis_sequence_iter = PyObject_GetIter(axis1_sequences);
         Py_DECREF(axis1_sequences);
     } else {
-        axis_sequence_iter = axis0_sequence_iter;
+        // axis_sequence_iter = axis0_sequence_iter;
+        axis_sequence_fast = PySequence_Fast(axis0_sequence_iter,
+                "failed to create sequence");
+        count_columns = PySequence_Fast_GET_SIZE(axis_sequence_fast);
     }
+    Py_DECREF(axis0_sequence_iter);
+    Py_DECREF(reader_instance);
 
     // List to be return constructer arrays
     PyObject* arrays = PyList_New(0);
     if (!arrays) {
-        Py_DECREF(axis_sequence_iter);
-        Py_DECREF(reader_instance);
+        Py_DECREF(axis_sequence_fast);
         return NULL;
     }
 
-    Py_ssize_t count_sequence = 0;
     PyObject *line;
-
-    while ((line = PyIter_Next(axis_sequence_iter))) {
-        PyObject* dtype_specifier = PyList_GetItem(dtypes, count_sequence);
-        if (!dtype_specifier) {
-            Py_DECREF(axis_sequence_iter);
-            Py_DECREF(reader_instance);
+    for (Py_ssize_t pos = 0; pos < count_columns; ++pos) {
+        line = PySequence_Fast_GET_ITEM(axis_sequence_fast, pos); // borrowed ref
+        if (!line) {
             return NULL;
         }
-
+        PyObject* dtype_specifier = PyList_GetItem(dtypes, pos);
+        if (!dtype_specifier) {
+            Py_DECREF(axis_sequence_fast);
+            Py_DECREF(arrays);
+            return NULL;
+        }
+        Py_INCREF(line); // got a borrowed ref
         PyObject* array = AK_SequenceStrToArray1D(line, dtype_specifier);
         if (!array) {
             return NULL;
@@ -390,20 +398,15 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 
         if (PyList_Append(arrays, array))
         {
-            PyErr_SetString(PyExc_NotImplementedError, "could not append to array.");
-            Py_DECREF(axis_sequence_iter);
-            Py_DECREF(reader_instance);
+            Py_DECREF(axis_sequence_fast);
             Py_DECREF(array);
             Py_DECREF(arrays);
             return NULL;
         }
         Py_DECREF(array);
-        ++count_sequence;
     }
     // check if PyErr occured
-
-    Py_DECREF(axis_sequence_iter);
-    Py_DECREF(reader_instance);
+    Py_DECREF(axis_sequence_fast);
     return arrays;
 }
 
