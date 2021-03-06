@@ -1,11 +1,8 @@
-
-
-
 import timeit
 import argparse
+import io
 
 import numpy as np
-import io
 
 from performance.reference.util import mloc as mloc_ref
 from performance.reference.util import immutable_filter as immutable_filter_ref
@@ -108,7 +105,6 @@ class DelimitedToArraysGenftAK(DelimitedToArraysGenft):
         _ = self.entry(self.file_like_int, self.dtypes_int, 0)
 
 class DelimitedToArraysGenftREF(DelimitedToArraysGenft):
-    import numpy
     entry = staticmethod(np.genfromtxt)
 
     def pre(self):
@@ -316,18 +312,6 @@ def get_arg_parser():
         nargs='+',
         help='Provide one or more performance tests by name.')
     return p
-
-
-def get_arg_parser():
-
-    p = argparse.ArgumentParser(
-        description='ArrayKit performance tool.',
-        )
-    p.add_argument("--names",
-        nargs='+',
-        help='Provide one or more performance tests by name.')
-    return p
-
 
 def main():
     options = get_arg_parser().parse_args()
