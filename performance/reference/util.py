@@ -181,3 +181,68 @@ def array_deepcopy(
     if memo is not None:
         memo[ident] = post
     return post
+
+
+def _isin_1d(
+        array: np.ndarray,
+        other: tp.FrozenSet[tp.Any]
+        ) -> np.ndarray:
+    '''
+    Iterate over an 1D array to build a 1D Boolean ndarray representing whether or not the original element is in the set
+
+    Args:
+        array: The source array
+        other: The set of elements being looked for
+    '''
+    result: np.ndarray = np.empty(array.shape, dtype=DTYPE_BOOL)
+
+    for i, element in enumerate(array):
+        result[i] = element in other
+
+    result.flags.writeable = False
+    return result
+
+
+def _isin_2d(
+        array: np.ndarray,
+        other: tp.FrozenSet[tp.Any]
+        ) -> np.ndarray:
+    '''
+    Iterate over an 2D array to build a 2D, immutable, Boolean ndarray representing whether or not the original element is in the set
+
+    Args:
+        array: The source array
+        other: The set of elements being looked for
+    '''
+    result: np.ndarray = np.empty(array.shape, dtype=DTYPE_BOOL)
+
+    for (i, j), v in np.ndenumerate(array):
+        result[i, j] = v in other
+
+    result.flags.writeable = False
+    return result
+
+
+def isin_array(*,
+        array: np.ndarray,
+        array_is_unique: bool,
+        other: np.ndarray,
+        other_is_unique: bool,
+        ) -> np.ndarray:
+    '''Core isin processing after other has been converted to an array.
+    '''
+    if array.dtype == DTYPE_OBJECT or other.dtype == DTYPE_OBJECT:
+        # both funcs return immutable arrays
+        func = _isin_1d if array.ndim == 1 else _isin_2d
+        try:
+            return func(array, frozenset(other))
+        except TypeError: # only occur when something is unhashable.
+            pass
+
+    assume_unique = array_is_unique and other_is_unique
+    func = np.in1d if array.ndim == 1 else np.isin
+
+    result = func(array, other, assume_unique=assume_unique) #type: ignore
+    result.flags.writeable = False
+
+    return result

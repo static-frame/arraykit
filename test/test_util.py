@@ -1,3 +1,4 @@
+import itertools
 import unittest
 
 import numpy as np  # type: ignore
@@ -166,6 +167,69 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             row_1d_filter(a1.reshape(1,2,5))
+
+    def test_isin_1d(self) -> None:
+        from performance.reference.util import isin_array
+
+        T, F = True, False
+        arr1 = np.array([1, 2, 3, 4, 5])
+
+        expected = [
+                (np.array([T, F, T, T, F]), [1, 3, 4]),
+                (np.array([F, F, F, F, F]), [7, 8]),
+                (np.array([T, T, T, T, T]), [1, 2, 3, 4, 5]),
+        ]
+
+        for expected_result, values in expected:
+            for dtype in (int, object):
+                arr2 = np.array(values, dtype=dtype)
+
+                for aiu, oiu in itertools.product((T, F), (T, F)):
+                    self.assertTrue(np.array_equal(expected_result, isin_array(
+                            array=arr1,
+                            array_is_unique=aiu,
+                            other=arr2,
+                            other_is_unique=oiu,
+                    )))
+
+    def test_isin_2d(self) -> None:
+        from performance.reference.util import isin_array
+
+        T, F = True, False
+        arr1 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+
+        expected = [
+                (np.array([[T, F, T], [T, F, F], [F, F, T]]), [1, 3, 4, 9]),
+                (np.array([[F, F, F], [F, F, F], [F, F, F]]), [10, 11]),
+                (np.array([[T, T, T], [T, T, T], [T, T, T]]), [1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        ]
+
+        for expected_result, values in expected:
+            for dtype in (int, object):
+                arr2 = np.array(values, dtype=dtype)
+
+                for aiu, oiu in itertools.product((T, F), (T, F)):
+                    self.assertTrue(np.array_equal(expected_result, isin_array(
+                            array=arr1,
+                            array_is_unique=aiu,
+                            other=arr2,
+                            other_is_unique=oiu,
+                    )))
+
+    def test_risky(self) -> None:
+        from arraykit import isin_array
+
+        T, F = True, False
+        arr1 = np.array([1, 2, 3, 4, 5])
+        arr2 = np.array([1, 3, 4])
+        expected = np.array([T, F, T, T, F])
+
+        self.assertTrue(np.array_equal(expected, isin_array(
+                array=arr1,
+                array_is_unique=T,
+                other=arr2,
+                other_is_unique=F,
+        )))
 
 if __name__ == '__main__':
     unittest.main()

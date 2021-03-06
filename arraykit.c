@@ -251,6 +251,52 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
+static PyObject *
+isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    int array_is_unique, other_is_unique;
+    PyArrayObject *array, *other;
+
+    static char *kwlist[] = {"array", "array_is_unique", "other", "other_is_unique", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
+                                     kwlist,
+                                     &PyArray_Type, &array, &array_is_unique,
+                                     &PyArray_Type, &other, &other_is_unique)
+        )
+    {
+        return NULL;
+    }
+    if (PyArray_NDIM(other) != 1) {
+        return PyErr_Format(PyExc_TypeError, "Expected other to be 1-dimensional");
+    }
+
+    if (PyDataType_ISOBJECT(PyArray_DESCR(array)) || PyDataType_ISOBJECT(PyArray_DESCR(other))) {
+
+        int unique = array_is_unique && other_is_unique;
+        int ndim = PyArray_NDIM(array);
+
+        PyArrayObject* result = NULL;
+
+        // PyObject* numpy = PyImport_Import("numpy");
+        // if (numpy == NULL) {
+        //     PyErr_SetString(PyExc_ImportError, "numpy failed to import");
+        //     return NULL;
+        // }
+
+        // PyObject* in1d = PyObject_GetAttrString(numpy, "in1d");
+        // Py_DECREF(numpy);
+        // if (in1d == NULL) {
+        //     PyErr_SetString(PyExc_AttributeError, "in1d not found");
+        //     return NULL;
+        // }
+
+        return result;
+    }
+
+    return PyBool_FromLong(1);
+}
+
 //------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
@@ -527,6 +573,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"isin_array", isin_array, METH_VARARGS | METH_KEYWORDS, NULL}, // I don't know how to deal with this warning :'(
     {NULL},
 };
 
