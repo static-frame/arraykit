@@ -154,12 +154,11 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 PyObject*
 AK_SequenceStrToArray1DComplex(PyObject* sequence)
 {
-    Py_ssize_t size = PyList_Size(sequence);
+    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
+    Py_ssize_t size = PySequence_Fast_GET_SIZE(sequence_fast);
     if (!size) {
         return NULL;
     }
-
-    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
 
     npy_intp dims[] = {size};
     PyObject* array = PyArray_SimpleNew(1, dims, NPY_COMPLEX128);
@@ -190,12 +189,11 @@ AK_SequenceStrToArray1DComplex(PyObject* sequence)
 PyObject*
 AK_SequenceStrToArray1DBoolean(PyObject* sequence)
 {
-    Py_ssize_t size = PyList_Size(sequence);
+    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
+    Py_ssize_t size = PySequence_Fast_GET_SIZE(sequence_fast);
     if (!size) {
         return NULL;
     }
-
-    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
 
     npy_intp dims[] = {size};
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
@@ -217,10 +215,6 @@ AK_SequenceStrToArray1DBoolean(PyObject* sequence)
         }
         if (PyUnicode_CompareWithASCIIString(element_lower, "true") == 0) {
             *(npy_bool *) PyArray_GETPTR1((PyArrayObject *)array, pos) = 1;
-            // this does not work; not sure why!
-            // PyArray_SETITEM((PyArrayObject *)array,
-            //         PyArray_GETPTR1((PyArrayObject *)array, pos),
-            //         1);
         }
     }
     Py_DECREF(sequence_fast);
@@ -272,6 +266,7 @@ AK_SequenceStrToArray1D(
         PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
         return array;
 }
+
 
 //------------------------------------------------------------------------------
 // AK module public methods
@@ -390,14 +385,14 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
             Py_DECREF(arrays);
             return NULL;
         }
+
         Py_INCREF(line); // got a borrowed ref
         PyObject* array = AK_SequenceStrToArray1D(line, dtype_specifier);
         if (!array) {
             return NULL;
         }
 
-        if (PyList_Append(arrays, array))
-        {
+        if (PyList_Append(arrays, array)) {
             Py_DECREF(axis_sequence_fast);
             Py_DECREF(array);
             Py_DECREF(arrays);
@@ -405,7 +400,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         }
         Py_DECREF(array);
     }
-    // check if PyErr occured
+    // check if PyErr occurred
     Py_DECREF(axis_sequence_fast);
     return arrays;
 }
