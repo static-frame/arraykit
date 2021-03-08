@@ -186,7 +186,7 @@ AK_SequenceStrToArray1DComplex(PyObject* sequence)
 // Booleans
 // NP's Boolean conversion in genfromtxt
 // https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-PyObject*
+static inline PyObject*
 AK_SequenceStrToArray1DBoolean(PyObject* sequence)
 {
     PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
@@ -224,7 +224,7 @@ AK_SequenceStrToArray1DBoolean(PyObject* sequence)
 }
 
 // Convert an sequence of strings to a 1D array.
-PyObject*
+static inline PyObject*
 AK_SequenceStrToArray1D(
         PyObject *sequence,
         PyObject *dtype_specifier)
