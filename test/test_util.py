@@ -221,15 +221,14 @@ class TestUnit(unittest.TestCase):
 
         T, F = True, False
         arr1 = np.array([1, 2, 3, 4, 5])
-        arr2 = np.array([1, 3, 4])
-        expected = np.array([T, F, T, T, F])
+        arr2 = np.array([1, 4, 7, 9])
+        expected = np.array([T, F, F, T, F])
 
-        self.assertTrue(np.array_equal(expected, isin_array(
-                array=arr1,
-                array_is_unique=T,
-                other=arr2,
-                other_is_unique=F,
-        )))
+
+        post = isin_array(array=arr1, array_is_unique=T, other=arr2, other_is_unique=F)
+        print(post.tobytes())
+        print(post.tobytes())
+        self.assertTrue(np.array_equal(expected, post))
 
 if __name__ == '__main__':
     unittest.main()

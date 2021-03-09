@@ -251,6 +251,97 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
+//------------------------------------------------------------------------------
+// Comparison Macros
+//------------------------------------------------------------------------------
+
+# define _AK_C_QSORT_COMP_FUNC(type) \
+    _##type##_compare
+
+# define _AK_C_QSORT_COMP_REF_ARR(type) \
+    _##type##_COMP_ARR
+
+# define _AK_BUILD_C_QSORT_COMP(type) \
+    static type* _AK_C_QSORT_COMP_REF_ARR(type); \
+    \
+    static int \
+    _AK_C_QSORT_COMP_FUNC(type)(const void * a, const void * b) { \
+        int aa = *((int *) a); \
+        int bb = *((int *) b); \
+        \
+        if (_AK_C_QSORT_COMP_REF_ARR(type)[aa] < _AK_C_QSORT_COMP_REF_ARR(type)[bb]) { \
+            return -1; \
+        } \
+        if (_AK_C_QSORT_COMP_REF_ARR(type)[aa] == _AK_C_QSORT_COMP_REF_ARR(type)[bb]) { \
+            return 0; \
+        } \
+        return 1; \
+    }
+
+_AK_BUILD_C_QSORT_COMP(long)
+_AK_BUILD_C_QSORT_COMP(PY_UINT32_T)
+
+# define AK_IDX_COMP(type, ref_array, ptr_array, size) \
+        _AK_C_QSORT_COMP_REF_ARR(type) = ref_array; \
+        qsort(ptr_array, size, sizeof(PY_UINT32_T), _AK_C_QSORT_COMP_FUNC(type)); \
+        _AK_C_QSORT_COMP_REF_ARR(type) = NULL; \
+
+//------------------------------------------------------------------------------
+// Concat Macros
+//------------------------------------------------------------------------------
+
+# define AK_C_ARR_CONCAT_FUNC(type) \
+        _##type##_concat
+
+# define _AK_BUILD_C_ARR_CONCAT(type) \
+    static void \
+    AK_C_ARR_CONCAT_FUNC(type)(type* target, type* arr1, size_t arr1_size, type* arr2, size_t arr2_size) \
+    { \
+        for (size_t i = 0; i < arr1_size; ++i) { \
+            target[i] = arr1[i]; \
+        } \
+        for (size_t i = 0; i < arr2_size; ++i) { \
+            target[arr1_size + i] = arr2[i]; \
+        } \
+    } \
+
+_AK_BUILD_C_ARR_CONCAT(long)
+
+
+/*
+static void
+print_arr_long(long* arr, PY_UINT32_T* indexer, size_t size)
+{
+    for (size_t i = 0; i < size; ++i) {
+        if (indexer) {
+            printf("%lu ", arr[indexer[i]]);
+        }
+        else {
+            printf("%lu ", arr[i]);
+        }
+    }
+    printf("\n");
+}
+
+static void
+print_arr_sizet(PY_UINT32_T* arr, size_t size)
+{
+    for (size_t i = 0; i < size; ++i) {
+        printf("%u ", arr[i]);
+    }
+    printf("\n");
+}
+
+static void
+print_arr_char(char* arr, size_t size)
+{
+    for (size_t i = 0; i < size; ++i) {
+        printf("%x ", arr[i]);
+    }
+    printf("\n");
+}
+*/
+
 static PyObject *
 isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
@@ -271,27 +362,78 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return PyErr_Format(PyExc_TypeError, "Expected other to be 1-dimensional");
     }
 
-    if (PyDataType_ISOBJECT(PyArray_DESCR(array)) || PyDataType_ISOBJECT(PyArray_DESCR(other))) {
+    PyArray_Descr* array_dtype = PyArray_DTYPE(array);
+    PyArray_Descr* other_dtype = PyArray_DTYPE(other);
 
-        int unique = array_is_unique && other_is_unique;
-        int ndim = PyArray_NDIM(array);
+    if (PyDataType_ISOBJECT(array_dtype) || PyDataType_ISOBJECT(other_dtype)) {
+        return NULL;
+    }
 
-        PyArrayObject* result = NULL;
+    // int unique = array_is_unique && other_is_unique;
+    size_t ar1_size = PyArray_SIZE(array);
+    size_t ar2_size = PyArray_SIZE(other);
+    size_t ar3_size = ar1_size + ar2_size;
 
-        // PyObject* numpy = PyImport_Import("numpy");
-        // if (numpy == NULL) {
-        //     PyErr_SetString(PyExc_ImportError, "numpy failed to import");
-        //     return NULL;
-        // }
+    if (array_dtype->type_num == NPY_LONG && other_dtype->type_num == NPY_LONG) {
+        long* ar1 = (long*)PyArray_DATA(array);
+        long* ar2 = (long*)PyArray_DATA(other);
 
-        // PyObject* in1d = PyObject_GetAttrString(numpy, "in1d");
-        // Py_DECREF(numpy);
-        // if (in1d == NULL) {
-        //     PyErr_SetString(PyExc_AttributeError, "in1d not found");
-        //     return NULL;
-        // }
+        long ar3[ar3_size];
+        AK_C_ARR_CONCAT_FUNC(long)(ar3, ar1, ar1_size, ar2, ar2_size);
 
-        return result;
+        PY_UINT32_T order[ar3_size];
+        PY_UINT32_T indx[ar3_size];
+        for (size_t i = 0; i < ar3_size; ++i) {
+            order[i] = i;
+            indx[i] = i;
+        }
+
+        AK_IDX_COMP(long, ar3, order, ar3_size)
+
+        // Set flag
+        char flag[ar3_size];
+        for (size_t i = 1; i < ar3_size; ++i) {
+            flag[i-1] = (ar3[order[i]] == ar3[order[i-1]]);
+        }
+        flag[ar3_size - 1] = 0;
+
+        AK_IDX_COMP(PY_UINT32_T, order, indx, ar3_size)
+
+        //char *result = PyMem_Malloc(ar1_size);
+        char result[5];
+        if (!result) {
+            return NULL;
+        }
+        for (size_t i = 0; i < ar1_size; ++i) {
+            result[i] = flag[indx[i]];
+        }
+
+        // npy_intp *argsort_result; argsort_result = PyMem_Malloc(ar3_size);
+        // PyArrayObject* sorted = PyArray_ArgSort(array, ar1_size, NPY_MERGESORT);
+        // long* sorted_arr = (long*)PyArray_DATA(array);
+
+        /*
+        ``*data`` : ``char *``
+            ``NULL`` for creating brand-new memory. If you want this array to wrap
+            another memory area, then pass the pointer here. You are
+            responsible for deleting the memory in that case, but do not do so
+            until the new array object has been deleted. The best way to
+            handle that is to get the memory from another Python object,
+            ``INCREF`` that Python object after passing it's data pointer to this
+            routine, and set the ``->base`` member of the returned array to the
+            Python object. *You are responsible for* setting ``PyArray_BASE(ret)``
+            to the base object. Failure to do so will create a memory leak.
+        */
+
+        return PyArray_NewFromDescr(
+                &PyArray_Type,                         // class (subtype)
+                PyArray_DescrFromType(NPY_BOOL),       // dtype (descr)
+                PyArray_NDIM(array),                   // ndim (nd)
+                (npy_intp*)&ar1_size,                  // dims
+                NULL,                                  // strides
+                result,                                // data
+                NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
+                NULL);                                 // sublclass (obj)
     }
 
     return PyBool_FromLong(1);
