@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+from functools import partial
 import itertools
 import unittest
 
@@ -219,19 +221,37 @@ class TestUnit(unittest.TestCase):
     def test_risky(self) -> None:
         from arraykit import isin_array
 
-        T, F = True, False
-        arr1 = np.array([1, 2, 3, 4, 5])
-        arr2 = np.array([1, 4, 7, 9])
-        expected = np.array([T, F, F, T, F])
+        isin_array_func = partial(isin_array, array_is_unique=True, other_is_unique=True)
 
+        e_1d = np.array([1, 0, 0, 1, 0], dtype=bool)
+        e_2d = np.array([[1, 0, 0], [1, 0, 1]], dtype=bool)
 
-        post = isin_array(array=arr1, array_is_unique=T, other=arr2, other_is_unique=F)
-        print(post.tobytes())
-        print(post.tobytes())
-        self.assertTrue(np.array_equal(expected, post))
+        v_1d = [1, 2, 3, 4, 5]
+        v_2d = [[1, 2, 3], [4, 5, 9]]
+
+        w_1d = [1, 4, 7, 9]
+
+        dtype_funcs = [
+                (int, int),
+                (float, float),
+                (str, str),
+                ('datetime64[D]', lambda x: date(2020, 1, x)),
+        ]
+
+        for dtype, dtype_func in dtype_funcs:
+            arr1 = np.array([dtype_func(v) for v in v_1d], dtype=dtype)
+            arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
+
+            post = isin_array_func(array=arr1, other=arr2)
+            self.assertTrue(np.array_equal(e_1d, post))
+
+        for dtype, dtype_func in dtype_funcs:
+            arr1 = np.array([[dtype_func(x) for x in y] for y in v_2d], dtype=dtype)
+            arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
+
+            post = isin_array_func(array=arr1, other=arr2)
+            self.assertTrue(np.array_equal(e_2d, post))
+
 
 if __name__ == '__main__':
     unittest.main()
-
-
-

@@ -1,6 +1,5 @@
-
-
-
+from datetime import date, timedelta
+from functools import partial
 import timeit
 import argparse
 
@@ -15,6 +14,7 @@ from performance.reference.util import column_1d_filter as column_1d_filter_ref
 from performance.reference.util import row_1d_filter as row_1d_filter_ref
 from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
+from performance.reference.util import isin_array as isin_array_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -27,6 +27,7 @@ from arraykit import column_1d_filter as column_1d_filter_ak
 from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
+from arraykit import isin_array as isin_array_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -219,6 +220,47 @@ class ArrayGOPerfAK(ArrayGOPerf):
 
 class ArrayGOPerfREF(ArrayGOPerf):
     entry = staticmethod(ArrayGOREF)
+
+
+#-------------------------------------------------------------------------------
+class IsinArrayPerf(Perf):
+    NUMBER = 1000
+
+    def pre(self):
+        self.arrays = []
+
+        v_1d = [1, 2, 3, 4, 5]
+        v_2d = [[1, 2, 3], [4, 5, 9]]
+        w_1d = [1, 4, 7, 9]
+
+        dtype_funcs = [
+                (int, int),
+                (float, float),
+                (str, str),
+                ('datetime64[D]', lambda x: date(2020, 1, x)),
+        ]
+
+        for dtype, dtype_func in dtype_funcs:
+            arr1 = np.array([dtype_func(v) for v in v_1d], dtype=dtype)
+            arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
+            self.arrays.append((arr1, arr2))
+
+        for dtype, dtype_func in dtype_funcs:
+            arr1 = np.array([[dtype_func(x) for x in y] for y in v_2d], dtype=dtype)
+            arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
+            self.arrays.append((arr1, arr2))
+
+    def main(self):
+        for _ in range(25):
+            for arr1, arr2 in self.arrays:
+                self.entry(array=arr1, array_is_unique=True, other=arr2, other_is_unique=True)
+
+class IsinArrayPerfAK(IsinArrayPerf):
+    entry = staticmethod(isin_array_ak)
+
+class IsinArrayPerfREF(IsinArrayPerf):
+    entry = staticmethod(isin_array_ref)
+
 
 
 #-------------------------------------------------------------------------------

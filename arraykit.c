@@ -41,6 +41,11 @@
         return NULL;\
     } while (0)
 
+// To simplify lines merely checking for NULL pointers
+# define AK_CHECK_NULL(obj) \
+    if (!obj) { \
+        return NULL; \
+    }
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
@@ -237,11 +242,8 @@ static PyObject *
 resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
-    if (!PyArg_ParseTuple(args, "O!O!:resolve_dtype",
+    AK_CHECK_NULL(PyArg_ParseTuple(args, "O!O!:resolve_dtype",
                           &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
-    {
-        return NULL;
-    }
     return (PyObject *)AK_ResolveDTypes(d1, d2);
 }
 
@@ -252,95 +254,126 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
-// Comparison Macros
-//------------------------------------------------------------------------------
+// isin
 
-# define _AK_C_QSORT_COMP_FUNC(type) \
-    _##type##_compare
+static PyArrayObject *
+AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
+{
+    PyObject *container = PyTuple_Pack(2, arr1, arr2);
+    AK_CHECK_NULL(container)
 
-# define _AK_C_QSORT_COMP_REF_ARR(type) \
-    _##type##_COMP_ARR
+    PyArrayObject *array = (PyArrayObject*)PyArray_Concatenate(container, 0);
+    Py_DECREF(container);
+    return array;
+}
 
-# define _AK_BUILD_C_QSORT_COMP(type) \
-    static type* _AK_C_QSORT_COMP_REF_ARR(type); \
-    \
-    static int \
-    _AK_C_QSORT_COMP_FUNC(type)(const void * a, const void * b) { \
-        int aa = *((int *) a); \
-        int bb = *((int *) b); \
-        \
-        if (_AK_C_QSORT_COMP_REF_ARR(type)[aa] < _AK_C_QSORT_COMP_REF_ARR(type)[bb]) { \
-            return -1; \
-        } \
-        if (_AK_C_QSORT_COMP_REF_ARR(type)[aa] == _AK_C_QSORT_COMP_REF_ARR(type)[bb]) { \
-            return 0; \
-        } \
-        return 1; \
+static PyObject *
+AK_isin_array_object(PyArrayObject *Py_UNUSED(array), PyArrayObject *Py_UNUSED(other))
+{
+    return NULL;
+}
+
+static PyObject *
+AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_unique)
+{
+    /* Algorithm:
+
+        if not assume_unique:
+            array, rev_idx = np.unique(array, return_inverse=True)
+            other = np.unique(other)
+
+        ar = np.concatenate((array, other))
+
+        order = ar.argsort(kind='mergesort')
+        sar = ar[order]
+
+        flag = np.concatenate(((sar[1:] == sar[:-1]), [False]))
+
+        ret = np.empty(ar.shape, dtype=bool)
+        ret[order] = flag
+
+        if assume_unique:
+            return ret[:len(array)]
+        else:
+            return ret[rev_idx]
+    */
+
+    // 1. Capture original array shape for return value
+    int array_ndim = PyArray_NDIM(array);
+    npy_intp* array_dims = PyArray_DIMS(array);
+    size_t array_size = PyArray_SIZE(array);
+
+    // 2. Ravel the array as we want to operate on 1D arrays only.
+    array = (PyArrayObject*)PyArray_Ravel(array, NPY_CORDER);
+    // other is guaranteed to be 1D
+
+    if (!assume_unique) {
+        // TODO: Call array, rev_idx = np.unique(array, return_inverse=True)
+        // TODO: Call other = np.unique(other)
     }
 
-_AK_BUILD_C_QSORT_COMP(long)
-_AK_BUILD_C_QSORT_COMP(PY_UINT32_T)
+    // 3. Concatenate
+    PyArrayObject* ar = AK_concat_arrays(array, other);
+    AK_CHECK_NULL(ar)
 
-# define AK_IDX_COMP(type, ref_array, ptr_array, size) \
-        _AK_C_QSORT_COMP_REF_ARR(type) = ref_array; \
-        qsort(ptr_array, size, sizeof(PY_UINT32_T), _AK_C_QSORT_COMP_FUNC(type)); \
-        _AK_C_QSORT_COMP_REF_ARR(type) = NULL; \
+    size_t ar_size = PyArray_SIZE(ar);
 
-//------------------------------------------------------------------------------
-// Concat Macros
-//------------------------------------------------------------------------------
+    // 4: Sort
+    PyArrayObject *order = (PyArrayObject*)PyArray_ArgSort(ar, 0, NPY_MERGESORT);
+    long* order_arr = (long*)PyArray_DATA(order);
 
-# define AK_C_ARR_CONCAT_FUNC(type) \
-        _##type##_concat
+    // 5. Find duplicates
+    PyObject* sar = PyObject_GetItem((PyObject*)ar, (PyObject*)order);
+    AK_CHECK_NULL(sar)
 
-# define _AK_BUILD_C_ARR_CONCAT(type) \
-    static void \
-    AK_C_ARR_CONCAT_FUNC(type)(type* target, type* arr1, size_t arr1_size, type* arr2, size_t arr2_size) \
-    { \
-        for (size_t i = 0; i < arr1_size; ++i) { \
-            target[i] = arr1[i]; \
-        } \
-        for (size_t i = 0; i < arr2_size; ++i) { \
-            target[arr1_size + i] = arr2[i]; \
-        } \
-    } \
+    PyObject* comp_a = PySequence_GetSlice((PyObject*)sar, 1, ar_size);
+    AK_CHECK_NULL(comp_a)
 
-_AK_BUILD_C_ARR_CONCAT(long)
+    PyObject* comp_b = PySequence_GetSlice((PyObject*)sar, 0, ar_size - 1);
+    AK_CHECK_NULL(comp_b)
 
+    PyObject* flag = PyObject_RichCompare(comp_a, comp_b, Py_EQ);
+    AK_CHECK_NULL(flag)
 
-/*
-static void
-print_arr_long(long* arr, PY_UINT32_T* indexer, size_t size)
-{
-    for (size_t i = 0; i < size; ++i) {
-        if (indexer) {
-            printf("%lu ", arr[indexer[i]]);
+    npy_bool* flag_arr = (npy_bool*)PyArray_DATA((PyArrayObject*)flag);
+
+    // 6: Construct empty array
+    PyArrayObject* ret = (PyArrayObject*)PyArray_Empty(
+            array_ndim,                      // nd
+            array_dims,                      // dims
+            PyArray_DescrFromType(NPY_BOOL), // dtype
+            1);                              // is_f_order
+    AK_CHECK_NULL(ret)
+
+    size_t stride = 0;
+    if (array_ndim == 2) {
+        stride = (size_t)array_dims[1];
+    }
+
+    // 7: Assign into duplicates array
+    for (size_t i = 0; i < (size_t)PyArray_SIZE(order); ++i) {
+        size_t idx_0 = (size_t)order_arr[i];
+        if (idx_0 >= array_size) { continue; }
+
+        // We are guaranteed that flag_ar[i] is always a valid index
+        if (array_ndim == 1) {
+            *(npy_bool *) PyArray_GETPTR1(ret, idx_0) = flag_arr[i];
         }
         else {
-            printf("%lu ", arr[i]);
+            size_t idx_1 = idx_0 / stride;
+            idx_0 = idx_0 - (stride * idx_1);
+
+            *(npy_bool *) PyArray_GETPTR2(ret, idx_1, idx_0) = flag_arr[i];
         }
     }
-    printf("\n");
-}
 
-static void
-print_arr_sizet(PY_UINT32_T* arr, size_t size)
-{
-    for (size_t i = 0; i < size; ++i) {
-        printf("%u ", arr[i]);
+    // 8. Return!
+    if (assume_unique) {
+        return (PyObject*)ret;
     }
-    printf("\n");
-}
 
-static void
-print_arr_char(char* arr, size_t size)
-{
-    for (size_t i = 0; i < size; ++i) {
-        printf("%x ", arr[i]);
-    }
-    printf("\n");
+    return NULL;
 }
-*/
 
 static PyObject *
 isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
@@ -350,14 +383,11 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     static char *kwlist[] = {"array", "array_is_unique", "other", "other_is_unique", NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
+    AK_CHECK_NULL(PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
                                      kwlist,
                                      &PyArray_Type, &array, &array_is_unique,
-                                     &PyArray_Type, &other, &other_is_unique)
-        )
-    {
-        return NULL;
-    }
+                                     &PyArray_Type, &other, &other_is_unique))
+
     if (PyArray_NDIM(other) != 1) {
         return PyErr_Format(PyExc_TypeError, "Expected other to be 1-dimensional");
     }
@@ -365,78 +395,12 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyArray_Descr* array_dtype = PyArray_DTYPE(array);
     PyArray_Descr* other_dtype = PyArray_DTYPE(other);
 
+    // 2. Handle object dtypes
     if (PyDataType_ISOBJECT(array_dtype) || PyDataType_ISOBJECT(other_dtype)) {
-        return NULL;
+        return AK_isin_array_object(array, other);
     }
 
-    // int unique = array_is_unique && other_is_unique;
-    size_t ar1_size = PyArray_SIZE(array);
-    size_t ar2_size = PyArray_SIZE(other);
-    size_t ar3_size = ar1_size + ar2_size;
-
-    if (array_dtype->type_num == NPY_LONG && other_dtype->type_num == NPY_LONG) {
-        long* ar1 = (long*)PyArray_DATA(array);
-        long* ar2 = (long*)PyArray_DATA(other);
-
-        long ar3[ar3_size];
-        AK_C_ARR_CONCAT_FUNC(long)(ar3, ar1, ar1_size, ar2, ar2_size);
-
-        PY_UINT32_T order[ar3_size];
-        PY_UINT32_T indx[ar3_size];
-        for (size_t i = 0; i < ar3_size; ++i) {
-            order[i] = i;
-            indx[i] = i;
-        }
-
-        AK_IDX_COMP(long, ar3, order, ar3_size)
-
-        // Set flag
-        char flag[ar3_size];
-        for (size_t i = 1; i < ar3_size; ++i) {
-            flag[i-1] = (ar3[order[i]] == ar3[order[i-1]]);
-        }
-        flag[ar3_size - 1] = 0;
-
-        AK_IDX_COMP(PY_UINT32_T, order, indx, ar3_size)
-
-        //char *result = PyMem_Malloc(ar1_size);
-        char result[5];
-        if (!result) {
-            return NULL;
-        }
-        for (size_t i = 0; i < ar1_size; ++i) {
-            result[i] = flag[indx[i]];
-        }
-
-        // npy_intp *argsort_result; argsort_result = PyMem_Malloc(ar3_size);
-        // PyArrayObject* sorted = PyArray_ArgSort(array, ar1_size, NPY_MERGESORT);
-        // long* sorted_arr = (long*)PyArray_DATA(array);
-
-        /*
-        ``*data`` : ``char *``
-            ``NULL`` for creating brand-new memory. If you want this array to wrap
-            another memory area, then pass the pointer here. You are
-            responsible for deleting the memory in that case, but do not do so
-            until the new array object has been deleted. The best way to
-            handle that is to get the memory from another Python object,
-            ``INCREF`` that Python object after passing it's data pointer to this
-            routine, and set the ``->base`` member of the returned array to the
-            Python object. *You are responsible for* setting ``PyArray_BASE(ret)``
-            to the base object. Failure to do so will create a memory leak.
-        */
-
-        return PyArray_NewFromDescr(
-                &PyArray_Type,                         // class (subtype)
-                PyArray_DescrFromType(NPY_BOOL),       // dtype (descr)
-                PyArray_NDIM(array),                   // ndim (nd)
-                (npy_intp*)&ar1_size,                  // dims
-                NULL,                                  // strides
-                result,                                // data
-                NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
-                NULL);                                 // sublclass (obj)
-    }
-
-    return PyBool_FromLong(1);
+    return AK_isin_array_dtype(array, other, array_is_unique && other_is_unique);
 }
 
 //------------------------------------------------------------------------------
@@ -504,13 +468,10 @@ ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
     int parsed = PyArg_ParseTupleAndKeywords(
         args, kwargs, "O|$p:ArrayGO", argnames, &iterable, &own_iterable
     );
-    if (!parsed) {
-        return NULL;
-    }
+    AK_CHECK_NULL(parsed)
+
     ArrayGOObject *self = (ArrayGOObject *)cls->tp_alloc(cls, 0);
-    if (!self) {
-        return NULL;
-    }
+    AK_CHECK_NULL(self)
 
     if (PyArray_Check(iterable)) {
         if (!PyDataType_ISOBJECT(PyArray_DESCR((PyArrayObject *)iterable))) {
@@ -553,9 +514,8 @@ ArrayGO_append(ArrayGOObject *self, PyObject *value)
 {
     if (!self->list) {
         self->list = PyList_New(1);
-        if (!self->list) {
-            return NULL;
-        }
+        AK_CHECK_NULL(self->list)
+
         Py_INCREF(value);
         PyList_SET_ITEM(self->list, 0, value);
     }
@@ -571,9 +531,8 @@ ArrayGO_extend(ArrayGOObject *self, PyObject *values)
 {
     if (!self->list) {
         self->list = PySequence_List(values);
-        if (!self->list) {
-            return NULL;
-        }
+        AK_CHECK_NULL(self->list)
+
         Py_RETURN_NONE;
     }
     Py_ssize_t len = PyList_Size(self->list);
@@ -715,7 +674,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
-    {"isin_array", isin_array, METH_VARARGS | METH_KEYWORDS, NULL}, // I don't know how to deal with this warning :'(
+    {"isin_array", (PyCFunction)isin_array, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL},
 };
 
