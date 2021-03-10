@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 from functools import partial
 import itertools
 import unittest

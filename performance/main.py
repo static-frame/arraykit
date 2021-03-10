@@ -1,5 +1,4 @@
-from datetime import date, timedelta
-from functools import partial
+from datetime import date
 import timeit
 import argparse
 
