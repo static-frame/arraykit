@@ -243,14 +243,14 @@ class TestUnit(unittest.TestCase):
             arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
 
             post = isin_array_func(array=arr1, other=arr2)
-            self.assertTrue(np.array_equal(e_1d, post), msg=f'\nExpected:\n{e_1d}\nActual:\n{post}')
+            self.assertTrue(np.array_equal(e_1d, post), msg=f'\n{dtype}\nExpected:\n{e_1d}\nActual:\n{post}')
 
         for dtype, dtype_func in dtype_funcs:
             arr1 = np.array([[dtype_func(x) for x in y] for y in v_2d], dtype=dtype)
             arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
 
             post = isin_array_func(array=arr1, other=arr2)
-            self.assertTrue(np.array_equal(e_2d, post), msg=f'\nExpected:\n{e_2d}\nActual:\n{post}')
+            self.assertTrue(np.array_equal(e_2d, post), msg=f'\n{dtype}\nExpected:\n{e_2d}\nActual:\n{post}')
 
 
 if __name__ == '__main__':
