@@ -320,7 +320,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
     // 4: Sort
     PyArrayObject *order = (PyArrayObject*)PyArray_ArgSort(ar, 0, NPY_MERGESORT);
-    long* order_arr = (long*)PyArray_DATA(order);
+    npy_intp* order_arr = (npy_intp*)PyArray_DATA(order);
 
     // 5. Find duplicates
     PyObject* sar = PyObject_GetItem((PyObject*)ar, (PyObject*)order);

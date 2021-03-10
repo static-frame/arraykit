@@ -252,6 +252,34 @@ class TestUnit(unittest.TestCase):
             post = isin_array_func(array=arr1, other=arr2)
             self.assertTrue(np.array_equal(e_2d, post), msg=f'\n{dtype}\nExpected:\n{e_2d}\nActual:\n{post}')
 
+    def test_failing_windows(self) -> None:
+        from arraykit import isin_array
+
+        isin_array_func = partial(isin_array, array_is_unique=True, other_is_unique=True)
+
+        arr1 = np.array([1, 2, 3, 4, 5], dtype=int)
+        arr2 = np.array([1, 4, 7, 9], dtype=int)
+        expected = np.array([1, 0, 0, 1, 0], dtype=bool)
+
+        post = isin_array_func(array=arr1, other=arr2)
+
+        if not np.array_equal(expected, post):
+            print('arr1:')
+            print(arr1.shape, arr1.dtype, arr1.nbytes, arr1.itemsize)
+            print(arr1.tobytes())
+            print(arr1)
+
+            print('\narr2:')
+            print(arr2.shape, arr2.dtype, arr2.nbytes, arr2.itemsize)
+            print(arr2.tobytes())
+            print(arr2)
+
+            print('\npost:')
+            print(post.shape, post.dtype, post.nbytes, post.itemsize)
+            print(post.tobytes())
+            print(post)
+
+            assert False
 
 if __name__ == '__main__':
     unittest.main()
