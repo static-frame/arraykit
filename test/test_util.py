@@ -218,7 +218,7 @@ class TestUnit(unittest.TestCase):
                             other_is_unique=oiu,
                     )))
 
-    def test_risky(self) -> None:
+    def test_1d_2d_dtype_unique(self) -> None:
         from arraykit import isin_array
 
         isin_array_func = partial(isin_array, array_is_unique=True, other_is_unique=True)
@@ -252,34 +252,61 @@ class TestUnit(unittest.TestCase):
             post = isin_array_func(array=arr1, other=arr2)
             self.assertTrue(np.array_equal(e_2d, post), msg=f'\n{dtype}\nExpected:\n{e_2d}\nActual:\n{post}')
 
-    def test_failing_windows(self) -> None:
+    def test_1d_2d_dtype_object_unique(self) -> None:
         from arraykit import isin_array
 
-        isin_array_func = partial(isin_array, array_is_unique=True, other_is_unique=True)
+        e_1d = np.array([1, 0, 0, 1, 0], dtype=bool)
+        e_2d = np.array([[1, 0, 0], [1, 0, 1]], dtype=bool)
 
-        arr1 = np.array([1, 2, 3, 4, 5], dtype=int)
-        arr2 = np.array([1, 4, 7, 9], dtype=int)
-        expected = np.array([1, 0, 0, 1, 0], dtype=bool)
+        arr1_1d = np.array([1, 2, 3, 4, 5], dtype=object)
+        arr1_2d = np.array([[1, 2, 3], [4, 5, 9]], dtype=object)
 
-        post = isin_array_func(array=arr1, other=arr2)
+        arr2 = np.array([1, 4, 7, 9], dtype=object)
 
-        if not np.array_equal(expected, post):
-            print('arr1:')
-            print(arr1.shape, arr1.dtype, arr1.nbytes, arr1.itemsize)
-            print(arr1.tobytes())
-            print(arr1)
+        post = isin_array(array=arr1_1d, array_is_unique=True, other=arr2, other_is_unique=True)
+        self.assertTrue(np.array_equal(e_1d, post))
 
-            print('\narr2:')
-            print(arr2.shape, arr2.dtype, arr2.nbytes, arr2.itemsize)
-            print(arr2.tobytes())
-            print(arr2)
+        post = isin_array(array=arr1_2d, array_is_unique=True, other=arr2, other_is_unique=True)
+        self.assertTrue(np.array_equal(e_2d, post))
 
-            print('\npost:')
-            print(post.shape, post.dtype, post.nbytes, post.itemsize)
-            print(post.tobytes())
-            print(post)
+        class C:
+            def __init__(self, val):
+                self.val = val
 
-            assert False
+            def __eq__(self, other):
+                return self.val == other.val
+
+            def __hash__(self):
+                return hash(self.val)
+
+        arr1 = np.array([C(1), C(2), C(3), C(4), C(5)])
+        arr2 = np.array([C(1), C(4), C(9)])
+
+        post = isin_array(array=arr1, array_is_unique=True, other=arr2, other_is_unique=True)
+        self.assertTrue(np.array_equal(e_1d, post))
+
+        arr1 = np.array([[C(1), C(2), C(3)], [C(4), C(5), C(9)]])
+
+        post = isin_array(array=arr1, array_is_unique=True, other=arr2, other_is_unique=True)
+        self.assertTrue(np.array_equal(e_2d, post))
+
+    def test_1d_2d_dtype_object_non_unique(self) -> None:
+        from arraykit import isin_array
+
+        e_1d = np.array([1, 0, 0, 1, 0], dtype=bool)
+        e_2d = np.array([[1, 0, 0], [1, 0, 1]], dtype=bool)
+
+        arr1_1d = np.array([1, 2, 2, 4, 5], dtype=object)
+        arr1_2d = np.array([[1, 2, 3], [4, 2, 9]], dtype=object)
+
+        arr2 = np.array([1, 4, 4, 9], dtype=object)
+
+        post = isin_array(array=arr1_1d, array_is_unique=False, other=arr2, other_is_unique=False)
+        self.assertTrue(np.array_equal(e_1d, post))
+
+        post = isin_array(array=arr1_2d, array_is_unique=False, other=arr2, other_is_unique=False)
+        self.assertTrue(np.array_equal(e_2d, post))
+
 
 if __name__ == '__main__':
     unittest.main()

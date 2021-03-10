@@ -103,9 +103,8 @@ PyArray_Descr*
 AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
-    if (iterator == NULL) {
-        return NULL;
-    }
+    AK_CHECK_NULL(iterator)
+
     PyArray_Descr *resolved = NULL;
     PyArray_Descr *dtype;
     while ((dtype = (PyArray_Descr*) PyIter_Next(iterator))) {
@@ -268,9 +267,86 @@ AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
 }
 
 static PyObject *
-AK_isin_array_object(PyArrayObject *Py_UNUSED(array), PyArrayObject *Py_UNUSED(other))
+AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
 {
-    return NULL;
+    /* Algorithm:
+
+        for loc, element in loc_iter(array):
+            result[loc] = element in set(other)
+            return ret[rev_idx]
+    */
+
+    // 1. Capture original array shape for return value
+    int array_ndim = PyArray_NDIM(array);
+    npy_intp* array_dims = PyArray_DIMS(array);
+
+    PyObject* compare_elements = PyFrozenSet_New((PyObject*)other);
+    AK_CHECK_NULL(compare_elements)
+
+    // 2: Construct empty array
+    PyArrayObject* result = (PyArrayObject*)PyArray_Empty(
+            array_ndim,                      // nd
+            array_dims,                      // dims
+            PyArray_DescrFromType(NPY_BOOL), // dtype
+            0);                              // is_f_order
+    AK_CHECK_NULL(result)
+
+    // 3. Set up iteration
+    // https://numpy.org/doc/stable/reference/c-api/iterator.html?highlight=npyiter_multinew#simple-iteration-example
+    NpyIter *iter = NpyIter_New(array,
+                        NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
+                        NPY_KEEPORDER,
+                        NPY_NO_CASTING,
+                        NULL);
+    AK_CHECK_NULL(iter)
+
+    // Store locally since it is called alot
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    // 4. Iterate!
+    int i = 0;
+    do {
+        int j = 0;
+        char* data = *dataptr;
+        npy_intp size = *sizeptr;
+        npy_intp stride = *strideptr;
+
+        while (size--) {
+            PyObject* obj;
+            memcpy(&obj, data, sizeof(obj));
+
+            // 5. Assign into result whether or not the element exists in the set
+            int found = PySequence_Contains(compare_elements, obj);
+            if (found == -1) {
+                return NULL;
+            }
+
+            if (array_ndim == 1){
+                *(npy_bool *) PyArray_GETPTR1(result, j) = (npy_bool)found;
+            }
+            else {
+                *(npy_bool *) PyArray_GETPTR2(result, i, j) = (npy_bool)found;
+            }
+
+            data += stride;
+            ++j;
+        }
+
+        ++i;
+        /* Increment the iterator to the next inner loop */
+    } while(iternext(iter));
+
+    NpyIter_Deallocate(iter);
+
+    return (PyObject*)result;
 }
 
 static PyObject *
@@ -342,7 +418,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
             array_ndim,                      // nd
             array_dims,                      // dims
             PyArray_DescrFromType(NPY_BOOL), // dtype
-            1);                              // is_f_order
+            0);                              // is_f_order
     AK_CHECK_NULL(ret)
 
     size_t stride = 0;
