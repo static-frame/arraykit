@@ -42,7 +42,7 @@
     } while (0)
 
 // To simplify lines merely checking for NULL pointers
-# define AK_CHECK_NULL(obj) \
+# define AK_CHECK_NOT(obj) \
     if (!obj) { \
         return NULL; \
     }
@@ -103,7 +103,7 @@ PyArray_Descr*
 AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
-    AK_CHECK_NULL(iterator)
+    AK_CHECK_NOT(iterator)
 
     PyArray_Descr *resolved = NULL;
     PyArray_Descr *dtype;
@@ -241,7 +241,7 @@ static PyObject *
 resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
-    AK_CHECK_NULL(PyArg_ParseTuple(args, "O!O!:resolve_dtype",
+    AK_CHECK_NOT(PyArg_ParseTuple(args, "O!O!:resolve_dtype",
                           &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
     return (PyObject *)AK_ResolveDTypes(d1, d2);
 }
@@ -259,7 +259,7 @@ static PyArrayObject *
 AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
 {
     PyObject *container = PyTuple_Pack(2, arr1, arr2);
-    AK_CHECK_NULL(container)
+    AK_CHECK_NOT(container)
 
     PyArrayObject *array = (PyArrayObject*)PyArray_Concatenate(container, 0);
     Py_DECREF(container);
@@ -269,42 +269,48 @@ AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
 static PyObject *
 AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
 {
-    /* Algorithm:
+    /*  Algorithm:
 
         for loc, element in loc_iter(array):
             result[loc] = element in set(other)
-            return ret[rev_idx]
     */
+
+    // 0. Deallocate on failure
+    PyObject* compare_elements;
+    PyArrayObject* result;
+    NpyIter *iter = NULL; // Compiler gets mad if this isn't set to NULL
 
     // 1. Capture original array shape for return value
     int array_ndim = PyArray_NDIM(array);
     npy_intp* array_dims = PyArray_DIMS(array);
 
-    PyObject* compare_elements = PyFrozenSet_New((PyObject*)other);
-    AK_CHECK_NULL(compare_elements)
+    compare_elements = PyFrozenSet_New((PyObject*)other);
+    AK_CHECK_NOT(compare_elements)
 
     // 2: Construct empty array
-    PyArrayObject* result = (PyArrayObject*)PyArray_Empty(
+    result = (PyArrayObject*)PyArray_Empty(
             array_ndim,                      // nd
             array_dims,                      // dims
             PyArray_DescrFromType(NPY_BOOL), // dtype
             0);                              // is_f_order
-    AK_CHECK_NULL(result)
+    if (!result) {
+        goto failure;
+    }
 
     // 3. Set up iteration
     // https://numpy.org/doc/stable/reference/c-api/iterator.html?highlight=npyiter_multinew#simple-iteration-example
-    NpyIter *iter = NpyIter_New(array,
-                        NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
-                        NPY_KEEPORDER,
-                        NPY_NO_CASTING,
-                        NULL);
-    AK_CHECK_NULL(iter)
+    iter = NpyIter_New(array,
+                       NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
+                       NPY_KEEPORDER,
+                       NPY_NO_CASTING,
+                       NULL);
+    if (!iter) {
+        goto failure;
+    }
 
-    // Store locally since it is called alot
     NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
     if (!iternext) {
-        NpyIter_Deallocate(iter);
-        return NULL;
+        goto failure;
     }
 
     char** dataptr = NpyIter_GetDataPtrArray(iter);
@@ -322,11 +328,17 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
         while (size--) {
             PyObject* obj;
             memcpy(&obj, data, sizeof(obj));
+            if (!obj) {
+                goto failure;
+            }
+            Py_INCREF(obj);
 
             // 5. Assign into result whether or not the element exists in the set
             int found = PySequence_Contains(compare_elements, obj);
+            Py_DECREF(obj);
+
             if (found == -1) {
-                return NULL;
+                goto failure;
             }
 
             if (array_ndim == 1){
@@ -344,9 +356,18 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
         /* Increment the iterator to the next inner loop */
     } while(iternext(iter));
 
+    Py_DECREF(compare_elements);
     NpyIter_Deallocate(iter);
 
     return (PyObject*)result;
+
+failure:
+    Py_DECREF(compare_elements);
+    Py_XDECREF(result);
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+    return NULL;
 }
 
 static PyObject *
@@ -390,7 +411,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
     // 3. Concatenate
     PyArrayObject* ar = AK_concat_arrays(array, other);
-    AK_CHECK_NULL(ar)
+    AK_CHECK_NOT(ar)
 
     size_t ar_size = PyArray_SIZE(ar);
 
@@ -400,16 +421,16 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
     // 5. Find duplicates
     PyObject* sar = PyObject_GetItem((PyObject*)ar, (PyObject*)order);
-    AK_CHECK_NULL(sar)
+    AK_CHECK_NOT(sar)
 
     PyObject* comp_a = PySequence_GetSlice((PyObject*)sar, 1, ar_size);
-    AK_CHECK_NULL(comp_a)
+    AK_CHECK_NOT(comp_a)
 
     PyObject* comp_b = PySequence_GetSlice((PyObject*)sar, 0, ar_size - 1);
-    AK_CHECK_NULL(comp_b)
+    AK_CHECK_NOT(comp_b)
 
     PyObject* flag = PyObject_RichCompare(comp_a, comp_b, Py_EQ);
-    AK_CHECK_NULL(flag)
+    AK_CHECK_NOT(flag)
 
     npy_bool* flag_arr = (npy_bool*)PyArray_DATA((PyArrayObject*)flag);
 
@@ -419,7 +440,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
             array_dims,                      // dims
             PyArray_DescrFromType(NPY_BOOL), // dtype
             0);                              // is_f_order
-    AK_CHECK_NULL(ret)
+    AK_CHECK_NOT(ret)
 
     size_t stride = 0;
     if (array_ndim == 2) {
@@ -459,7 +480,7 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     static char *kwlist[] = {"array", "array_is_unique", "other", "other_is_unique", NULL};
 
-    AK_CHECK_NULL(PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
+    AK_CHECK_NOT(PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
                                      kwlist,
                                      &PyArray_Type, &array, &array_is_unique,
                                      &PyArray_Type, &other, &other_is_unique))
@@ -544,10 +565,10 @@ ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
     int parsed = PyArg_ParseTupleAndKeywords(
         args, kwargs, "O|$p:ArrayGO", argnames, &iterable, &own_iterable
     );
-    AK_CHECK_NULL(parsed)
+    AK_CHECK_NOT(parsed)
 
     ArrayGOObject *self = (ArrayGOObject *)cls->tp_alloc(cls, 0);
-    AK_CHECK_NULL(self)
+    AK_CHECK_NOT(self)
 
     if (PyArray_Check(iterable)) {
         if (!PyDataType_ISOBJECT(PyArray_DESCR((PyArrayObject *)iterable))) {
@@ -590,7 +611,7 @@ ArrayGO_append(ArrayGOObject *self, PyObject *value)
 {
     if (!self->list) {
         self->list = PyList_New(1);
-        AK_CHECK_NULL(self->list)
+        AK_CHECK_NOT(self->list)
 
         Py_INCREF(value);
         PyList_SET_ITEM(self->list, 0, value);
@@ -607,7 +628,7 @@ ArrayGO_extend(ArrayGOObject *self, PyObject *values)
 {
     if (!self->list) {
         self->list = PySequence_List(values);
-        AK_CHECK_NULL(self->list)
+        AK_CHECK_NOT(self->list)
 
         Py_RETURN_NONE;
     }
