@@ -704,12 +704,9 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
                 0);                              // is_f_order
 
         Py_INCREF(tmp);
-        AK_PPRINT(tmp)
-        AK_PPRINT(ordered_idx)
-        AK_PPRINT(comparison)
 
         // TODO: Comparison is missing a trailing False value...
-        if (PyObject_SetItem(tmp, ordered_idx, comparison)) {
+        if (PyObject_SetItem(tmp, (PyObject*)ordered_idx, (PyObject*)comparison)) {
             goto failure;
         }
 
@@ -768,6 +765,52 @@ failure:
     Py_XDECREF(ordered_idx);
     Py_XDECREF(sorted_arr);
     Py_XDECREF(comparison);
+    return NULL;
+}
+
+static PyObject *
+AK_isin_array_dtype_use_np(PyArrayObject *array, PyArrayObject *other, int assume_unique)
+{
+    PyObject* numpy = NULL;
+    PyObject* func = NULL;
+    PyObject* args = NULL;
+    PyObject* kwarg = NULL;
+
+    numpy = PyImport_ImportModule("numpy");
+    AK_GOTO_ON_NOT(numpy, failure)
+
+    if (PyArray_NDIM(array) == 1) {
+        func = PyObject_GetAttrString(numpy, "in1d");
+    }
+    else {
+        func = PyObject_GetAttrString(numpy, "isin");
+    }
+    AK_GOTO_ON_NOT(func, failure)
+
+    args = PyTuple_Pack(2, (PyObject*)array, (PyObject*)other);
+    AK_GOTO_ON_NOT(args, failure)
+
+    kwarg = PyDict_New();
+    AK_GOTO_ON_NOT(kwarg, failure);
+    if (PyDict_SetItemString(kwarg, "assume_unique", PyLong_FromLong((long)assume_unique)) == -1) {
+        goto failure;
+    }
+
+    PyObject* result = PyObject_Call(func, args, kwarg);
+    AK_GOTO_ON_NOT(result, failure)
+
+    Py_DECREF(numpy);
+    Py_DECREF(func);
+    Py_DECREF(args);
+    Py_DECREF(kwarg);
+
+    return result;
+
+failure:
+    Py_XDECREF(numpy);
+    Py_XDECREF(func);
+    Py_XDECREF(args);
+    Py_XDECREF(kwarg);
     return NULL;
 }
 
@@ -892,7 +935,8 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return AK_isin_array_object(array, other);
     }
     // Use numpy in1d logic for dtype arrays
-    return AK_isin_array_dtype(array, other, array_is_unique && other_is_unique);
+    //return AK_isin_array_dtype(array, other, array_is_unique && other_is_unique);
+    return AK_isin_array_dtype_use_np(array, other, array_is_unique && other_is_unique);
 }
 
 //------------------------------------------------------------------------------
