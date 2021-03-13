@@ -302,87 +302,8 @@ is_nat(PyObject *a)
 //------------------------------------------------------------------------------
 // isin
 
-/*
-static void
-AK_print_array_float(PyArrayObject *array)
-{
-    NpyIter *iter = NULL;
-
-    int array_ndim = PyArray_NDIM(array);
-    npy_intp* array_dims = PyArray_DIMS(array);
-
-    iter = NpyIter_New(array,
-                       NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
-                       NPY_KEEPORDER,
-                       NPY_NO_CASTING,
-                       NULL);
-
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-
-    char** dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-
-    // 4. Iterate!
-    do {
-        char* data = *dataptr;
-        npy_intp size = *sizeptr;
-        npy_intp stride = *strideptr;
-
-        printf("NUMPY  %i ", (int)stride);
-        while (size--) {
-            double val;
-            memcpy(&val, data, sizeof(double));
-            printf("%.1f ", val);
-            data += stride;
-        }
-        printf("\n");
-
-        // Increment the iterator to the next inner loop
-    } while(iternext(iter));
-
-    NpyIter_Deallocate(iter);
-}
-
-static void
-AK_print_array_bool(PyArrayObject *array)
-{
-    NpyIter *iter = NULL;
-
-    int array_ndim = PyArray_NDIM(array);
-    npy_intp* array_dims = PyArray_DIMS(array);
-
-    iter = NpyIter_New(array,
-                       NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
-                       NPY_KEEPORDER,
-                       NPY_NO_CASTING,
-                       NULL);
-
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-
-    char** dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-
-    // 4. Iterate!
-    do {
-        char* data = *dataptr;
-        npy_intp size = *sizeptr;
-        npy_intp stride = *strideptr;
-
-        printf("NUMPY  %i ", (int)stride);
-        while (size--) {
-            printf("%i ", (int)*data);
-            data += stride;
-        }
-        printf("\n");
-
-        // Increment the iterator to the next inner loop
-    } while(iternext(iter));
-
-    NpyIter_Deallocate(iter);
-}
-*/
+# define AK_PPRINT(obj) \
+    printf(""#obj""); printf(": "); PyObject_Print(obj, stdout, 0); printf("\n"); fflush(stdout);
 
 static PyArrayObject *
 AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
@@ -396,7 +317,7 @@ AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
 }
 
 static PyArrayObject*
-AK_compare_two_slices_from_array(PyArrayObject *arr, Py_ssize_t l1, Py_ssize_t l2, Py_ssize_t r1, Py_ssize_t r2)
+AK_compare_two_slices_from_array(PyArrayObject *arr, Py_ssize_t l1, Py_ssize_t l2, Py_ssize_t r1, Py_ssize_t r2, int EQ)
 {
     PyObject* left_slice = NULL;
     PyObject* right_slice = NULL;
@@ -408,7 +329,7 @@ AK_compare_two_slices_from_array(PyArrayObject *arr, Py_ssize_t l1, Py_ssize_t l
     right_slice = PySequence_GetSlice((PyObject*)arr, r1, r2);
     AK_GOTO_ON_NOT(right_slice, failure)
 
-    comparison = PyObject_RichCompare(left_slice, right_slice, Py_EQ);
+    comparison = PyObject_RichCompare(left_slice, right_slice, EQ);
     AK_GOTO_ON_NOT(comparison, failure)
 
     Py_DECREF(left_slice);
@@ -486,7 +407,7 @@ AK_build_unique_arr_mask(PyArrayObject *sar, npy_bool* mask)
         }
 
         // 4. Build mask in such a way to only include 1 NaN value
-        comparison = AK_compare_two_slices_from_array(sar, 1, firstnan, 0, firstnan - 1);
+        comparison = AK_compare_two_slices_from_array(sar, 1, firstnan, 0, firstnan - 1, Py_NE);
         AK_GOTO_ON_NOT(comparison, failure)
         npy_bool* comparison_arr = (npy_bool*)PyArray_DATA(comparison);
 
@@ -500,7 +421,7 @@ AK_build_unique_arr_mask(PyArrayObject *sar, npy_bool* mask)
     }
     else {
         // 3. Build mask through a simple [1:] != [:-1] slice comparison
-        comparison = AK_compare_two_slices_from_array(sar, 1, size, 0, size - 1);
+        comparison = AK_compare_two_slices_from_array(sar, 1, size, 0, size - 1, Py_NE);
         AK_GOTO_ON_NOT(comparison, failure)
         npy_bool* comparison_arr = (npy_bool*)PyArray_DATA(comparison);
 
@@ -520,7 +441,7 @@ failure:
     return 0;
 }
 
-static PyObject*
+static PyArrayObject*
 AK_get_unique_arr(PyArrayObject *original_arr)
 {
     /* Algorithm
@@ -571,7 +492,7 @@ AK_get_unique_arr(PyArrayObject *original_arr)
     AK_GOTO_ON_NOT(mask, failure)
 
     // 4. Filter sar
-    PyObject *filtered_arr = PyObject_GetItem((PyObject*)sar, (PyObject*)mask);
+    PyArrayObject *filtered_arr = (PyArrayObject*)PyObject_GetItem((PyObject*)sar, (PyObject*)mask);
     AK_GOTO_ON_NOT(filtered_arr, failure)
 
     Py_DECREF(sar);
@@ -717,11 +638,12 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     */
     // 0. Deallocate on failure
     PyArrayObject* raveled_array = NULL;
-    PyArrayObject *reverse_idx = NULL;
+    PyObject *reverse_idx = NULL;
     PyArrayObject* concatenated = NULL;
     PyArrayObject *ordered_idx = NULL;
     PyArrayObject* sorted_arr = NULL;
     PyArrayObject* comparison = NULL;
+    PyArrayObject* ret = NULL;
 
     // 1. Capture original array shape for return value
     int array_ndim = PyArray_NDIM(array);
@@ -735,17 +657,20 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
     if (!assume_unique) {
         PyObject* arr_and_rev_idx = AK_get_unique_arr_w_inverse(raveled_array);
-        PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GetItem(arr_and_rev_idx, 0);
+        PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GET_ITEM(arr_and_rev_idx, 0);
         AK_GOTO_ON_NOT(raveled_array_unique, failure)
+        Py_INCREF(raveled_array_unique);
 
-        reverse_idx = (PyArrayObject*)PyTuple_GetItem(arr_and_rev_idx, (Py_ssize_t)1);
-        Py_DECREF(arr_and_rev_idx);
+        reverse_idx = PyTuple_GET_ITEM(arr_and_rev_idx, 1);
         AK_GOTO_ON_NOT(reverse_idx, failure)
 
-        PyArrayObject *other_unique = (PyArrayObject*)AK_get_unique_arr(other);
+        PyArrayObject *other_unique = AK_get_unique_arr(other);
+        AK_GOTO_ON_NOT(other_unique, failure)
+        Py_INCREF(other_unique);
 
         // 3. Concatenate
         concatenated = AK_concat_arrays(raveled_array_unique, other_unique);
+        Py_DECREF(arr_and_rev_idx);
         Py_DECREF(raveled_array_unique);
         Py_DECREF(other_unique);
     }
@@ -754,7 +679,6 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
         concatenated = AK_concat_arrays(raveled_array, other);
     }
     AK_GOTO_ON_NOT(concatenated, failure)
-
 
     size_t concatenated_size = PyArray_SIZE(concatenated);
 
@@ -767,54 +691,75 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     sorted_arr = (PyArrayObject*)PyObject_GetItem((PyObject*)concatenated, (PyObject*)ordered_idx);
     AK_GOTO_ON_NOT(sorted_arr, failure)
 
-    comparison = AK_compare_two_slices_from_array(sorted_arr, 1, concatenated_size, 0, concatenated_size - 1);
+    comparison = AK_compare_two_slices_from_array(sorted_arr, 1, concatenated_size, 0, concatenated_size - 1, Py_EQ);
     AK_GOTO_ON_NOT(comparison, failure)
     npy_bool* comparison_arr = (npy_bool*)PyArray_DATA(comparison);
 
-    // 6: Construct empty array
-    PyArrayObject* ret = (PyArrayObject*)PyArray_Empty(
-            array_ndim,                      // nd
-            array_dims,                      // dims
-            PyArray_DescrFromType(NPY_BOOL), // dtype
-            0);                              // is_f_order
+    if (!assume_unique) {
+        // 6: Construct empty array
+        PyObject* tmp = PyArray_Empty(
+                PyArray_NDIM(concatenated),      // nd
+                PyArray_DIMS(concatenated),      // dims
+                PyArray_DescrFromType(NPY_BOOL), // dtype
+                0);                              // is_f_order
 
-    AK_GOTO_ON_NOT(ret, failure)
+        Py_INCREF(tmp);
+        AK_PPRINT(tmp)
+        AK_PPRINT(ordered_idx)
+        AK_PPRINT(comparison)
 
-    size_t stride = 0;
-    if (array_ndim == 2) {
-        stride = (size_t)array_dims[1];
-    }
-
-    // 7: Assign into duplicates array
-    for (size_t i = 0; i < (size_t)PyArray_SIZE(ordered_idx); ++i) {
-        size_t idx_0 = (size_t)ordered_idx_arr[i];
-        if (idx_0 >= array_size) { continue; }
-
-        // We are guaranteed that flag_ar[i] is always a valid index
-        if (array_ndim == 1) {
-            *(npy_bool *) PyArray_GETPTR1(ret, idx_0) = comparison_arr[i];
+        // TODO: Comparison is missing a trailing False value...
+        if (PyObject_SetItem(tmp, ordered_idx, comparison)) {
+            goto failure;
         }
-        else {
-            size_t idx_1 = idx_0 / stride;
-            idx_0 = idx_0 - (stride * idx_1);
 
-            *(npy_bool *) PyArray_GETPTR2(ret, idx_1, idx_0) = comparison_arr[i];
+        printf("HERE\n");
+
+        ret = (PyArrayObject*)PyObject_GetItem(tmp, reverse_idx);
+        Py_DECREF(tmp);
+        Py_DECREF(reverse_idx);
+    }
+    else {
+        // 6: Construct empty array
+        ret = (PyArrayObject*)PyArray_Empty(
+                array_ndim,                      // nd
+                array_dims,                      // dims
+                PyArray_DescrFromType(NPY_BOOL), // dtype
+                0);                              // is_f_order
+
+        AK_GOTO_ON_NOT(ret, failure)
+
+        size_t stride = 0;
+        if (array_ndim == 2) {
+            stride = (size_t)array_dims[1];
+        }
+
+        // 7: Assign into duplicates array
+        for (size_t i = 0; i < (size_t)PyArray_SIZE(ordered_idx); ++i) {
+            size_t idx_0 = (size_t)ordered_idx_arr[i];
+            if (idx_0 >= array_size) { continue; }
+
+            // We are guaranteed that flag_ar[i] is always a valid index
+            if (array_ndim == 1) {
+                *(npy_bool *) PyArray_GETPTR1(ret, idx_0) = comparison_arr[i];
+            }
+            else {
+                size_t idx_1 = idx_0 / stride;
+                idx_0 = idx_0 - (stride * idx_1);
+
+                *(npy_bool *) PyArray_GETPTR2(ret, idx_1, idx_0) = comparison_arr[i];
+            }
         }
     }
 
-    Py_XDECREF(reverse_idx); // This might not exist
+    // 8. Cleanup & Return!
+    Py_DECREF(raveled_array);
+    Py_DECREF(concatenated);
+    Py_DECREF(ordered_idx);
+    Py_DECREF(sorted_arr);
+    Py_DECREF(comparison);
 
-    // 8. Return!
-    if (assume_unique) {
-        Py_DECREF(raveled_array);
-        Py_DECREF(concatenated);
-        Py_DECREF(ordered_idx);
-        Py_DECREF(sorted_arr);
-        Py_DECREF(comparison);
-        return (PyObject*)ret;
-    }
-
-    // return NULL;
+    return (PyObject*)ret;
 
 failure:
     Py_XDECREF(raveled_array);
