@@ -261,19 +261,47 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
-// isin
+// utils
 
-static PyArrayObject *
-AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
+static int
+is_nan(PyObject *a)
 {
-    PyObject *container = PyTuple_Pack(2, arr1, arr2);
-    AK_CHECK_NOT(container)
+    double v = PyFloat_AsDouble(a);
 
-    PyArrayObject *array = (PyArrayObject*)PyArray_Concatenate(container, 0);
-    Py_DECREF(container);
-    return array;
+    // Need to disambiguate, since v could be -1 and no failure happened
+    if (v == -1 && PyErr_Occurred()) {
+        return -1;
+    }
+
+    return isnan(v);
 }
 
+static int
+is_nanj(PyObject *a)
+{
+    return isnan(((PyComplexObject*)a)->cval.real);
+}
+
+static int
+is_nat(PyObject *a)
+{
+    // NaT - Datetime
+    if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
+        return PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
+    }
+
+    // NaT - Timedelta
+    if (PyArray_IsScalar(a, Timedelta)) { // Cannot fail
+        return PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
+    }
+
+    Py_UNREACHABLE();
+}
+
+//------------------------------------------------------------------------------
+// isin
+
+/*
 static void
 AK_print_array_float(PyArrayObject *array)
 {
@@ -309,7 +337,7 @@ AK_print_array_float(PyArrayObject *array)
         }
         printf("\n");
 
-        /* Increment the iterator to the next inner loop */
+        // Increment the iterator to the next inner loop
     } while(iternext(iter));
 
     NpyIter_Deallocate(iter);
@@ -348,48 +376,26 @@ AK_print_array_bool(PyArrayObject *array)
         }
         printf("\n");
 
-        /* Increment the iterator to the next inner loop */
+        // Increment the iterator to the next inner loop
     } while(iternext(iter));
 
     NpyIter_Deallocate(iter);
 }
+*/
 
-static int
-is_nan(PyObject *a)
+// DONE
+static PyArrayObject *
+AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
 {
-    double v = PyFloat_AsDouble(a);
+    PyObject *container = PyTuple_Pack(2, arr1, arr2);
+    AK_CHECK_NOT(container)
 
-    // Need to disambiguate, since v could be -1 and no failure happened
-    if (v == -1 && PyErr_Occurred()) {
-        return -1;
-    }
-
-    return isnan(v);
+    PyArrayObject *array = (PyArrayObject*)PyArray_Concatenate(container, 0);
+    Py_DECREF(container);
+    return array;
 }
 
 static int
-is_nanj(PyObject *a)
-{
-    return isnan(((PyComplexObject*)a)->cval.real);
-}
-
-static int
-is_nat(PyObject *a)
-{
-    // NaT - Datetime
-    if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
-        return PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
-    }
-
-    // NaT - Timedelta
-    if (PyArray_IsScalar(a, Timedelta)) { // Cannot fail
-        return PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
-    }
-
-    Py_UNREACHABLE();
-}
-
-static PyObject*
 AK_build_unique_arr_mask(PyArrayObject *sar, npy_bool* mask)
 {
     /* Algorithm (assumes `sar` is sorted & mask is initialized to [1, 0, ... len(sar)]
@@ -410,7 +416,7 @@ AK_build_unique_arr_mask(PyArrayObject *sar, npy_bool* mask)
     PyObject* right_slice = NULL;
     PyObject* comparison = NULL;
 
-    int size = PyArray_SIZE(sar);
+    size_t size = (size_t)PyArray_SIZE(sar);
     PyArray_Descr* dtype = PyArray_DESCR(sar);
 
     int is_float = PyDataType_ISFLOAT(dtype);
@@ -528,7 +534,7 @@ AK_get_unique_arr(PyArrayObject *original_arr)
     memset(mask_arr, 0, sizeof(mask_arr));
     mask_arr[0] = 1;
 
-    AK_build_unique_arr_mask(arr, &mask_arr);
+    AK_GOTO_ON_NOT(AK_build_unique_arr_mask(arr, mask_arr), failure)
 
     PyObject* mask = PyArray_NewFromDescr(
                 &PyArray_Type,                         // class (subtype)
@@ -597,7 +603,7 @@ AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
     memset(mask_arr, 0, sizeof(mask_arr));
     mask_arr[0] = 1;
 
-    AK_build_unique_arr_mask(arr, &mask_arr);
+    AK_GOTO_ON_NOT(AK_build_unique_arr_mask(arr, mask_arr), failure)
 
     PyObject* mask = PyArray_NewFromDescr(
                 &PyArray_Type,                         // class (subtype)
@@ -617,102 +623,6 @@ AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
 
 failure:
     printf("FAILURE!\n");
-    return NULL;
-}
-
-static PyObject *
-AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
-{
-    /*  Algorithm:
-
-        for loc, element in loc_iter(array):
-            result[loc] = element in set(other)
-    */
-
-    // 0. Deallocate on failure
-    PyObject* compare_elements = NULL;
-    PyArrayObject* result = NULL;
-    NpyIter *iter = NULL;
-
-    // 1. Capture original array shape for return value
-    int array_ndim = PyArray_NDIM(array);
-    npy_intp* array_dims = PyArray_DIMS(array);
-
-    compare_elements = PyFrozenSet_New((PyObject*)other);
-    AK_CHECK_NOT(compare_elements)
-
-    // 2: Construct empty array
-    result = (PyArrayObject*)PyArray_Empty(
-            array_ndim,                      // nd
-            array_dims,                      // dims
-            PyArray_DescrFromType(NPY_BOOL), // dtype
-            0);                              // is_f_order
-    AK_GOTO_ON_NOT(result, failure)
-
-    // 3. Set up iteration
-    // https://numpy.org/doc/stable/reference/c-api/iterator.html?highlight=npyiter_multinew#simple-iteration-example
-    iter = NpyIter_New(array,
-                       NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
-                       NPY_KEEPORDER,
-                       NPY_NO_CASTING,
-                       NULL);
-    AK_GOTO_ON_NOT(iter, failure)
-
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-    AK_GOTO_ON_NOT(iternext, failure)
-
-    char** dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-
-    // 4. Iterate!
-    int i = 0;
-    do {
-        int j = 0;
-        char* data = *dataptr;
-        npy_intp size = *sizeptr;
-        npy_intp stride = *strideptr;
-
-        while (size--) {
-            PyObject* obj;
-            memcpy(&obj, data, sizeof(obj));
-            AK_GOTO_ON_NOT(obj, failure)
-            Py_INCREF(obj);
-
-            // 5. Assign into result whether or not the element exists in the set
-            int found = PySequence_Contains(compare_elements, obj);
-            Py_DECREF(obj);
-
-            if (found == -1) {
-                goto failure;
-            }
-
-            if (array_ndim == 1){
-                *(npy_bool *) PyArray_GETPTR1(result, j) = (npy_bool)found;
-            }
-            else {
-                *(npy_bool *) PyArray_GETPTR2(result, i, j) = (npy_bool)found;
-            }
-
-            data += stride;
-            ++j;
-        }
-
-        ++i;
-        /* Increment the iterator to the next inner loop */
-    } while(iternext(iter));
-
-    Py_DECREF(compare_elements);
-    NpyIter_Deallocate(iter);
-
-    return (PyObject*)result;
-
-failure:
-    Py_DECREF(compare_elements);
-    Py_XDECREF(result);
-    if (iter != NULL) {
-        NpyIter_Deallocate(iter);
-    }
     return NULL;
 }
 
@@ -762,13 +672,14 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     AK_GOTO_ON_NOT(raveled_array, failure)
     Py_INCREF(raveled_array);
 
-    return AK_get_unique(raveled_array);
-
     if (!assume_unique) {
         PyObject* arr_and_rev_idx = AK_get_unique_arr_w_inverse(raveled_array);
-        PyArrayObject *raveled_array_unique = PyTuple_GetItem(arr_and_rev_idx, 0);
-        reverse_idx = PyTuple_GetItem(arr_and_rev_idx, 1);
+        PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GetItem(arr_and_rev_idx, 0);
+        AK_GOTO_ON_NOT(raveled_array_unique, failure)
+
+        reverse_idx = (PyArrayObject*)PyTuple_GetItem(arr_and_rev_idx, (Py_ssize_t)1);
         Py_DECREF(arr_and_rev_idx);
+        AK_GOTO_ON_NOT(reverse_idx, failure)
 
         PyArrayObject *other_unique = (PyArrayObject*)AK_get_unique_arr(other);
 
@@ -866,6 +777,104 @@ failure:
 
 }
 
+// DONE
+static PyObject *
+AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
+{
+    /*  Algorithm:
+
+        for loc, element in loc_iter(array):
+            result[loc] = element in set(other)
+    */
+
+    // 0. Deallocate on failure
+    PyObject* compare_elements = NULL;
+    PyArrayObject* result = NULL;
+    NpyIter *iter = NULL;
+
+    // 1. Capture original array shape for return value
+    int array_ndim = PyArray_NDIM(array);
+    npy_intp* array_dims = PyArray_DIMS(array);
+
+    compare_elements = PyFrozenSet_New((PyObject*)other);
+    AK_CHECK_NOT(compare_elements)
+
+    // 2: Construct empty array
+    result = (PyArrayObject*)PyArray_Empty(
+            array_ndim,                      // nd
+            array_dims,                      // dims
+            PyArray_DescrFromType(NPY_BOOL), // dtype
+            0);                              // is_f_order
+    AK_GOTO_ON_NOT(result, failure)
+
+    // 3. Set up iteration
+    // https://numpy.org/doc/stable/reference/c-api/iterator.html?highlight=npyiter_multinew#simple-iteration-example
+    iter = NpyIter_New(array,
+                       NPY_ITER_READONLY | NPY_ITER_REFS_OK | NPY_ITER_EXTERNAL_LOOP,
+                       NPY_KEEPORDER,
+                       NPY_NO_CASTING,
+                       NULL);
+    AK_GOTO_ON_NOT(iter, failure)
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    AK_GOTO_ON_NOT(iternext, failure)
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    // 4. Iterate!
+    int i = 0;
+    do {
+        int j = 0;
+        char* data = *dataptr;
+        npy_intp size = *sizeptr;
+        npy_intp stride = *strideptr;
+
+        while (size--) {
+            PyObject* obj;
+            memcpy(&obj, data, sizeof(obj));
+            AK_GOTO_ON_NOT(obj, failure)
+            Py_INCREF(obj);
+
+            // 5. Assign into result whether or not the element exists in the set
+            int found = PySequence_Contains(compare_elements, obj);
+            Py_DECREF(obj);
+
+            if (found == -1) {
+                goto failure;
+            }
+
+            if (array_ndim == 1){
+                *(npy_bool *) PyArray_GETPTR1(result, j) = (npy_bool)found;
+            }
+            else {
+                *(npy_bool *) PyArray_GETPTR2(result, i, j) = (npy_bool)found;
+            }
+
+            data += stride;
+            ++j;
+        }
+
+        ++i;
+        /* Increment the iterator to the next inner loop */
+    } while(iternext(iter));
+
+    Py_DECREF(compare_elements);
+    NpyIter_Deallocate(iter);
+
+    return (PyObject*)result;
+
+failure:
+    Py_DECREF(compare_elements);
+    Py_XDECREF(result);
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+    return NULL;
+}
+
+// DONE
 static PyObject *
 isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
