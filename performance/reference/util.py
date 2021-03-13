@@ -246,3 +246,37 @@ def isin_array(*,
     result.flags.writeable = False
 
     return result
+
+def unique(ar, return_inverse=False):
+
+    ar = np.asanyarray(ar).flatten()
+
+    if return_inverse:
+        perm = ar.argsort(kind='quicksort')
+        aux = ar[perm]
+    else:
+        ar.sort()
+        aux = ar
+
+    mask = np.empty(aux.shape, dtype=np.bool_)
+    mask[:1] = True
+    if aux.dtype.kind in "cfmM" and np.isnan(aux[-1]):
+        if aux.dtype.kind == "c":  # for complex all NaNs are considered equivalent
+            aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
+        else:
+            aux_firstnan = np.searchsorted(aux, aux[-1], side='left')
+
+        mask[1:aux_firstnan] = (aux[1:aux_firstnan] != aux[:aux_firstnan - 1])
+        mask[aux_firstnan] = True
+        mask[aux_firstnan + 1:] = False
+    else:
+        mask[1:] = aux[1:] != aux[:-1]
+
+    ret = aux[mask]
+    if return_inverse:
+        imask = np.cumsum(mask) - 1
+        inv_idx = np.empty(mask.shape, dtype=np.intp)
+        inv_idx[perm] = imask
+        return ret, inv_idx
+
+    return ret
