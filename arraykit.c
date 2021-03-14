@@ -637,7 +637,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
             return ret[rev_idx]
     */
     // 0. Deallocate on failure
-    PyArrayObject* raveled_array = NULL;
+    PyArrayObject* flattened_array = NULL;
     PyObject *reverse_idx = NULL;
     PyArrayObject* concatenated = NULL;
     PyArrayObject *ordered_idx = NULL;
@@ -651,18 +651,19 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     size_t array_size = PyArray_SIZE(array);
 
     // 2. Ravel the array as we want to operate on 1D arrays only. (other is guaranteed to be 1D)
-    raveled_array = (PyArrayObject*)PyArray_Ravel(array, NPY_CORDER);
-    AK_GOTO_ON_NOT(raveled_array, failure)
-    Py_INCREF(raveled_array);
+    flattened_array = (PyArrayObject*)PyArray_Flatten(array, NPY_CORDER);
+    AK_GOTO_ON_NOT(flattened_array, failure)
+    Py_INCREF(flattened_array);
 
     if (!assume_unique) {
-        PyObject* arr_and_rev_idx = AK_get_unique_arr_w_inverse(raveled_array);
+        PyObject* arr_and_rev_idx = AK_get_unique_arr_w_inverse(flattened_array);
         PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GET_ITEM(arr_and_rev_idx, 0);
         AK_GOTO_ON_NOT(raveled_array_unique, failure)
         Py_INCREF(raveled_array_unique);
 
         reverse_idx = PyTuple_GET_ITEM(arr_and_rev_idx, 1);
         AK_GOTO_ON_NOT(reverse_idx, failure)
+        Py_INCREF(reverse_idx);
 
         PyArrayObject *other_unique = AK_get_unique_arr(other);
         AK_GOTO_ON_NOT(other_unique, failure)
@@ -676,7 +677,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     }
     else {
         // 3. Concatenate
-        concatenated = AK_concat_arrays(raveled_array, other);
+        concatenated = AK_concat_arrays(flattened_array, other);
     }
     AK_GOTO_ON_NOT(concatenated, failure)
 
@@ -705,12 +706,31 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
         Py_INCREF(tmp);
 
+        npy_intp dims[1] = {1};
+
+        PyArrayObject *false = (PyArrayObject*)PyArray_NewFromDescr(
+                &PyArray_Type,                         // class (subtype)
+                PyArray_DescrFromType(NPY_BOOL),       // dtype (descr)
+                1,                                     // ndim (nd)
+                dims,                                  // dims
+                NULL,                                  // strides
+                "\0",                                  // data
+                NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
+                NULL);                                 // sublclass (obj)
+        Py_INCREF(false);
+
+        PyArrayObject* xyz = AK_concat_arrays(comparison, false);
+        Py_INCREF(xyz);
+
         // TODO: Comparison is missing a trailing False value...
-        if (PyObject_SetItem(tmp, (PyObject*)ordered_idx, (PyObject*)comparison)) {
+        if (PyObject_SetItem(tmp, (PyObject*)ordered_idx, (PyObject*)xyz)) {
             goto failure;
         }
 
-        printf("HERE\n");
+        Py_INCREF(ordered_idx);
+        Py_INCREF(xyz);
+        Py_INCREF(tmp);
+        Py_INCREF(reverse_idx);
 
         ret = (PyArrayObject*)PyObject_GetItem(tmp, reverse_idx);
         Py_DECREF(tmp);
@@ -750,7 +770,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     }
 
     // 8. Cleanup & Return!
-    Py_DECREF(raveled_array);
+    Py_DECREF(flattened_array);
     Py_DECREF(concatenated);
     Py_DECREF(ordered_idx);
     Py_DECREF(sorted_arr);
@@ -759,7 +779,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
     return (PyObject*)ret;
 
 failure:
-    Py_XDECREF(raveled_array);
+    Py_XDECREF(flattened_array);
     Py_XDECREF(reverse_idx);
     Py_XDECREF(concatenated);
     Py_XDECREF(ordered_idx);
@@ -935,8 +955,8 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return AK_isin_array_object(array, other);
     }
     // Use numpy in1d logic for dtype arrays
-    //return AK_isin_array_dtype(array, other, array_is_unique && other_is_unique);
-    return AK_isin_array_dtype_use_np(array, other, array_is_unique && other_is_unique);
+    return AK_isin_array_dtype(array, other, array_is_unique && other_is_unique);
+    //return AK_isin_array_dtype_use_np(array, other, array_is_unique && other_is_unique);
 }
 
 //------------------------------------------------------------------------------
