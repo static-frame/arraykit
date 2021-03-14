@@ -327,17 +327,13 @@ class TestUnit(unittest.TestCase):
         ]
 
         for dtype, dtype_func in dtype_funcs:
-            print(dtype, dtype_func)
             arr1 = np.array([dtype_func(v) for v in v_1d], dtype=dtype)
             arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
-
-            print(arr1, arr2, e_1d)
 
             post = isin_array_func(array=arr1, other=arr2)
             self.assertTrue(np.array_equal(e_1d, post), msg=f'\n{dtype}\nExpected:\n{e_1d}\nActual:\n{post}')
 
         for dtype, dtype_func in dtype_funcs:
-            print(dtype, dtype_func)
             arr1 = np.array([[dtype_func(x) for x in y] for y in v_2d], dtype=dtype)
             arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
 

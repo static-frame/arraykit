@@ -222,45 +222,172 @@ class ArrayGOPerfREF(ArrayGOPerf):
 
 
 #-------------------------------------------------------------------------------
-class IsinArrayPerf(Perf):
-    NUMBER = 1000
+
+def build_arr(dtype, size, num_nans, contains_dups):
+    if dtype.kind == 'M':
+        if dtype == 'datetime64[Y]':
+            delta = np.timedelta64(size, 'Y')
+        elif dtype == 'datetime64[M]':
+            delta = np.timedelta64(size, 'M')
+        else:
+            delta = np.timedelta64(size, 'D')
+
+        start = np.datetime64('2000-01-01').astype(dtype)
+        end = start + delta
+        arr = np.arange(start, start + delta).astype(dtype)
+
+        nan_val = np.datetime64('NaT')
+    else:
+        if dtype.kind == 'm':
+            nan_val = np.timedelta64('NaT')
+        elif dtype.kind == 'c':
+            nan_val = np.complex_(np.nan)
+        else:
+            nan_val = np.nan
+
+        arr = np.arange(size).astype(dtype)
+
+    if num_nans == 1:
+        arr = np.concatenate((arr, [nan_val]*num_nans))
+    elif num_nans > 1:
+        arr = np.concatenate((arr, [nan_val]*num_nans))
+
+    if contains_dups:
+        dups = np.array([arr[i] for i in range(0, size, int(size * 0.3))], dtype=dtype)
+        arr = np.concatenate((arr, dups))
+
+    np.random.seed(0)
+    np.random.shuffle(arr)
+    return arr, (num_nans <= 1 and not contains_dups)
+
+storage = []
+def build_subclassses(klass, meth):
+    storage.append(type(f'{klass.__name__}AK', (klass,), dict(entry=staticmethod(globals()[f'{meth}_ak']))))
+    storage.append(type(f'{klass.__name__}REF', (klass,), dict(entry=staticmethod(globals()[f'{meth}_ref']))))
+
+class Obj:
+    def __init__(self, val):
+        self.val = val
+    def __eq__(self, other):
+        return self.val == other.val
+    def __hash__(self):
+        return hash(self.val)
+
+def get_dtypes():
+    dtypes = [np.dtype(int), np.dtype(float), np.dtype(np.complex_), np.dtype('O')]
+    dtypes.extend((np.dtype(f'datetime64[{f}]') for f in 'DMY'))
+    dtypes.extend((np.dtype(f'timedelta64[{f}]') for f in 'DMY'))
+    return dtypes
+
+class IsinDtypeUnique1DPerf(Perf):
+    NUMBER = 1
 
     def pre(self):
-        self.arrays = []
-
-        v_1d = [1, 2, 3, 4, 5]
-        v_2d = [[1, 2, 3], [4, 5, 9]]
-        w_1d = [1, 4, 7, 9]
-
-        dtype_funcs = [
-                (int, int),
-                (float, float),
-                (str, str),
-                ('datetime64[D]', lambda x: date(2020, 1, x)),
-        ]
-
-        for dtype, dtype_func in dtype_funcs:
-            arr1 = np.array([dtype_func(v) for v in v_1d], dtype=dtype)
-            arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
-            self.arrays.append((arr1, arr2))
-
-        for dtype, dtype_func in dtype_funcs:
-            arr1 = np.array([[dtype_func(x) for x in y] for y in v_2d], dtype=dtype)
-            arr2 = np.array([dtype_func(v) for v in w_1d], dtype=dtype)
-            self.arrays.append((arr1, arr2))
+        self.kwargs = []
+        for dtype in get_dtypes():
+            for size in (100, 5000, 20000, 100000):
+                for num_nans in (0, 1):
+                    arr1, arr1_unique = build_arr(dtype, size, num_nans, contains_dups=False)
+                    arr2, arr2_unique = build_arr(dtype, size // 25, num_nans // 25, contains_dups=False)
+                    assert arr1_unique and arr2_unique, 'Expect both arrays to be unique'
+                    #print(size, len(arr1), len(arr2))
+                    self.kwargs.append(dict(array=arr1, array_is_unique=True, other=arr2, other_is_unique=True))
 
     def main(self):
-        for _ in range(25):
-            for arr1, arr2 in self.arrays:
-                self.entry(array=arr1, array_is_unique=True, other=arr2, other_is_unique=True)
+        for kwargs in self.kwargs:
+            self.entry(**kwargs)
 
-class IsinArrayPerfAK(IsinArrayPerf):
-    entry = staticmethod(isin_array_ak)
+class IsinDtypeNonUnique1DPerf(Perf):
+    NUMBER = 10
 
-class IsinArrayPerfREF(IsinArrayPerf):
-    entry = staticmethod(isin_array_ref)
+    def pre(self):
+        self.kwargs = []
+        for dtype in get_dtypes():
+            for size in (100, 5000, 20000):
+                for num_nans, contains_dups in ((2 + (size // 2), False), (size // 2, True), (2 + (size // 8), False), (size // 8, True)):
+                    arr1, arr1_unique = build_arr(dtype, size, num_nans, contains_dups)
+                    arr2, arr2_unique = build_arr(dtype, size // 25, num_nans // 25, contains_dups)
+                    assert not arr1_unique or not arr2_unique, 'Expect at least one of the arrays to contains duplicates'
+                    self.kwargs.append(dict(array=arr1, array_is_unique=arr1_unique, other=arr2, other_is_unique=arr2_unique))
 
+    def main(self):
+        for kwargs in self.kwargs:
+            self.entry(**kwargs)
 
+class IsinDtypeUnique2DPerf(Perf):
+    NUMBER = 10
+
+    def pre(self):
+        self.kwargs = []
+        for dtype in get_dtypes():
+            for size in (100, 5000, 20000, 100000):
+                for num_nans in (0, 1):
+                    arr1, arr1_unique = build_arr(dtype, size, num_nans, contains_dups=False)
+                    arr2, arr2_unique = build_arr(dtype, size // 25, num_nans // 25, contains_dups=False)
+                    assert arr1_unique and arr2_unique, 'Expect both arrays to be unique'
+                    self.kwargs.append(dict(array=arr1, array_is_unique=True, other=arr2, other_is_unique=True))
+
+    def main(self):
+        for kwargs in self.kwargs:
+            self.entry(**kwargs)
+
+class IsinDtypeNonUnique2DPerf(Perf):
+    NUMBER = 10
+
+    def pre(self):
+        self.kwargs = []
+        for dtype in get_dtypes():
+            for size in (100, 5000, 20000):
+                for num_nans, contains_dups in ((2 + (size // 2), False), (size // 2, True), (2 + (size // 8), False), (size // 8, True)):
+                    arr1, arr1_unique = build_arr(dtype, size, num_nans, contains_dups)
+                    arr2, arr2_unique = build_arr(dtype, size // 25, num_nans // 25, contains_dups)
+                    assert not arr1_unique or not arr2_unique, 'Expect at least one of the arrays to contains duplicates'
+                    self.kwargs.append(dict(array=arr1, array_is_unique=arr1_unique, other=arr2, other_is_unique=arr2_unique))
+
+    def main(self):
+        for kwargs in self.kwargs:
+            self.entry(**kwargs)
+
+# class IsinObject1DPerf(Perf):
+#     NUMBER = 10
+
+#     def pre(self):
+#         self.kwargs = []
+#         for dtype in get_dtypes():
+#             for size in (100, 5000, 20000):
+#                 for num_nans, contains_dups in ((2 + (size // 2), False), (size // 2, True), (2 + (size // 8), False), (size // 8, True)):
+#                     arr1, arr1_unique = build_arr(dtype, size, num_nans, contains_dups)
+#                     arr2, arr2_unique = build_arr(dtype, size // 25, num_nans // 25, contains_dups)
+#                     assert not arr1_unique or not arr2_unique, 'Expect at least one of the arrays to contains duplicates'
+#                     self.kwargs.append(dict(array=arr1, array_is_unique=arr1_unique, other=arr2, other_is_unique=arr2_unique))
+
+#     def main(self):
+#         for kwargs in self.kwargs:
+#             self.entry(**kwargs)
+
+# class IsinObject2DPerf(Perf):
+#     NUMBER = 10
+
+#     def pre(self):
+#         self.kwargs = []
+#         for dtype in get_dtypes():
+#             for size in (100, 5000, 20000):
+#                 for num_nans, contains_dups in ((2 + (size // 2), False), (size // 2, True), (2 + (size // 8), False), (size // 8, True)):
+#                     arr1, arr1_unique = build_arr(dtype, size, num_nans, contains_dups)
+#                     arr2, arr2_unique = build_arr(dtype, size // 25, num_nans // 25, contains_dups)
+#                     assert not arr1_unique or not arr2_unique, 'Expect at least one of the arrays to contains duplicates'
+#                     self.kwargs.append(dict(array=arr1, array_is_unique=arr1_unique, other=arr2, other_is_unique=arr2_unique))
+
+#     def main(self):
+#         for kwargs in self.kwargs:
+#             self.entry(**kwargs)
+
+build_subclassses(IsinDtypeUnique1DPerf, 'isin_array')
+build_subclassses(IsinDtypeUnique2DPerf, 'isin_array')
+build_subclassses(IsinDtypeNonUnique1DPerf, 'isin_array')
+build_subclassses(IsinDtypeNonUnique2DPerf, 'isin_array')
+# build_subclassses(IsinObject1DPerf, 'isin_array')
+# build_subclassses(IsinObject2DPerf, 'isin_array')
 
 #-------------------------------------------------------------------------------
 
@@ -290,6 +417,7 @@ def main():
                 cls_map['ak'] = cls_runner
             elif cls_runner.__name__.endswith('REF'):
                 cls_map['ref'] = cls_runner
+        assert cls_map
         for func_attr in cls_perf.FUNCTIONS:
             results = {}
             for key, cls_runner in cls_map.items():

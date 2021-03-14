@@ -247,6 +247,7 @@ def isin_array(*,
 
     return result
 
+
 def unique(ar, return_inverse=False):
 
     ar = np.asanyarray(ar).flatten()
