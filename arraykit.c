@@ -296,7 +296,7 @@ is_nat(PyObject *a)
         return PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
     }
 
-    Py_UNREACHABLE();
+    Py_FatalError("This should be impossible");
 }
 
 //------------------------------------------------------------------------------
