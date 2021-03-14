@@ -233,7 +233,7 @@ class TestUnit(unittest.TestCase):
                 (float, float),
                 (str, str),
                 ('datetime64[D]', lambda x: date(2020, 1, x)),
-                ('timedelta64[D]', lambda x: timedelta(x)),
+                ('timedelta64[D]', timedelta),
         ]
 
         for dtype, dtype_func in dtype_funcs:
@@ -323,7 +323,7 @@ class TestUnit(unittest.TestCase):
                 (float, float),
                 (str, str),
                 ('datetime64[D]', lambda x: date(2020, 1, x)),
-                ('timedelta64[D]', lambda x: timedelta(x)),
+                ('timedelta64[D]', timedelta),
         ]
 
         for dtype, dtype_func in dtype_funcs:

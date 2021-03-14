@@ -1,4 +1,3 @@
-from datetime import date
 import timeit
 import argparse
 
@@ -268,8 +267,10 @@ def build_arr(dtype, size, num_nans, num_duplicates):
 
 storage = []
 def build_subclassses(klass, meth):
-    storage.append(type(f'{klass.__name__}AK', (klass,), dict(entry=staticmethod(globals()[f'{meth}_ak']))))
-    storage.append(type(f'{klass.__name__}REF', (klass,), dict(entry=staticmethod(globals()[f'{meth}_ref']))))
+    #storage.append(type(f'{klass.__name__}AK', (klass,), dict(entry=staticmethod(globals()[f'{meth}_ak']))))
+    #storage.append(type(f'{klass.__name__}REF', (klass,), dict(entry=staticmethod(globals()[f'{meth}_ref']))))
+    storage.append(type(f'{klass.__name__}AK', (klass,), dict(entry=staticmethod(isin_array_ak))))
+    storage.append(type(f'{klass.__name__}REF', (klass,), dict(entry=staticmethod(isin_array_ref))))
 
 class Obj:
     def __init__(self, val):

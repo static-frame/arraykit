@@ -395,16 +395,16 @@ AK_build_unique_arr_mask(PyArrayObject *sar, npy_bool* mask)
         // 3. Discover the location of the first NaN element
         size_t firstnan = 0;
         if (is_complex) {
+            // TODO: I don't understand the necessity of this branch.
             // aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
         }
-        else {
-            // This gives back an array of 1-element since `last_element` is a single element
-            PyObject* firstnan_obj = PyArray_SearchSorted(sar, last_element, NPY_SEARCHLEFT, NULL);
-            AK_GOTO_ON_NOT(firstnan_obj, failure)
 
-            firstnan = *(size_t*)PyArray_DATA((PyArrayObject*)firstnan_obj);
-            Py_DECREF(firstnan_obj);
-        }
+        // This gives back an array of 1-element since `last_element` is a single element
+        PyObject* firstnan_obj = PyArray_SearchSorted(sar, last_element, NPY_SEARCHLEFT, NULL);
+        AK_GOTO_ON_NOT(firstnan_obj, failure)
+
+        firstnan = *(size_t*)PyArray_DATA((PyArrayObject*)firstnan_obj);
+        Py_DECREF(firstnan_obj);
 
         // 4. Build mask in such a way to only include 1 NaN value
         comparison = AK_compare_two_slices_from_array(sar, 1, firstnan, 0, firstnan - 1, Py_NE);
@@ -736,7 +736,7 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
         if (array_ndim == 2) {
             PyObject* shape = PyTuple_Pack(2, PyLong_FromLong(array_dims[0]), PyLong_FromLong(array_dims[1]));
-            ret = PyArray_Reshape(ret, shape);
+            ret = (PyArrayObject*)PyArray_Reshape(ret, shape);
         }
 
         Py_DECREF(tmp);
@@ -794,6 +794,7 @@ failure:
     return NULL;
 }
 
+/*
 static PyObject *
 AK_isin_array_dtype_use_np(PyArrayObject *array, PyArrayObject *other, int assume_unique)
 {
@@ -839,6 +840,7 @@ failure:
     Py_XDECREF(kwarg);
     return NULL;
 }
+*/
 
 static PyObject *
 AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
@@ -919,7 +921,7 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
         }
 
         ++i;
-        /* Increment the iterator to the next inner loop */
+        // Increment the iterator to the next inner loop
     } while(iternext(iter));
 
     Py_DECREF(compare_elements);
