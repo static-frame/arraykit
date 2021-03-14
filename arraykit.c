@@ -733,6 +733,12 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
         Py_INCREF(reverse_idx);
 
         ret = (PyArrayObject*)PyObject_GetItem(tmp, reverse_idx);
+
+        if (array_ndim == 2) {
+            PyObject* shape = PyTuple_Pack(2, PyLong_FromLong(array_dims[0]), PyLong_FromLong(array_dims[1]));
+            ret = PyArray_Reshape(ret, shape);
+        }
+
         Py_DECREF(tmp);
         Py_DECREF(reverse_idx);
     }
