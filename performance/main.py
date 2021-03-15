@@ -310,20 +310,17 @@ class IsinArrayDtypeUnique2DPerf(Perf):
     def pre(self):
         self.kwargs = []
         for dtype in get_dtypes():
-            for size, num_nans, reshape in [
-                    (100, 0, (10, 10)),
-                    (100, 1, (10, 10)),
-                    (5000, 0, (200, 25)),
-                    (5000, 1, (200, 25)),
-                    (20000, 0, (200, 100)),
-                    (20000, 1, (200, 100)),
-                    (100000, 0, (500, 200)),
-                    (100000, 1, (500, 200)),
+            for size, reshape in [
+                    (100, (10, 10)),
+                    (5000, (200, 25)),
+                    (20000, (200, 100)),
+                    (100000, (500, 200)),
                 ]:
-                arr1, arr1_unique = build_arr(dtype, size, num_nans, num_duplicates=0)
-                arr2, arr2_unique = build_arr(dtype, size // 10, num_nans // 10, num_duplicates=0)
-                assert arr1_unique and arr2_unique, 'Expect both arrays to be unique'
-                self.kwargs.append(dict(array=arr1.reshape(reshape), array_is_unique=True, other=arr2, other_is_unique=True))
+                for num_nans in (0, 1):
+                    arr1, arr1_unique = build_arr(dtype, size, num_nans, num_duplicates=0)
+                    arr2, arr2_unique = build_arr(dtype, size // 10, num_nans // 10, num_duplicates=0)
+                    assert arr1_unique and arr2_unique, 'Expect both arrays to be unique'
+                    self.kwargs.append(dict(array=arr1.reshape(reshape), array_is_unique=True, other=arr2, other_is_unique=True))
 
     def main(self):
         assert set(x['array'].ndim for x in self.kwargs) == {2}, "Expected all arr1's to be 2D"
