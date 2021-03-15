@@ -463,7 +463,7 @@ AK_get_unique_arr(PyArrayObject *original_arr)
     size_t size = PyArray_SIZE(original_arr);
     PyArray_Descr* dtype = PyArray_DESCR(original_arr);
 
-    npy_bool mask_arr[size];
+    npy_bool* mask_arr = PyMem_Malloc(size);
 
     // 2. Get a copy of the original arr since sorting is in-place
     PyArrayObject* sar = (PyArrayObject*)PyArray_FromArray(
@@ -476,7 +476,7 @@ AK_get_unique_arr(PyArrayObject *original_arr)
     }
 
     // 3. Build mask
-    memset(mask_arr, 0, sizeof(mask_arr));
+    memset(mask_arr, 0, size);
     mask_arr[0] = 1;
     AK_GOTO_ON_NOT(AK_build_unique_arr_mask(sar, mask_arr), failure)
 
@@ -494,6 +494,8 @@ AK_get_unique_arr(PyArrayObject *original_arr)
     // 4. Filter sar
     PyArrayObject *filtered_arr = (PyArrayObject*)PyObject_GetItem((PyObject*)sar, (PyObject*)mask);
     AK_GOTO_ON_NOT(filtered_arr, failure)
+
+    PyMem_Free(mask_arr);
 
     Py_DECREF(sar);
     Py_DECREF(mask);
@@ -536,7 +538,7 @@ AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
 
     size_t size = PyArray_SIZE(original_arr);
 
-    npy_bool mask_arr[size];
+    npy_bool* mask_arr = PyMem_Malloc(size);
 
     // 2. Get sorted indices & sort array
     ordered_idx = PyArray_ArgSort(original_arr, 0, NPY_QUICKSORT);
@@ -546,7 +548,7 @@ AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
     AK_GOTO_ON_NOT(sar, failure)
 
     // 3. Build mask
-    memset(mask_arr, 0, sizeof(mask_arr));
+    memset(mask_arr, 0, size);
     mask_arr[0] = 1;
     AK_GOTO_ON_NOT(AK_build_unique_arr_mask(sar, mask_arr), failure)
 
@@ -589,6 +591,8 @@ AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
     // 6. Pack it up in a tuple and return
     PyObject* ret = PyTuple_Pack(2, filtered_arr, inv_idx);
     AK_GOTO_ON_NOT(ret, failure)
+
+    PyMem_Free(mask_arr);
 
     Py_DECREF(ordered_idx);
     Py_DECREF(sar);
