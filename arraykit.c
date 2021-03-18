@@ -305,6 +305,9 @@ is_nat(PyObject *a)
 # define AK_PPRINT(obj) \
     printf(""#obj""); printf(": "); PyObject_Print(obj, stdout, 0); printf("\n"); fflush(stdout);
 
+# define AK_HERE printf("HERE\n"); fflush(stdout);
+
+// DONE. Returns a new reference
 static PyArrayObject *
 AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
 {
@@ -441,6 +444,7 @@ failure:
     return 0;
 }
 
+// Returns a new reference
 static PyArrayObject*
 AK_get_unique_arr(PyArrayObject *original_arr)
 {
@@ -507,6 +511,7 @@ failure:
     return NULL;
 }
 
+// Returns a new reference
 static PyObject*
 AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
 {
@@ -575,7 +580,10 @@ AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
             NULL);   // out-array
     AK_GOTO_ON_NOT(cumsum, failure)
 
-    imask = PyNumber_Subtract(cumsum, PyLong_FromLong(1));
+    PyObject* one = PyLong_FromLong(1);
+    AK_GOTO_ON_NOT(one, failure)
+    imask = PyNumber_Subtract(cumsum, one);
+    Py_DECREF(one);
     AK_GOTO_ON_NOT(imask, failure)
 
     inv_idx = PyArray_Empty(
@@ -661,22 +669,30 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
     if (!assume_unique) {
         PyObject* arr_and_rev_idx = AK_get_unique_arr_w_inverse(flattened_array);
-        PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GET_ITEM(arr_and_rev_idx, 0);
-        AK_GOTO_ON_NOT(raveled_array_unique, failure)
-        Py_INCREF(raveled_array_unique);
+        AK_GOTO_ON_NOT(arr_and_rev_idx, failure)
+
+        PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GET_ITEM(arr_and_rev_idx, 0); // BORROWED! Py_DECREF(arr_and_rev_idx); handles this
+        if (!raveled_array_unique) {
+            Py_DECREF(arr_and_rev_idx);
+            goto failure;
+        }
 
         reverse_idx = PyTuple_GET_ITEM(arr_and_rev_idx, 1);
-        AK_GOTO_ON_NOT(reverse_idx, failure)
-        Py_INCREF(reverse_idx);
+        if (!reverse_idx) {
+            Py_DECREF(arr_and_rev_idx);
+            goto failure;
+        }
+        Py_INCREF(reverse_idx); // Since this was borrowed and we need outside of this scope, increment it's refcount
 
         PyArrayObject *other_unique = AK_get_unique_arr(other);
-        AK_GOTO_ON_NOT(other_unique, failure)
-        Py_INCREF(other_unique);
+        if (!other_unique) {
+            Py_DECREF(arr_and_rev_idx);
+            goto failure;
+        }
 
         // 3. Concatenate
         concatenated = AK_concat_arrays(raveled_array_unique, other_unique);
         Py_DECREF(arr_and_rev_idx);
-        Py_DECREF(raveled_array_unique);
         Py_DECREF(other_unique);
     }
     else {
@@ -702,17 +718,16 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
 
     if (!assume_unique) {
         // 6: Construct empty array
-        PyObject* tmp = PyArray_Empty(
+        PyObject* concatenated_mask = PyArray_Empty(
                 PyArray_NDIM(concatenated),      // nd
                 PyArray_DIMS(concatenated),      // dims
                 PyArray_DescrFromType(NPY_BOOL), // dtype
                 0);                              // is_f_order
-
-        Py_INCREF(tmp);
+        AK_GOTO_ON_NOT(concatenated_mask, failure)
 
         npy_intp dims[1] = {1};
 
-        PyArrayObject *false = (PyArrayObject*)PyArray_NewFromDescr(
+        PyArrayObject *single_false_array = (PyArrayObject*)PyArray_NewFromDescr(
                 &PyArray_Type,                         // class (subtype)
                 PyArray_DescrFromType(NPY_BOOL),       // dtype (descr)
                 1,                                     // ndim (nd)
@@ -721,30 +736,58 @@ AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_uniqu
                 "\0",                                  // data
                 NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
                 NULL);                                 // sublclass (obj)
-        Py_INCREF(false);
-
-        PyArrayObject* xyz = AK_concat_arrays(comparison, false);
-        Py_INCREF(xyz);
-
-        // TODO: Comparison is missing a trailing False value...
-        if (PyObject_SetItem(tmp, (PyObject*)ordered_idx, (PyObject*)xyz)) {
+        if (!single_false_array) {
+            Py_DECREF(concatenated_mask);
             goto failure;
         }
 
-        Py_INCREF(ordered_idx);
-        Py_INCREF(xyz);
-        Py_INCREF(tmp);
-        Py_INCREF(reverse_idx);
-
-        ret = (PyArrayObject*)PyObject_GetItem(tmp, reverse_idx);
-
-        if (array_ndim == 2) {
-            PyObject* shape = PyTuple_Pack(2, PyLong_FromLong(array_dims[0]), PyLong_FromLong(array_dims[1]));
-            ret = (PyArrayObject*)PyArray_Reshape(ret, shape);
+        PyArrayObject* full_comparison = AK_concat_arrays(comparison, single_false_array);
+        Py_DECREF(single_false_array);
+        if (!full_comparison) {
+            Py_DECREF(concatenated_mask);
+            goto failure;
         }
 
-        Py_DECREF(tmp);
-        Py_DECREF(reverse_idx);
+        int success = PyObject_SetItem(concatenated_mask, (PyObject*)ordered_idx, (PyObject*)full_comparison);
+        Py_DECREF(full_comparison);
+        if (success == -1) {
+            Py_DECREF(concatenated_mask);
+            goto failure;
+        }
+
+        PyObject* ret_1d = (PyArrayObject*)PyObject_GetItem(concatenated_mask, reverse_idx); // Should be a new reference?
+        Py_DECREF(reverse_idx); // We are officially done with this
+        Py_DECREF(concatenated_mask);
+        AK_GOTO_ON_NOT(ret_1d, failure)
+
+        if (array_ndim == 2) {
+            PyObject* dim0 = PyLong_FromLong(array_dims[0]);
+            if (!dim0) {
+                Py_DECREF(ret_1d);
+                goto failure;
+            }
+            PyObject* dim1 = PyLong_FromLong(array_dims[1]);
+            if (!dim1) {
+                Py_DECREF(ret_1d);
+                Py_DECREF(dim0);
+                goto failure;
+            }
+
+            PyObject* shape = PyTuple_Pack(2, dim0, dim1);
+            Py_DECREF(dim0);
+            Py_DECREF(dim1);
+            if (!shape) {
+                Py_DECREF(ret_1d);
+                goto failure;
+            }
+
+            ret = (PyArrayObject*)PyArray_Reshape(ret_1d, shape);
+            Py_DECREF(ret_1d);
+            Py_DECREF(shape);
+        }
+        else {
+            ret = ret_1d;
+        }
     }
     else {
         // 6: Construct empty array
@@ -906,6 +949,7 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
             Py_INCREF(obj);
 
             // 5. Assign into result whether or not the element exists in the set
+            // int found = PySequence_Contains(compare_elements, ((PyObject**)data)[0]);
             int found = PySequence_Contains(compare_elements, obj);
             Py_DECREF(obj);
 
@@ -945,6 +989,7 @@ failure:
 static PyObject *
 isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
+    AK_PPRINT(kwargs)
     int array_is_unique, other_is_unique;
     PyArrayObject *array, *other;
 

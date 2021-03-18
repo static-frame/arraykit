@@ -235,7 +235,7 @@ def isin_array(*,
         # both funcs return immutable arrays
         func = _isin_1d if array.ndim == 1 else _isin_2d
         try:
-            return func(array, frozenset(other))
+            return func(array, frozenset(other)) # Isolate the frozenset creation to it's own try-except
         except TypeError: # only occur when something is unhashable.
             pass
 

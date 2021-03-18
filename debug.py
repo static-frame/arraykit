@@ -9,6 +9,23 @@ funcTF = partial(isin_array, array_is_unique=True, other_is_unique=False)
 funcFT = partial(isin_array, array_is_unique=False, other_is_unique=True)
 funcFF = partial(isin_array, array_is_unique=False, other_is_unique=False)
 
+arr1 = np.array([1, 5, 2, 3, 4, 5, 1], dtype=np.int_)
+arr2 = np.array([1, 4, 7, 9], dtype=np.int_)
+post = funcFF(array=arr1, other=arr2)
+
+arr1 = np.array([1, 5, 2, 3, 4, 5, 1], dtype=np.float_)
+arr2 = np.array([1, 4, 7, 9], dtype=np.float_)
+post = funcFF(array=arr1, other=arr2)
+
+arr1 = np.array([1, 5, 2, 3, 4, 5, 1], dtype=str)
+arr2 = np.array([1, 4, 7, 9], dtype=str)
+post = funcFF(array=arr1, other=arr2)
+
+arr1 = np.array([1, 5, 2, 3, 4, 5, 1], dtype=np.complex_)
+arr2 = np.array([1, 4, 7, 9], dtype=np.complex_)
+post = funcFF(array=arr1, other=arr2)
+exit(0)
+
 
 def test_arrays(arr1, arr2, expected, func):
     post = func(array=arr1.astype(np.int_), other=arr2.astype(np.int_))
