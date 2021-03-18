@@ -49,12 +49,12 @@
         return NULL; \
     }
 
-// To simplify lines going to a label failure on `!value`
-# define AK_GOTO_ON_NOT(obj, label) \
-    if (!obj) { \
-        goto label; \
-    }
+// Print & flush out an arbitrary Python object
+# define AK_PPRINT(obj) \
+    printf(""#obj""); printf(": "); PyObject_Print(obj, stdout, 0); printf("\n"); fflush(stdout);
 
+// A simple `DEBUG` print & flush
+# define AK_DEBUG printf("DEBUG\n"); fflush(stdout);
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
@@ -112,7 +112,7 @@ PyArray_Descr*
 AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
-    AK_CHECK_NOT(iterator)
+    AK_CHECK_NOT(iterator);
 
     PyArray_Descr *resolved = NULL;
     PyArray_Descr *dtype;
@@ -251,7 +251,7 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
     AK_CHECK_NOT(PyArg_ParseTuple(args, "O!O!:resolve_dtype",
-                          &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
+                          &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2));
     return (PyObject *)AK_ResolveDTypes(d1, d2);
 }
 
@@ -261,633 +261,61 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
-//------------------------------------------------------------------------------
-// utils
-
-static int
-is_nan(PyObject *a)
-{
-    double v = PyFloat_AsDouble(a);
-
-    // Need to disambiguate, since v could be -1 and no failure happened
-    if (v == -1 && PyErr_Occurred()) {
-        return -1;
-    }
-
-    return isnan(v);
-}
-
-static int
-is_nanj(PyObject *a)
-{
-    return isnan(((PyComplexObject*)a)->cval.real);
-}
-
-static int
-is_nat(PyObject *a)
-{
-    // NaT - Datetime
-    if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
-        return PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
-    }
-
-    // NaT - Timedelta
-    if (PyArray_IsScalar(a, Timedelta)) { // Cannot fail
-        return PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
-    }
-
-    Py_FatalError("This should be impossible");
-}
 
 //------------------------------------------------------------------------------
 // isin
 
-# define AK_PPRINT(obj) \
-    printf(""#obj""); printf(": "); PyObject_Print(obj, stdout, 0); printf("\n"); fflush(stdout);
-
-# define AK_HERE printf("HERE\n"); fflush(stdout);
-
-// DONE. Returns a new reference
-static PyArrayObject *
-AK_concat_arrays(PyArrayObject *arr1, PyArrayObject *arr2)
-{
-    PyObject *container = PyTuple_Pack(2, arr1, arr2);
-    AK_CHECK_NOT(container)
-
-    PyArrayObject *array = (PyArrayObject*)PyArray_Concatenate(container, 0);
-    Py_DECREF(container);
-    return array;
-}
-
-static PyArrayObject*
-AK_compare_two_slices_from_array(PyArrayObject *arr, Py_ssize_t l1, Py_ssize_t l2, Py_ssize_t r1, Py_ssize_t r2, int EQ)
-{
-    PyObject* left_slice = NULL;
-    PyObject* right_slice = NULL;
-    PyObject* comparison = NULL;
-
-    left_slice = PySequence_GetSlice((PyObject*)arr, l1, l2);
-    AK_GOTO_ON_NOT(left_slice, failure)
-
-    right_slice = PySequence_GetSlice((PyObject*)arr, r1, r2);
-    AK_GOTO_ON_NOT(right_slice, failure)
-
-    comparison = PyObject_RichCompare(left_slice, right_slice, EQ);
-    AK_GOTO_ON_NOT(comparison, failure)
-
-    Py_DECREF(left_slice);
-    Py_DECREF(right_slice);
-
-    return (PyArrayObject*)comparison;
-
-failure:
-    Py_XDECREF(left_slice);
-    Py_XDECREF(right_slice);
-    return NULL;
-}
-
-static int
-AK_build_unique_arr_mask(PyArrayObject *sar, npy_bool* mask)
-{
-    /* Algorithm (assumes `sar` is sorted & mask is initialized to [1, 0, ...] & len(mask) == len(sar)
-
-        // cfmM = [Complex, Float, Datetime, Timedelta]
-        if sar.dtype.kind in "cfmM" and np.isnan(sar[-1]):
-            if sar.dtype.kind == "c":  # for complex all NaNs are considered equivalent
-                aux_firstnan = np.searchsorted(np.isnan(sar), True, side='left')
-            else:
-                aux_firstnan = np.searchsorted(sar, sar[-1], side='left')
-
-            mask[1:aux_firstnan] = (sar[1:aux_firstnan] != sar[:aux_firstnan - 1])
-            mask[aux_firstnan] = True
-            mask[aux_firstnan + 1:] = False
-        else:
-            mask[1:] = sar[1:] != sar[:-1]
-    */
-    // 0. Deallocate on failure
-    PyArrayObject* comparison = NULL;
-    PyObject* last_element = NULL;
-
-    // 1. Determine if last element contains NaNs/NaTs
-    size_t size = (size_t)PyArray_SIZE(sar);
-    PyArray_Descr* dtype = PyArray_DESCR(sar);
-
-    int is_float = PyDataType_ISFLOAT(dtype);
-    int is_complex = PyDataType_ISCOMPLEX(dtype);
-    int is_dt = PyDataType_ISDATETIME(dtype);
-
-    int contains_nan = 0;
-
-    if (is_float | is_complex | is_dt) {
-        last_element = PyObject_GetItem((PyObject*)sar, PyLong_FromLong(-1));
-        AK_GOTO_ON_NOT(last_element, failure)
-        if (is_float) {
-            contains_nan = is_nan(last_element);
-        }
-        else if (is_complex) {
-            contains_nan = is_nanj(last_element);
-        }
-        else {
-            // This will always be false as long as numpy < 1.18. NaT sort to the front
-            contains_nan = is_nat(last_element);
-        }
-    }
-
-    // 2. Populate mask
-    if (contains_nan) {
-        // 3. Discover the location of the first NaN element
-        size_t firstnan = 0;
-        if (is_complex) {
-            // TODO: I don't understand the necessity of this branch.
-            // aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
-        }
-
-        // This gives back an array of 1-element since `last_element` is a single element
-        PyObject* firstnan_obj = PyArray_SearchSorted(sar, last_element, NPY_SEARCHLEFT, NULL);
-        AK_GOTO_ON_NOT(firstnan_obj, failure)
-
-        firstnan = *(size_t*)PyArray_DATA((PyArrayObject*)firstnan_obj);
-        Py_DECREF(firstnan_obj);
-
-        // 4. Build mask in such a way to only include 1 NaN value
-        comparison = AK_compare_two_slices_from_array(sar, 1, firstnan, 0, firstnan - 1, Py_NE);
-        AK_GOTO_ON_NOT(comparison, failure)
-        npy_bool* comparison_arr = (npy_bool*)PyArray_DATA(comparison);
-
-        for (size_t i = 1; i < firstnan; ++i) {
-            mask[i] = comparison_arr[i-1];
-        }
-        mask[firstnan] = 1;
-        for (size_t i = firstnan + 1; i < size; ++i) {
-            mask[i] = 0;
-        }
-    }
-    else {
-        // 3. Build mask through a simple [1:] != [:-1] slice comparison
-        comparison = AK_compare_two_slices_from_array(sar, 1, size, 0, size - 1, Py_NE);
-        AK_GOTO_ON_NOT(comparison, failure)
-        npy_bool* comparison_arr = (npy_bool*)PyArray_DATA(comparison);
-
-        for (size_t i = 1; i < (size_t)size; ++i) {
-            mask[i] = comparison_arr[i-1];
-        }
-    }
-
-    Py_DECREF(comparison);
-    Py_XDECREF(last_element); // Only populated when sar contains NaNs/NaTs
-
-    return 1;
-
-failure:
-    Py_XDECREF(comparison);
-    Py_XDECREF(last_element);
-    return 0;
-}
-
-// Returns a new reference
-static PyArrayObject*
-AK_get_unique_arr(PyArrayObject *original_arr)
-{
-    /* Algorithm
-
-        sar = copy(original_arr)
-        sar.sort()
-
-        mask = np.empty(sar.shape, dtype=np.bool_)
-        mask[0] = True
-
-        build_mask(...)
-
-        return sar[mask]
-    */
-
-    // 1. Initialize
-    PyObject* mask = NULL; // Deallocate on failure
-
-    size_t size = PyArray_SIZE(original_arr);
-    PyArray_Descr* dtype = PyArray_DESCR(original_arr);
-
-    npy_bool* mask_arr = PyMem_Malloc(size);
-
-    // 2. Get a copy of the original arr since sorting is in-place
-    PyArrayObject* sar = (PyArrayObject*)PyArray_FromArray(
-            original_arr,
-            dtype,
-            NPY_ARRAY_DEFAULT | NPY_ARRAY_ENSURECOPY);
-    AK_CHECK_NOT(sar)
-    if (PyArray_Sort(sar, 0, NPY_QUICKSORT) == -1) { // In-place
-        goto failure;
-    }
-
-    // 3. Build mask
-    memset(mask_arr, 0, size);
-    mask_arr[0] = 1;
-    AK_GOTO_ON_NOT(AK_build_unique_arr_mask(sar, mask_arr), failure)
-
-    mask = PyArray_NewFromDescr(
-                &PyArray_Type,                         // class (subtype)
-                PyArray_DescrFromType(NPY_BOOL),       // dtype (descr)
-                PyArray_NDIM(sar),                     // ndim (nd)
-                PyArray_DIMS(sar),                     // dims
-                NULL,                                  // strides
-                mask_arr,                              // data
-                NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
-                NULL);                                 // sublclass (obj)
-    AK_GOTO_ON_NOT(mask, failure)
-
-    // 4. Filter sar
-    PyArrayObject *filtered_arr = (PyArrayObject*)PyObject_GetItem((PyObject*)sar, (PyObject*)mask);
-    AK_GOTO_ON_NOT(filtered_arr, failure)
-
-    PyMem_Free(mask_arr);
-
-    Py_DECREF(sar);
-    Py_DECREF(mask);
-    return filtered_arr;
-
-failure:
-    Py_DECREF(sar); // Cannot be NULL
-    Py_XDECREF(mask);
-    return NULL;
-}
-
-// Returns a new reference
-static PyObject*
-AK_get_unique_arr_w_inverse(PyArrayObject *original_arr)
-{
-    /* Algorithm
-
-        ordered_idx = original_arr.argsort(kind='quicksort')
-        sar = original_arr[ordered_idx]
-
-        mask = np.empty(sar.shape, dtype=np.bool_)
-        mask[0] = True
-
-        AK_build_unique_arr_mask(sar, mask)
-
-        ret = sar[mask]
-        imask = np.cumsum(mask) - 1
-        inv_idx = np.empty(mask.shape, dtype=np.intp)
-        inv_idx[ordered_idx] = imask
-        return ret, inv_idx
-    */
-
-    // 1. Initialize
-    PyObject *ordered_idx = NULL;
-    PyArrayObject *sar = NULL;
-    PyArrayObject* mask = NULL;
-    PyObject *filtered_arr = NULL;
-    PyObject* cumsum = NULL;
-    PyObject* imask = NULL;
-    PyObject* inv_idx = NULL;
-
-    size_t size = PyArray_SIZE(original_arr);
-
-    npy_bool* mask_arr = PyMem_Malloc(size);
-
-    // 2. Get sorted indices & sort array
-    ordered_idx = PyArray_ArgSort(original_arr, 0, NPY_QUICKSORT);
-    AK_GOTO_ON_NOT(ordered_idx, failure)
-
-    sar = (PyArrayObject*)PyObject_GetItem((PyObject*)original_arr, ordered_idx);
-    AK_GOTO_ON_NOT(sar, failure)
-
-    // 3. Build mask
-    memset(mask_arr, 0, size);
-    mask_arr[0] = 1;
-    AK_GOTO_ON_NOT(AK_build_unique_arr_mask(sar, mask_arr), failure)
-
-    mask = (PyArrayObject*)PyArray_NewFromDescr(
-                &PyArray_Type,                         // subtype
-                PyArray_DescrFromType(NPY_BOOL),       // dtype
-                PyArray_NDIM(sar),                     // nd
-                PyArray_DIMS(sar),                     // dims
-                NULL,                                  // strides
-                mask_arr,                              // data
-                NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
-                NULL);                                 // sublclass (obj)
-    AK_GOTO_ON_NOT(mask, failure)
-
-    // 4. Filter arr
-    filtered_arr = PyObject_GetItem((PyObject*)sar, (PyObject*)mask);
-    AK_GOTO_ON_NOT(filtered_arr, failure)
-
-    // 5. Determine the inverse index
-    cumsum = PyArray_CumSum(
-            mask,    // array
-            0,       // axis
-            NPY_INT, // dtype
-            NULL);   // out-array
-    AK_GOTO_ON_NOT(cumsum, failure)
-
-    PyObject* one = PyLong_FromLong(1);
-    AK_GOTO_ON_NOT(one, failure)
-    imask = PyNumber_Subtract(cumsum, one);
-    Py_DECREF(one);
-    AK_GOTO_ON_NOT(imask, failure)
-
-    inv_idx = PyArray_Empty(
-            PyArray_NDIM(mask),             // nd
-            PyArray_DIMS(mask),             // dims
-            PyArray_DescrFromType(NPY_INT), // dtype
-            0);                             // is_f_order
-
-    if (PyObject_SetItem(inv_idx, ordered_idx, imask)) {
-        goto failure;
-    }
-
-    // 6. Pack it up in a tuple and return
-    PyObject* ret = PyTuple_Pack(2, filtered_arr, inv_idx);
-    AK_GOTO_ON_NOT(ret, failure)
-
-    PyMem_Free(mask_arr);
-
-    Py_DECREF(ordered_idx);
-    Py_DECREF(sar);
-    Py_DECREF(mask);
-    Py_DECREF(filtered_arr);
-    Py_DECREF(cumsum);
-    Py_DECREF(imask);
-    Py_DECREF(inv_idx);
-    return ret;
-
-failure:
-    Py_XDECREF(ordered_idx);
-    Py_XDECREF(sar);
-    Py_XDECREF(mask);
-    Py_XDECREF(filtered_arr);
-    Py_XDECREF(cumsum);
-    Py_XDECREF(imask);
-    Py_XDECREF(inv_idx);
-    return NULL;
-}
-
-static PyObject *
-AK_isin_array_dtype(PyArrayObject *array, PyArrayObject *other, int assume_unique)
-{
-    /* Algorithm:
-
-        array = np.ravel(array)
-
-        if not assume_unique:
-            array, rev_idx = np.unique(array, return_inverse=True)
-            other = np.unique(other)
-
-        concatenated = np.concatenate((array, other))
-
-        ordered_idx = concatenated.argsort(kind='mergesort')
-        sorted_arr = concatenated[ordered_idx]
-
-        flag = np.concatenate(((sorted_arr[1:] == sorted_arr[:-1]), [False]))
-
-        ret = np.empty(concatenated.shape, dtype=bool)
-        ret[ordered_idx] = flag
-
-        if assume_unique:
-            return ret[:len(array)]
-        else:
-            return ret[rev_idx]
-    */
-    // 0. Deallocate on failure
-    PyArrayObject* flattened_array = NULL;
-    PyObject *reverse_idx = NULL;
-    PyArrayObject* concatenated = NULL;
-    PyArrayObject *ordered_idx = NULL;
-    PyArrayObject* sorted_arr = NULL;
-    PyArrayObject* comparison = NULL;
-    PyArrayObject* ret = NULL;
-
-    // 1. Capture original array shape for return value
-    int array_ndim = PyArray_NDIM(array);
-    npy_intp* array_dims = PyArray_DIMS(array);
-    size_t array_size = PyArray_SIZE(array);
-
-    // 2. Ravel the array as we want to operate on 1D arrays only. (other is guaranteed to be 1D)
-    flattened_array = (PyArrayObject*)PyArray_Flatten(array, NPY_CORDER);
-    AK_GOTO_ON_NOT(flattened_array, failure)
-    Py_INCREF(flattened_array);
-
-    if (!assume_unique) {
-        PyObject* arr_and_rev_idx = AK_get_unique_arr_w_inverse(flattened_array);
-        AK_GOTO_ON_NOT(arr_and_rev_idx, failure)
-
-        PyArrayObject *raveled_array_unique = (PyArrayObject*)PyTuple_GET_ITEM(arr_and_rev_idx, 0); // BORROWED! Py_DECREF(arr_and_rev_idx); handles this
-        if (!raveled_array_unique) {
-            Py_DECREF(arr_and_rev_idx);
-            goto failure;
-        }
-
-        reverse_idx = PyTuple_GET_ITEM(arr_and_rev_idx, 1);
-        if (!reverse_idx) {
-            Py_DECREF(arr_and_rev_idx);
-            goto failure;
-        }
-        Py_INCREF(reverse_idx); // Since this was borrowed and we need outside of this scope, increment it's refcount
-
-        PyArrayObject *other_unique = AK_get_unique_arr(other);
-        if (!other_unique) {
-            Py_DECREF(arr_and_rev_idx);
-            goto failure;
-        }
-
-        // 3. Concatenate
-        concatenated = AK_concat_arrays(raveled_array_unique, other_unique);
-        Py_DECREF(arr_and_rev_idx);
-        Py_DECREF(other_unique);
-    }
-    else {
-        // 3. Concatenate
-        concatenated = AK_concat_arrays(flattened_array, other);
-    }
-    AK_GOTO_ON_NOT(concatenated, failure)
-
-    size_t concatenated_size = PyArray_SIZE(concatenated);
-
-    // 4: Sort
-    ordered_idx = (PyArrayObject*)PyArray_ArgSort(concatenated, 0, NPY_MERGESORT);
-    AK_GOTO_ON_NOT(ordered_idx, failure)
-    npy_intp* ordered_idx_arr = (npy_intp*)PyArray_DATA(ordered_idx);
-
-    // 5. Find duplicates
-    sorted_arr = (PyArrayObject*)PyObject_GetItem((PyObject*)concatenated, (PyObject*)ordered_idx);
-    AK_GOTO_ON_NOT(sorted_arr, failure)
-
-    comparison = AK_compare_two_slices_from_array(sorted_arr, 1, concatenated_size, 0, concatenated_size - 1, Py_EQ);
-    AK_GOTO_ON_NOT(comparison, failure)
-    npy_bool* comparison_arr = (npy_bool*)PyArray_DATA(comparison);
-
-    if (!assume_unique) {
-        // 6: Construct empty array
-        PyObject* concatenated_mask = PyArray_Empty(
-                PyArray_NDIM(concatenated),      // nd
-                PyArray_DIMS(concatenated),      // dims
-                PyArray_DescrFromType(NPY_BOOL), // dtype
-                0);                              // is_f_order
-        AK_GOTO_ON_NOT(concatenated_mask, failure)
-
-        npy_intp dims[1] = {1};
-
-        PyArrayObject *single_false_array = (PyArrayObject*)PyArray_NewFromDescr(
-                &PyArray_Type,                         // class (subtype)
-                PyArray_DescrFromType(NPY_BOOL),       // dtype (descr)
-                1,                                     // ndim (nd)
-                dims,                                  // dims
-                NULL,                                  // strides
-                "\0",                                  // data
-                NPY_ARRAY_DEFAULT | NPY_ARRAY_OWNDATA, // flags
-                NULL);                                 // sublclass (obj)
-        if (!single_false_array) {
-            Py_DECREF(concatenated_mask);
-            goto failure;
-        }
-
-        PyArrayObject* full_comparison = AK_concat_arrays(comparison, single_false_array);
-        Py_DECREF(single_false_array);
-        if (!full_comparison) {
-            Py_DECREF(concatenated_mask);
-            goto failure;
-        }
-
-        int success = PyObject_SetItem(concatenated_mask, (PyObject*)ordered_idx, (PyObject*)full_comparison);
-        Py_DECREF(full_comparison);
-        if (success == -1) {
-            Py_DECREF(concatenated_mask);
-            goto failure;
-        }
-
-        PyObject* ret_1d = (PyArrayObject*)PyObject_GetItem(concatenated_mask, reverse_idx); // Should be a new reference?
-        Py_DECREF(reverse_idx); // We are officially done with this
-        Py_DECREF(concatenated_mask);
-        AK_GOTO_ON_NOT(ret_1d, failure)
-
-        if (array_ndim == 2) {
-            PyObject* dim0 = PyLong_FromLong(array_dims[0]);
-            if (!dim0) {
-                Py_DECREF(ret_1d);
-                goto failure;
-            }
-            PyObject* dim1 = PyLong_FromLong(array_dims[1]);
-            if (!dim1) {
-                Py_DECREF(ret_1d);
-                Py_DECREF(dim0);
-                goto failure;
-            }
-
-            PyObject* shape = PyTuple_Pack(2, dim0, dim1);
-            Py_DECREF(dim0);
-            Py_DECREF(dim1);
-            if (!shape) {
-                Py_DECREF(ret_1d);
-                goto failure;
-            }
-
-            ret = (PyArrayObject*)PyArray_Reshape(ret_1d, shape);
-            Py_DECREF(ret_1d);
-            Py_DECREF(shape);
-        }
-        else {
-            ret = ret_1d;
-        }
-    }
-    else {
-        // 6: Construct empty array
-        ret = (PyArrayObject*)PyArray_Empty(
-                array_ndim,                      // nd
-                array_dims,                      // dims
-                PyArray_DescrFromType(NPY_BOOL), // dtype
-                0);                              // is_f_order
-
-        AK_GOTO_ON_NOT(ret, failure)
-
-        size_t stride = 0;
-        if (array_ndim == 2) {
-            stride = (size_t)array_dims[1];
-        }
-
-        // 7: Assign into duplicates array
-        for (size_t i = 0; i < (size_t)PyArray_SIZE(ordered_idx); ++i) {
-            size_t idx_0 = (size_t)ordered_idx_arr[i];
-            if (idx_0 >= array_size) { continue; }
-
-            // We are guaranteed that flag_ar[i] is always a valid index
-            if (array_ndim == 1) {
-                *(npy_bool *) PyArray_GETPTR1(ret, idx_0) = comparison_arr[i];
-            }
-            else {
-                size_t idx_1 = idx_0 / stride;
-                idx_0 = idx_0 - (stride * idx_1);
-
-                *(npy_bool *) PyArray_GETPTR2(ret, idx_1, idx_0) = comparison_arr[i];
-            }
-        }
-    }
-
-    // 8. Cleanup & Return!
-    Py_DECREF(flattened_array);
-    Py_DECREF(concatenated);
-    Py_DECREF(ordered_idx);
-    Py_DECREF(sorted_arr);
-    Py_DECREF(comparison);
-
-    return (PyObject*)ret;
-
-failure:
-    Py_XDECREF(flattened_array);
-    Py_XDECREF(reverse_idx);
-    Py_XDECREF(concatenated);
-    Py_XDECREF(ordered_idx);
-    Py_XDECREF(sorted_arr);
-    Py_XDECREF(comparison);
-    return NULL;
-}
-
-/*
 static PyObject *
 AK_isin_array_dtype_use_np(PyArrayObject *array, PyArrayObject *other, int assume_unique)
 {
-    PyObject* numpy = NULL;
-    PyObject* func = NULL;
-    PyObject* args = NULL;
-    PyObject* kwarg = NULL;
+    PyObject* result = NULL;
 
-    numpy = PyImport_ImportModule("numpy");
-    AK_GOTO_ON_NOT(numpy, failure)
+    PyObject* args = PyTuple_Pack(2, (PyObject*)array, (PyObject*)other);
+    AK_CHECK_NOT(args);
 
-    if (PyArray_NDIM(array) == 1) {
-        func = PyObject_GetAttrString(numpy, "in1d");
+    PyObject* kwarg = PyDict_New();
+    if (!kwarg) {
+        Py_DECREF(args);
+        return NULL;
     }
-    else {
-        func = PyObject_GetAttrString(numpy, "isin");
-    }
-    AK_GOTO_ON_NOT(func, failure)
 
-    args = PyTuple_Pack(2, (PyObject*)array, (PyObject*)other);
-    AK_GOTO_ON_NOT(args, failure)
-
-    kwarg = PyDict_New();
-    AK_GOTO_ON_NOT(kwarg, failure);
-    if (PyDict_SetItemString(kwarg, "assume_unique", PyLong_FromLong((long)assume_unique)) == -1) {
+    PyObject* assume_unique_obj = PyLong_FromLong((long)assume_unique);
+    if (!assume_unique_obj) {
         goto failure;
     }
 
-    PyObject* result = PyObject_Call(func, args, kwarg);
-    AK_GOTO_ON_NOT(result, failure)
+    int success = PyDict_SetItemString(kwarg, "assume_unique", assume_unique_obj);
+    Py_DECREF(assume_unique_obj);
+    if (success == -1) {
+        goto failure;
+    }
 
+    PyObject* numpy = PyImport_ImportModule("numpy");
+    if (!numpy) {
+        goto failure;
+    }
+
+    PyObject* func = PyObject_GetAttrString(numpy, PyArray_NDIM(array) == 1 ? "in1d": "isin");
     Py_DECREF(numpy);
+    if (!func) {
+        goto failure;
+    }
+
+    result = PyObject_Call(func, args, kwarg);
     Py_DECREF(func);
-    Py_DECREF(args);
-    Py_DECREF(kwarg);
+    if (!result) {
+        goto failure;
+    }
+
+    if (0) {
+    failure:
+        // These will always exist.
+        Py_DECREF(args);
+        Py_DECREF(kwarg);
+    }
 
     return result;
-
-failure:
-    Py_XDECREF(numpy);
-    Py_XDECREF(func);
-    Py_XDECREF(args);
-    Py_XDECREF(kwarg);
-    return NULL;
 }
-*/
 
 static PyObject *
 AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
@@ -908,7 +336,7 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
     npy_intp* array_dims = PyArray_DIMS(array);
 
     compare_elements = PyFrozenSet_New((PyObject*)other);
-    AK_CHECK_NOT(compare_elements)
+    AK_CHECK_NOT(compare_elements);
 
     // 2: Construct empty array
     result = (PyArrayObject*)PyArray_Empty(
@@ -916,7 +344,9 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
             array_dims,                      // dims
             PyArray_DescrFromType(NPY_BOOL), // dtype
             0);                              // is_f_order
-    AK_GOTO_ON_NOT(result, failure)
+    if (!result) {
+        goto failure;
+    }
 
     // 3. Set up iteration
     // https://numpy.org/doc/stable/reference/c-api/iterator.html?highlight=npyiter_multinew#simple-iteration-example
@@ -925,10 +355,14 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
                        NPY_KEEPORDER,
                        NPY_NO_CASTING,
                        NULL);
-    AK_GOTO_ON_NOT(iter, failure)
+    if (!iter) {
+        goto failure;
+    }
 
     NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-    AK_GOTO_ON_NOT(iternext, failure)
+    if (!iternext) {
+        goto failure;
+    }
 
     char** dataptr = NpyIter_GetDataPtrArray(iter);
     npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
@@ -945,7 +379,9 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
         while (size--) {
             PyObject* obj;
             memcpy(&obj, data, sizeof(obj));
-            AK_GOTO_ON_NOT(obj, failure)
+            if (!obj) {
+                goto failure;
+            }
             Py_INCREF(obj);
 
             // 5. Assign into result whether or not the element exists in the set
@@ -989,7 +425,6 @@ failure:
 static PyObject *
 isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
-    AK_PPRINT(kwargs)
     int array_is_unique, other_is_unique;
     PyArrayObject *array, *other;
 
@@ -998,7 +433,7 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     AK_CHECK_NOT(PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
                                      kwlist,
                                      &PyArray_Type, &array, &array_is_unique,
-                                     &PyArray_Type, &other, &other_is_unique))
+                                     &PyArray_Type, &other, &other_is_unique));
 
     if (PyArray_NDIM(other) != 1) {
         return PyErr_Format(PyExc_TypeError, "Expected other to be 1-dimensional");
@@ -1012,8 +447,7 @@ isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return AK_isin_array_object(array, other);
     }
     // Use numpy in1d logic for dtype arrays
-    return AK_isin_array_dtype(array, other, array_is_unique && other_is_unique);
-    //return AK_isin_array_dtype_use_np(array, other, array_is_unique && other_is_unique);
+    return AK_isin_array_dtype_use_np(array, other, array_is_unique && other_is_unique);
 }
 
 //------------------------------------------------------------------------------
@@ -1081,10 +515,10 @@ ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
     int parsed = PyArg_ParseTupleAndKeywords(
         args, kwargs, "O|$p:ArrayGO", argnames, &iterable, &own_iterable
     );
-    AK_CHECK_NOT(parsed)
+    AK_CHECK_NOT(parsed);
 
     ArrayGOObject *self = (ArrayGOObject *)cls->tp_alloc(cls, 0);
-    AK_CHECK_NOT(self)
+    AK_CHECK_NOT(self);
 
     if (PyArray_Check(iterable)) {
         if (!PyDataType_ISOBJECT(PyArray_DESCR((PyArrayObject *)iterable))) {
@@ -1127,7 +561,7 @@ ArrayGO_append(ArrayGOObject *self, PyObject *value)
 {
     if (!self->list) {
         self->list = PyList_New(1);
-        AK_CHECK_NOT(self->list)
+        AK_CHECK_NOT(self->list);
 
         Py_INCREF(value);
         PyList_SET_ITEM(self->list, 0, value);
@@ -1144,7 +578,7 @@ ArrayGO_extend(ArrayGOObject *self, PyObject *values)
 {
     if (!self->list) {
         self->list = PySequence_List(values);
-        AK_CHECK_NOT(self->list)
+        AK_CHECK_NOT(self->list);
 
         Py_RETURN_NONE;
     }
