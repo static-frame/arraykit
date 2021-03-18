@@ -42,6 +42,13 @@
         return NULL;\
     } while (0)
 
+// Print & flush out an arbitrary Python object
+# define AK_PPRINT(obj) \
+    printf(""#obj""); printf(": "); PyObject_Print(obj, stdout, 0); printf("\n"); fflush(stdout);
+
+// A simple `DEBUG` print & flush
+# define AK_DEBUG printf("DEBUG\n"); fflush(stdout);
+
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
