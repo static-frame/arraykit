@@ -143,7 +143,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
         Py_DECREF(id);
         return found;
     }
-    else if (PyErr_Occurred) {
+    else if (PyErr_Occurred()) {
         goto error;
     }
 
@@ -174,7 +174,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
         if (!array_new || PyDict_SetItem(memo, id, array_new)) {
-            Py_DECREF(array_new);
+            Py_XDECREF(array_new);
             goto error;
         }
     }
