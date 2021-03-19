@@ -37,7 +37,7 @@
 // Placeholder of not implemented pathways / debugging.
 # define AK_NOT_IMPLEMENTED(msg)\
     do {\
-        PyErr_Format(PyExc_NotImplementedError, msg);\
+        PyErr_SetString(PyExc_NotImplementedError, msg);\
         return NULL;\
     } while (0)
 
@@ -143,6 +143,9 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
         Py_DECREF(id);
         return found;
     }
+    else if (PyErr_Occurred) {
+        goto error;
+    }
 
     // if dtype is object, call deepcopy with memo
     PyObject *array_new;
@@ -170,7 +173,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
                 array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
-        if (PyDict_SetItem(memo, id, array_new)) {
+        if (!array_new || PyDict_SetItem(memo, id, array_new)) {
             Py_DECREF(array_new);
             goto error;
         }
