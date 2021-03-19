@@ -5,8 +5,8 @@
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 # include "numpy/arrayobject.h"
-# include "numpy/arrayscalars.h" // Needed for Datetime scalar expansions
-# include "numpy/halffloat.h" // Needed for Datetime scalar expansions
+# include "numpy/arrayscalars.h"
+# include "numpy/halffloat.h"
 
 //------------------------------------------------------------------------------
 // Macros
@@ -271,16 +271,17 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
         return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
     }
     if (PyArray_IsScalar(arg, Half)) {
-        return PyBool_FromLong((npy_half_isnan(PyArrayScalar_VAL(arg, Half))));
+        // return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(arg, Half))); This inexplicably fails
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Half) == NPY_HALF_NAN);
     }
     if (PyArray_IsScalar(arg, Float32)) {
         return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
     }
     if (PyArray_IsScalar(arg, Float64)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float64)));
     }
     if (PyArray_IsScalar(arg, Float128)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float128)));
     }
 
     // NaNj
