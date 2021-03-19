@@ -82,6 +82,12 @@ class TestUnit(unittest.TestCase):
         # import ipdb; ipdb.set_trace()
 
     #---------------------------------------------------------------------------
+    def test_sequence_str_to_test_a(self) -> None:
+        from arraykit import _sequence_str_to_test
+        post = _sequence_str_to_test(['foo', 'bar', 'alpha', 'beta'])
+        import ipdb; ipdb.set_trace()
+
+    #---------------------------------------------------------------------------
 
     def test_delimited_to_arrays_a(self) -> None:
 

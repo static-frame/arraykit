@@ -130,7 +130,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
-
+//------------------------------------------------------------------------------
 // AK_SequenceStrToArray1DAuto(PyObject* sequence)
 // Determine the type dynamically
 // Ideas: keep the same sequence and mutate it in-place with Python objects when necessary
@@ -423,6 +423,28 @@ sequence_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
     return array;
 }
 
+
+static PyObject *
+_sequence_str_to_test(PyObject *Py_UNUSED(m), PyObject *iterable)
+{
+    // Py_ssize_t size = PySequence_Size(iterable);
+
+    Py_UNICODE *buffer = (Py_UNICODE*)PyMem_Malloc(sizeof(Py_UNICODE) * 100);
+    PyObject *iter = PyObject_GetIter(iterable);
+    PyObject *element;
+    Py_ssize_t size = 0;
+    while ((element = PyIter_Next(iter))) {
+        size += PyUnicode_GET_LENGTH(element);
+    }
+
+    PyMem_Free(buffer);
+
+    // PyObject* post = PyUnicode_FromString("test");
+    PyObject* post = PyUnicode_FromFormat("%zi", size);
+    return post;
+}
+
+//------------------------------------------------------------------------------
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
@@ -819,6 +841,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
     {"sequence_str_to_array_1d", sequence_str_to_array_1d, METH_VARARGS, NULL},
+    {"_sequence_str_to_test", _sequence_str_to_test, METH_O, NULL},
     {NULL},
 };
 
