@@ -173,8 +173,17 @@ class TestUnit(unittest.TestCase):
     def test_isna_element_true(self) -> None:
         self.assertTrue(isna_element(np.datetime64('NaT')))
         self.assertTrue(isna_element(np.timedelta64('NaT')))
+
+        nan = np.nan
+        nanj = complex(nan, 0)
+
+        for float_class in (float, np.float16, np.float32, np.float64, np.float128):
+            self.assertTrue(isna_element(float_class(nan)), float_class)
+
+        for cfloat_class in (complex, np.complex64, np.complex128, np.complex256):
+            self.assertTrue(isna_element(cfloat_class(nanj)))
+
         self.assertTrue(isna_element(float('NaN')))
-        self.assertTrue(isna_element(np.nan))
         self.assertTrue(isna_element(None))
 
     def test_isna_element_false(self) -> None:
@@ -198,6 +207,3 @@ class TestUnit(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-
-

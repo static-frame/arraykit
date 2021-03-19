@@ -6,6 +6,7 @@
 
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h" // Needed for Datetime scalar expansions
+# include "numpy/halffloat.h" // Needed for Datetime scalar expansions
 
 //------------------------------------------------------------------------------
 // Macros
@@ -263,34 +264,51 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 // general utility
 
 static PyObject *
-isna_element(PyObject *Py_UNUSED(m), PyObject *a)
+isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     // NaN
-    if (PyFloat_Check(a)) {
-        double v = PyFloat_AsDouble(a);
+    if (PyFloat_Check(arg)) {
+        return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
+    }
+    if (PyArray_IsScalar(arg, Half)) {
+        return PyBool_FromLong((npy_half_isnan(PyArrayScalar_VAL(arg, Half))));
+    }
+    if (PyArray_IsScalar(arg, Float32)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+    }
+    if (PyArray_IsScalar(arg, Float64)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+    }
+    if (PyArray_IsScalar(arg, Float128)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+    }
 
-        // Need to disambiguate, since v could be -1 and no failure happened
-        if (v == -1 && PyErr_Occurred()) {
-            return NULL;
-        }
-
-        return PyBool_FromLong(isnan(v));
+    // NaNj
+    if (PyComplex_Check(arg)) {
+        return PyBool_FromLong(isnan(((PyComplexObject*)arg)->cval.real));
+    }
+    if (PyArray_IsScalar(arg, Complex64)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Complex64).real));
+    }
+    if (PyArray_IsScalar(arg, Complex128)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Complex128).real));
+    }
+    if (PyArray_IsScalar(arg, Complex256)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Complex256).real));
     }
 
     // NaT - Datetime
-    if (PyArray_IsScalar(a, Datetime)) { // Cannot fail
-        int isnat = PyArrayScalar_VAL(a, Datetime) == NPY_DATETIME_NAT;
-        return PyBool_FromLong(isnat);
+    if (PyArray_IsScalar(arg, Datetime)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Datetime) == NPY_DATETIME_NAT);
     }
 
     // NaT - Timedelta
-    if (PyArray_IsScalar(a, Timedelta)) { // Cannot fail
-        int isnat = PyArrayScalar_VAL(a, Timedelta) == NPY_DATETIME_NAT;
-        return PyBool_FromLong(isnat);
+    if (PyArray_IsScalar(arg, Timedelta)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT);
     }
 
     // None
-    return PyBool_FromLong(a == Py_None);
+    return PyBool_FromLong(arg == Py_None);
 }
 
 //------------------------------------------------------------------------------
