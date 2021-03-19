@@ -429,18 +429,66 @@ _sequence_str_to_test(PyObject *Py_UNUSED(m), PyObject *iterable)
 {
     // Py_ssize_t size = PySequence_Size(iterable);
 
-    Py_UNICODE *buffer = (Py_UNICODE*)PyMem_Malloc(sizeof(Py_UNICODE) * 100);
+    Py_ssize_t buffer_count = 100;
+    Py_ssize_t buffer_size = sizeof(Py_UCS4) * buffer_count;
+
+    Py_UCS4 *buffer = (Py_UCS4*)PyMem_Malloc(buffer_size);
+    Py_ssize_t *buffer_offset = (Py_ssize_t*)PyMem_Malloc(
+            sizeof(Py_ssize_t) * buffer_count);
+
+    // TODO: error handle
+
     PyObject *iter = PyObject_GetIter(iterable);
+    // TODO: error handle
+
     PyObject *element;
-    Py_ssize_t size = 0;
+
+
+    Py_ssize_t element_count = 0;
+    Py_ssize_t element_length;
+    Py_UCS4 *pos = buffer;
+    Py_UCS4 *end = buffer + buffer_size;
+
+    // encoding stage
     while ((element = PyIter_Next(iter))) {
-        size += PyUnicode_GET_LENGTH(element);
+        // might use PyUnicode_CheckExact
+
+        // do not copy null
+        if(!PyUnicode_AsUCS4(element, pos, end-pos, 0)) {
+            return NULL;
+        }
+        element_length = PyUnicode_GET_LENGTH(element);
+        pos += element_length;
+        buffer_offset[element_count] = element_length;
+        ++element_count;
+
     }
 
+    // reading stage
+
+    pos = buffer;
+    for (Py_ssize_t i=0; i < element_count; ++i) {
+        element_length = buffer_offset[i];
+
+        Py_UCS4 *dst = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * element_length);
+        memcpy(dst, pos, element_length);
+        // if ((char)dst == "true") {
+        //     AK_NOT_IMPLEMENTED("here");
+        // }
+        PyMem_Free(dst);
+
+        pos += element_length;
+    }
+
+    PyObject* post = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
+            buffer,
+            buffer_size);
+
     PyMem_Free(buffer);
+    PyMem_Free(buffer_offset);
 
     // PyObject* post = PyUnicode_FromString("test");
-    PyObject* post = PyUnicode_FromFormat("%zi", size);
+    // PyObject* post = PyUnicode_FromFormat("%zi", size);
     return post;
 }
 

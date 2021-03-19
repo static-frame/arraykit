@@ -84,7 +84,7 @@ class TestUnit(unittest.TestCase):
     #---------------------------------------------------------------------------
     def test_sequence_str_to_test_a(self) -> None:
         from arraykit import _sequence_str_to_test
-        post = _sequence_str_to_test(['foo', 'bar', 'alpha', 'beta'])
+        post = _sequence_str_to_test(['true', 'False', 'TRUE', 'FALSE'])
         import ipdb; ipdb.set_trace()
 
     #---------------------------------------------------------------------------
