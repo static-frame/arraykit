@@ -271,8 +271,7 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
         return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
     }
     if (PyArray_IsScalar(arg, Half)) {
-        // return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(arg, Half))); This inexplicably fails
-        return PyBool_FromLong(PyArrayScalar_VAL(arg, Half) == NPY_HALF_NAN);
+        return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(arg, Half)));
     }
     if (PyArray_IsScalar(arg, Float32)) {
         return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));

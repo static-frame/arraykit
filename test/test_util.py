@@ -177,11 +177,16 @@ class TestUnit(unittest.TestCase):
         nan = np.nan
         nanj = complex(nan, 0)
 
+        nnan = -np.nan
+        nnanj = complex(nnan, 0)
+
         for float_class in (float, np.float16, np.float32, np.float64, np.float128):
-            self.assertTrue(isna_element(float_class(nan)), float_class)
+            self.assertTrue(isna_element(float_class(nan)))
+            self.assertTrue(isna_element(float_class(nnan)))
 
         for cfloat_class in (complex, np.complex64, np.complex128, np.complex256):
             self.assertTrue(isna_element(cfloat_class(nanj)))
+            self.assertTrue(isna_element(cfloat_class(nnanj)))
 
         self.assertTrue(isna_element(float('NaN')))
         self.assertTrue(isna_element(None))
@@ -205,5 +210,8 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(False))
 
 
-if __name__ == '__main__':
-    unittest.main()
+isna_element(np.float16(np.nan))
+isna_element(np.float16(-np.nan))
+
+# if __name__ == '__main__':
+#     unittest.main()
