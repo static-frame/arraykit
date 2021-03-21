@@ -131,6 +131,194 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 //------------------------------------------------------------------------------
+// CPL Type, New, Destrctor
+
+typedef struct {
+    Py_ssize_t buffer_count; // accumulated number of code points
+    Py_ssize_t buffer_capacity; // max number of code points
+    Py_UCS4 *buffer;
+
+    Py_ssize_t offsets_count; // accumulated number of elements
+    Py_ssize_t offsets_capacity; // max number of elements
+    Py_ssize_t *offsets;
+
+    Py_UCS4 *pos_current;
+    Py_UCS4 *pos_end;
+    Py_ssize_t index_current;
+
+} AK_CodePointLine;
+
+AK_CodePointLine* AK_CPL_New()
+{
+    AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
+    // TODO: handle error
+    cpl->buffer_count = 0;
+    cpl->buffer_capacity = 20;
+    cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
+    // TODO: handle error
+    cpl->pos_current = cpl->buffer;
+    cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
+
+    cpl->offsets_count = 0;
+    cpl->offsets_capacity = 8;
+    cpl->offsets = (Py_ssize_t*)PyMem_Malloc(
+            sizeof(Py_ssize_t) * cpl->offsets_capacity);
+    // TODO: handle error
+    cpl->index_current = 0;
+
+    return cpl;
+}
+
+void AK_CPL_Free(AK_CodePointLine* cpl)
+{
+    PyMem_Free(cpl->buffer);
+    PyMem_Free(cpl->offsets);
+    PyMem_Free(cpl);
+}
+
+//------------------------------------------------------------------------------
+// CPL Mutation
+
+int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
+{
+    Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
+
+    if ((cpl->buffer_count + element_length) >= cpl->buffer_capacity) {
+        // realloc
+        cpl->buffer_capacity *= 2;
+        cpl->buffer = PyMem_Realloc(cpl->buffer, sizeof(Py_UCS4) * cpl->buffer_capacity);
+        // TODO: handle error
+        cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
+        cpl->pos_current = cpl->buffer + cpl->buffer_count;
+    }
+    if (cpl->offsets_count == cpl->offsets_capacity) {
+        // realloc
+        cpl->offsets_capacity *= 2;
+        cpl->offsets = PyMem_Realloc(cpl->offsets, sizeof(Py_ssize_t) * cpl->offsets_capacity);
+        // TODO: handle error
+    }
+    // use PyUnicode_CheckExact
+
+    if(!PyUnicode_AsUCS4(element,
+            cpl->pos_current,
+            cpl->pos_end - cpl->pos_current,
+            0)) { // last zero means do not copy null
+        return -1; // need to handle error
+    }
+    cpl->offsets[cpl->offsets_count] = element_length;
+    ++(cpl->offsets_count);
+    ++(cpl->index_current);
+
+    cpl->buffer_count += element_length;
+    cpl->pos_current += element_length; // add to pointer
+    return 0;
+}
+
+//------------------------------------------------------------------------------
+// CPL Constructors
+
+AK_CodePointLine* AK_CPL_FromIterable(PyObject* iterable)
+{
+    PyObject *iter = PyObject_GetIter(iterable);
+    // TODO: error handle
+
+    AK_CodePointLine *cpl = AK_CPL_New();
+    // TODO: handle error
+
+    PyObject *element;
+    while ((element = PyIter_Next(iter))) {
+        AK_CPL_Append(cpl, element);
+        // TODO: handle error
+        Py_DECREF(element);
+    }
+
+    Py_DECREF(iter);
+    return cpl;
+}
+
+//------------------------------------------------------------------------------
+// CPL Navigation
+
+void AK_CPL_CurrentReset(AK_CodePointLine* cpl)
+{
+    cpl->pos_current = cpl->buffer;
+    cpl->index_current = 0;
+}
+
+void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
+{
+    cpl->pos_current += cpl->offsets[cpl->index_current];
+    ++(cpl->index_current);
+}
+
+//------------------------------------------------------------------------------
+// CPL: Code Point Parsers
+
+// NP's Boolean conversion in genfromtxt
+// https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
+int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+    Py_UCS4 *p = cpl->pos_current;
+    Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+
+    static char* lower = "true";
+    static char* upper = "TRUE";
+
+    int i = 0;
+    int score = 0;
+
+    for (;p < end; ++p) {
+        char pchar = *p;
+        if (pchar == lower[i] || pchar == upper[i]) {
+            ++score;
+        }
+        ++i;
+
+    }
+    if (score == 4) {
+        return 1;
+    }
+    return 0;
+}
+
+
+//------------------------------------------------------------------------------
+// CPL: Exporters
+
+PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
+{
+    npy_intp dims[] = {cpl->offsets_count};
+    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
+    // TODO: check error
+
+    // assuming this is cotiguous
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // TODO: check error
+    npy_bool *array_buffer = (npy_bool*)PyArray_DATA((PyArrayObject*)array);
+
+    AK_CPL_CurrentReset(cpl);
+
+    for (int i=0; i < cpl->offsets_count; ++i) {
+        if (AK_CPL_IsTrue(cpl)) {
+            array_buffer[i] = 1;
+        }
+        AK_CPL_CurrentAdvance(cpl);
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
+// Returns a new reference.
+PyObject* AK_CPL_ToUnicode(AK_CodePointLine* cpl)
+{
+    return PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
+            cpl->buffer,
+            cpl->buffer_count);
+            // cpl->buffer_size);
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
 // AK_SequenceStrToArray1DAuto(PyObject* sequence)
 // Determine the type dynamically
 // Ideas: keep the same sequence and mutate it in-place with Python objects when necessary
@@ -151,81 +339,123 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 // Complex Numbers
 // Python `complex()` will take any string that looks a like a float; if a "+"" is present the second component must have a "j", otherwise a "complex() arg is a malformed string" is raised. Outer parenthesis are optional, but must be balanced if present
 // NP genfromtxt will interpret complex numbers with dtype None; Parenthesis are optional. With dtype complex, complex notations will be interpreted. Balanced parenthesis are not required; unbalanced parenthesis, as well as missing "j", do not raise and instead result in NaNs.
-PyObject*
-AK_SequenceStrToArray1DComplex(PyObject* sequence)
-{
-    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
-    Py_ssize_t size = PySequence_Fast_GET_SIZE(sequence_fast);
-    if (!size) {
-        return NULL;
-    }
+// PyObject*
+// AK_SequenceStrToArray1DComplex(PyObject* sequence)
+// {
+//     PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
+//     Py_ssize_t size = PySequence_Fast_GET_SIZE(sequence_fast);
+//     if (!size) {
+//         return NULL;
+//     }
 
-    npy_intp dims[] = {size};
-    PyObject* array = PyArray_SimpleNew(1, dims, NPY_COMPLEX128);
+//     npy_intp dims[] = {size};
+//     PyObject* array = PyArray_SimpleNew(1, dims, NPY_COMPLEX128);
 
-    PyObject *element;
-    for (Py_ssize_t pos = 0; pos < size; ++pos)
-    {
-        element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
-        if (!element) {
-            return NULL;
-        }
-        PyObject *v = PyObject_CallFunctionObjArgs((PyObject *)&PyComplex_Type, element, NULL);
-        if (!v) {
-            return NULL;
-        }
-        PyArray_SETITEM((PyArrayObject *)array,
-                PyArray_GETPTR1((PyArrayObject *)array, pos),
-                v);
-    }
-    // NOTE: will be made immutable in caller
-    Py_DECREF(sequence_fast);
-    return array;
-}
+//     PyObject *element;
+//     for (Py_ssize_t pos = 0; pos < size; ++pos)
+//     {
+//         element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
+//         if (!element) {
+//             return NULL;
+//         }
+//         PyObject *v = PyObject_CallFunctionObjArgs((PyObject *)&PyComplex_Type, element, NULL);
+//         if (!v) {
+//             return NULL;
+//         }
+//         PyArray_SETITEM((PyArrayObject *)array,
+//                 PyArray_GETPTR1((PyArrayObject *)array, pos),
+//                 v);
+//     }
+//     // NOTE: will be made immutable in caller
+//     Py_DECREF(sequence_fast);
+//     return array;
+// }
 
-// Booleans
-// NP's Boolean conversion in genfromtxt
-// https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-static inline PyObject*
-AK_SequenceStrToArray1DBoolean(PyObject* sequence)
-{
-    PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
-    Py_ssize_t size = PySequence_Fast_GET_SIZE(sequence_fast);
-    if (!size) {
-        return NULL;
-    }
+// static inline PyObject*
+// AK_SequenceStrToArray1DBoolean(PyObject* sequence)
+// {
+//     PyObject *sequence_fast = PySequence_Fast(sequence, "could not create sequence");
+//     Py_ssize_t size = PySequence_Fast_GET_SIZE(sequence_fast);
+//     if (!size) {
+//         return NULL;
+//     }
 
-    npy_intp dims[] = {size};
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
-    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    PyObject *lower = PyUnicode_FromString("lower");
-    if (!lower) {
-        return NULL;
-    }
+//     npy_intp dims[] = {size};
+//     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
+//     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+//     PyObject *lower = PyUnicode_FromString("lower");
+//     if (!lower) {
+//         return NULL;
+//     }
 
-    PyObject *element;
-    for (Py_ssize_t pos = 0; pos < size; ++pos) {
-        element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
-        if (!element) {
-            return NULL;
-        }
-        PyObject* element_lower = PyObject_CallMethodObjArgs(element, lower, NULL);
-        if (!element_lower) {
-            return NULL;
-        }
-        if (PyUnicode_CompareWithASCIIString(element_lower, "true") == 0) {
-            *(npy_bool *) PyArray_GETPTR1((PyArrayObject *)array, pos) = 1;
-        }
-    }
-    Py_DECREF(sequence_fast);
-    Py_DECREF(lower);
-    // NOTE: will be made immutable in caller
-    return array;
-}
+//     PyObject *element;
+//     for (Py_ssize_t pos = 0; pos < size; ++pos) {
+//         element = PySequence_Fast_GET_ITEM(sequence_fast, pos); // borrowed ref
+//         if (!element) {
+//             return NULL;
+//         }
+//         PyObject* element_lower = PyObject_CallMethodObjArgs(element, lower, NULL);
+//         if (!element_lower) {
+//             return NULL;
+//         }
+//         if (PyUnicode_CompareWithASCIIString(element_lower, "true") == 0) {
+//             *(npy_bool *) PyArray_GETPTR1((PyArrayObject *)array, pos) = 1;
+//         }
+//     }
+//     Py_DECREF(sequence_fast);
+//     Py_DECREF(lower);
+//     // NOTE: will be made immutable in caller
+//     return array;
+// }
+
+// // Convert an sequence of strings to a 1D array.
+// static inline PyObject*
+// AK_IterableStrToArray1D(
+//         PyObject *sequence,
+//         PyObject *dtype_specifier)
+// {
+//         // Convert specifier into a dtype if necessary
+//         PyArray_Descr* dtype;
+//         if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
+//         {
+//             dtype = (PyArray_Descr* )dtype_specifier;
+//         }
+//         else {
+//             // Use converter2 here so that None returns NULL (as opposed to default dtype float); NULL will leave strings unchanged
+//             PyArray_DescrConverter2(dtype_specifier, &dtype);
+//         }
+
+//         PyObject* array;
+//         if (!dtype) {
+//             AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
+//         }
+//         else if (PyDataType_ISBOOL(dtype)) {
+//             array = AK_SequenceStrToArray1DBoolean(sequence);
+//         }
+//         else if (PyDataType_ISCOMPLEX(dtype)) {
+//             array = AK_SequenceStrToArray1DComplex(sequence);
+//         }
+//         else {
+//             // NOTE: Some types can be converted directly from strings. int, float, dt64, variously sized strings: will convert from strings correctly. bool dtypes: will treat string as truthy/falsy
+//             Py_XINCREF(dtype); // will steal
+//             array = PyArray_FromAny(sequence,
+//                     dtype, // can be NULL, object: strings will remain
+//                     1,
+//                     1,
+//                     NPY_ARRAY_FORCECAST, // not sure this is best
+//                     NULL);
+//         }
+//         if (!array) {
+//             return NULL;
+//         }
+//         PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+//         return array;
+// }
+
 
 // Convert an sequence of strings to a 1D array.
 static inline PyObject*
-AK_SequenceStrToArray1D(
+AK_IterableStrToArray1D(
         PyObject *sequence,
         PyObject *dtype_specifier)
 {
@@ -240,30 +470,21 @@ AK_SequenceStrToArray1D(
             PyArray_DescrConverter2(dtype_specifier, &dtype);
         }
 
+        AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence);
         PyObject* array;
+
         if (!dtype) {
             AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
         }
         else if (PyDataType_ISBOOL(dtype)) {
-            array = AK_SequenceStrToArray1DBoolean(sequence);
-        }
-        else if (PyDataType_ISCOMPLEX(dtype)) {
-            array = AK_SequenceStrToArray1DComplex(sequence);
+            array = AK_CPL_ToArrayBoolean(cpl);
+            // TODO: handle error
         }
         else {
-            // NOTE: Some types can be converted directly from strings. int, float, dt64, variously sized strings: will convert from strings correctly. bool dtypes: will treat string as truthy/falsy
-            Py_XINCREF(dtype); // will steal
-            array = PyArray_FromAny(sequence,
-                    dtype, // can be NULL, object: strings will remain
-                    1,
-                    1,
-                    NPY_ARRAY_FORCECAST, // not sure this is best
-                    NULL);
+            AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
         }
-        if (!array) {
-            return NULL;
-        }
-        PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+
+        AK_CPL_Free(cpl);
         return array;
 }
 
@@ -271,6 +492,7 @@ AK_SequenceStrToArray1D(
 //------------------------------------------------------------------------------
 // AK module public methods
 //------------------------------------------------------------------------------
+
 
 static PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
@@ -387,7 +609,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         }
 
         Py_INCREF(line); // got a borrowed ref
-        PyObject* array = AK_SequenceStrToArray1D(line, dtype_specifier);
+        PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
         if (!array) {
             return NULL;
         }
@@ -409,88 +631,22 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 // If dtype of object is given, leave strings
 // If dtype of None is given, discover
 static PyObject *
-sequence_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
+iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyObject *iterable, *dtype_specifier;
 
-    if (!PyArg_ParseTuple(args, "OO:sequence_str_to_array_1d",
+    if (!PyArg_ParseTuple(args, "OO:iterable_str_to_array_1d",
             &iterable,
             &dtype_specifier))
     {
         return NULL;
     }
-    PyObject* array = AK_SequenceStrToArray1D(iterable, dtype_specifier);
+    PyObject* array = AK_IterableStrToArray1D(iterable, dtype_specifier);
     return array;
 }
 
 
-static PyObject *
-_sequence_str_to_test(PyObject *Py_UNUSED(m), PyObject *iterable)
-{
-    // Py_ssize_t size = PySequence_Size(iterable);
 
-    Py_ssize_t buffer_count = 100;
-    Py_ssize_t buffer_size = sizeof(Py_UCS4) * buffer_count;
-
-    Py_UCS4 *buffer = (Py_UCS4*)PyMem_Malloc(buffer_size);
-    Py_ssize_t *buffer_offset = (Py_ssize_t*)PyMem_Malloc(
-            sizeof(Py_ssize_t) * buffer_count);
-
-    // TODO: error handle
-
-    PyObject *iter = PyObject_GetIter(iterable);
-    // TODO: error handle
-
-    PyObject *element;
-
-
-    Py_ssize_t element_count = 0;
-    Py_ssize_t element_length;
-    Py_UCS4 *pos = buffer;
-    Py_UCS4 *end = buffer + buffer_size;
-
-    // encoding stage
-    while ((element = PyIter_Next(iter))) {
-        // might use PyUnicode_CheckExact
-
-        // do not copy null
-        if(!PyUnicode_AsUCS4(element, pos, end-pos, 0)) {
-            return NULL;
-        }
-        element_length = PyUnicode_GET_LENGTH(element);
-        pos += element_length;
-        buffer_offset[element_count] = element_length;
-        ++element_count;
-
-    }
-
-    // reading stage
-
-    pos = buffer;
-    for (Py_ssize_t i=0; i < element_count; ++i) {
-        element_length = buffer_offset[i];
-
-        Py_UCS4 *dst = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * element_length);
-        memcpy(dst, pos, element_length);
-        // if ((char)dst == "true") {
-        //     AK_NOT_IMPLEMENTED("here");
-        // }
-        PyMem_Free(dst);
-
-        pos += element_length;
-    }
-
-    PyObject* post = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
-            buffer,
-            buffer_size);
-
-    PyMem_Free(buffer);
-    PyMem_Free(buffer_offset);
-
-    // PyObject* post = PyUnicode_FromString("test");
-    // PyObject* post = PyUnicode_FromFormat("%zi", size);
-    return post;
-}
 
 //------------------------------------------------------------------------------
 // Return the integer version of the pointer to underlying data-buffer of array.
@@ -888,8 +1044,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
-    {"sequence_str_to_array_1d", sequence_str_to_array_1d, METH_VARARGS, NULL},
-    {"_sequence_str_to_test", _sequence_str_to_test, METH_O, NULL},
+    {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
     {NULL},
 };
 

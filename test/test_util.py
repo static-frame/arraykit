@@ -11,7 +11,7 @@ from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import delimited_to_arrays
-from arraykit import sequence_str_to_array_1d
+from arraykit import iterable_str_to_array_1d
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -20,105 +20,109 @@ class TestUnit(unittest.TestCase):
 
 
 
-    def test_sequence_str_to_array_1d_a(self) -> None:
-        a1 = sequence_str_to_array_1d(['1', '3', '4'], int)
-        self.assertEqual(a1.tolist(), [1, 3, 4])
-        self.assertEqual(a1.dtype, np.dtype(int))
+    # def test_sequence_str_to_array_1d_a(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['1', '3', '4'], int)
+    #     self.assertEqual(a1.tolist(), [1, 3, 4])
+    #     self.assertEqual(a1.dtype, np.dtype(int))
 
-        a2 = sequence_str_to_array_1d(['1', '30', '4'], str)
-        self.assertEqual(a2.tolist(), ['1', '30', '4'])
-        self.assertEqual(a2.dtype, np.dtype('<U2'))
+    #     a2 = iterable_str_to_array_1d(['1', '30', '4'], str)
+    #     self.assertEqual(a2.tolist(), ['1', '30', '4'])
+    #     self.assertEqual(a2.dtype, np.dtype('<U2'))
 
-        # with dtype_discover set to True, this should return integers in an object array
-        a3 = sequence_str_to_array_1d(['1', '3', '4'], object)
-        self.assertEqual(a3.tolist(), ['1', '3', '4'])
-        self.assertEqual(a3.dtype, np.dtype('O'))
+    #     # with dtype_discover set to True, this should return integers in an object array
+    #     a3 = iterable_str_to_array_1d(['1', '3', '4'], object)
+    #     self.assertEqual(a3.tolist(), ['1', '3', '4'])
+    #     self.assertEqual(a3.dtype, np.dtype('O'))
 
 
     def test_sequence_str_to_array_1d_b1(self) -> None:
-        a1 = sequence_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
+        a1 = iterable_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
         self.assertEqual(a1.tolist(), [True, False, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
+        self.assertFalse(a1.flags.writeable)
+
 
     def test_sequence_str_to_array_1d_b2(self) -> None:
-        a1 = sequence_str_to_array_1d(['true', 'True', 'TRUE', 't'], bool)
+        a1 = iterable_str_to_array_1d(['true', 'True', 'TRUE', 't'], bool)
         self.assertEqual(a1.tolist(), [True, True, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
-
-
-    def test_sequence_str_to_array_1d_c(self) -> None:
-        with self.assertRaises(ValueError):
-            _ = sequence_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
-
-        a1 = sequence_str_to_array_1d(['3.2', 'nan', 'inf', 'NaN'], float)
-        self.assertEqual(str(a1.tolist()), '[3.2, nan, inf, nan]')
-        self.assertEqual(a1.dtype, np.dtype(float))
-
-
-    def test_sequence_str_to_array_1d_d1(self) -> None:
-        a1 = sequence_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
-        self.assertEqual(a1.dtype, np.dtype(complex))
-        self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
-
-    def test_sequence_str_to_array_1d_d2(self) -> None:
-        a1 = sequence_str_to_array_1d(['3+0j', '100+nanj'], complex)
-        self.assertEqual(a1.dtype, np.dtype(complex))
-
-    def test_sequence_str_to_array_1d_d3(self) -> None:
-        a1 = sequence_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
-        self.assertEqual(a1.dtype, np.dtype(complex))
-        self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
-
-    def test_sequence_str_to_array_1d_d4(self) -> None:
-        with self.assertRaises(ValueError):
-            a1 = sequence_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
-
-
-    def test_sequence_str_to_array_1d_e(self) -> None:
-
-        a1 = sequence_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
-        self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
-        self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
-        # import ipdb; ipdb.set_trace()
-
-    #---------------------------------------------------------------------------
-    def test_sequence_str_to_test_a(self) -> None:
-        from arraykit import _sequence_str_to_test
-        post = _sequence_str_to_test(['true', 'False', 'TRUE', 'FALSE'])
+        self.assertFalse(a1.flags.writeable)
         import ipdb; ipdb.set_trace()
 
+
+    # def test_sequence_str_to_array_1d_c(self) -> None:
+    #     with self.assertRaises(ValueError):
+    #         _ = iterable_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
+
+    #     a1 = iterable_str_to_array_1d(['3.2', 'nan', 'inf', 'NaN'], float)
+    #     self.assertEqual(str(a1.tolist()), '[3.2, nan, inf, nan]')
+    #     self.assertEqual(a1.dtype, np.dtype(float))
+
+
+    # def test_sequence_str_to_array_1d_d1(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
+    #     self.assertEqual(a1.dtype, np.dtype(complex))
+    #     self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
+
+    # def test_sequence_str_to_array_1d_d2(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['3+0j', '100+nanj'], complex)
+    #     self.assertEqual(a1.dtype, np.dtype(complex))
+
+    # def test_sequence_str_to_array_1d_d3(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
+    #     self.assertEqual(a1.dtype, np.dtype(complex))
+    #     self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
+
+    # def test_sequence_str_to_array_1d_d4(self) -> None:
+    #     with self.assertRaises(ValueError):
+    #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
+
+
+    # def test_sequence_str_to_array_1d_e(self) -> None:
+
+    #     a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
+    #     self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
+    #     self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+    #     # import ipdb; ipdb.set_trace()
+
+    #---------------------------------------------------------------------------
+    # def test_sequence_str_to_test_a(self) -> None:
+    #     from arraykit import _sequence_str_to_test
+    #     post = _sequence_str_to_test(
+    #             ['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE'] * 5)
+
     #---------------------------------------------------------------------------
 
-    def test_delimited_to_arrays_a(self) -> None:
+    # def test_delimited_to_arrays_a(self) -> None:
 
-        msg = [
-            '1,-2,54',
-            '1,-2,54',
-            'True,False,true',
-            'a,bb,cc',
-        ]
-        dtypes = [str, np.dtype(float), bool, str]
-        post = delimited_to_arrays(msg, dtypes, 0)
-        self.assertTrue(isinstance(post, list))
-        self.assertEqual(post[0].dtype, np.dtype('<U2'))
-        self.assertEqual(post[1].dtype, np.dtype(float))
-        self.assertEqual(post[2].dtype, np.dtype(bool))
-        self.assertEqual(post[3].dtype, np.dtype('<U2'))
+    #     msg = [
+    #         '1,-2,54',
+    #         '1,-2,54',
+    #         'True,False,true',
+    #         'a,bb,cc',
+    #     ]
+    #     dtypes = [str, np.dtype(float), bool, str]
+    #     post = delimited_to_arrays(msg, dtypes, 0)
+    #     self.assertTrue(isinstance(post, list))
+    #     self.assertEqual(post[0].dtype, np.dtype('<U2'))
+    #     self.assertEqual(post[1].dtype, np.dtype(float))
+    #     self.assertEqual(post[2].dtype, np.dtype(bool))
+    #     self.assertEqual(post[3].dtype, np.dtype('<U2'))
 
-    def test_delimited_to_arrays_b(self) -> None:
+    # def test_delimited_to_arrays_b(self) -> None:
 
-        msg = [
-            '1,True,foo',
-            '1,False,baz',
-            '20,True,bar',
-            '-4,False,34',
-        ]
-        dtypes = [int, bool, str]
-        post = delimited_to_arrays(msg, dtypes, 1)
-        self.assertTrue(isinstance(post, list))
-        self.assertEqual(post[0].dtype, np.dtype(int))
-        self.assertEqual(post[1].dtype, np.dtype(bool))
-        self.assertEqual(post[2].dtype, np.dtype('<U3'))
+    #     msg = [
+    #         '1,True,foo',
+    #         '1,False,baz',
+    #         '20,True,bar',
+    #         '-4,False,34',
+    #     ]
+    #     dtypes = [int, bool, str]
+    #     post = delimited_to_arrays(msg, dtypes, 1)
+    #     self.assertTrue(isinstance(post, list))
+    #     self.assertEqual(post[0].dtype, np.dtype(int))
+    #     self.assertEqual(post[1].dtype, np.dtype(bool))
+    #     self.assertEqual(post[2].dtype, np.dtype('<U3'))
 
         # import ipdb; ipdb.set_trace()
 
