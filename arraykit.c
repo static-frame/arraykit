@@ -274,10 +274,8 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
 
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + 4; // read no more than 4 chracters
-
     static char* lower = "true";
     static char* upper = "TRUE";
-
     int i = 0;
     int score = 0;
     char c;
@@ -288,7 +286,6 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
             ++score;
         }
         ++i;
-
     }
     if (score == 4) {
         return 1;
