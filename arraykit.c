@@ -257,8 +257,13 @@ static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 // NP's Boolean conversion in genfromtxt
 // https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
 static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+    // must have at least 4 characters
+    if (cpl->offsets[cpl->index_current] < 4) {
+        return 0;
+    }
+
     Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+    Py_UCS4 *end = p + 4; // read no more than 4 chracters
 
     static char* lower = "true";
     static char* upper = "TRUE";

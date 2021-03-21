@@ -48,6 +48,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
+    def test_sequence_str_to_array_1d_b3(self) -> None:
+        a1 = iterable_str_to_array_1d(['sd', 'er', 'TRUE', 'twerwersdfsd'], bool)
+        self.assertEqual(a1.tolist(), [False, False, True, False])
+        self.assertEqual(a1.dtype, np.dtype(bool))
+        self.assertFalse(a1.flags.writeable)
+
 
     # def test_sequence_str_to_array_1d_c(self) -> None:
     #     with self.assertRaises(ValueError):
