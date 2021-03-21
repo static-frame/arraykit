@@ -266,31 +266,46 @@ static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
 
 // NP's Boolean conversion in genfromtxt
 // https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+// Return 1 if True, 0 if False, -1 anything else
+static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
     // must have at least 4 characters
     if (cpl->offsets[cpl->index_current] < 4) {
         return 0;
     }
 
     Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + 4; // read no more than 4 chracters
-    static char* lower = "true";
-    static char* upper = "TRUE";
-    int i = 0;
+    // read no more than 5 chracters
+    // already know we have 4 or more; if less than 5, we have 4, else 5
+    Py_UCS4 *end = p + (cpl->offsets[cpl->index_current] < 5 ? 4 : 5);
+
+    static char* t_lower = "true";
+    static char* t_upper = "TRUE";
+    static char* f_lower = "false";
+    static char* f_upper = "FALSE";
     int score = 0;
+    int i = 0;
     char c;
 
     for (;p < end; ++p) {
         c = *p;
-        if (c == lower[i] || c == upper[i]) {
+        if (score >= 0 && (c == t_lower[i] || c == t_upper[i])) {
             ++score;
+        }
+        else if (score <= 0 && (c == f_lower[i] || c == f_upper[i])) {
+            --score;
+        }
+        else {
+            return -1;
         }
         ++i;
     }
     if (score == 4) {
-        return 1;
+       return 1;
     }
-    return 0;
+    else if (score == -5) {
+        return 0;
+    }
+    return -1;
 }
 
 
@@ -303,15 +318,16 @@ PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
     // TODO: check error
 
-    // assuming this is cotiguous
+    // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     // TODO: check error
+
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA((PyArrayObject*)array);
 
     AK_CPL_CurrentReset(cpl);
-
     for (int i=0; i < cpl->offsets_count; ++i) {
-        if (AK_CPL_IsTrue(cpl)) {
+        // this is forgiving in that invalid strings remain false
+        if (AK_CPL_ParseBoolean(cpl) == 1) {
             array_buffer[i] = 1;
         }
         AK_CPL_CurrentAdvance(cpl);
