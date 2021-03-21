@@ -251,6 +251,16 @@ static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
     ++(cpl->index_current);
 }
 
+static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
+{
+    if (cpl->index_current > 0) {
+        // can remove one
+        --(cpl->index_current);
+        // remove the offset at this new position
+        cpl->pos_current -= cpl->offsets[cpl->index_current];
+    }
+}
+
 //------------------------------------------------------------------------------
 // CPL: Code Point Parsers
 
