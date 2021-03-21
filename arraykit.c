@@ -245,7 +245,7 @@ void AK_CPL_CurrentReset(AK_CodePointLine* cpl)
     cpl->index_current = 0;
 }
 
-void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
+static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
     cpl->pos_current += cpl->offsets[cpl->index_current];
     ++(cpl->index_current);
@@ -256,7 +256,7 @@ void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 
 // NP's Boolean conversion in genfromtxt
 // https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
 
@@ -265,10 +265,11 @@ int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
 
     int i = 0;
     int score = 0;
+    char c;
 
     for (;p < end; ++p) {
-        char pchar = *p;
-        if (pchar == lower[i] || pchar == upper[i]) {
+        c = *p;
+        if (c == lower[i] || c == upper[i]) {
             ++score;
         }
         ++i;
@@ -313,7 +314,6 @@ PyObject* AK_CPL_ToUnicode(AK_CodePointLine* cpl)
     return PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
             cpl->buffer,
             cpl->buffer_count);
-            // cpl->buffer_size);
 }
 
 //------------------------------------------------------------------------------
@@ -645,9 +645,20 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
     return array;
 }
 
+static PyObject *
+_test(PyObject *Py_UNUSED(m), PyObject *value)
+{
+    AK_CodePointLine* cpl1 = AK_CPL_FromIterable(value);
+    AK_CodePointLine* cpl2 = AK_CPL_FromIterable(value);
+    // AK_NOT_IMPLEMENTED("here");
+    PyObject* post = AK_CPL_ToUnicode(cpl1);
+    AK_CPL_Free(cpl1);
+    AK_CPL_Free(cpl2);
+    return post;
+}
 
 
-
+//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
@@ -1045,6 +1056,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
+    {"_test", _test, METH_O, NULL},
     {NULL},
 };
 

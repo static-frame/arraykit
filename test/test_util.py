@@ -47,7 +47,6 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), [True, True, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
-        import ipdb; ipdb.set_trace()
 
 
     # def test_sequence_str_to_array_1d_c(self) -> None:
@@ -86,10 +85,12 @@ class TestUnit(unittest.TestCase):
     #     # import ipdb; ipdb.set_trace()
 
     #---------------------------------------------------------------------------
-    # def test_sequence_str_to_test_a(self) -> None:
-    #     from arraykit import _sequence_str_to_test
-    #     post = _sequence_str_to_test(
-    #             ['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE'] * 5)
+    def test_test_a(self) -> None:
+        from arraykit import _test
+        post = _test(
+                ['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE']
+                )
+        print(post)
 
     #---------------------------------------------------------------------------
 
