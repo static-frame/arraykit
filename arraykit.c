@@ -131,7 +131,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 //------------------------------------------------------------------------------
-// CPL Type, New, Destrctor
+// CodePointLine Type, New, Destrctor
 
 typedef struct {
     Py_ssize_t buffer_count; // accumulated number of code points
@@ -264,19 +264,41 @@ static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CPL: Code Point Parsers
 
-// NP's Boolean conversion in genfromtxt
-// https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-// Return 1 if True, 0 if False, -1 anything else
-static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
-    // must have at least 4 characters
+// This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
+// NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
+static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+    // must have at least 1 characters
     if (cpl->offsets[cpl->index_current] < 4) {
         return 0;
     }
+    static char* t_lower = "true";
+    static char* t_upper = "TRUE";
 
     Py_UCS4 *p = cpl->pos_current;
-    // read no more than 5 chracters
-    // already know we have 4 or more; if less than 5, we have 4, else 5
-    Py_UCS4 *end = p + (cpl->offsets[cpl->index_current] < 5 ? 4 : 5);
+    Py_UCS4 *end = p + 4; // we must have at least 4 characters
+    int i = 0;
+    char c;
+
+    for (;p < end; ++p) {
+        c = *p;
+        if (c != t_lower[i] && c != t_upper[i]) {
+            return 0;
+        }
+        ++i;
+    }
+    return 1; //matched all characters
+}
+
+// Parse full field and return 1 or 0 only for valid Boolean strings. Return 1 if True, 0 if False, -1 anything else
+static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
+    // must have only 4 or 5 characters
+    Py_ssize_t size = cpl->offsets[cpl->index_current];
+    if (size < 4 || size > 5) {
+        return -1;
+    }
+
+    Py_UCS4 *p = cpl->pos_current;
+    Py_UCS4 *end = p + size; // size is either 4 or 5
 
     static char* t_lower = "true";
     static char* t_upper = "TRUE";
@@ -299,6 +321,7 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
         }
         ++i;
     }
+    // we might not need to look a the score value
     if (score == 4) {
        return 1;
     }
@@ -327,9 +350,12 @@ PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     AK_CPL_CurrentReset(cpl);
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
-        if (AK_CPL_ParseBoolean(cpl) == 1) {
+        if (AK_CPL_IsTrue(cpl) == 1) {
             array_buffer[i] = 1;
         }
+        // if (AK_CPL_ParseBoolean(cpl) == 1) {
+        //     array_buffer[i] = 1;
+        // }
         AK_CPL_CurrentAdvance(cpl);
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
@@ -489,8 +515,7 @@ AK_IterableStrToArray1D(
 {
         // Convert specifier into a dtype if necessary
         PyArray_Descr* dtype;
-        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
-        {
+        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
             dtype = (PyArray_Descr* )dtype_specifier;
         }
         else {
