@@ -131,6 +131,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // CodePointLine Type, New, Destrctor
 
 typedef struct {
@@ -369,6 +370,36 @@ PyObject* AK_CPL_ToUnicode(AK_CodePointLine* cpl)
             cpl->buffer,
             cpl->buffer_count);
 }
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// CodePointGrid Type, New, Destrctor
+
+typedef struct {
+    Py_ssize_t lines_count; // accumulated number of code points
+    Py_ssize_t lines_capacity; // max number of code points
+    AK_CodePointLine **lines; // array of pointers
+} AK_CodePointGrid;
+
+AK_CodePointGrid* AK_CPG_New()
+{
+    AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
+    cpg->lines_count = 0;
+    cpg->lines_capacity = 20;
+    cpg->lines = (AK_CodePointLine**)PyMem_Malloc(sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+    return cpg;
+}
+
+void AK_CPG_Free(AK_CodePointGrid* cpg)
+{
+    // free everything in lines
+    for (int i=0; i < cpg->lines_count; ++i) {
+        AK_CPL_Free(cpg->lines[i]);
+    }
+    PyMem_Free(cpg->lines);
+    PyMem_Free(cpg);
+}
+
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
