@@ -190,8 +190,10 @@ def array_deepcopy(
 def isna_element(value: tp.Any) -> bool:
     '''Return Boolean if value is an NA. This does not yet handle pd.NA
     '''
-    if isinstance(value, float):
+    try:
         return np.isnan(value) #type: ignore
+    except TypeError:
+        continue
 
     if isinstance(value, (np.datetime64, np.timedelta64)):
         return np.isnat(value) #type: ignore
