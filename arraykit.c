@@ -505,6 +505,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
         }
 
         PyObject* array;
+
         if (!dtype) {
             AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
         }
