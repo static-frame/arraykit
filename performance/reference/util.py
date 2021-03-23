@@ -193,7 +193,7 @@ def isna_element(value: tp.Any) -> bool:
     try:
         return np.isnan(value) #type: ignore
     except TypeError:
-        continue
+        pass
 
     if isinstance(value, (np.datetime64, np.timedelta64)):
         return np.isnat(value) #type: ignore

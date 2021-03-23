@@ -178,7 +178,7 @@ class TestUnit(unittest.TestCase):
         nanj = complex(nan, 0)
 
         nnan = -np.nan
-        nnanj = complex(nnan, 0)
+        nnanj = -complex(nan, 0)
 
         for float_class in (float, np.float16, np.float32, np.float64, np.float128):
             self.assertTrue(isna_element(float_class(nan)))
@@ -189,6 +189,7 @@ class TestUnit(unittest.TestCase):
             self.assertTrue(isna_element(cfloat_class(nnanj)))
 
         self.assertTrue(isna_element(float('NaN')))
+        self.assertTrue(isna_element(-float('NaN')))
         self.assertTrue(isna_element(None))
 
     def test_isna_element_false(self) -> None:

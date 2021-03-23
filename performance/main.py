@@ -228,11 +228,20 @@ class IsNaElementPerf(Perf):
     def pre(self):
         self.values = [
                 # Na-elements
-                np.nan, np.datetime64('NaT'), np.timedelta64('NaT'), None, float('NaN'),
+                np.datetime64('NaT'), np.timedelta64('NaT'), None, float('NaN'), -float('NaN'),
 
                 # Non-float, Non-na elements
                 1, 'str', np.datetime64('2020-12-31'), datetime.date(2020, 12, 31), False,
         ]
+
+        # Append all the different types of nans across dtypes
+        for ctor in (float, np.float16, np.float32, np.float64, np.float128):
+            self.values.append(ctor(np.nan))
+            self.values.append(ctor(-np.nan))
+
+        for ctor in (complex, np.complex64, np.complex128, np.complex256):
+            self.values.append(ctor(complex(np.nan, 0)))
+            self.values.append(ctor(-complex(np.nan, 0)))
 
         # Append a wide range of float values, with different precision, across types
         for val in (
@@ -246,7 +255,7 @@ class IsNaElementPerf(Perf):
                     self.values.append(np.float128(sign * val))
 
     def main(self):
-        for _ in range(10):
+        for _ in range(20):
             for val in self.values:
                 self.entry(val)
 
