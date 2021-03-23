@@ -94,47 +94,48 @@ class TestUnit(unittest.TestCase):
     def test_test_a(self) -> None:
         from arraykit import _test
         post = _test(
-                ['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE']
+                [['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE'],
+                ['g', 't', 'w', 'g', 'true', 'f']]
                 )
         print(post)
 
     #---------------------------------------------------------------------------
 
-    # def test_delimited_to_arrays_a(self) -> None:
+    def test_delimited_to_arrays_a(self) -> None:
 
-    #     msg = [
-    #         '1,-2,54',
-    #         '1,-2,54',
-    #         'True,False,true',
-    #         'a,bb,cc',
-    #     ]
-    #     dtypes = [str, np.dtype(float), bool, str]
-    #     post = delimited_to_arrays(msg, dtypes, 0)
-    #     self.assertTrue(isinstance(post, list))
-    #     self.assertEqual(post[0].dtype, np.dtype('<U2'))
-    #     self.assertEqual(post[1].dtype, np.dtype(float))
-    #     self.assertEqual(post[2].dtype, np.dtype(bool))
-    #     self.assertEqual(post[3].dtype, np.dtype('<U2'))
+        msg = [
+            'false,true,true,false',
+            'true,f,f,true',
+            'True,False,TRUE,FALSE',
+        ]
 
-    # def test_delimited_to_arrays_b(self) -> None:
+        dtypes0 = [bool, np.dtype(bool), bool]
+        post0 = delimited_to_arrays(msg, dtypes0, 0)
+        self.assertTrue(isinstance(post0, list))
+        self.assertEqual(len(post0), 3)
+        self.assertTrue(all(len(e) == 4 for e in post0))
 
-    #     msg = [
-    #         '1,True,foo',
-    #         '1,False,baz',
-    #         '20,True,bar',
-    #         '-4,False,34',
-    #     ]
-    #     dtypes = [int, bool, str]
-    #     post = delimited_to_arrays(msg, dtypes, 1)
-    #     self.assertTrue(isinstance(post, list))
-    #     self.assertEqual(post[0].dtype, np.dtype(int))
-    #     self.assertEqual(post[1].dtype, np.dtype(bool))
-    #     self.assertEqual(post[2].dtype, np.dtype('<U3'))
-
-        # import ipdb; ipdb.set_trace()
+        dtypes1 = [bool, np.dtype(bool), bool, bool]
+        post1 = delimited_to_arrays(msg, dtypes1, 1)
+        self.assertTrue(isinstance(post1, list))
+        self.assertEqual(len(post1), 4)
+        self.assertTrue(all(len(e) == 3 for e in post1))
 
 
 
+    def test_delimited_to_arrays_b(self) -> None:
+
+        msg = [
+            ','.join(['True', 'False'] * 20),
+            ','.join(['True', 'True'] * 20),
+            ','.join(['False', 'False'] * 20),
+        ]
+
+        dtypes0 = [bool] * 40
+        post0 = delimited_to_arrays(msg, dtypes0, 1)
+        self.assertTrue(isinstance(post0, list))
+        self.assertEqual(len(post0), 40)
+        self.assertTrue(all(len(e) == 3 for e in post0))
 
 
 

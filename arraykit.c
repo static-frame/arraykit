@@ -154,14 +154,14 @@ AK_CodePointLine* AK_CPL_New()
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
     // TODO: handle error
     cpl->buffer_count = 0;
-    cpl->buffer_capacity = 20;
+    cpl->buffer_capacity = 1000;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
     // TODO: handle error
     cpl->pos_current = cpl->buffer;
     cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
 
     cpl->offsets_count = 0;
-    cpl->offsets_capacity = 8;
+    cpl->offsets_capacity = 500;
     cpl->offsets = (Py_ssize_t*)PyMem_Malloc(
             sizeof(Py_ssize_t) * cpl->offsets_capacity);
     // TODO: handle error
@@ -187,7 +187,8 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
     if ((cpl->buffer_count + element_length) >= cpl->buffer_capacity) {
         // realloc
         cpl->buffer_capacity *= 2;
-        cpl->buffer = PyMem_Realloc(cpl->buffer, sizeof(Py_UCS4) * cpl->buffer_capacity);
+        cpl->buffer = PyMem_Realloc(cpl->buffer,
+                sizeof(Py_UCS4) * cpl->buffer_capacity);
         // TODO: handle error
         cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
         cpl->pos_current = cpl->buffer + cpl->buffer_count;
@@ -195,7 +196,8 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
     if (cpl->offsets_count == cpl->offsets_capacity) {
         // realloc
         cpl->offsets_capacity *= 2;
-        cpl->offsets = PyMem_Realloc(cpl->offsets, sizeof(Py_ssize_t) * cpl->offsets_capacity);
+        cpl->offsets = PyMem_Realloc(cpl->offsets,
+                sizeof(Py_ssize_t) * cpl->offsets_capacity);
         // TODO: handle error
     }
     // use PyUnicode_CheckExact
@@ -282,10 +284,12 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
 
     for (;p < end; ++p) {
         c = *p;
-        if (c != t_lower[i] && c != t_upper[i]) {
+        if (c == t_lower[i] || c == t_upper[i]) {
+            ++i;
+        }
+        else {
             return 0;
         }
-        ++i;
     }
     return 1; //matched all characters
 }
@@ -332,11 +336,10 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
     return -1;
 }
 
-
 //------------------------------------------------------------------------------
 // CPL: Exporters
 
-PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
+static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 {
     npy_intp dims[] = {cpl->offsets_count};
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
@@ -351,7 +354,7 @@ PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     AK_CPL_CurrentReset(cpl);
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
-        if (AK_CPL_IsTrue(cpl) == 1) {
+        if (AK_CPL_IsTrue(cpl)) {
             array_buffer[i] = 1;
         }
         // if (AK_CPL_ParseBoolean(cpl) == 1) {
@@ -385,20 +388,140 @@ AK_CodePointGrid* AK_CPG_New()
 {
     AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
     cpg->lines_count = 0;
-    cpg->lines_capacity = 20;
-    cpg->lines = (AK_CodePointLine**)PyMem_Malloc(sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+    cpg->lines_capacity = 100;
+    cpg->lines = (AK_CodePointLine**)PyMem_Malloc(
+            sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+    // NOTE: initialize lines to NULL?
     return cpg;
 }
 
 void AK_CPG_Free(AK_CodePointGrid* cpg)
 {
-    // free everything in lines
     for (int i=0; i < cpg->lines_count; ++i) {
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
     PyMem_Free(cpg);
 }
+//------------------------------------------------------------------------------
+// CodePointGrid: Mutation
+
+static inline int AK_CPG_AppendAtLine(AK_CodePointGrid* cpg, int line, PyObject* element)
+{
+    if (line >= cpg->lines_capacity) {
+        cpg->lines_capacity *= 2;
+        // NOTE: as we sure we are only copying pointers?
+        cpg->lines = PyMem_Realloc(cpg->lines,
+                sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+        // TODO: handle error, initialize lines to NULL
+    }
+    // for now we assume sequential acesss, so should only check if equal
+    if (line >= cpg->lines_count) {
+        // initialize a CPL in this position
+        cpg->lines[line] = AK_CPL_New();
+        ++(cpg->lines_count);
+    }
+    AK_CPL_Append(cpg->lines[line], element);
+    // handle failure
+    return 1;
+}
+
+//------------------------------------------------------------------------------
+// CodePointGrid: Constructors
+
+// Given an iterable, load a CPG. If axis is 0, interpret the first level of as the primary level (rows become columns); if axis is 1, align values by position per row (rows are partitioned into columns).
+AK_CodePointGrid* AK_CPG_FromIterable(
+        PyObject* iterable,
+        int axis)
+{
+
+    AK_CodePointGrid* cpg = AK_CPG_New();
+    // expect an iterable of iterables
+    PyObject *outer_iter = PyObject_GetIter(iterable);
+    // TODO: handle error
+    PyObject *outer;
+    PyObject *inner_iter;
+    PyObject *inner;
+
+    int inner_count;
+    int outer_count = 0;
+
+    int *count_src = axis == 0 ? &outer_count : &inner_count;
+
+    while ((outer = PyIter_Next(outer_iter))) {
+        inner_iter = PyObject_GetIter(outer);
+        // TODO: handle error
+        inner_count = 0;
+
+        while ((inner = PyIter_Next(inner_iter))) {
+            AK_CPG_AppendAtLine(cpg, *count_src, inner);
+            // TODO: handle error
+            ++inner_count;
+        }
+        ++outer_count;
+        Py_DECREF(inner_iter);
+    }
+    Py_DECREF(outer_iter);
+    return cpg;
+}
+
+//------------------------------------------------------------------------------
+// CPL: Exporters
+
+PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
+{
+    PyObject* list = PyList_New(0);
+    // handle error
+    for (int i = 0; i < cpg->lines_count; ++i) {
+        if (PyList_Append(list, AK_CPL_ToUnicode(cpg->lines[i]))) {
+           // handle error
+        }
+    }
+    return list;
+}
+
+PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
+{
+    PyObject* list = PyList_New(0);
+    // handle error
+    for (int i = 0; i < cpg->lines_count; ++i) {
+
+        PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
+        if (!dtype_specifier) {
+            Py_DECREF(list);
+            return NULL;
+        }
+
+        PyArray_Descr* dtype;
+        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
+            dtype = (PyArray_Descr* )dtype_specifier;
+        }
+        else { // converter2 set NULL for None
+            PyArray_DescrConverter2(dtype_specifier, &dtype);
+        }
+
+        PyObject* array;
+        if (!dtype) {
+            AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
+        }
+        else if (PyDataType_ISBOOL(dtype)) {
+            array = AK_CPL_ToArrayBoolean(cpg->lines[i]);
+        }
+        else if (PyDataType_ISCOMPLEX(dtype)) {
+            AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
+        }
+        else {
+            AK_NOT_IMPLEMENTED("no handling for other dtypes yet");
+        }
+
+        if (PyList_Append(list, array)) {
+           // handle error
+        }
+        Py_DECREF(array);
+    }
+    return list;
+}
+
 
 
 //------------------------------------------------------------------------------
@@ -549,8 +672,7 @@ AK_IterableStrToArray1D(
         if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
             dtype = (PyArray_Descr* )dtype_specifier;
         }
-        else {
-            // Use converter2 here so that None returns NULL (as opposed to default dtype float); NULL will leave strings unchanged
+        else { // converter2 set NULL for None
             PyArray_DescrConverter2(dtype_specifier, &dtype);
         }
 
@@ -578,6 +700,7 @@ AK_IterableStrToArray1D(
 //------------------------------------------------------------------------------
 
 
+
 static PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 {
@@ -589,10 +712,10 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     {
         return NULL;
     }
-    // NOTE: consider taking shape_estimate as a tuple to pre-size lists?
+    // NOTE: consider taking shape_estimate?
 
     // Parse text
-    // For now, we import and use the CSV module directly; in the future, can vend code from here and implement support for an axis argument to collect data columnwise rather than rowwise
+    // For now, we import and use the CSV module directly
     PyObject *module_csv = PyImport_ImportModule("csv");
     if (!module_csv) {
         return NULL;
@@ -609,107 +732,155 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
         return NULL;
     }
 
-    // Get the an iterator for the appropriate axis
-    PyObject *axis_sequence_fast; // for generic assignment
-    Py_ssize_t count_columns = -1;
-
-    PyObject *axis0_sequence_iter = PyObject_GetIter(reader_instance);
-    if (!axis0_sequence_iter) {
-        Py_DECREF(reader_instance);
-        return NULL;
-    }
-
-    if (PyLong_AsLong(axis) == 1) { // this can fail
-        PyObject* axis1_sequences = PyList_New(0);
-        if (!axis1_sequences) {
-            Py_DECREF(axis0_sequence_iter);
-            return NULL;
-        }
-        // get first size
-        Py_ssize_t count_row = 0;
-
-        PyObject *row;
-        PyObject* column;
-        while ((row = PyIter_Next(axis0_sequence_iter))) {
-            // get count of columns from first row
-            if (count_row == 0) {
-                count_columns = PyList_Size(row);
-                // use Py_ssize_t?
-                for (int i=0; i < count_columns; ++i) {
-                    column = PyList_New(0);
-                    if (PyList_Append(axis1_sequences, column)) // does not steal
-                    {
-                        Py_DECREF(row);
-                        Py_DECREF(axis1_sequences);
-                        return NULL;
-                    }
-                    Py_DECREF(column);
-                }
-            }
-            // walk through row and append to columns
-            for (int i=0; i < count_columns; ++i) {
-                PyObject* element = PyList_GetItem(row, i);
-                column = PyList_GetItem(axis1_sequences, i); // borrowed?
-                if (PyList_Append(column, element))
-                    {
-                        Py_DECREF(axis1_sequences);
-                        return NULL;
-                    }
-                Py_DECREF(element);
-            }
-            ++count_row;
-        }
-        axis_sequence_fast = PySequence_Fast(axis1_sequences,
-                "failed to create sequence");
-        // axis_sequence_iter = PyObject_GetIter(axis1_sequences);
-        Py_DECREF(axis1_sequences);
-    } else {
-        // axis_sequence_iter = axis0_sequence_iter;
-        axis_sequence_fast = PySequence_Fast(axis0_sequence_iter,
-                "failed to create sequence");
-        count_columns = PySequence_Fast_GET_SIZE(axis_sequence_fast);
-    }
-    Py_DECREF(axis0_sequence_iter);
+    AK_CodePointGrid* cpg = AK_CPG_FromIterable(reader_instance, PyLong_AsLong(axis));
+    // TODO: handle error
     Py_DECREF(reader_instance);
 
-    // List to be return constructer arrays
-    PyObject* arrays = PyList_New(0);
+    PyObject* arrays = AK_CPG_ToArrayList(cpg, dtypes);
     if (!arrays) {
-        Py_DECREF(axis_sequence_fast);
+        AK_CPG_Free(cpg);
         return NULL;
     }
 
-    PyObject *line;
-    for (Py_ssize_t pos = 0; pos < count_columns; ++pos) {
-        line = PySequence_Fast_GET_ITEM(axis_sequence_fast, pos); // borrowed ref
-        if (!line) {
-            return NULL;
-        }
-        PyObject* dtype_specifier = PyList_GetItem(dtypes, pos);
-        if (!dtype_specifier) {
-            Py_DECREF(axis_sequence_fast);
-            Py_DECREF(arrays);
-            return NULL;
-        }
-
-        Py_INCREF(line); // got a borrowed ref
-        PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
-        if (!array) {
-            return NULL;
-        }
-
-        if (PyList_Append(arrays, array)) {
-            Py_DECREF(axis_sequence_fast);
-            Py_DECREF(array);
-            Py_DECREF(arrays);
-            return NULL;
-        }
-        Py_DECREF(array);
-    }
-    // check if PyErr occurred
-    Py_DECREF(axis_sequence_fast);
+    AK_CPG_Free(cpg);
     return arrays;
 }
+
+
+
+
+// static PyObject *
+// delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
+// {
+//     PyObject *file_like, *dtypes, *axis;
+//     if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
+//             &file_like,
+//             &dtypes,
+//             &axis)) // TODO: enforce this is an int?
+//     {
+//         return NULL;
+//     }
+//     // NOTE: consider taking shape_estimate as a tuple to pre-size lists?
+
+//     // Parse text
+//     // For now, we import and use the CSV module directly; in the future, can vend code from here and implement support for an axis argument to collect data columnwise rather than rowwise
+//     PyObject *module_csv = PyImport_ImportModule("csv");
+//     if (!module_csv) {
+//         return NULL;
+//     }
+//     PyObject *reader = PyObject_GetAttrString(module_csv, "reader");
+//     Py_DECREF(module_csv);
+//     if (!reader) {
+//         return NULL;
+//     }
+//     // TODO: pass in full parameters for parsing
+//     PyObject *reader_instance = PyObject_CallFunctionObjArgs(reader, file_like, NULL);
+//     Py_DECREF(reader);
+//     if (!reader_instance) {
+//         return NULL;
+//     }
+
+//     // Get the an iterator for the appropriate axis
+//     PyObject *axis_sequence_fast; // for generic assignment
+//     Py_ssize_t count_columns = -1;
+
+//     PyObject *axis0_sequence_iter = PyObject_GetIter(reader_instance);
+//     if (!axis0_sequence_iter) {
+//         Py_DECREF(reader_instance);
+//         return NULL;
+//     }
+
+//     if (PyLong_AsLong(axis) == 1) { // this can fail
+//         PyObject* axis1_sequences = PyList_New(0);
+//         if (!axis1_sequences) {
+//             Py_DECREF(axis0_sequence_iter);
+//             return NULL;
+//         }
+//         // get first size
+//         Py_ssize_t count_row = 0;
+
+//         PyObject *row;
+//         PyObject* column;
+//         while ((row = PyIter_Next(axis0_sequence_iter))) {
+//             // get count of columns from first row
+//             if (count_row == 0) {
+//                 count_columns = PyList_Size(row);
+//                 // use Py_ssize_t?
+//                 for (int i=0; i < count_columns; ++i) {
+//                     column = PyList_New(0);
+//                     if (PyList_Append(axis1_sequences, column)) // does not steal
+//                     {
+//                         Py_DECREF(row);
+//                         Py_DECREF(axis1_sequences);
+//                         return NULL;
+//                     }
+//                     Py_DECREF(column);
+//                 }
+//             }
+//             // walk through row and append to columns
+//             for (int i=0; i < count_columns; ++i) {
+//                 PyObject* element = PyList_GetItem(row, i);
+//                 column = PyList_GetItem(axis1_sequences, i); // borrowed?
+//                 if (PyList_Append(column, element))
+//                     {
+//                         Py_DECREF(axis1_sequences);
+//                         return NULL;
+//                     }
+//                 Py_DECREF(element);
+//             }
+//             ++count_row;
+//         }
+//         axis_sequence_fast = PySequence_Fast(axis1_sequences,
+//                 "failed to create sequence");
+//         // axis_sequence_iter = PyObject_GetIter(axis1_sequences);
+//         Py_DECREF(axis1_sequences);
+//     } else {
+//         // axis_sequence_iter = axis0_sequence_iter;
+//         axis_sequence_fast = PySequence_Fast(axis0_sequence_iter,
+//                 "failed to create sequence");
+//         count_columns = PySequence_Fast_GET_SIZE(axis_sequence_fast);
+//     }
+//     Py_DECREF(axis0_sequence_iter);
+//     Py_DECREF(reader_instance);
+
+    // List to be return constructer arrays
+//     PyObject* arrays = PyList_New(0);
+//     if (!arrays) {
+//         Py_DECREF(axis_sequence_fast);
+//         return NULL;
+//     }
+
+//     PyObject *line;
+//     for (Py_ssize_t pos = 0; pos < count_columns; ++pos) {
+//         line = PySequence_Fast_GET_ITEM(axis_sequence_fast, pos); // borrowed ref
+//         if (!line) {
+//             return NULL;
+//         }
+//         PyObject* dtype_specifier = PyList_GetItem(dtypes, pos);
+//         if (!dtype_specifier) {
+//             Py_DECREF(axis_sequence_fast);
+//             Py_DECREF(arrays);
+//             return NULL;
+//         }
+
+//         Py_INCREF(line); // got a borrowed ref
+//         PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
+//         if (!array) {
+//             return NULL;
+//         }
+
+//         if (PyList_Append(arrays, array)) {
+//             Py_DECREF(axis_sequence_fast);
+//             Py_DECREF(array);
+//             Py_DECREF(arrays);
+//             return NULL;
+//         }
+//         Py_DECREF(array);
+//     }
+//     // check if PyErr occurred
+//     Py_DECREF(axis_sequence_fast);
+//     return arrays;
+// }
 
 // If dtype_specifier is given, always try to return that dtype
 // If dtype of object is given, leave strings
@@ -732,12 +903,9 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
 static PyObject *
 _test(PyObject *Py_UNUSED(m), PyObject *value)
 {
-    AK_CodePointLine* cpl1 = AK_CPL_FromIterable(value);
-    AK_CodePointLine* cpl2 = AK_CPL_FromIterable(value);
-    // AK_NOT_IMPLEMENTED("here");
-    PyObject* post = AK_CPL_ToUnicode(cpl1);
-    AK_CPL_Free(cpl1);
-    AK_CPL_Free(cpl2);
+    AK_CodePointGrid* cpg = AK_CPG_FromIterable(value, 1);
+    PyObject* post = AK_CPG_ToUnicodeList(cpg);
+    AK_CPG_Free(cpg);
     return post;
 }
 
