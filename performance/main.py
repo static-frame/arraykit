@@ -37,7 +37,7 @@ class Perf:
 
 #-------------------------------------------------------------------------------
 class DelimitedToArraysPandas(Perf):
-    NUMBER = 30
+    NUMBER = 40
     FUNCTIONS = ('bool_uniform', )
 
     def pre(self):

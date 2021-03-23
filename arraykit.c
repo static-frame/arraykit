@@ -208,9 +208,9 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
             0)) { // last zero means do not copy null
         return -1; // need to handle error
     }
-    cpl->offsets[cpl->offsets_count] = element_length;
-    ++(cpl->offsets_count);
-    ++(cpl->index_current);
+    cpl->offsets[cpl->offsets_count++] = element_length;
+    // ++(cpl->offsets_count);
+    // ++(cpl->index_current);
 
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
@@ -250,22 +250,26 @@ void AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 
 static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
-    cpl->pos_current += cpl->offsets[cpl->index_current];
-    ++(cpl->index_current);
+    cpl->pos_current += cpl->offsets[cpl->index_current++];
+    // ++(cpl->index_current);
 }
 
 static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
 {
     if (cpl->index_current > 0) {
-        // can remove one
-        --(cpl->index_current);
+        // --(cpl->index_current);
         // remove the offset at this new position
-        cpl->pos_current -= cpl->offsets[cpl->index_current];
+        cpl->pos_current -= cpl->offsets[--cpl->index_current];
     }
 }
 
 //------------------------------------------------------------------------------
 // CPL: Code Point Parsers
+
+static char* TRUE_LOWER = "true";
+static char* TRUE_UPPER = "TRUE";
+static char* FALSE_LOWER = "false";
+static char* FALSE_UPPER = "FALSE";
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 // NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
@@ -274,8 +278,8 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
     if (cpl->offsets[cpl->index_current] < 4) {
         return 0;
     }
-    static char* t_lower = "true";
-    static char* t_upper = "TRUE";
+    // static char* TRUE_LOWER = "true";
+    // static char* TRUE_UPPER = "TRUE";
 
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + 4; // we must have at least 4 characters
@@ -284,7 +288,7 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
 
     for (;p < end; ++p) {
         c = *p;
-        if (c == t_lower[i] || c == t_upper[i]) {
+        if (c == TRUE_LOWER[i] || c == TRUE_UPPER[i]) {
             ++i;
         }
         else {
@@ -305,20 +309,16 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + size; // size is either 4 or 5
 
-    static char* t_lower = "true";
-    static char* t_upper = "TRUE";
-    static char* f_lower = "false";
-    static char* f_upper = "FALSE";
     int score = 0;
     int i = 0;
     char c;
 
     for (;p < end; ++p) {
         c = *p;
-        if (score >= 0 && (c == t_lower[i] || c == t_upper[i])) {
+        if (score >= 0 && (c == TRUE_LOWER[i] || c == TRUE_UPPER[i])) {
             ++score;
         }
-        else if (score <= 0 && (c == f_lower[i] || c == f_upper[i])) {
+        else if (score <= 0 && (c == FALSE_LOWER[i] || c == FALSE_UPPER[i])) {
             --score;
         }
         else {
@@ -357,9 +357,6 @@ static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
         if (AK_CPL_IsTrue(cpl)) {
             array_buffer[i] = 1;
         }
-        // if (AK_CPL_ParseBoolean(cpl) == 1) {
-        //     array_buffer[i] = 1;
-        // }
         AK_CPL_CurrentAdvance(cpl);
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
