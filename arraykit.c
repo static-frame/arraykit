@@ -132,7 +132,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-// CodePointLine Type, New, Destrctor
+// CodePointLine: Type, New, Destrctor
 
 typedef struct {
     Py_ssize_t buffer_count; // accumulated number of code points
@@ -178,7 +178,7 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
 }
 
 //------------------------------------------------------------------------------
-// CPL Mutation
+// CodePointLine: Mutation
 
 int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
 {
@@ -186,7 +186,7 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
 
     if ((cpl->buffer_count + element_length) >= cpl->buffer_capacity) {
         // realloc
-        cpl->buffer_capacity *= 2;
+        cpl->buffer_capacity *= 2; // needs to be max of this or element_length
         cpl->buffer = PyMem_Realloc(cpl->buffer,
                 sizeof(Py_UCS4) * cpl->buffer_capacity);
         // TODO: handle error
@@ -208,9 +208,8 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
             0)) { // last zero means do not copy null
         return -1; // need to handle error
     }
+    // read offset_count, then increment
     cpl->offsets[cpl->offsets_count++] = element_length;
-    // ++(cpl->offsets_count);
-    // ++(cpl->index_current);
 
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
@@ -218,7 +217,7 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
 }
 
 //------------------------------------------------------------------------------
-// CPL Constructors
+// CodePointLine: Constructors
 
 AK_CodePointLine* AK_CPL_FromIterable(PyObject* iterable)
 {
@@ -234,13 +233,14 @@ AK_CodePointLine* AK_CPL_FromIterable(PyObject* iterable)
         // TODO: handle error
         Py_DECREF(element);
     }
+    // TODO: handle error
 
     Py_DECREF(iter);
     return cpl;
 }
 
 //------------------------------------------------------------------------------
-// CPL Navigation
+// CodePointLine: Navigation
 
 void AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 {
@@ -250,21 +250,21 @@ void AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 
 static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
+    // use index_current, then increment
     cpl->pos_current += cpl->offsets[cpl->index_current++];
-    // ++(cpl->index_current);
 }
 
 static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
 {
     if (cpl->index_current > 0) {
-        // --(cpl->index_current);
+        // decrement index_current, then use
         // remove the offset at this new position
         cpl->pos_current -= cpl->offsets[--cpl->index_current];
     }
 }
 
 //------------------------------------------------------------------------------
-// CPL: Code Point Parsers
+// CodePointLine: Code Point Parsers
 
 static char* TRUE_LOWER = "true";
 static char* TRUE_UPPER = "TRUE";
@@ -278,9 +278,6 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
     if (cpl->offsets[cpl->index_current] < 4) {
         return 0;
     }
-    // static char* TRUE_LOWER = "true";
-    // static char* TRUE_UPPER = "TRUE";
-
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + 4; // we must have at least 4 characters
     int i = 0;
@@ -337,7 +334,7 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
 }
 
 //------------------------------------------------------------------------------
-// CPL: Exporters
+// CodePointLine: Exporters
 
 static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 {
@@ -352,6 +349,7 @@ static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA((PyArrayObject*)array);
 
     AK_CPL_CurrentReset(cpl);
+
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
         if (AK_CPL_IsTrue(cpl)) {
@@ -419,7 +417,7 @@ static inline int AK_CPG_AppendAtLine(
     if (line >= cpg->lines_count) {
         // initialize a CPL in this position
         cpg->lines[line] = AK_CPL_New();
-        ++(cpg->lines_count);
+        ++cpg->lines_count;
     }
     AK_CPL_Append(cpg->lines[line], element);
     // handle failure
@@ -483,7 +481,7 @@ PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
 
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 {
-    PyObject* list = PyList_New(0);
+    PyObject* list = PyList_New(cpg->lines_count);
     // handle error
     for (int i = 0; i < cpg->lines_count; ++i) {
 
@@ -516,10 +514,9 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
             AK_NOT_IMPLEMENTED("no handling for other dtypes yet");
         }
 
-        if (PyList_Append(list, array)) {
+        if (PyList_SetItem(list, i, array)) { // steals reference
            // handle error
         }
-        Py_DECREF(array);
     }
     return list;
 }
@@ -707,6 +704,7 @@ static PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyObject *file_like, *dtypes, *axis;
+    // load axis as long (l), avoid creation below
     if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
             &file_like,
             &dtypes,
@@ -739,13 +737,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     Py_DECREF(reader_instance);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, dtypes);
-    if (!arrays) {
-        AK_CPG_Free(cpg);
-        return NULL;
-    }
-
     AK_CPG_Free(cpg);
-    return arrays;
+    return arrays; // could be NULL
 }
 
 
