@@ -406,7 +406,10 @@ void AK_CPG_Free(AK_CodePointGrid* cpg)
 //------------------------------------------------------------------------------
 // CodePointGrid: Mutation
 
-static inline int AK_CPG_AppendAtLine(AK_CodePointGrid* cpg, int line, PyObject* element)
+static inline int AK_CPG_AppendAtLine(
+        AK_CodePointGrid* cpg,
+        int line,
+        PyObject* element)
 {
     if (line >= cpg->lines_capacity) {
         cpg->lines_capacity *= 2;
@@ -434,7 +437,6 @@ AK_CodePointGrid* AK_CPG_FromIterable(
         PyObject* iterable,
         int axis)
 {
-
     AK_CodePointGrid* cpg = AK_CPG_New();
     // expect an iterable of iterables
     PyObject *outer_iter = PyObject_GetIter(iterable);
@@ -457,8 +459,10 @@ AK_CodePointGrid* AK_CPG_FromIterable(
             AK_CPG_AppendAtLine(cpg, *count_src, inner);
             // TODO: handle error
             ++inner_count;
+            Py_DECREF(inner);
         }
         ++outer_count;
+        Py_DECREF(outer);
         Py_DECREF(inner_iter);
     }
     Py_DECREF(outer_iter);
