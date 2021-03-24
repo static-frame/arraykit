@@ -63,6 +63,8 @@
         fprintf(stderr, #msg);  \
     _AK_DEBUG_END()
 
+# define isnanj(val) (isnan(val.real) || isnan(val.imag))
+
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
 # define AK_UNLIKELY(X) __builtin_expect(!!(X), 0)
@@ -291,23 +293,31 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
     if (PyArray_IsScalar(arg, Float64)) {
         return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float64)));
     }
+    # ifdef PyFloat128ArrType_Type
     if (PyArray_IsScalar(arg, Float128)) {
         return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float128)));
     }
+    # endif
 
     // NaNj
     if (PyComplex_Check(arg)) {
-        return PyBool_FromLong(isnan(((PyComplexObject*)arg)->cval.real));
+        Py_complex val = ((PyComplexObject*)arg)->cval;
+        return PyBool_FromLong(isnanj(val));
     }
     if (PyArray_IsScalar(arg, Complex64)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Complex64).real));
+        npy_cfloat val = PyArrayScalar_VAL(arg, Complex64);
+        return PyBool_FromLong(isnanj(val));
     }
     if (PyArray_IsScalar(arg, Complex128)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Complex128).real));
+        npy_cdouble val = PyArrayScalar_VAL(arg, Complex128);
+        return PyBool_FromLong(isnanj(val));
     }
+    # ifdef PyComplex256ArrType_Type
     if (PyArray_IsScalar(arg, Complex256)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Complex256).real));
+        npy_clongdouble val = PyArrayScalar_VAL(arg, Complex256);
+        return PyBool_FromLong(isnanj(val));
     }
+    # endif
 
     // NaT - Datetime
     if (PyArray_IsScalar(arg, Datetime)) {

@@ -226,6 +226,8 @@ class IsNaElementPerf(Perf):
     NUMBER = 1000
 
     def pre(self):
+        class FloatSubclass(float): pass
+
         self.values = [
                 # Na-elements
                 np.datetime64('NaT'), np.timedelta64('NaT'), None, float('NaN'), -float('NaN'),
@@ -234,28 +236,51 @@ class IsNaElementPerf(Perf):
                 1, 'str', np.datetime64('2020-12-31'), datetime.date(2020, 12, 31), False,
         ]
 
-        # Append all the different types of nans across dtypes
-        for ctor in (float, np.float16, np.float32, np.float64, np.float128):
-            self.values.append(ctor(np.nan))
-            self.values.append(ctor(-np.nan))
+        nan = np.nan
+        nanjs = [
+                complex(nan, 0),
+                -complex(nan, 0),
+                complex(-nan, 0),
+                -complex(-nan, 0),
+                complex(0, nan),
+                -complex(0, nan),
+                complex(0, -nan),
+                -complex(0, -nan),
+        ]
 
-        for ctor in (complex, np.complex64, np.complex128, np.complex256):
-            self.values.append(ctor(complex(np.nan, 0)))
-            self.values.append(ctor(-complex(np.nan, 0)))
+        float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
+        if hasattr(np, 'float128'):
+            float_classes.append(np.float128)
+
+        cfloat_classes = [complex, np.complex64, np.complex128]
+        if hasattr(np, 'complex256'):
+            cfloat_classes.append(np.complex256)
+
+        # Append all the different types of nans across dtypes
+        for ctor in float_classes:
+            self.values.append(ctor(nan))
+            self.values.append(ctor(-nan))
+
+        for ctor in cfloat_classes:
+            for nanj in nanjs:
+                self.values.append(ctor(complex(nan, 0)))
+                self.values.append(ctor(-complex(nan, 0)))
+
 
         # Append a wide range of float values, with different precision, across types
         for val in (
                 1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
             ):
             for sign in (1, -1):
-                for ctor in (np.float16, np.float32, np.float64, float):
+                for ctor in float_classes:
                     self.values.append(ctor(sign * val))
 
-                if hasattr(np, 'float128'):
-                    self.values.append(np.float128(sign * val))
+                for ctor in cfloat_classes:
+                    self.values.append(ctor(complex(sign * val, val)))
+                    self.values.append(ctor(complex(val, sign * val)))
 
     def main(self):
-        for _ in range(20):
+        for _ in range(10):
             for val in self.values:
                 self.entry(val)
 

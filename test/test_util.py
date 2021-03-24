@@ -1,5 +1,6 @@
 import datetime
 import unittest
+import itertools
 
 import numpy as np  # type: ignore
 
@@ -175,22 +176,40 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(isna_element(np.timedelta64('NaT')))
 
         nan = np.nan
-        nanj = complex(nan, 0)
+        nanjs = [
+                complex(nan, 0),
+                -complex(nan, 0),
+                complex(-nan, 0),
+                -complex(-nan, 0),
+                complex(0, nan),
+                -complex(0, nan),
+                complex(0, -nan),
+                -complex(0, -nan),
+        ]
 
-        nnan = -np.nan
-        nnanj = -complex(nan, 0)
+        float_classes = [float, np.float16, np.float32, np.float64]
+        if hasattr(np, 'float128'):
+            float_classes.append(np.float128)
 
-        for float_class in (float, np.float16, np.float32, np.float64, np.float128):
+        cfloat_classes = [complex, np.complex64, np.complex128]
+        if hasattr(np, 'complex256'):
+            cfloat_classes.append(np.complex256)
+
+        for float_class in float_classes:
             self.assertTrue(isna_element(float_class(nan)))
-            self.assertTrue(isna_element(float_class(nnan)))
+            self.assertTrue(isna_element(float_class(-nan)))
 
-        for cfloat_class in (complex, np.complex64, np.complex128, np.complex256):
-            self.assertTrue(isna_element(cfloat_class(nanj)))
-            self.assertTrue(isna_element(cfloat_class(nnanj)))
+        for cfloat_class in cfloat_classes:
+            for nanj in nanjs:
+                self.assertTrue(isna_element(cfloat_class(nanj)))
 
         self.assertTrue(isna_element(float('NaN')))
         self.assertTrue(isna_element(-float('NaN')))
         self.assertTrue(isna_element(None))
+
+        class FloatSubclass(float): pass
+        self.assertTrue(isna_element(FloatSubclass(nan)))
+        self.assertTrue(isna_element(FloatSubclass(-nan)))
 
     def test_isna_element_false(self) -> None:
         # Test a wide range of float values, with different precision, across types
