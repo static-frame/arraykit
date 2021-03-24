@@ -263,9 +263,7 @@ class IsNaElementPerf(Perf):
 
         for ctor in cfloat_classes:
             for nanj in nanjs:
-                self.values.append(ctor(complex(nan, 0)))
-                self.values.append(ctor(-complex(nan, 0)))
-
+                self.values.append(ctor(nanj))
 
         # Append a wide range of float values, with different precision, across types
         for val in (
