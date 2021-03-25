@@ -5,12 +5,13 @@
             "owner": "gcc-problem-matcher",
             "pattern": [
                 {
-                    "regexp": "^\\s*(.*):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "regexp": "^\\s*(.*):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)(?:\\s*(\\[.*\\])\\s*)$",
                     "file": 1,
                     "line": 2,
                     "column": 3,
                     "severity": 4,
-                    "message": 5
+                    "message": 5,
+                    "code": 5
                 }
             ]
         }
