@@ -63,8 +63,6 @@
         fprintf(stderr, #msg);  \
     _AK_DEBUG_END()
 
-# define isnanj(val) (isnan(val.real) || isnan(val.imag))
-
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
 # define AK_UNLIKELY(X) __builtin_expect(!!(X), 0)
