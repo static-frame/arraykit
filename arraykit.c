@@ -77,7 +77,9 @@
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
 {
-    return;
+    if (!a) {  // TODO: Remove!
+        return 42;  // TODO: Remove!
+    }  // TODO: Remove!
     # ifdef __clang__  // TODO: Remove!
     badtype x;  // TODO: Remove!
     # endif  // TODO: Remove!
