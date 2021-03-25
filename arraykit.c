@@ -305,20 +305,20 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // NaNj
     if (PyComplex_Check(arg)) {
         Py_complex val = ((PyComplexObject*)arg)->cval;
-        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
     if (PyArray_IsScalar(arg, Complex64)) {
         npy_cfloat val = PyArrayScalar_VAL(arg, Complex64);
-        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
     if (PyArray_IsScalar(arg, Complex128)) {
         npy_cdouble val = PyArrayScalar_VAL(arg, Complex128);
-        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
     # ifdef PyComplex256ArrType_Type
     if (PyArray_IsScalar(arg, Complex256)) {
         npy_clongdouble val = PyArrayScalar_VAL(arg, Complex256);
-        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
     # endif
 
