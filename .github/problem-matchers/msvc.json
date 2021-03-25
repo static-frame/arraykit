@@ -1,5 +1,5 @@
 {
-    "__comment": "Taken from CPython!",
+    "__comment": "Taken from CPython.",
     "problemMatcher": [
         {
             "owner": "msvc-problem-matcher",
