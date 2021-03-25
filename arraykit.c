@@ -77,6 +77,9 @@
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
 {
+    if (!a) {
+        return 42;  // TODO: Remove
+    }
     // https://numpy.org/devdocs/reference/c-api/array.html#array-flags
     if (PyArray_FLAGS(a) & NPY_ARRAY_WRITEABLE) {
         if ((a = (PyArrayObject *)PyArray_NewCopy(a, NPY_ANYORDER))) {
