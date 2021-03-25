@@ -278,6 +278,11 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 static PyObject *
 isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
+    // None
+    if (arg == Py_None) {
+        Py_RETURN_TRUE;
+    }
+
     // NaN
     if (PyFloat_Check(arg)) {
         return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
@@ -300,20 +305,20 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // NaNj
     if (PyComplex_Check(arg)) {
         Py_complex val = ((PyComplexObject*)arg)->cval;
-        return PyBool_FromLong(isnanj(val));
+        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
     }
     if (PyArray_IsScalar(arg, Complex64)) {
         npy_cfloat val = PyArrayScalar_VAL(arg, Complex64);
-        return PyBool_FromLong(isnanj(val));
+        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
     }
     if (PyArray_IsScalar(arg, Complex128)) {
         npy_cdouble val = PyArrayScalar_VAL(arg, Complex128);
-        return PyBool_FromLong(isnanj(val));
+        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
     }
     # ifdef PyComplex256ArrType_Type
     if (PyArray_IsScalar(arg, Complex256)) {
         npy_clongdouble val = PyArrayScalar_VAL(arg, Complex256);
-        return PyBool_FromLong(isnanj(val));
+        return PyBool_FromLong((isnan(val.real) || isnan(val.imag)));
     }
     # endif
 
