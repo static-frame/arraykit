@@ -327,8 +327,7 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
         return PyBool_FromLong(PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT);
     }
 
-    // None
-    return PyBool_FromLong(arg == Py_None);
+    Py_RETURN_FALSE;
 }
 
 //------------------------------------------------------------------------------
