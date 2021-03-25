@@ -37,9 +37,9 @@ jobs:
         if: matrix.os == 'Ubuntu' && github.event_name == 'release' && github.event.action == 'published'
         with:
           platforms: all
-      - run: echo "::add-matcher::.github/problem-matchers/gcc.json"
+      - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
         if: matrix.os == 'Ubuntu'
-      - run: echo "::add-matcher::.github/problem-matchers/msvc.json"
+      - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'Windows'
       - uses: joerick/cibuildwheel@v1.9.0
         with:
