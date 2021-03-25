@@ -77,9 +77,9 @@
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
 {
-    int __VA_ARGS__ = 42;  // TODO: Remove!
-    # ifdef _MSC_VER  // TODO: Remove!
-    x;  // TODO: Remove!
+    return;
+    # ifdef __clang__  // TODO: Remove!
+    badtype x;  // TODO: Remove!
     # endif  // TODO: Remove!
     // https://numpy.org/devdocs/reference/c-api/array.html#array-flags
     if (PyArray_FLAGS(a) & NPY_ARRAY_WRITEABLE) {
