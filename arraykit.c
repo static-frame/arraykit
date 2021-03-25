@@ -80,9 +80,6 @@ AK_ImmutableFilter(PyArrayObject *a)
     if (!a) {  // TODO: Remove!
         return 42;  // TODO: Remove!
     }  // TODO: Remove!
-    # ifdef __clang__  // TODO: Remove!
-    badtype x;  // TODO: Remove!
-    # endif  // TODO: Remove!
     // https://numpy.org/devdocs/reference/c-api/array.html#array-flags
     if (PyArray_FLAGS(a) & NPY_ARRAY_WRITEABLE) {
         if ((a = (PyArrayObject *)PyArray_NewCopy(a, NPY_ANYORDER))) {
