@@ -1,5 +1,4 @@
 {
-    "__comment": "Taken from CPython, with modifications.",
     "problemMatcher": [
         {
             "owner": "msvc-problem-matcher",
