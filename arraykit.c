@@ -271,6 +271,144 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
+// rolling
+
+static int
+assign_into_slice_from_slice(PyObject *dest, PyObject *src, PyObject *dest_slice, PyObject *src_slice)
+{
+    PyObject* shifted_src = PyObject_GetItem((PyObject*)src, src_slice);
+    if (!shifted_src) {
+        return -1;
+    }
+
+    int success = PyObject_SetItem(dest, dest_slice, shifted_src);
+    Py_DECREF(shifted_src);
+    return success;
+}
+
+static PyObject *
+roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    /* Algorithm.
+
+        size = len(array)
+        if size <= 1:
+            return array.copy()
+
+        shift = shift % size
+        if shift == 0:
+            return array.copy()
+
+        post = np.empty(size, dtype=array.dtype)
+        post[0:shift] = array[-shift:]
+        post[shift:] = array[0:-shift]
+        return post
+    */
+    PyArrayObject *array;
+    int shift;
+
+    if (!PyArg_ParseTuple(args, "O!i:roll_1d", &PyArray_Type, &array, &shift))
+    {
+        return NULL;
+    }
+
+    // Must be signed in order for modulo to work properly for negative shift values
+    int size = (int)PyArray_SIZE(array);
+
+    uint8_t is_empty = (size == 0);
+
+    if (!is_empty) {
+        shift = shift % size;
+    }
+
+    if (is_empty || (shift == 0)) {
+        PyObject* copy = PyArray_Copy(array);
+        if (!copy) {
+            return NULL;
+        }
+        return copy;
+    }
+
+    // Create an empty array
+    PyArray_Descr* dtype = PyArray_DESCR(array);
+    Py_INCREF(dtype); // PyArray_Empty steals a reference to dtype
+
+    PyObject* post = PyArray_Empty(
+                PyArray_NDIM(array),
+                PyArray_DIMS(array),
+                dtype,
+                0);
+    if (!post) {
+        return NULL;
+    }
+
+    // Build integers
+    PyObject* zero = PyLong_FromLong(0);
+    PyObject* pos_shift = PyLong_FromLong(shift);
+    PyObject* neg_shift = PyLong_FromLong(-shift);
+    if (!zero || !pos_shift || !neg_shift) {
+        goto integer_build_failure;
+    }
+
+    // Build slices
+    PyObject* first_dest_slice = PySlice_New(zero, pos_shift, Py_None);     // [0:shift]
+    PyObject* first_src_slice = PySlice_New(neg_shift, Py_None, Py_None);   // [-shift:]
+    PyObject* second_dest_slice = PySlice_New(pos_shift, Py_None, Py_None); // [shift:]
+    PyObject* second_src_slice = PySlice_New(zero, neg_shift, Py_None);     // [0:-shift]
+    Py_DECREF(zero);
+    Py_DECREF(pos_shift);
+    Py_DECREF(neg_shift);
+    if (!first_dest_slice || !first_src_slice || !second_dest_slice || !second_src_slice) {
+        goto slice_build_failure;
+    }
+
+    int success;
+
+    // First Assign
+    success = assign_into_slice_from_slice(post, (PyObject*)array, first_dest_slice, first_src_slice);
+    Py_DECREF(first_dest_slice);
+    Py_DECREF(first_src_slice);
+    if (success == -1) {
+        Py_DECREF(second_dest_slice);
+        Py_DECREF(second_src_slice);
+        goto failure;
+    }
+
+    // First Assign
+    success = assign_into_slice_from_slice(post, (PyObject*)array, second_dest_slice, second_src_slice);
+    Py_DECREF(second_src_slice);
+    Py_DECREF(second_dest_slice);
+    if (success == -1) {
+        goto failure;
+    }
+
+    return post;
+
+// Handled potentially leaked integer objects
+integer_build_failure:
+    Py_XDECREF(zero);
+    Py_XDECREF(pos_shift);
+    Py_XDECREF(neg_shift);
+    goto failure;
+
+// Handled potentially leaked slice objects
+slice_build_failure:
+    // Integers objects have all been cleaned up.
+    Py_XDECREF(first_dest_slice);
+    Py_XDECREF(first_src_slice);
+    Py_XDECREF(second_dest_slice);
+    Py_XDECREF(second_src_slice);
+    goto failure;
+
+// Handle final object that will always exist at this point.
+failure:
+    // Integers objects have all been cleaned up.
+    // Slice objects have all been cleaned up.
+    Py_DECREF(post);
+    return NULL;
+}
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -546,6 +684,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"roll_1d", roll_1d, METH_VARARGS, NULL},
     {NULL},
 };
 

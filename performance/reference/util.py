@@ -181,3 +181,63 @@ def array_deepcopy(
     if memo is not None:
         memo[ident] = post
     return post
+
+
+def roll_1d(array: np.ndarray, shift: int) -> np.ndarray:
+    '''
+    Specialized form of np.roll that, by focusing on the 1D solution, is at least four times faster.
+    '''
+    size = len(array)
+    if size <= 1:
+        return array.copy()
+
+    # result will be positive
+    shift = shift % size
+    if shift == 0:
+        return array.copy()
+
+    post = np.empty(size, dtype=array.dtype)
+
+    post[0:shift] = array[-shift:]
+    post[shift:] = array[0:-shift]
+    return post
+
+
+def roll_2d(array: np.ndarray,
+            shift: int,
+            axis: int
+            ) -> np.ndarray:
+    '''
+    Specialized form of np.roll that, by focusing on the 2D solution
+    '''
+    post = np.empty(array.shape, dtype=array.dtype)
+
+    if axis == 0: # roll rows
+        size = array.shape[0]
+        if size <= 1:
+            return array.copy()
+
+        # result will be positive
+        shift = shift % size
+        if shift == 0:
+            return array.copy()
+
+        post[0:shift, :] = array[-shift:, :]
+        post[shift:, :] = array[0:-shift, :]
+        return post
+
+    elif axis == 1: # roll columns
+        size = array.shape[1]
+        if size <= 1:
+            return array.copy()
+
+        # result will be positive
+        shift = shift % size
+        if shift == 0:
+            return array.copy()
+
+        post[:, 0:shift] = array[:, -shift:]
+        post[:, shift:] = array[:, 0:-shift]
+        return post
+
+    raise NotImplementedError()
