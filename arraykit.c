@@ -303,16 +303,10 @@ AK_isin_array_dtype_use_np(PyArrayObject *array, PyArrayObject *other, int assum
 
     result = PyObject_Call(func, args, kwarg);
     Py_DECREF(func);
-    if (!result) {
-        goto failure;
-    }
-
-    if (0) {
-    failure:
-        // These will always exist.
-        Py_DECREF(args);
-        Py_DECREF(kwarg);
-    }
+failure:
+    // These will always exist.
+    Py_DECREF(args);
+    Py_DECREF(kwarg);
 
     return result;
 }
