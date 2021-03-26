@@ -15,6 +15,7 @@ from performance.reference.util import column_1d_filter as column_1d_filter_ref
 from performance.reference.util import row_1d_filter as row_1d_filter_ref
 from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
+from performance.reference.util import roll_1d as roll_1d_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -27,6 +28,7 @@ from arraykit import column_1d_filter as column_1d_filter_ak
 from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
+from arraykit import roll_1d as roll_1d_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -219,6 +221,26 @@ class ArrayGOPerfAK(ArrayGOPerf):
 
 class ArrayGOPerfREF(ArrayGOPerf):
     entry = staticmethod(ArrayGOREF)
+
+
+#-------------------------------------------------------------------------------
+class Roll1d(Perf):
+    NUMBER = 10
+    SIZE = 20_000
+
+    def pre(self):
+        self.array = np.arange(self.SIZE)
+
+    def main(self):
+        for i in range(-(self.SIZE+1), self.SIZE+1):
+            self.entry(self.array, i)
+
+
+class Roll1dAK(Roll1d):
+    entry = staticmethod(roll_1d_ak)
+
+class Roll1dREF(Roll1d):
+    entry = staticmethod(roll_1d_ref)
 
 
 #-------------------------------------------------------------------------------
