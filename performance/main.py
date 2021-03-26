@@ -38,7 +38,7 @@ class Perf:
 #-------------------------------------------------------------------------------
 class DelimitedToArraysPandas(Perf):
     NUMBER = 40
-    FUNCTIONS = ('bool_uniform', )
+    FUNCTIONS = ('bool_uniform', 'int_uniform')
 
     def pre(self):
         records_int = [','.join(str(x) for x in range(1000))] * 1000
@@ -56,9 +56,9 @@ class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
         self.dtypes_bool = [bool] * 1000
         self.axis = 1
 
-    # def int_uniform(self):
-    #     self.file_like_int.seek(0)
-    #     _ = self.entry(self.file_like_int, self.dtypes_int, self.axis)
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, self.dtypes_int, self.axis)
 
     def bool_uniform(self):
         self.file_like_bool.seek(0)
@@ -74,9 +74,9 @@ class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
         self.dtypes_int = {i: int for i in range(1000)}
         self.dtypes_bool = {i: bool for i in range(1000)}
 
-    # def int_uniform(self):
-    #     self.file_like_int.seek(0)
-    #     _ = self.entry(self.file_like_int, dtype=self.dtypes_int)
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtype=self.dtypes_int)
 
     def bool_uniform(self):
         self.file_like_bool.seek(0)

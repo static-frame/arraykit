@@ -35,23 +35,37 @@ class TestUnit(unittest.TestCase):
     #     self.assertEqual(a3.dtype, np.dtype('O'))
 
 
-    def test_sequence_str_to_array_1d_b1(self) -> None:
+    def test_sequence_str_to_array_1d_bool_1(self) -> None:
         a1 = iterable_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
         self.assertEqual(a1.tolist(), [True, False, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
-
-    def test_sequence_str_to_array_1d_b2(self) -> None:
+    def test_sequence_str_to_array_1d_bool_2(self) -> None:
         a1 = iterable_str_to_array_1d(['true', 'True', 'TRUE', 't'], bool)
         self.assertEqual(a1.tolist(), [True, True, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
-    def test_sequence_str_to_array_1d_b3(self) -> None:
+    def test_sequence_str_to_array_1d_bool_3(self) -> None:
         a1 = iterable_str_to_array_1d(['sd', 'er', 'TRUE', 'twerwersdfsd'], bool)
         self.assertEqual(a1.tolist(), [False, False, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
+        self.assertFalse(a1.flags.writeable)
+
+
+    def test_sequence_str_to_array_1d_int_1(self) -> None:
+        # NOTE: floats will be truncated
+        a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], int)
+        self.assertEqual(a1.tolist(), [23, -54, 1000, 23])
+        self.assertEqual(a1.dtype, np.dtype(int))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_sequence_str_to_array_1d_int_2(self) -> None:
+        # NOTE: empty strings get converted to zero
+        a1 = iterable_str_to_array_1d(['23', '', '  -123000', '23'], int)
+        self.assertEqual(a1.tolist(), [23, 0, -123000, 23])
+        self.assertEqual(a1.dtype, np.dtype(int))
         self.assertFalse(a1.flags.writeable)
 
 
@@ -136,6 +150,22 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 40)
         self.assertTrue(all(len(e) == 3 for e in post0))
+
+
+    def test_delimited_to_arrays_c(self) -> None:
+
+        msg = [
+            ','.join(['True', '10'] * 20),
+            ','.join(['True', '-2000'] * 20),
+            ','.join(['False', '82342343'] * 20),
+        ]
+
+        dtypes0 = [bool, int] * 20
+        post0 = delimited_to_arrays(msg, dtypes0, 1)
+        self.assertTrue(isinstance(post0, list))
+        self.assertEqual(len(post0), 40)
+        self.assertTrue(all(len(e) == 3 for e in post0))
+
 
 
 

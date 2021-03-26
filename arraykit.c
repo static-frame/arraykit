@@ -1,5 +1,6 @@
 # include "Python.h"
 # include "structmember.h"
+# include "limits.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -254,14 +255,32 @@ static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
     cpl->pos_current += cpl->offsets[cpl->index_current++];
 }
 
-static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
+// static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
+// {
+//     if (cpl->index_current > 0) {
+//         // decrement index_current, then use
+//         // remove the offset at this new position
+//         cpl->pos_current -= cpl->offsets[--cpl->index_current];
+//     }
+// }
+
+//------------------------------------------------------------------------------
+// CodePointLine: Element exporters
+
+// Return a null-terminated char array found at the curent position; this will need to be freed
+char* AK_CPL_ToNewChars(AK_CodePointLine* cpl)
 {
-    if (cpl->index_current > 0) {
-        // decrement index_current, then use
-        // remove the offset at this new position
-        cpl->pos_current -= cpl->offsets[--cpl->index_current];
+    int points = cpl->offsets[cpl->index_current];
+    char* post = (char*)PyMem_Malloc(sizeof(char) * (points + 1));
+    // TODO: mask values before insertion
+    Py_UCS4 *p = cpl->pos_current;
+    for (int i=0; i<points; ++i) {
+        post[i] = *p++; // need to masks to size of char
     }
+    post[points] = '\0';
+    return post;
 }
+
 
 //------------------------------------------------------------------------------
 // CodePointLine: Code Point Parsers
@@ -270,6 +289,139 @@ static char* TRUE_LOWER = "true";
 static char* TRUE_UPPER = "TRUE";
 static char* FALSE_LOWER = "false";
 static char* FALSE_UPPER = "FALSE";
+
+#define isspace_ascii(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
+#define isdigit_ascii(c) (((unsigned)(c) - '0') < 10u)
+
+#define ERROR_NO_DIGITS 1
+#define ERROR_OVERFLOW 2
+#define ERROR_INVALID_CHARS 3
+
+
+// Extended from pandas/_libs/src/parser/tokenizer.c
+static inline int64_t UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+{
+    char tsep = '\0'; // thousands seperator; if null processing is skipped
+    int64_t int_min = LONG_LONG_MIN;
+    int64_t int_max = LONG_LONG_MAX;
+    Py_UCS4 *p = p_item;
+    int isneg = 0;
+    int64_t number = 0;
+    int d;
+    // Skip leading spaces.
+    while (isspace_ascii(*p)) {
+        ++p;
+        if (p >= end) {return number;}
+    }
+    // Handle sign.
+    if (*p == '-') {
+        isneg = 1;
+        ++p;
+    } else if (*p == '+') {
+        ++p;
+    }
+    if (p >= end) {return number;}
+
+    // Check that there is a first digit.
+    if (!isdigit_ascii(*p)) {
+        *error = ERROR_NO_DIGITS;
+        return 0;
+    }
+    if (isneg) {
+        // If number is greater than pre_min, at least one more digit can be processed without overflowing.
+        int dig_pre_min = -(int_min % 10);
+        int64_t pre_min = int_min / 10;
+        d = *p;
+        if (tsep != '\0') {
+            while (1) {
+                if (d == tsep) {
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                    continue;
+                } else if (!isdigit_ascii(d)) {
+                    break;
+                }
+                if ((number > pre_min) ||
+                    ((number == pre_min) && (d - '0' <= dig_pre_min))) {
+                    number = number * 10 - (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        } else {
+            while (isdigit_ascii(d)) {
+                if ((number > pre_min) ||
+                    ((number == pre_min) && (d - '0' <= dig_pre_min))) {
+                    number = number * 10 - (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        }
+    } else {
+        // If number is less than pre_max, at least one more digit can be processed without overflowing.
+        int64_t pre_max = int_max / 10;
+        int dig_pre_max = int_max % 10;
+        d = *p;
+        if (tsep != '\0') {
+            while (1) {
+                if (d == tsep) {
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                    continue;
+                } else if (!isdigit_ascii(d)) {
+                    break;
+                }
+                if ((number < pre_max) ||
+                    ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                    number = number * 10 + (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        } else {
+            while (isdigit_ascii(d)) {
+                if ((number < pre_max) ||
+                    ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                    number = number * 10 + (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        }
+    }
+    // Skip trailing spaces.
+    // while (isspace_ascii(*p)) {
+    //     ++p;
+    //     if (p >= end) {return number;}
+    // }
+    // // Did we use up all the characters?
+    // if (*p) {
+    //     *error = ERROR_INVALID_CHARS;
+    //     return 0;
+    // }
+    *error = 0;
+    return number;
+}
+
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 // NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
@@ -333,6 +485,21 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
     return -1;
 }
 
+static inline int64_t AK_CPL_ParseLong(AK_CodePointLine* cpl)
+{
+    // char* c = AK_CPL_ToNewChars(cpl);
+    // long v = PyOS_strtol(c, NULL, 10);
+    // PyMem_Free(c);
+    // return v;
+
+    Py_UCS4 *p = cpl->pos_current;
+    Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
+    int error;
+    int64_t v = UCS4_to_int64(p, end, &error);
+    return v;
+
+}
+
 //------------------------------------------------------------------------------
 // CodePointLine: Exporters
 
@@ -360,6 +527,32 @@ static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
+
+
+static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
+{
+    Py_ssize_t count = cpl->offsets_count;
+    npy_intp dims[] = {count};
+    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_LONGLONG);
+    // TODO: check error
+
+    // assuming this is contiguous
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // TODO: check error
+
+    npy_longlong *array_buffer = (npy_longlong*)PyArray_DATA((PyArrayObject*)array);
+
+    AK_CPL_CurrentReset(cpl);
+
+    for (int i=0; i < count; ++i) {
+        array_buffer[i] = AK_CPL_ParseLong(cpl);
+        AK_CPL_CurrentAdvance(cpl);
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
+
 
 // Returns a new reference.
 PyObject* AK_CPL_ToUnicode(AK_CodePointLine* cpl)
@@ -506,6 +699,9 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
         }
         else if (PyDataType_ISBOOL(dtype)) {
             array = AK_CPL_ToArrayBoolean(cpg->lines[i]);
+        }
+        else if (PyDataType_ISINTEGER(dtype)) {
+            array = AK_CPL_ToArrayLong(cpg->lines[i]);
         }
         else if (PyDataType_ISCOMPLEX(dtype)) {
             AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
@@ -683,6 +879,10 @@ AK_IterableStrToArray1D(
         }
         else if (PyDataType_ISBOOL(dtype)) {
             array = AK_CPL_ToArrayBoolean(cpl);
+            // TODO: handle error
+        }
+        else if (PyDataType_ISINTEGER(dtype)) {
+            array = AK_CPL_ToArrayLong(cpl);
             // TODO: handle error
         }
         else {
