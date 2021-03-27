@@ -1,6 +1,7 @@
 # include "Python.h"
 # include "structmember.h"
 # include "limits.h"
+# include "stdbool.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -718,6 +719,936 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 }
 
 
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// CSV from CPython
+
+// typedef struct {
+//     PyObject *error_obj;   /* CSV exception */
+//     PyObject *dialects;   /* Dialect registry */
+//     PyTypeObject *dialect_type;
+//     PyTypeObject *reader_type;
+//     PyTypeObject *writer_type;
+//     long field_limit;   /* max parsed field size */
+// } _csvstate;
+
+typedef enum {
+    START_RECORD, START_FIELD, ESCAPED_CHAR, IN_FIELD,
+    IN_QUOTED_FIELD, ESCAPE_IN_QUOTED_FIELD, QUOTE_IN_QUOTED_FIELD,
+    EAT_CRNL,AFTER_ESCAPED_CRNL
+} ParserState;
+
+typedef enum {
+    QUOTE_MINIMAL, QUOTE_ALL, QUOTE_NONNUMERIC, QUOTE_NONE
+} QuoteStyle;
+
+typedef struct {
+    QuoteStyle style;
+    const char *name;
+} StyleDesc;
+
+static const StyleDesc quote_styles[] = {
+    { QUOTE_MINIMAL,    "QUOTE_MINIMAL" },
+    { QUOTE_ALL,        "QUOTE_ALL" },
+    { QUOTE_NONNUMERIC, "QUOTE_NONNUMERIC" },
+    { QUOTE_NONE,       "QUOTE_NONE" },
+    { 0 }
+};
+
+typedef struct {
+    PyObject_HEAD
+
+    char doublequote;           /* is " represented by ""? */
+    char skipinitialspace;      /* ignore spaces following delimiter? */
+    char strict;                /* raise exception on bad CSV */
+    int quoting;                /* style of quoting to write */
+    Py_UCS4 delimiter;          /* field separator */
+    Py_UCS4 quotechar;          /* quote character */
+    Py_UCS4 escapechar;         /* escape character */
+    PyObject *lineterminator;   /* string to write between records */
+
+} DialectObj;
+
+typedef struct {
+    PyObject_HEAD
+
+    PyObject *input_iter;   /* iterate over this for input lines */
+
+    DialectObj *dialect;    /* parsing dialect */
+
+    PyObject *fields;           /* field list for current record */
+    ParserState state;          /* current CSV parse state */
+    Py_UCS4 *field;             /* temporary buffer */
+    Py_ssize_t field_size;      /* size of allocated buffer */
+    Py_ssize_t field_len;       /* length of current field */
+    int numeric_field;          /* treat field as numeric */
+    unsigned long line_num;     /* Source-file line number */
+} ReaderObj;
+
+// dialect
+
+static PyObject *
+get_nullchar_as_None(Py_UCS4 c)
+{
+    if (c == '\0') {
+        Py_RETURN_NONE;
+    }
+    else
+        return PyUnicode_FromOrdinal(c);
+}
+
+static PyObject *
+Dialect_get_lineterminator(DialectObj *self, void *Py_UNUSED(ignored))
+{
+    Py_XINCREF(self->lineterminator);
+    return self->lineterminator;
+}
+
+static PyObject *
+Dialect_get_delimiter(DialectObj *self, void *Py_UNUSED(ignored))
+{
+    return get_nullchar_as_None(self->delimiter);
+}
+
+static PyObject *
+Dialect_get_escapechar(DialectObj *self, void *Py_UNUSED(ignored))
+{
+    return get_nullchar_as_None(self->escapechar);
+}
+
+static PyObject *
+Dialect_get_quotechar(DialectObj *self, void *Py_UNUSED(ignored))
+{
+    return get_nullchar_as_None(self->quotechar);
+}
+
+static PyObject *
+Dialect_get_quoting(DialectObj *self, void *Py_UNUSED(ignored))
+{
+    return PyLong_FromLong(self->quoting);
+}
+
+
+
+static int
+_set_bool(const char *name, char *target, PyObject *src, bool dflt)
+{
+    if (src == NULL)
+        *target = dflt;
+    else {
+        int b = PyObject_IsTrue(src);
+        if (b < 0)
+            return -1;
+        *target = (char)b;
+    }
+    return 0;
+}
+
+static int
+_set_int(const char *name, int *target, PyObject *src, int dflt)
+{
+    if (src == NULL)
+        *target = dflt;
+    else {
+        int value;
+        if (!PyLong_CheckExact(src)) {
+            PyErr_Format(PyExc_TypeError,
+                         "\"%s\" must be an integer", name);
+            return -1;
+        }
+        value = _PyLong_AsInt(src);
+        if (value == -1 && PyErr_Occurred()) {
+            return -1;
+        }
+        *target = value;
+    }
+    return 0;
+}
+
+static int
+_set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 dflt)
+{
+    if (src == NULL)
+        *target = dflt;
+    else {
+        *target = '\0';
+        if (src != Py_None) {
+            Py_ssize_t len;
+            if (!PyUnicode_Check(src)) {
+                PyErr_Format(PyExc_TypeError,
+                    "\"%s\" must be string, not %.200s", name,
+                    Py_TYPE(src)->tp_name);
+                return -1;
+            }
+            len = PyUnicode_GetLength(src);
+            if (len > 1) {
+                PyErr_Format(PyExc_TypeError,
+                    "\"%s\" must be a 1-character string",
+                    name);
+                return -1;
+            }
+            /* PyUnicode_READY() is called in PyUnicode_GetLength() */
+            if (len > 0)
+                *target = PyUnicode_READ_CHAR(src, 0);
+        }
+    }
+    return 0;
+}
+
+static int
+_set_str(const char *name, PyObject **target, PyObject *src, const char *dflt)
+{
+    if (src == NULL)
+        *target = PyUnicode_DecodeASCII(dflt, strlen(dflt), NULL);
+    else {
+        if (src == Py_None)
+            *target = NULL;
+        else if (!PyUnicode_Check(src)) {
+            PyErr_Format(PyExc_TypeError,
+                         "\"%s\" must be a string", name);
+            return -1;
+        }
+        else {
+            if (PyUnicode_READY(src) == -1)
+                return -1;
+            Py_INCREF(src);
+            Py_XSETREF(*target, src);
+        }
+    }
+    return 0;
+}
+
+static int
+dialect_check_quoting(int quoting)
+{
+    const StyleDesc *qs;
+
+    for (qs = quote_styles; qs->name; qs++) {
+        if ((int)qs->style == quoting)
+            return 0;
+    }
+    PyErr_Format(PyExc_TypeError, "bad \"quoting\" value");
+    return -1;
+}
+
+
+#define D_OFF(x) offsetof(DialectObj, x)
+
+static struct PyMemberDef Dialect_memberlist[] = {
+    { "skipinitialspace",   T_BOOL, D_OFF(skipinitialspace), READONLY },
+    { "doublequote",        T_BOOL, D_OFF(doublequote), READONLY },
+    { "strict",             T_BOOL, D_OFF(strict), READONLY },
+    { NULL }
+};
+
+static PyGetSetDef Dialect_getsetlist[] = {
+    { "delimiter",          (getter)Dialect_get_delimiter},
+    { "escapechar",             (getter)Dialect_get_escapechar},
+    { "lineterminator",         (getter)Dialect_get_lineterminator},
+    { "quotechar",              (getter)Dialect_get_quotechar},
+    { "quoting",                (getter)Dialect_get_quoting},
+    {NULL},
+};
+
+static void
+Dialect_dealloc(DialectObj *self)
+{
+    PyTypeObject *tp = Py_TYPE(self);
+    Py_CLEAR(self->lineterminator);
+    tp->tp_free((PyObject *)self);
+    Py_DECREF(tp);
+}
+
+static void
+Dialect_finalize(DialectObj *self)
+{
+    Py_CLEAR(self->lineterminator);
+}
+
+static char *dialect_kws[] = {
+    "dialect",
+    "delimiter",
+    "doublequote",
+    "escapechar",
+    "lineterminator",
+    "quotechar",
+    "quoting",
+    "skipinitialspace",
+    "strict",
+    NULL
+};
+
+
+// static _csvstate *
+// _csv_state_from_type(PyTypeObject *type, const char *name)
+// {
+//     PyObject *module = _PyType_GetModuleByDef(type, &_csvmodule);
+//     if (module == NULL) {
+//         return NULL;
+//     }
+//     _csvstate *module_state = PyModule_GetState(module);
+//     if (module_state == NULL) {
+//         PyErr_Format(PyExc_SystemError,
+//                      "%s: No _csv module state found", name);
+//         return NULL;
+//     }
+//     return module_state;
+// }
+
+static PyObject *
+dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+{
+    DialectObj *self;
+    PyObject *ret = NULL;
+
+    PyObject *dialect = NULL; // TODO: remove this argument
+    PyObject *delimiter = NULL;
+    PyObject *doublequote = NULL;
+    PyObject *escapechar = NULL;
+    PyObject *lineterminator = NULL;
+    PyObject *quotechar = NULL;
+    PyObject *quoting = NULL;
+    PyObject *skipinitialspace = NULL;
+    PyObject *strict = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "|OOOOOOOOO", dialect_kws,
+                                     &dialect,
+                                     &delimiter,
+                                     &doublequote,
+                                     &escapechar,
+                                     &lineterminator,
+                                     &quotechar,
+                                     &quoting,
+                                     &skipinitialspace,
+                                     &strict))
+        return NULL;
+
+    // _csvstate *module_state = _csv_state_from_type(type, "dialect_new");
+    // if (module_state == NULL) {
+    //     return NULL;
+    // }
+
+    if (dialect != NULL) {
+        AK_NOT_IMPLEMENTED("dialect must be None");
+    }
+
+    // if (dialect != NULL) {
+    //     // if (PyUnicode_Check(dialect)) {
+    //     //     dialect = get_dialect_from_registry(dialect, module_state);
+    //     //     if (dialect == NULL)
+    //     //         return NULL;
+    //     // }
+    //     // else
+    //     Py_INCREF(dialect);
+    //     /* Can we reuse this instance? */
+    //     if (PyObject_TypeCheck(dialect, module_state->dialect_type) &&
+    //         delimiter == NULL &&
+    //         doublequote == NULL &&
+    //         escapechar == NULL &&
+    //         lineterminator == NULL &&
+    //         quotechar == NULL &&
+    //         quoting == NULL &&
+    //         skipinitialspace == NULL &&
+    //         strict == NULL)
+    //         return dialect;
+    // }
+
+    self = (DialectObj *)type->tp_alloc(type, 0);
+    if (self == NULL) {
+        Py_CLEAR(dialect);
+        return NULL;
+    }
+    self->lineterminator = NULL;
+
+    Py_XINCREF(delimiter);
+    Py_XINCREF(doublequote);
+    Py_XINCREF(escapechar);
+    Py_XINCREF(lineterminator);
+    Py_XINCREF(quotechar);
+    Py_XINCREF(quoting);
+    Py_XINCREF(skipinitialspace);
+    Py_XINCREF(strict);
+    if (dialect != NULL) {
+#define DIALECT_GETATTR(v, n) \
+        if (v == NULL) \
+            v = PyObject_GetAttrString(dialect, n)
+        DIALECT_GETATTR(delimiter, "delimiter");
+        DIALECT_GETATTR(doublequote, "doublequote");
+        DIALECT_GETATTR(escapechar, "escapechar");
+        DIALECT_GETATTR(lineterminator, "lineterminator");
+        DIALECT_GETATTR(quotechar, "quotechar");
+        DIALECT_GETATTR(quoting, "quoting");
+        DIALECT_GETATTR(skipinitialspace, "skipinitialspace");
+        DIALECT_GETATTR(strict, "strict");
+        PyErr_Clear();
+    }
+
+    /* check types and convert to C values */
+#define DIASET(meth, name, target, src, dflt) \
+    if (meth(name, target, src, dflt)) \
+        goto err
+    DIASET(_set_char, "delimiter", &self->delimiter, delimiter, ',');
+    DIASET(_set_bool, "doublequote", &self->doublequote, doublequote, true);
+    DIASET(_set_char, "escapechar", &self->escapechar, escapechar, 0);
+    DIASET(_set_str, "lineterminator", &self->lineterminator, lineterminator, "\r\n");
+    DIASET(_set_char, "quotechar", &self->quotechar, quotechar, '"');
+    DIASET(_set_int, "quoting", &self->quoting, quoting, QUOTE_MINIMAL);
+    DIASET(_set_bool, "skipinitialspace", &self->skipinitialspace, skipinitialspace, false);
+    DIASET(_set_bool, "strict", &self->strict, strict, false);
+
+    /* validate options */
+    if (dialect_check_quoting(self->quoting))
+        goto err;
+    if (self->delimiter == 0) {
+        PyErr_SetString(PyExc_TypeError,
+                        "\"delimiter\" must be a 1-character string");
+        goto err;
+    }
+    if (quotechar == Py_None && quoting == NULL)
+        self->quoting = QUOTE_NONE;
+    if (self->quoting != QUOTE_NONE && self->quotechar == 0) {
+        PyErr_SetString(PyExc_TypeError,
+                        "quotechar must be set if quoting enabled");
+        goto err;
+    }
+    if (self->lineterminator == 0) {
+        PyErr_SetString(PyExc_TypeError, "lineterminator must be set");
+        goto err;
+    }
+
+    ret = (PyObject *)self;
+    Py_INCREF(self);
+err:
+    Py_CLEAR(self);
+    Py_CLEAR(dialect);
+    Py_CLEAR(delimiter);
+    Py_CLEAR(doublequote);
+    Py_CLEAR(escapechar);
+    Py_CLEAR(lineterminator);
+    Py_CLEAR(quotechar);
+    Py_CLEAR(quoting);
+    Py_CLEAR(skipinitialspace);
+    Py_CLEAR(strict);
+    return ret;
+}
+
+/* Since dialect is now a heap type, it inherits pickling method for
+ * protocol 0 and 1 from object, therefore it needs to be overriden */
+
+PyDoc_STRVAR(dialect_reduce_doc, "raises an exception to avoid pickling");
+
+static PyObject *
+Dialect_reduce(PyObject *self, PyObject *args) {
+    PyErr_Format(PyExc_TypeError,
+        "cannot pickle '%.100s' instances", _PyType_Name(Py_TYPE(self)));
+    return NULL;
+}
+
+static struct PyMethodDef dialect_methods[] = {
+    {"__reduce__", Dialect_reduce, METH_VARARGS, dialect_reduce_doc},
+    {"__reduce_ex__", Dialect_reduce, METH_VARARGS, dialect_reduce_doc},
+    {NULL, NULL}
+};
+
+// PyDoc_STRVAR(Dialect_Type_doc,
+// "CSV dialect\n"
+// "\n"
+// "The Dialect type records CSV parsing and generation options.\n");
+
+static PyType_Slot Dialect_Type_slots[] = {
+    // {Py_tp_doc, (char*)Dialect_Type_doc},
+    {Py_tp_members, Dialect_memberlist},
+    {Py_tp_getset, Dialect_getsetlist},
+    {Py_tp_new, dialect_new},
+    {Py_tp_methods, dialect_methods},
+    {Py_tp_finalize, Dialect_finalize},
+    {Py_tp_dealloc, Dialect_dealloc},
+    {0, NULL}
+};
+
+PyType_Spec Dialect_Type_spec = {
+    .name = "Dialect",
+    .basicsize = sizeof(DialectObj),
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .slots = Dialect_Type_slots,
+};
+
+
+/*
+ * Return an instance of the dialect type, given a Python instance or kwarg
+ * description of the dialect
+ */
+// static PyObject *
+// _call_dialect(_csvstate *module_state, PyObject *dialect_inst, PyObject *kwargs)
+// {
+//     PyObject *type = (PyObject *)module_state->dialect_type;
+//     if (dialect_inst) {
+//         return _PyObject_FastCallDict(type, &dialect_inst, 1, kwargs);
+//     }
+//     else {
+//         return _PyObject_FastCallDict(type, NULL, 0, kwargs);
+//     }
+// }
+
+// reader
+
+static int
+parse_save_field(ReaderObj *self)
+{
+    PyObject *field;
+
+    field = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
+                                      (void *) self->field, self->field_len);
+    if (field == NULL)
+        return -1;
+    self->field_len = 0;
+    if (self->numeric_field) {
+        PyObject *tmp;
+
+        self->numeric_field = 0;
+        tmp = PyNumber_Float(field);
+        Py_DECREF(field);
+        if (tmp == NULL)
+            return -1;
+        field = tmp;
+    }
+    if (PyList_Append(self->fields, field) < 0) {
+        Py_DECREF(field);
+        return -1;
+    }
+    Py_DECREF(field);
+    return 0;
+}
+
+static int
+parse_grow_buff(ReaderObj *self)
+{
+    assert((size_t)self->field_size <= PY_SSIZE_T_MAX / sizeof(Py_UCS4));
+
+    Py_ssize_t field_size_new = self->field_size ? 2 * self->field_size : 4096;
+    Py_UCS4 *field_new = self->field;
+    PyMem_Resize(field_new, Py_UCS4, field_size_new);
+    if (field_new == NULL) {
+        PyErr_NoMemory();
+        return 0;
+    }
+    self->field = field_new;
+    self->field_size = field_size_new;
+    return 1;
+}
+
+static int
+parse_add_char(ReaderObj *self, Py_UCS4 c)
+{
+    // if (self->field_len >= module_state->field_limit) {
+    //     PyErr_Format(PyExc_RuntimeError,
+    //                  "field larger than field limit (%ld)",
+    //                  module_state->field_limit);
+    //     return -1;
+    // }
+    if (self->field_len == self->field_size && !parse_grow_buff(self))
+        return -1;
+    self->field[self->field_len++] = c;
+    return 0;
+}
+
+static int
+parse_process_char(ReaderObj *self, Py_UCS4 c)
+{
+    DialectObj *dialect = self->dialect;
+
+    switch (self->state) {
+    case START_RECORD: /* start of record */
+        if (c == '\0')
+            /* empty line - return [] */
+            break;
+        else if (c == '\n' || c == '\r') {
+            self->state = EAT_CRNL;
+            break;
+        }
+        /* normal character - handle as START_FIELD */
+        self->state = START_FIELD;
+        /* fallthru */
+    case START_FIELD: /* expecting field */
+        if (c == '\n' || c == '\r' || c == '\0') {
+            /* save empty field - return [fields] */
+            if (parse_save_field(self) < 0)
+                return -1;
+            self->state = (c == '\0' ? START_RECORD : EAT_CRNL);
+        }
+        else if (c == dialect->quotechar &&
+                 dialect->quoting != QUOTE_NONE) { /* start quoted field */
+            self->state = IN_QUOTED_FIELD;
+        }
+        else if (c == dialect->escapechar) { /* possible escaped character */
+            self->state = ESCAPED_CHAR;
+        }
+        else if (c == ' ' && dialect->skipinitialspace)
+            /* ignore space at start of field */
+            ;
+        else if (c == dialect->delimiter) { /* save empty field */
+            if (parse_save_field(self) < 0)
+                return -1;
+        }
+        else { /* begin new unquoted field */
+            if (dialect->quoting == QUOTE_NONNUMERIC)
+                self->numeric_field = 1;
+            if (parse_add_char(self, c) < 0)
+                return -1;
+            self->state = IN_FIELD;
+        }
+        break;
+
+    case ESCAPED_CHAR:
+        if (c == '\n' || c=='\r') {
+            if (parse_add_char(self, c) < 0)
+                return -1;
+            self->state = AFTER_ESCAPED_CRNL;
+            break;
+        }
+        if (c == '\0')
+            c = '\n';
+        if (parse_add_char(self, c) < 0)
+            return -1;
+        self->state = IN_FIELD;
+        break;
+
+    case AFTER_ESCAPED_CRNL:
+        if (c == '\0')
+            break;
+        /*fallthru*/
+
+    case IN_FIELD: /* in unquoted field */
+        if (c == '\n' || c == '\r' || c == '\0') {
+            /* end of line - return [fields] */
+            if (parse_save_field(self) < 0)
+                return -1;
+            self->state = (c == '\0' ? START_RECORD : EAT_CRNL);
+        }
+        else if (c == dialect->escapechar) { /* possible escaped character */
+            self->state = ESCAPED_CHAR;
+        }
+        else if (c == dialect->delimiter) { /* save field - wait for new field */
+            if (parse_save_field(self) < 0)
+                return -1;
+            self->state = START_FIELD;
+        }
+        else { /* normal character - save in field */
+            if (parse_add_char(self, c) < 0)
+                return -1;
+        }
+        break;
+
+    case IN_QUOTED_FIELD: /* in quoted field */
+        if (c == '\0')
+            ;
+        else if (c == dialect->escapechar) { /* Possible escape character */
+            self->state = ESCAPE_IN_QUOTED_FIELD;
+        }
+        else if (c == dialect->quotechar &&
+                 dialect->quoting != QUOTE_NONE) {
+            if (dialect->doublequote) { /* doublequote; " represented by "" */
+                self->state = QUOTE_IN_QUOTED_FIELD;
+            }
+            else { /* end of quote part of field */
+                self->state = IN_FIELD;
+            }
+        }
+        else { /* normal character - save in field */
+            if (parse_add_char(self, c) < 0)
+                return -1;
+        }
+        break;
+
+    case ESCAPE_IN_QUOTED_FIELD:
+        if (c == '\0')
+            c = '\n';
+        if (parse_add_char(self, c) < 0)
+            return -1;
+        self->state = IN_QUOTED_FIELD;
+        break;
+
+    case QUOTE_IN_QUOTED_FIELD:
+        /* doublequote - seen a quote in a quoted field */
+        if (dialect->quoting != QUOTE_NONE &&
+            c == dialect->quotechar) {
+            /* save "" as " */
+            if (parse_add_char(self, c) < 0)
+                return -1;
+            self->state = IN_QUOTED_FIELD;
+        }
+        else if (c == dialect->delimiter) {
+            /* save field - wait for new field */
+            if (parse_save_field(self) < 0)
+                return -1;
+            self->state = START_FIELD;
+        }
+        else if (c == '\n' || c == '\r' || c == '\0') {
+            /* end of line - return [fields] */
+            if (parse_save_field(self) < 0)
+                return -1;
+            self->state = (c == '\0' ? START_RECORD : EAT_CRNL);
+        }
+        else if (!dialect->strict) {
+            if (parse_add_char(self, c) < 0)
+                return -1;
+            self->state = IN_FIELD;
+        }
+        else {
+            /* illegal */
+            PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
+                            dialect->delimiter,
+                            dialect->quotechar);
+            return -1;
+        }
+        break;
+
+    case EAT_CRNL:
+        if (c == '\n' || c == '\r')
+            ;
+        else if (c == '\0')
+            self->state = START_RECORD;
+        else {
+            PyErr_Format(PyExc_RuntimeError,
+                         "new-line character seen in unquoted field - do you need to open the file in universal-newline mode?");
+            return -1;
+        }
+        break;
+
+    }
+    return 0;
+}
+
+static int
+parse_reset(ReaderObj *self)
+{
+    Py_XSETREF(self->fields, PyList_New(0));
+    if (self->fields == NULL)
+        return -1;
+    self->field_len = 0;
+    self->state = START_RECORD;
+    self->numeric_field = 0;
+    return 0;
+}
+
+static PyObject *
+Reader_iternext(ReaderObj *self)
+{
+    PyObject *fields = NULL;
+    Py_UCS4 c;
+    Py_ssize_t pos, linelen;
+    unsigned int kind;
+    const void *data;
+    PyObject *lineobj;
+
+    // _csvstate *module_state = _csv_state_from_type(Py_TYPE(self),
+    //                                                "Reader.__next__");
+    // if (module_state == NULL) {
+    //     return NULL;
+    // }
+
+    if (parse_reset(self) < 0)
+        return NULL;
+    do {
+        lineobj = PyIter_Next(self->input_iter);
+        if (lineobj == NULL) {
+            /* End of input OR exception */
+            if (!PyErr_Occurred() && (self->field_len != 0 ||
+                                      self->state == IN_QUOTED_FIELD)) {
+                if (self->dialect->strict)
+                    PyErr_SetString(PyExc_RuntimeError,
+                                    "unexpected end of data");
+                else if (parse_save_field(self) >= 0)
+                    break;
+            }
+            return NULL;
+        }
+        if (!PyUnicode_Check(lineobj)) {
+            PyErr_Format(PyExc_RuntimeError,
+                         "iterator should return strings, "
+                         "not %.200s "
+                         "(the file should be opened in text mode)",
+                         Py_TYPE(lineobj)->tp_name
+                );
+            Py_DECREF(lineobj);
+            return NULL;
+        }
+        if (PyUnicode_READY(lineobj) == -1) {
+            Py_DECREF(lineobj);
+            return NULL;
+        }
+        ++self->line_num;
+        kind = PyUnicode_KIND(lineobj);
+        data = PyUnicode_DATA(lineobj);
+        pos = 0;
+        linelen = PyUnicode_GET_LENGTH(lineobj);
+        while (linelen--) {
+            c = PyUnicode_READ(kind, data, pos);
+            if (c == '\0') {
+                Py_DECREF(lineobj);
+                PyErr_Format(PyExc_RuntimeError,
+                             "line contains NUL");
+                goto err;
+            }
+            if (parse_process_char(self, c) < 0) {
+                Py_DECREF(lineobj);
+                goto err;
+            }
+            pos++;
+        }
+        Py_DECREF(lineobj);
+        if (parse_process_char(self, 0) < 0)
+            goto err;
+    } while (self->state != START_RECORD);
+
+    fields = self->fields;
+    self->fields = NULL;
+err:
+    return fields;
+}
+
+static void
+Reader_dealloc(ReaderObj *self)
+{
+    PyTypeObject *tp = Py_TYPE(self);
+    PyObject_GC_UnTrack(self);
+    Py_CLEAR(self->dialect);
+    Py_CLEAR(self->input_iter);
+    Py_CLEAR(self->fields);
+    if (self->field != NULL) {
+        PyMem_Free(self->field);
+        self->field = NULL;
+    }
+    PyObject_GC_Del(self);
+    Py_DECREF(tp);
+}
+
+static void
+Reader_finalize(ReaderObj *self)
+{
+    Py_CLEAR(self->dialect);
+    Py_CLEAR(self->input_iter);
+    Py_CLEAR(self->fields);
+    if (self->field != NULL) {
+        PyMem_Free(self->field);
+        self->field = NULL;
+    }
+}
+
+static int
+Reader_traverse(ReaderObj *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->dialect);
+    Py_VISIT(self->input_iter);
+    Py_VISIT(self->fields);
+    return 0;
+}
+
+static int
+Reader_clear(ReaderObj *self)
+{
+    Py_CLEAR(self->dialect);
+    Py_CLEAR(self->input_iter);
+    Py_CLEAR(self->fields);
+    return 0;
+}
+
+// PyDoc_STRVAR(Reader_Type_doc,
+// "CSV reader\n"
+// "\n"
+// "Reader objects are responsible for reading and parsing tabular data\n"
+// "in CSV format.\n"
+// );
+
+static struct PyMethodDef Reader_methods[] = {
+    { NULL, NULL }
+};
+#define R_OFF(x) offsetof(ReaderObj, x)
+
+static struct PyMemberDef Reader_memberlist[] = {
+    { "dialect", T_OBJECT, R_OFF(dialect), READONLY },
+    { "line_num", T_ULONG, R_OFF(line_num), READONLY },
+    { NULL }
+};
+
+static PyType_Slot Reader_Type_slots[] = {
+    // {Py_tp_doc, (char*)Reader_Type_doc},
+    {Py_tp_traverse, Reader_traverse},
+    {Py_tp_clear, Reader_clear},
+    {Py_tp_iter, PyObject_SelfIter},
+    {Py_tp_iternext, Reader_iternext},
+    {Py_tp_methods, Reader_methods},
+    {Py_tp_members, Reader_memberlist},
+    {Py_tp_finalize, Reader_finalize},
+    {Py_tp_dealloc, Reader_dealloc},
+    {0, NULL}
+};
+
+PyType_Spec Reader_Type_spec = {
+    .name = "Reader",
+    .basicsize = sizeof(ReaderObj),
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    .slots = Reader_Type_slots
+};
+
+
+static PyObject *
+csv_reader(PyObject *args, PyObject *keyword_args)
+{
+    PyObject * iterator, * dialect = NULL;
+
+
+    // _csvstate *module_state = get_csv_state(module);
+
+    // ReaderObj * self = PyObject_GC_New(
+    //     ReaderObj,
+    //     module_state->reader_type);
+
+    // These were previously stored on the module object
+    PyObject *type_reader = (PyObject *)PyType_FromSpec(&Reader_Type_spec);
+    PyObject *type_dialect = (PyObject *)PyType_FromSpec(&Dialect_Type_spec);
+
+    ReaderObj *self = PyObject_GC_New(ReaderObj, (PyTypeObject *)type_reader); // NOT SURE!
+
+    if (!self)
+        return NULL;
+
+    self->dialect = NULL;
+    self->fields = NULL;
+    self->input_iter = NULL;
+    self->field = NULL;
+    self->field_size = 0;
+    self->line_num = 0;
+
+    if (parse_reset(self) < 0) {
+        Py_DECREF(self);
+        return NULL;
+    }
+
+    if (!PyArg_UnpackTuple(args, "", 1, 2, &iterator, &dialect)) {
+        Py_DECREF(self);
+        return NULL;
+    }
+    self->input_iter = PyObject_GetIter(iterator);
+    if (self->input_iter == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+
+    // self->dialect = (DialectObj *)_call_dialect(module_state, dialect,
+    //                                             keyword_args);
+    self->dialect = (DialectObj *)_PyObject_FastCallDict(type_dialect, NULL, 0, keyword_args);
+
+    if (self->dialect == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+
+    PyObject_GC_Track(self);
+    return (PyObject *)self;
+}
+
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -811,50 +1742,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 //     return array;
 // }
 
-// // Convert an sequence of strings to a 1D array.
-// static inline PyObject*
-// AK_IterableStrToArray1D(
-//         PyObject *sequence,
-//         PyObject *dtype_specifier)
-// {
-//         // Convert specifier into a dtype if necessary
-//         PyArray_Descr* dtype;
-//         if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type))
-//         {
-//             dtype = (PyArray_Descr* )dtype_specifier;
-//         }
-//         else {
-//             // Use converter2 here so that None returns NULL (as opposed to default dtype float); NULL will leave strings unchanged
-//             PyArray_DescrConverter2(dtype_specifier, &dtype);
-//         }
-
-//         PyObject* array;
-//         if (!dtype) {
-//             AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
-//         }
-//         else if (PyDataType_ISBOOL(dtype)) {
-//             array = AK_SequenceStrToArray1DBoolean(sequence);
-//         }
-//         else if (PyDataType_ISCOMPLEX(dtype)) {
-//             array = AK_SequenceStrToArray1DComplex(sequence);
-//         }
-//         else {
-//             // NOTE: Some types can be converted directly from strings. int, float, dt64, variously sized strings: will convert from strings correctly. bool dtypes: will treat string as truthy/falsy
-//             Py_XINCREF(dtype); // will steal
-//             array = PyArray_FromAny(sequence,
-//                     dtype, // can be NULL, object: strings will remain
-//                     1,
-//                     1,
-//                     NPY_ARRAY_FORCECAST, // not sure this is best
-//                     NULL);
-//         }
-//         if (!array) {
-//             return NULL;
-//         }
-//         PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
-//         return array;
-// }
-
 
 // Convert an sequence of strings to a 1D array.
 static inline PyObject*
@@ -940,142 +1827,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
     AK_CPG_Free(cpg);
     return arrays; // could be NULL
 }
-
-
-
-
-// static PyObject *
-// delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
-// {
-//     PyObject *file_like, *dtypes, *axis;
-//     if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
-//             &file_like,
-//             &dtypes,
-//             &axis)) // TODO: enforce this is an int?
-//     {
-//         return NULL;
-//     }
-//     // NOTE: consider taking shape_estimate as a tuple to pre-size lists?
-
-//     // Parse text
-//     // For now, we import and use the CSV module directly; in the future, can vend code from here and implement support for an axis argument to collect data columnwise rather than rowwise
-//     PyObject *module_csv = PyImport_ImportModule("csv");
-//     if (!module_csv) {
-//         return NULL;
-//     }
-//     PyObject *reader = PyObject_GetAttrString(module_csv, "reader");
-//     Py_DECREF(module_csv);
-//     if (!reader) {
-//         return NULL;
-//     }
-//     // TODO: pass in full parameters for parsing
-//     PyObject *reader_instance = PyObject_CallFunctionObjArgs(reader, file_like, NULL);
-//     Py_DECREF(reader);
-//     if (!reader_instance) {
-//         return NULL;
-//     }
-
-//     // Get the an iterator for the appropriate axis
-//     PyObject *axis_sequence_fast; // for generic assignment
-//     Py_ssize_t count_columns = -1;
-
-//     PyObject *axis0_sequence_iter = PyObject_GetIter(reader_instance);
-//     if (!axis0_sequence_iter) {
-//         Py_DECREF(reader_instance);
-//         return NULL;
-//     }
-
-//     if (PyLong_AsLong(axis) == 1) { // this can fail
-//         PyObject* axis1_sequences = PyList_New(0);
-//         if (!axis1_sequences) {
-//             Py_DECREF(axis0_sequence_iter);
-//             return NULL;
-//         }
-//         // get first size
-//         Py_ssize_t count_row = 0;
-
-//         PyObject *row;
-//         PyObject* column;
-//         while ((row = PyIter_Next(axis0_sequence_iter))) {
-//             // get count of columns from first row
-//             if (count_row == 0) {
-//                 count_columns = PyList_Size(row);
-//                 // use Py_ssize_t?
-//                 for (int i=0; i < count_columns; ++i) {
-//                     column = PyList_New(0);
-//                     if (PyList_Append(axis1_sequences, column)) // does not steal
-//                     {
-//                         Py_DECREF(row);
-//                         Py_DECREF(axis1_sequences);
-//                         return NULL;
-//                     }
-//                     Py_DECREF(column);
-//                 }
-//             }
-//             // walk through row and append to columns
-//             for (int i=0; i < count_columns; ++i) {
-//                 PyObject* element = PyList_GetItem(row, i);
-//                 column = PyList_GetItem(axis1_sequences, i); // borrowed?
-//                 if (PyList_Append(column, element))
-//                     {
-//                         Py_DECREF(axis1_sequences);
-//                         return NULL;
-//                     }
-//                 Py_DECREF(element);
-//             }
-//             ++count_row;
-//         }
-//         axis_sequence_fast = PySequence_Fast(axis1_sequences,
-//                 "failed to create sequence");
-//         // axis_sequence_iter = PyObject_GetIter(axis1_sequences);
-//         Py_DECREF(axis1_sequences);
-//     } else {
-//         // axis_sequence_iter = axis0_sequence_iter;
-//         axis_sequence_fast = PySequence_Fast(axis0_sequence_iter,
-//                 "failed to create sequence");
-//         count_columns = PySequence_Fast_GET_SIZE(axis_sequence_fast);
-//     }
-//     Py_DECREF(axis0_sequence_iter);
-//     Py_DECREF(reader_instance);
-
-    // List to be return constructer arrays
-//     PyObject* arrays = PyList_New(0);
-//     if (!arrays) {
-//         Py_DECREF(axis_sequence_fast);
-//         return NULL;
-//     }
-
-//     PyObject *line;
-//     for (Py_ssize_t pos = 0; pos < count_columns; ++pos) {
-//         line = PySequence_Fast_GET_ITEM(axis_sequence_fast, pos); // borrowed ref
-//         if (!line) {
-//             return NULL;
-//         }
-//         PyObject* dtype_specifier = PyList_GetItem(dtypes, pos);
-//         if (!dtype_specifier) {
-//             Py_DECREF(axis_sequence_fast);
-//             Py_DECREF(arrays);
-//             return NULL;
-//         }
-
-//         Py_INCREF(line); // got a borrowed ref
-//         PyObject* array = AK_IterableStrToArray1D(line, dtype_specifier);
-//         if (!array) {
-//             return NULL;
-//         }
-
-//         if (PyList_Append(arrays, array)) {
-//             Py_DECREF(axis_sequence_fast);
-//             Py_DECREF(array);
-//             Py_DECREF(arrays);
-//             return NULL;
-//         }
-//         Py_DECREF(array);
-//     }
-//     // check if PyErr occurred
-//     Py_DECREF(axis_sequence_fast);
-//     return arrays;
-// }
 
 // If dtype_specifier is given, always try to return that dtype
 // If dtype of object is given, leave strings
