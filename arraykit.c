@@ -422,49 +422,67 @@ _roll_1d_b(PyArrayObject* array, int shift, int size)
 }
 
 static PyObject *
-_roll_1d_c(PyArrayObject* array, int shift, int size)
+_roll_1d_c(PyArrayObject *array, int shift)
 {
-    /*
-        post = np.empty(size, dtype=array.dtype)
-        post[0:shift] = array[-shift:]
-        post[shift:] = array[0:-shift]
-        return post
-    */
+    // Tell the constructor to automatically allocate the output.
+    // The data type of the output will match that of the input.
+    PyArrayObject *arrays[2];
+    npy_uint32 arrays_flags[2];
+    arrays[0] = array;
+    arrays[1] = NULL;
+    arrays_flags[0] = NPY_ITER_READONLY;
+    arrays_flags[1] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE;
 
-    // Create an empty array
-    PyArray_Descr* dtype = PyArray_DESCR(array);
-    Py_INCREF(dtype); // PyArray_Empty steals a reference to dtype
+    // Construct the iterator
+    NpyIter *iter = NpyIter_MultiNew(
+            2,                      // number of arrays
+            arrays,
+            NPY_ITER_EXTERNAL_LOOP, // No inner iteration - inner loop is handled by CopyArray code
+            NPY_KEEPORDER,          // Maintain existing order
+            NPY_NO_CASTING,         // Only allows identical types
+            arrays_flags,
+            NULL);                  // We don't have to specify dtypes since it will use array's
 
-    PyArrayObject* post = (PyArrayObject*)PyArray_Empty(
-                PyArray_NDIM(array),
-                PyArray_DIMS(array),
-                dtype,
-                0);
-    if (!post) {
+    if (iter == NULL) {
         return NULL;
     }
 
-    npy_intp array_stride = PyArray_STRIDE(array, 0);
-    npy_intp post_stride = PyArray_STRIDE(post, 0);
-    char* array_dataptr = PyArray_BYTES(array);
-    char* post_dataptr = PyArray_BYTES(post);
-
-    for (int i = 0; i < size; ++i) {
-        int src_i = (i + size - shift) % size;
-
-        PyObject* obj = PyArray_GETITEM(array, array_dataptr + (array_stride * src_i));
-        if (!obj) {
-            Py_DECREF(post);
-            return NULL;
-        }
-
-        if (PyArray_SETITEM(post, post_dataptr + (i * post_stride), obj) == -1) {
-            Py_DECREF(post);
-            return NULL;
-        }
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        NpyIter_Deallocate(iter);
+        return NULL;
     }
 
-    return (PyObject*)post;
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
+
+    do {
+        char* src_data = dataptr[0];
+        char* dst_data = dataptr[1];
+        npy_intp size = *sizeptr;
+
+        int offset = ((size - shift) % size) * itemsize;
+        int first_chunk = (size * itemsize) - offset;
+
+        memcpy(dst_data, src_data + offset, first_chunk);
+        memcpy(dst_data + first_chunk, src_data, offset);
+    } while (iternext(iter));
+
+    // Get the result from the iterator object array
+    PyObject *ret = (PyObject*)NpyIter_GetOperandArray(iter)[1];
+    if (!ret) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+    Py_INCREF(ret);
+
+    if (NpyIter_Deallocate(iter) != NPY_SUCCEED) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+
+    return ret;
 }
 
 static PyObject *
@@ -509,8 +527,8 @@ roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
         }
         return copy;
     }
-    return _roll_1d_a(array, shift);
-    return _roll_1d_b(array, shift, size);
+
+    return _roll_1d_c(array, shift);
 }
 
 
