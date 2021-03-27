@@ -541,11 +541,11 @@ static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
     // TODO: check error
 
     npy_longlong *array_buffer = (npy_longlong*)PyArray_DATA((PyArrayObject*)array);
+    npy_longlong *end = array_buffer + count;
 
     AK_CPL_CurrentReset(cpl);
-
-    for (int i=0; i < count; ++i) {
-        array_buffer[i] = AK_CPL_ParseLong(cpl);
+    while (array_buffer < end) {
+        *array_buffer++ = AK_CPL_ParseLong(cpl);
         AK_CPL_CurrentAdvance(cpl);
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
