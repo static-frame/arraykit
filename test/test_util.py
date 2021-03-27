@@ -173,7 +173,7 @@ class TestUnit(unittest.TestCase):
     #---------------------------------------------------------------------------
 
     def test_roll_1d_a(self) -> None:
-        a1 = np.arange(12)
+        a1 = np.arange(12, dtype=float)
 
         for i in range(len(a1) + 1):
             post = roll_1d(a1, i)

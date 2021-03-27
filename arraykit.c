@@ -457,6 +457,7 @@ _roll_1d_c(PyArrayObject *array, int shift)
     npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
     npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
 
+    // TODO: This does NOT work with objects....
     do {
         char* src_data = dataptr[0];
         char* dst_data = dataptr[1];
@@ -470,7 +471,7 @@ _roll_1d_c(PyArrayObject *array, int shift)
     } while (iternext(iter));
 
     // Get the result from the iterator object array
-    PyObject *ret = (PyObject*)NpyIter_GetOperandArray(iter)[1];
+    PyArrayObject *ret = NpyIter_GetOperandArray(iter)[1];
     if (!ret) {
         NpyIter_Deallocate(iter);
         return NULL;
@@ -482,7 +483,7 @@ _roll_1d_c(PyArrayObject *array, int shift)
         return NULL;
     }
 
-    return ret;
+    return (PyObject*)ret;
 }
 
 static PyObject *
