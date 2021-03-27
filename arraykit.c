@@ -287,47 +287,14 @@ assign_into_slice_from_slice(PyObject *dest, PyObject *src, PyObject *dest_slice
 }
 
 static PyObject *
-roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
+_roll_1d_a(PyArrayObject* array, int shift)
 {
-    /* Algorithm.
-
-        size = len(array)
-        if size <= 1:
-            return array.copy()
-
-        shift = shift % size
-        if shift == 0:
-            return array.copy()
-
+    /*
         post = np.empty(size, dtype=array.dtype)
         post[0:shift] = array[-shift:]
         post[shift:] = array[0:-shift]
         return post
     */
-    PyArrayObject *array;
-    int shift;
-
-    if (!PyArg_ParseTuple(args, "O!i:roll_1d", &PyArray_Type, &array, &shift))
-    {
-        return NULL;
-    }
-
-    // Must be signed in order for modulo to work properly for negative shift values
-    int size = (int)PyArray_SIZE(array);
-
-    uint8_t is_empty = (size == 0);
-
-    if (!is_empty) {
-        shift = shift % size;
-    }
-
-    if (is_empty || (shift == 0)) {
-        PyObject* copy = PyArray_Copy(array);
-        if (!copy) {
-            return NULL;
-        }
-        return copy;
-    }
 
     // Create an empty array
     PyArray_Descr* dtype = PyArray_DESCR(array);
@@ -407,6 +374,145 @@ failure:
     Py_DECREF(post);
     return NULL;
 }
+
+static PyObject *
+_roll_1d_b(PyArrayObject* array, int shift, int size)
+{
+    /*
+        post = np.empty(size, dtype=array.dtype)
+        post[0:shift] = array[-shift:]
+        post[shift:] = array[0:-shift]
+        return post
+    */
+
+    // Create an empty array
+    PyArray_Descr* dtype = PyArray_DESCR(array);
+    Py_INCREF(dtype); // PyArray_Empty steals a reference to dtype
+
+    PyArrayObject* post = (PyArrayObject*)PyArray_Empty(
+                PyArray_NDIM(array),
+                PyArray_DIMS(array),
+                dtype,
+                0);
+    if (!post) {
+        return NULL;
+    }
+
+    npy_intp array_stride = PyArray_STRIDE(array, 0);
+    npy_intp post_stride = PyArray_STRIDE(post, 0);
+    char* array_dataptr = PyArray_BYTES(array);
+    char* post_dataptr = PyArray_BYTES(post);
+
+    for (int i = 0; i < size; ++i) {
+        int src_i = (i + size - shift) % size;
+
+        PyObject* obj = PyArray_GETITEM(array, array_dataptr + (array_stride * src_i));
+        if (!obj) {
+            Py_DECREF(post);
+            return NULL;
+        }
+
+        if (PyArray_SETITEM(post, post_dataptr + (i * post_stride), obj) == -1) {
+            Py_DECREF(post);
+            return NULL;
+        }
+    }
+
+    return (PyObject*)post;
+}
+
+static PyObject *
+_roll_1d_c(PyArrayObject* array, int shift, int size)
+{
+    /*
+        post = np.empty(size, dtype=array.dtype)
+        post[0:shift] = array[-shift:]
+        post[shift:] = array[0:-shift]
+        return post
+    */
+
+    // Create an empty array
+    PyArray_Descr* dtype = PyArray_DESCR(array);
+    Py_INCREF(dtype); // PyArray_Empty steals a reference to dtype
+
+    PyArrayObject* post = (PyArrayObject*)PyArray_Empty(
+                PyArray_NDIM(array),
+                PyArray_DIMS(array),
+                dtype,
+                0);
+    if (!post) {
+        return NULL;
+    }
+
+    npy_intp array_stride = PyArray_STRIDE(array, 0);
+    npy_intp post_stride = PyArray_STRIDE(post, 0);
+    char* array_dataptr = PyArray_BYTES(array);
+    char* post_dataptr = PyArray_BYTES(post);
+
+    for (int i = 0; i < size; ++i) {
+        int src_i = (i + size - shift) % size;
+
+        PyObject* obj = PyArray_GETITEM(array, array_dataptr + (array_stride * src_i));
+        if (!obj) {
+            Py_DECREF(post);
+            return NULL;
+        }
+
+        if (PyArray_SETITEM(post, post_dataptr + (i * post_stride), obj) == -1) {
+            Py_DECREF(post);
+            return NULL;
+        }
+    }
+
+    return (PyObject*)post;
+}
+
+static PyObject *
+roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    /* Algorithm.
+
+        size = len(array)
+        if size <= 1:
+            return array.copy()
+
+        shift = shift % size
+        if shift == 0:
+            return array.copy()
+
+        post = np.empty(size, dtype=array.dtype)
+        post[0:shift] = array[-shift:]
+        post[shift:] = array[0:-shift]
+        return post
+    */
+    PyArrayObject *array;
+    int shift;
+
+    if (!PyArg_ParseTuple(args, "O!i:roll_1d", &PyArray_Type, &array, &shift))
+    {
+        return NULL;
+    }
+
+    // Must be signed in order for modulo to work properly for negative shift values
+    int size = (int)PyArray_SIZE(array);
+
+    uint8_t is_empty = (size == 0);
+
+    if (!is_empty) {
+        shift = shift % size;
+    }
+
+    if (is_empty || (shift == 0)) {
+        PyObject* copy = PyArray_Copy(array);
+        if (!copy) {
+            return NULL;
+        }
+        return copy;
+    }
+    return _roll_1d_a(array, shift);
+    return _roll_1d_b(array, shift, size);
+}
+
 
 //------------------------------------------------------------------------------
 // ArrayGO
