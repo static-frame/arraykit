@@ -770,6 +770,18 @@ typedef struct {
 } DialectObj;
 
 typedef struct {
+    char doublequote;           /* is " represented by ""? */
+    char skipinitialspace;      /* ignore spaces following delimiter? */
+    char strict;                /* raise exception on bad CSV */
+    int quoting;                /* style of quoting to write */
+    Py_UCS4 delimiter;          /* field separator */
+    Py_UCS4 quotechar;          /* quote character */
+    Py_UCS4 escapechar;         /* escape character */
+    PyObject *lineterminator;   /* string to write between records */
+} AK_DR_Dialect;
+
+
+typedef struct {
     PyObject_HEAD
 
     PyObject *input_iter;   /* iterate over this for input lines */
@@ -784,6 +796,8 @@ typedef struct {
     int numeric_field;          /* treat field as numeric */
     unsigned long line_num;     /* Source-file line number */
 } ReaderObj;
+
+
 
 // dialect
 
@@ -1130,6 +1144,105 @@ err:
     Py_CLEAR(strict);
     return ret;
 }
+
+
+static PyObject*
+AK_DR_Dialect_New(PyTypeObject *delimiter,
+        PyObject *doublequote,
+        PyObject *escapechar,
+        PyObject *lineterminator,
+        PyObject *quotechar,
+        PyObject *quoting,
+        PyObject *skipinitialspace,
+        PyObject *strict
+        )
+{
+    AK_DR_Dialect *self = (AK_DR_Dialect *) PyMem_Malloc(sizeof(AK_DR_Dialect));
+    if (self == NULL) {
+        // Py_CLEAR(dialect);
+        return NULL;
+    }
+    self->lineterminator = NULL;
+
+    Py_XINCREF(delimiter);
+    Py_XINCREF(doublequote);
+    Py_XINCREF(escapechar);
+    Py_XINCREF(lineterminator);
+    Py_XINCREF(quotechar);
+    Py_XINCREF(quoting);
+    Py_XINCREF(skipinitialspace);
+    Py_XINCREF(strict);
+
+//     if (dialect != NULL) {
+// #define DIALECT_GETATTR(v, n)
+//         if (v == NULL)
+//             v = PyObject_GetAttrString(dialect, n)
+//         DIALECT_GETATTR(delimiter, "delimiter");
+//         DIALECT_GETATTR(doublequote, "doublequote");
+//         DIALECT_GETATTR(escapechar, "escapechar");
+//         DIALECT_GETATTR(lineterminator, "lineterminator");
+//         DIALECT_GETATTR(quotechar, "quotechar");
+//         DIALECT_GETATTR(quoting, "quoting");
+//         DIALECT_GETATTR(skipinitialspace, "skipinitialspace");
+//         DIALECT_GETATTR(strict, "strict");
+//         PyErr_Clear();
+//     }
+
+    /* check types and convert to C values */
+#define DIASET(meth, name, target, src, default) \
+    if (meth(name, target, src, default)) \
+        goto err
+    DIASET(_set_char, "delimiter", &self->delimiter, delimiter, ',');
+    DIASET(_set_bool, "doublequote", &self->doublequote, doublequote, true);
+    DIASET(_set_char, "escapechar", &self->escapechar, escapechar, 0);
+    DIASET(_set_str, "lineterminator", &self->lineterminator, lineterminator, "\r\n");
+    DIASET(_set_char, "quotechar", &self->quotechar, quotechar, '"');
+    DIASET(_set_int, "quoting", &self->quoting, quoting, QUOTE_MINIMAL);
+    DIASET(_set_bool, "skipinitialspace", &self->skipinitialspace, skipinitialspace, false);
+    DIASET(_set_bool, "strict", &self->strict, strict, false);
+
+    /* validate options */
+    if (dialect_check_quoting(self->quoting))
+        goto err;
+    if (self->delimiter == 0) {
+        PyErr_SetString(PyExc_TypeError,
+                        "\"delimiter\" must be a 1-character string");
+        goto err;
+    }
+    if (quotechar == Py_None && quoting == NULL)
+        self->quoting = QUOTE_NONE;
+    if (self->quoting != QUOTE_NONE && self->quotechar == 0) {
+        PyErr_SetString(PyExc_TypeError,
+                        "quotechar must be set if quoting enabled");
+        goto err;
+    }
+    if (self->lineterminator == 0) {
+        PyErr_SetString(PyExc_TypeError, "lineterminator must be set");
+        goto err;
+    }
+
+    // ret = (PyObject *)self;
+    // Py_INCREF(self);
+    return self;
+err:
+    Py_CLEAR(self);
+    // Py_CLEAR(dialect);
+    Py_CLEAR(delimiter);
+    Py_CLEAR(doublequote);
+    Py_CLEAR(escapechar);
+    Py_CLEAR(lineterminator);
+    Py_CLEAR(quotechar);
+    Py_CLEAR(quoting);
+    Py_CLEAR(skipinitialspace);
+    Py_CLEAR(strict);
+    return NULL;
+}
+
+
+
+
+
+
 
 /* Since dialect is now a heap type, it inherits pickling method for
  * protocol 0 and 1 from object, therefore it needs to be overriden */
