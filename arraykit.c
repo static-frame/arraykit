@@ -931,7 +931,6 @@ dialect_check_quoting(int quoting)
     return -1;
 }
 
-
 #define D_OFF(x) offsetof(DialectObj, x)
 
 static struct PyMemberDef Dialect_memberlist[] = {
@@ -1012,16 +1011,16 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "|OOOOOOOOO", dialect_kws,
-                                     &dialect,
-                                     &delimiter,
-                                     &doublequote,
-                                     &escapechar,
-                                     &lineterminator,
-                                     &quotechar,
-                                     &quoting,
-                                     &skipinitialspace,
-                                     &strict))
+            "|OOOOOOOOO", dialect_kws,
+            &dialect,
+            &delimiter,
+            &doublequote,
+            &escapechar,
+            &lineterminator,
+            &quotechar,
+            &quoting,
+            &skipinitialspace,
+            &strict))
         return NULL;
 
     // _csvstate *module_state = _csv_state_from_type(type, "dialect_new");
@@ -1069,24 +1068,25 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     Py_XINCREF(quoting);
     Py_XINCREF(skipinitialspace);
     Py_XINCREF(strict);
-    if (dialect != NULL) {
-#define DIALECT_GETATTR(v, n) \
-        if (v == NULL) \
-            v = PyObject_GetAttrString(dialect, n)
-        DIALECT_GETATTR(delimiter, "delimiter");
-        DIALECT_GETATTR(doublequote, "doublequote");
-        DIALECT_GETATTR(escapechar, "escapechar");
-        DIALECT_GETATTR(lineterminator, "lineterminator");
-        DIALECT_GETATTR(quotechar, "quotechar");
-        DIALECT_GETATTR(quoting, "quoting");
-        DIALECT_GETATTR(skipinitialspace, "skipinitialspace");
-        DIALECT_GETATTR(strict, "strict");
-        PyErr_Clear();
-    }
+
+//     if (dialect != NULL) {
+// #define DIALECT_GETATTR(v, n)
+//         if (v == NULL)
+//             v = PyObject_GetAttrString(dialect, n)
+//         DIALECT_GETATTR(delimiter, "delimiter");
+//         DIALECT_GETATTR(doublequote, "doublequote");
+//         DIALECT_GETATTR(escapechar, "escapechar");
+//         DIALECT_GETATTR(lineterminator, "lineterminator");
+//         DIALECT_GETATTR(quotechar, "quotechar");
+//         DIALECT_GETATTR(quoting, "quoting");
+//         DIALECT_GETATTR(skipinitialspace, "skipinitialspace");
+//         DIALECT_GETATTR(strict, "strict");
+//         PyErr_Clear();
+//     }
 
     /* check types and convert to C values */
-#define DIASET(meth, name, target, src, dflt) \
-    if (meth(name, target, src, dflt)) \
+#define DIASET(meth, name, target, src, default) \
+    if (meth(name, target, src, default)) \
         goto err
     DIASET(_set_char, "delimiter", &self->delimiter, delimiter, ',');
     DIASET(_set_bool, "doublequote", &self->doublequote, doublequote, true);
@@ -1378,8 +1378,7 @@ parse_process_char(ReaderObj *self, Py_UCS4 c)
                 return -1;
             self->state = IN_QUOTED_FIELD;
         }
-        else if (c == dialect->delimiter) {
-            /* save field - wait for new field */
+        else if (c == dialect->delimiter) { /* save field - wait for new field */
             if (parse_save_field(self) < 0)
                 return -1;
             self->state = START_FIELD;
@@ -1395,8 +1394,7 @@ parse_process_char(ReaderObj *self, Py_UCS4 c)
                 return -1;
             self->state = IN_FIELD;
         }
-        else {
-            /* illegal */
+        else { /* illegal */
             PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
                             dialect->delimiter,
                             dialect->quotechar);
@@ -1594,11 +1592,9 @@ PyType_Spec Reader_Type_spec = {
 
 
 static PyObject *
-csv_reader(PyObject *args, PyObject *keyword_args)
+csv_reader(PyObject *iterable, PyObject *keyword_args)
 {
-    PyObject * iterator, * dialect = NULL;
-
-
+    // PyObject * iterator, * dialect = NULL;
     // _csvstate *module_state = get_csv_state(module);
 
     // ReaderObj * self = PyObject_GC_New(
@@ -1626,11 +1622,12 @@ csv_reader(PyObject *args, PyObject *keyword_args)
         return NULL;
     }
 
-    if (!PyArg_UnpackTuple(args, "", 1, 2, &iterator, &dialect)) {
-        Py_DECREF(self);
-        return NULL;
-    }
-    self->input_iter = PyObject_GetIter(iterator);
+    // only need to take iterator
+    // if (!PyArg_UnpackTuple(args, "", 1, 2, &iterator, &dialect)) {
+    //     Py_DECREF(self);
+    //     return NULL;
+    // }
+    self->input_iter = PyObject_GetIter(iterable);
     if (self->input_iter == NULL) {
         Py_DECREF(self);
         return NULL;
