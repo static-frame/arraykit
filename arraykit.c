@@ -787,46 +787,46 @@ typedef struct {
 
 // dialect
 
-static PyObject *
-get_nullchar_as_None(Py_UCS4 c)
-{
-    if (c == '\0') {
-        Py_RETURN_NONE;
-    }
-    else
-        return PyUnicode_FromOrdinal(c);
-}
+// static PyObject *
+// get_nullchar_as_None(Py_UCS4 c)
+// {
+//     if (c == '\0') {
+//         Py_RETURN_NONE;
+//     }
+//     else
+//         return PyUnicode_FromOrdinal(c);
+// }
 
-static PyObject *
-Dialect_get_lineterminator(DialectObj *self, void *Py_UNUSED(ignored))
-{
-    Py_XINCREF(self->lineterminator);
-    return self->lineterminator;
-}
+// static PyObject *
+// Dialect_get_lineterminator(DialectObj *self, void *Py_UNUSED(ignored))
+// {
+//     Py_XINCREF(self->lineterminator);
+//     return self->lineterminator;
+// }
 
-static PyObject *
-Dialect_get_delimiter(DialectObj *self, void *Py_UNUSED(ignored))
-{
-    return get_nullchar_as_None(self->delimiter);
-}
+// static PyObject *
+// Dialect_get_delimiter(DialectObj *self, void *Py_UNUSED(ignored))
+// {
+//     return get_nullchar_as_None(self->delimiter);
+// }
 
-static PyObject *
-Dialect_get_escapechar(DialectObj *self, void *Py_UNUSED(ignored))
-{
-    return get_nullchar_as_None(self->escapechar);
-}
+// static PyObject *
+// Dialect_get_escapechar(DialectObj *self, void *Py_UNUSED(ignored))
+// {
+//     return get_nullchar_as_None(self->escapechar);
+// }
 
-static PyObject *
-Dialect_get_quotechar(DialectObj *self, void *Py_UNUSED(ignored))
-{
-    return get_nullchar_as_None(self->quotechar);
-}
+// static PyObject *
+// Dialect_get_quotechar(DialectObj *self, void *Py_UNUSED(ignored))
+// {
+//     return get_nullchar_as_None(self->quotechar);
+// }
 
-static PyObject *
-Dialect_get_quoting(DialectObj *self, void *Py_UNUSED(ignored))
-{
-    return PyLong_FromLong(self->quoting);
-}
+// static PyObject *
+// Dialect_get_quoting(DialectObj *self, void *Py_UNUSED(ignored))
+// {
+//     return PyLong_FromLong(self->quoting);
+// }
 
 
 
@@ -931,23 +931,23 @@ dialect_check_quoting(int quoting)
     return -1;
 }
 
-#define D_OFF(x) offsetof(DialectObj, x)
+// #define D_OFF(x) offsetof(DialectObj, x)
 
-static struct PyMemberDef Dialect_memberlist[] = {
-    { "skipinitialspace",   T_BOOL, D_OFF(skipinitialspace), READONLY },
-    { "doublequote",        T_BOOL, D_OFF(doublequote), READONLY },
-    { "strict",             T_BOOL, D_OFF(strict), READONLY },
-    { NULL }
-};
+// static struct PyMemberDef Dialect_memberlist[] = {
+//     { "skipinitialspace",   T_BOOL, D_OFF(skipinitialspace), READONLY },
+//     { "doublequote",        T_BOOL, D_OFF(doublequote), READONLY },
+//     { "strict",             T_BOOL, D_OFF(strict), READONLY },
+//     { NULL }
+// };
 
-static PyGetSetDef Dialect_getsetlist[] = {
-    { "delimiter",          (getter)Dialect_get_delimiter},
-    { "escapechar",             (getter)Dialect_get_escapechar},
-    { "lineterminator",         (getter)Dialect_get_lineterminator},
-    { "quotechar",              (getter)Dialect_get_quotechar},
-    { "quoting",                (getter)Dialect_get_quoting},
-    {NULL},
-};
+// static PyGetSetDef Dialect_getsetlist[] = {
+//     { "delimiter",          (getter)Dialect_get_delimiter},
+//     { "escapechar",             (getter)Dialect_get_escapechar},
+//     { "lineterminator",         (getter)Dialect_get_lineterminator},
+//     { "quotechar",              (getter)Dialect_get_quotechar},
+//     { "quoting",                (getter)Dialect_get_quoting},
+//     {NULL},
+// };
 
 static void
 Dialect_dealloc(DialectObj *self)
@@ -965,7 +965,6 @@ Dialect_finalize(DialectObj *self)
 }
 
 static char *dialect_kws[] = {
-    "dialect",
     "delimiter",
     "doublequote",
     "escapechar",
@@ -1000,7 +999,7 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     DialectObj *self;
     PyObject *ret = NULL;
 
-    PyObject *dialect = NULL; // TODO: remove this argument
+    // PyObject *dialect = NULL; // TODO: remove this argument
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
     PyObject *escapechar = NULL;
@@ -1012,7 +1011,6 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "|OOOOOOOOO", dialect_kws,
-            &dialect,
             &delimiter,
             &doublequote,
             &escapechar,
@@ -1028,9 +1026,9 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     //     return NULL;
     // }
 
-    if (dialect != NULL) {
-        AK_NOT_IMPLEMENTED("dialect must be None");
-    }
+    // if (dialect != NULL) {
+    //     AK_NOT_IMPLEMENTED("dialect must be None");
+    // }
 
     // if (dialect != NULL) {
     //     // if (PyUnicode_Check(dialect)) {
@@ -1055,7 +1053,7 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 
     self = (DialectObj *)type->tp_alloc(type, 0);
     if (self == NULL) {
-        Py_CLEAR(dialect);
+        // Py_CLEAR(dialect);
         return NULL;
     }
     self->lineterminator = NULL;
@@ -1121,7 +1119,7 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     Py_INCREF(self);
 err:
     Py_CLEAR(self);
-    Py_CLEAR(dialect);
+    // Py_CLEAR(dialect);
     Py_CLEAR(delimiter);
     Py_CLEAR(doublequote);
     Py_CLEAR(escapechar);
@@ -1136,20 +1134,20 @@ err:
 /* Since dialect is now a heap type, it inherits pickling method for
  * protocol 0 and 1 from object, therefore it needs to be overriden */
 
-PyDoc_STRVAR(dialect_reduce_doc, "raises an exception to avoid pickling");
+// PyDoc_STRVAR(dialect_reduce_doc, "raises an exception to avoid pickling");
 
-static PyObject *
-Dialect_reduce(PyObject *self, PyObject *args) {
-    PyErr_Format(PyExc_TypeError,
-        "cannot pickle '%.100s' instances", _PyType_Name(Py_TYPE(self)));
-    return NULL;
-}
+// static PyObject *
+// Dialect_reduce(PyObject *self, PyObject *args) {
+//     PyErr_Format(PyExc_TypeError,
+//         "cannot pickle '%.100s' instances", _PyType_Name(Py_TYPE(self)));
+//     return NULL;
+// }
 
-static struct PyMethodDef dialect_methods[] = {
-    {"__reduce__", Dialect_reduce, METH_VARARGS, dialect_reduce_doc},
-    {"__reduce_ex__", Dialect_reduce, METH_VARARGS, dialect_reduce_doc},
-    {NULL, NULL}
-};
+// static struct PyMethodDef dialect_methods[] = {
+//     {"__reduce__", Dialect_reduce, METH_VARARGS, dialect_reduce_doc},
+//     {"__reduce_ex__", Dialect_reduce, METH_VARARGS, dialect_reduce_doc},
+//     {NULL, NULL}
+// };
 
 // PyDoc_STRVAR(Dialect_Type_doc,
 // "CSV dialect\n"
@@ -1158,10 +1156,10 @@ static struct PyMethodDef dialect_methods[] = {
 
 static PyType_Slot Dialect_Type_slots[] = {
     // {Py_tp_doc, (char*)Dialect_Type_doc},
-    {Py_tp_members, Dialect_memberlist},
-    {Py_tp_getset, Dialect_getsetlist},
+    // {Py_tp_members, Dialect_memberlist},
+    // {Py_tp_getset, Dialect_getsetlist},
     {Py_tp_new, dialect_new},
-    {Py_tp_methods, dialect_methods},
+    // {Py_tp_methods, dialect_methods},
     {Py_tp_finalize, Dialect_finalize},
     {Py_tp_dealloc, Dialect_dealloc},
     {0, NULL}
@@ -1782,39 +1780,81 @@ AK_IterableStrToArray1D(
 // AK module public methods
 //------------------------------------------------------------------------------
 
+static char *dtoa_kwarg_names[] = {
+    "file_like",
+    "dtypes",
+    "axis",
+    "delimiter",
+    "doublequote",
+    "escapechar",
+    "lineterminator",
+    "quotechar",
+    "quoting",
+    "skipinitialspace",
+    "strict",
+    NULL
+};
 
-
-static PyObject *
-delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args)
+static PyObject*
+delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
-    PyObject *file_like, *dtypes, *axis;
-    // load axis as long (l), avoid creation below
-    if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
+    PyObject *file_like;
+    PyObject *dtypes = NULL;
+    PyObject *axis = NULL;
+
+    PyObject *delimiter = NULL;
+    PyObject *doublequote = NULL;
+    PyObject *escapechar = NULL;
+    PyObject *lineterminator = NULL;
+    PyObject *quotechar = NULL;
+    PyObject *quoting = NULL;
+    PyObject *skipinitialspace = NULL;
+    PyObject *strict = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "OOO|OOOOOOOO:delimited_to_array", dtoa_kwarg_names,
             &file_like,
             &dtypes,
-            &axis)) // TODO: enforce this is an int?
-    {
+            &axis,
+            // kwarg only
+            &delimiter,
+            &doublequote,
+            &escapechar,
+            &lineterminator,
+            &quotechar,
+            &quoting,
+            &skipinitialspace,
+            &strict))
         return NULL;
-    }
+
+    // load axis as long (l), avoid creation below
+    // if (!PyArg_ParseTuple(args, "OOO:delimited_to_arrays",
+    //         &file_like,
+    //         &dtypes,
+    //         &axis)) // TODO: enforce this is an int?
+    // {
+    //     return NULL;
+    // }
     // NOTE: consider taking shape_estimate?
 
     // Parse text
-    // For now, we import and use the CSV module directly
-    PyObject *module_csv = PyImport_ImportModule("csv");
-    if (!module_csv) {
-        return NULL;
-    }
-    PyObject *reader = PyObject_GetAttrString(module_csv, "reader");
-    Py_DECREF(module_csv);
-    if (!reader) {
-        return NULL;
-    }
-    // TODO: pass in full parameters for parsing
-    PyObject *reader_instance = PyObject_CallFunctionObjArgs(reader, file_like, NULL);
-    Py_DECREF(reader);
-    if (!reader_instance) {
-        return NULL;
-    }
+    // PyObject *module_csv = PyImport_ImportModule("csv");
+    // if (!module_csv) {
+    //     return NULL;
+    // }
+    // PyObject *reader = PyObject_GetAttrString(module_csv, "reader");
+    // Py_DECREF(module_csv);
+    // if (!reader) {
+    //     return NULL;
+    // }
+    // // TODO: pass in full parameters for parsing
+    // PyObject *reader_instance = PyObject_CallFunctionObjArgs(reader, file_like, NULL);
+    // Py_DECREF(reader);
+    // if (!reader_instance) {
+    //     return NULL;
+    // }
+
+    PyObject *reader_instance = csv_reader(file_like, NULL);
 
     AK_CodePointGrid* cpg = AK_CPG_FromIterable(reader_instance, PyLong_AsLong(axis));
     // TODO: handle error
@@ -2249,7 +2289,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
-    {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS, NULL},
+    {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS | METH_KEYWORDS, NULL},
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
     {"_test", _test, METH_O, NULL},
     {NULL},
