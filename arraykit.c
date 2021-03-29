@@ -286,14 +286,15 @@ assign_into_slice_from_slice(PyObject *dest, PyObject *src, PyObject *dest_slice
     return success;
 }
 
+// Naive Re-implementation of C
 static PyObject *
 _roll_1d_a(PyArrayObject* array, int shift)
 {
     /*
-        post = np.empty(size, dtype=array.dtype)
-        post[0:shift] = array[-shift:]
-        post[shift:] = array[0:-shift]
-        return post
+        cls           ak           ref          ref/ak
+        Roll1dInt     3.32787074   4.06750092   1.22225328
+        Roll1dFloat   3.32698173   4.06643037   1.2222581
+        Roll1dObject  37.89614459  38.76268129  1.02286609
     */
 
     // Create an empty array
@@ -375,14 +376,15 @@ failure:
     return NULL;
 }
 
+// Manual iteration using Numpy C api
 static PyObject *
 _roll_1d_b(PyArrayObject* array, int shift, int size)
 {
     /*
-        post = np.empty(size, dtype=array.dtype)
-        post[0:shift] = array[-shift:]
-        post[shift:] = array[0:-shift]
-        return post
+        cls           ak          ref         ref/ak
+        Roll1dInt     3.94763173  0.13514971  0.03423564
+        Roll1dFloat   3.95269516  0.13621643  0.03446166
+        Roll1dObject  1.03418866  0.46459488  0.4492361
     */
 
     // Create an empty array
@@ -421,9 +423,16 @@ _roll_1d_b(PyArrayObject* array, int shift, int size)
     return (PyObject*)post;
 }
 
+// Being clever with C for primitives, struggling with Objects
 static PyObject *
 _roll_1d_c(PyArrayObject *array, int shift)
 {
+    /*
+        cls           ak           ref          ref/ak
+        Roll1dInt     2.82467638   4.14947038   1.46900736
+        Roll1dFloat   2.89442847   4.13699139   1.42929474
+        Roll1dObject  112.6879144  38.81264949  0.34442602
+    */
     // Tell the constructor to automatically allocate the output.
     // The data type of the output will match that of the input.
     PyArrayObject *arrays[2];
@@ -531,6 +540,106 @@ _roll_1d_c(PyArrayObject *array, int shift)
     return (PyObject*)ret;
 }
 
+// Being clever with C for primitives, and figuring out Objects
+static PyObject *
+_roll_1d_d(PyArrayObject *array, int shift)
+{
+    /*
+        Roll1d20kInt     2.91365521  4.25724612  1.46113586
+        Roll1d20kFloat   3.21448036  4.40039245  1.36892809
+        Roll1d20kObject  6.7969062   8.32454664  1.22475526
+        Roll1d1kInt      0.33637808  1.32518703  3.93957601
+        Roll1d1kFloat    0.32248451  1.24809331  3.87024272
+        Roll1d1kObject   1.46907919  2.9891046   2.03467901
+    */
+    // Tell the constructor to automatically allocate the output.
+    // The data type of the output will match that of the input.
+    PyArrayObject *arrays[2];
+    npy_uint32 arrays_flags[2];
+    arrays[0] = array;
+    arrays[1] = NULL;
+    arrays_flags[0] = NPY_ITER_READONLY;
+    arrays_flags[1] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE;
+
+    // No inner iteration - inner loop is handled by CopyArray code
+    // Reference objects are OK.
+    int iter_flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+
+    // Construct the iterator
+    NpyIter *iter = NpyIter_MultiNew(
+            2,              // number of arrays
+            arrays,
+            iter_flags,
+            NPY_KEEPORDER,  // Maintain existing order for `array`
+            NPY_NO_CASTING, // Both arrays will have the same dtype so casting isn't needed or allowed
+            arrays_flags,
+            NULL);          // We don't have to specify dtypes since it will use array's
+
+    /* Per the documentation for NPY_ITER_REFS_OK:
+
+        Indicates that arrays with reference types (object arrays or structured arrays
+        containing an object type) may be accepted and used in the iterator. If this flag
+        is enabled, the caller must be sure to check whether NpyIter_IterationNeedsAPI(iter)
+        is true, in which case it may not release the GIL during iteration.
+
+        However, `NpyIter_IterationNeedsAPI` is not documented at all. So.......
+    */
+
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
+
+    uint8_t is_object = PyDataType_ISOBJECT(PyArray_DESCR(array));
+
+    do {
+        char* src_data = dataptr[0];
+        char* dst_data = dataptr[1];
+        npy_intp size = *sizeptr;
+
+        int offset = ((size - shift) % size) * itemsize;
+        int first_chunk = (size * itemsize) - offset;
+
+        memcpy(dst_data, src_data + offset, first_chunk);
+        memcpy(dst_data + first_chunk, src_data, offset);
+
+        // Increment ref counts of objects.
+        if (PyDataType_ISOBJECT(PyArray_DESCR(array))) {
+            dst_data = dataptr[1];
+            for (int i = 0; i < size; ++i) {
+                PyObject* dst_ref = NULL;
+                memcpy(&dst_ref, dst_data, sizeof(dst_ref));
+                Py_INCREF(dst_ref);
+                dst_data += itemsize;
+            }
+        }
+    } while (iternext(iter));
+
+    // Get the result from the iterator object array
+    PyArrayObject *ret = NpyIter_GetOperandArray(iter)[1];
+    if (!ret) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+    Py_INCREF(ret);
+
+    if (NpyIter_Deallocate(iter) != NPY_SUCCEED) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+
+    return (PyObject*)ret;
+}
+
 static PyObject *
 roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
 {
@@ -574,7 +683,10 @@ roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
         return copy;
     }
 
-    return _roll_1d_c(array, shift);
+    //return _roll_1d_a(array, shift);       // Basically the same
+    //return _roll_1d_b(array, shift, size); // Way slower
+    //return _roll_1d_c(array, shift);       // Faster for primitives, same for objects
+    return _roll_1d_d(array, shift);         // Faster for primitives & objects!
 }
 
 

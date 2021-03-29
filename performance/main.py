@@ -223,8 +223,14 @@ class ArrayGOPerfREF(ArrayGOPerf):
     entry = staticmethod(ArrayGOREF)
 
 
+storage = []
+def build_subclassses(klass, ak_meth, ref_meth):
+    storage.append(type(f'{klass.__name__}AK', (klass,), dict(entry=staticmethod(ak_meth))))
+    storage.append(type(f'{klass.__name__}REF', (klass,), dict(entry=staticmethod(ref_meth))))
+
+
 #-------------------------------------------------------------------------------
-class Roll1d(Perf):
+class Roll1d20kInt(Perf):
     NUMBER = 10
     SIZE = 20_000
 
@@ -232,16 +238,71 @@ class Roll1d(Perf):
         self.array = np.arange(self.SIZE)
 
     def main(self):
-        for i in range(-(self.SIZE+1), self.SIZE+1):
+        for i in range(-20_001, 20_001):
+            self.entry(self.array, i)
+
+class Roll1d20kFloat(Perf):
+    NUMBER = 10
+    SIZE = 20_000
+
+    def pre(self):
+        self.array = np.arange(self.SIZE).astype(float)
+
+    def main(self):
+        for i in range(-20_001, 20_001):
+            self.entry(self.array, i)
+
+class Roll1d20kObject(Perf):
+    NUMBER = 2
+    SIZE = 20_000
+
+    def pre(self):
+        self.array = np.arange(self.SIZE).astype(object)
+
+    def main(self):
+        for i in range(-20_001, 20_001):
+            self.entry(self.array, i)
+
+class Roll1d1kInt(Perf):
+    NUMBER = 10
+    SIZE = 1_000
+
+    def pre(self):
+        self.array = np.arange(self.SIZE)
+
+    def main(self):
+        for i in range(-20_000, 20_000):
+            self.entry(self.array, i)
+
+class Roll1d1kFloat(Perf):
+    NUMBER = 10
+    SIZE = 1_000
+
+    def pre(self):
+        self.array = np.arange(self.SIZE).astype(float)
+
+    def main(self):
+        for i in range(-20_000, 20_000):
+            self.entry(self.array, i)
+
+class Roll1d1kObject(Perf):
+    NUMBER = 10
+    SIZE = 1_000
+
+    def pre(self):
+        self.array = np.arange(self.SIZE).astype(object)
+
+    def main(self):
+        for i in range(-20_000, 20_000):
             self.entry(self.array, i)
 
 
-class Roll1dAK(Roll1d):
-    entry = staticmethod(roll_1d_ak)
-
-class Roll1dREF(Roll1d):
-    entry = staticmethod(roll_1d_ref)
-
+build_subclassses(Roll1d20kInt, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d20kFloat, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d20kObject, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d1kInt, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d1kFloat, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d1kObject, roll_1d_ak, roll_1d_ref)
 
 #-------------------------------------------------------------------------------
 
