@@ -433,15 +433,29 @@ _roll_1d_c(PyArrayObject *array, int shift)
     arrays_flags[0] = NPY_ITER_READONLY;
     arrays_flags[1] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE;
 
+    // No inner iteration - inner loop is handled by CopyArray code
+    // Reference objects are OK.
+    int iter_flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+
     // Construct the iterator
     NpyIter *iter = NpyIter_MultiNew(
-            2,                      // number of arrays
+            2,              // number of arrays
             arrays,
-            NPY_ITER_EXTERNAL_LOOP, // No inner iteration - inner loop is handled by CopyArray code
-            NPY_KEEPORDER,          // Maintain existing order
-            NPY_NO_CASTING,         // Only allows identical types
+            iter_flags,
+            NPY_KEEPORDER,  // Maintain existing order for `array`
+            NPY_NO_CASTING, // Both arrays will have the same dtype so casting isn't needed or allowed
             arrays_flags,
-            NULL);                  // We don't have to specify dtypes since it will use array's
+            NULL);          // We don't have to specify dtypes since it will use array's
+
+    /* Per the documentation for NPY_ITER_REFS_OK:
+
+        Indicates that arrays with reference types (object arrays or structured arrays
+        containing an object type) may be accepted and used in the iterator. If this flag
+        is enabled, the caller must be sure to check whether NpyIter_IterationNeedsAPI(iter)
+        is true, in which case it may not release the GIL during iteration.
+
+        However, `NpyIter_IterationNeedsAPI` is not documented at all. So.......
+    */
 
     if (iter == NULL) {
         return NULL;
@@ -457,18 +471,49 @@ _roll_1d_c(PyArrayObject *array, int shift)
     npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
     npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
 
-    // TODO: This does NOT work with objects....
-    do {
-        char* src_data = dataptr[0];
-        char* dst_data = dataptr[1];
-        npy_intp size = *sizeptr;
+    if (!PyDataType_ISOBJECT(PyArray_DESCR(array))) {
+        do {
+            char* src_data = dataptr[0];
+            char* dst_data = dataptr[1];
+            npy_intp size = *sizeptr;
 
-        int offset = ((size - shift) % size) * itemsize;
-        int first_chunk = (size * itemsize) - offset;
+            int offset = ((size - shift) % size) * itemsize;
+            int first_chunk = (size * itemsize) - offset;
 
-        memcpy(dst_data, src_data + offset, first_chunk);
-        memcpy(dst_data + first_chunk, src_data, offset);
-    } while (iternext(iter));
+            memcpy(dst_data, src_data + offset, first_chunk);
+            memcpy(dst_data + first_chunk, src_data, offset);
+        } while (iternext(iter));
+    }
+    else {
+        // Object arrays contain pointers to arrays.
+        do {
+            char* src_data = dataptr[0];
+            char* dst_data = dataptr[1];
+            npy_intp size = *sizeptr;
+
+            PyObject* src_ref = NULL;
+            PyObject* dst_ref = NULL;
+
+            for (int i = 0; i < size; ++i) {
+                int offset = ((i + size - shift) % size) * itemsize;
+
+                // Update our temp PyObject* 's
+                memcpy(&src_ref, src_data + offset, sizeof(src_ref));
+                memcpy(&dst_ref, dst_data, sizeof(dst_ref));
+
+                // Copy the reference
+                memcpy(dst_data, &src_ref, sizeof(src_ref));
+
+                // Claim the reference
+                Py_XINCREF(src_ref);
+
+                // Release the reference in dst
+                Py_XDECREF(dst_ref);
+
+                dst_data += itemsize;
+            }
+        } while (iternext(iter));
+    }
 
     // Get the result from the iterator object array
     PyArrayObject *ret = NpyIter_GetOperandArray(iter)[1];
