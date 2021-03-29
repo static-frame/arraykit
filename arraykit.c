@@ -1058,7 +1058,7 @@ dialect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
         // Py_CLEAR(dialect);
         return NULL;
     }
-    self->lineterminator = NULL;
+    // self->lineterminator = NULL;
 
     Py_XINCREF(delimiter);
     Py_XINCREF(doublequote);
@@ -1226,7 +1226,7 @@ AK_DR_Dialect_New(PyObject *delimiter,
         // Py_CLEAR(dialect);
         return NULL;
     }
-    self->lineterminator = NULL;
+    // self->lineterminator = NULL;
 
     Py_XINCREF(delimiter);
     Py_XINCREF(doublequote);
@@ -1275,7 +1275,6 @@ AK_DR_Dialect_New(PyObject *delimiter,
     return self;
 err:
     Py_CLEAR(self);
-    // Py_CLEAR(dialect);
     Py_CLEAR(delimiter);
     Py_CLEAR(doublequote);
     Py_CLEAR(escapechar);
@@ -2397,7 +2396,10 @@ static PyMethodDef arraykit_methods[] =  {
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
-    {"delimited_to_arrays", delimited_to_arrays, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"delimited_to_arrays",
+            (PyCFunction)delimited_to_arrays,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
     {"_test", _test, METH_O, NULL},
     {NULL},
