@@ -383,18 +383,16 @@ AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
         npy_intp size = *sizeptr;
         npy_intp stride = *strideptr;
 
+        PyObject* obj_ref = NULL;
+
         while (size--) {
-            PyObject* obj;
-            memcpy(&obj, data, sizeof(obj));
-            if (!obj) {
-                goto failure;
-            }
-            Py_INCREF(obj);
+            // Object arrays contains pointers to PyObjects, so we will only temporarily
+            // look at the reference here.
+            memcpy(&obj_ref, data, sizeof(obj_ref));
 
             // 5. Assign into result whether or not the element exists in the set
             // int found = PySequence_Contains(compare_elements, ((PyObject**)data)[0]);
-            int found = PySequence_Contains(compare_elements, obj);
-            Py_DECREF(obj);
+            int found = PySequence_Contains(compare_elements, obj_ref);
 
             if (found == -1) {
                 goto failure;
