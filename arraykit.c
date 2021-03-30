@@ -504,7 +504,7 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
     return -1;
 }
 
-static inline npy_int64 AK_CPL_ParseLong(AK_CodePointLine* cpl)
+static inline npy_int64 AK_CPL_ParseInt64(AK_CodePointLine* cpl)
 {
     // char* c = AK_CPL_ToNewChars(cpl);
     // long v = PyOS_strtol(c, NULL, 10);
@@ -565,7 +565,7 @@ static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
 
     AK_CPL_CurrentReset(cpl);
     while (array_buffer < end) {
-        *array_buffer++ = AK_CPL_ParseLong(cpl);
+        *array_buffer++ = AK_CPL_ParseInt64(cpl);
         AK_CPL_CurrentAdvance(cpl);
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
@@ -772,7 +772,7 @@ static const StyleDesc quote_styles[] = {
 };
 
 static int
-_set_bool(const char *name, char *target, PyObject *src, bool dflt)
+AK_Dialect_set_bool(const char *name, char *target, PyObject *src, bool dflt)
 {
     if (src == NULL)
         *target = dflt;
@@ -786,7 +786,7 @@ _set_bool(const char *name, char *target, PyObject *src, bool dflt)
 }
 
 static int
-_set_int(const char *name, int *target, PyObject *src, int dflt)
+AK_Dialect_set_int(const char *name, int *target, PyObject *src, int dflt)
 {
     if (src == NULL)
         *target = dflt;
@@ -807,7 +807,7 @@ _set_int(const char *name, int *target, PyObject *src, int dflt)
 }
 
 static int
-_set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 dflt)
+AK_Dialect_set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 dflt)
 {
     if (src == NULL)
         *target = dflt;
@@ -837,7 +837,7 @@ _set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 dflt)
 }
 
 static int
-_set_str(const char *name, PyObject **target, PyObject *src, const char *dflt)
+AK_Dialect_set_str(const char *name, PyObject **target, PyObject *src, const char *dflt)
 {
     if (src == NULL)
         *target = PyUnicode_DecodeASCII(dflt, strlen(dflt), NULL);
@@ -860,10 +860,9 @@ _set_str(const char *name, PyObject **target, PyObject *src, const char *dflt)
 }
 
 static int
-dialect_check_quoting(int quoting)
+AK_Dialect_check_quoting(int quoting)
 {
     const StyleDesc *qs;
-
     for (qs = quote_styles; qs->name; qs++) {
         if ((int)qs->style == quoting)
             return 0;
@@ -882,7 +881,7 @@ typedef struct {
     Py_UCS4 quotechar;          /* quote character */
     Py_UCS4 escapechar;         /* escape character */
     PyObject *lineterminator;   /* string to write between records */
-} AK_DR_Dialect;
+} AK_Dialect;
 
 
 // check types and convert to C values
@@ -890,8 +889,8 @@ typedef struct {
     if (meth(name, target, src, default)) \
         goto err
 
-static AK_DR_Dialect*
-AK_DR_DialectNew(PyObject *delimiter,
+static AK_Dialect*
+AK_DialectNew(PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
         PyObject *lineterminator,
@@ -901,7 +900,7 @@ AK_DR_DialectNew(PyObject *delimiter,
         PyObject *strict
         )
 {
-    AK_DR_Dialect *dialect = (AK_DR_Dialect *) PyMem_Malloc(sizeof(AK_DR_Dialect));
+    AK_Dialect *dialect = (AK_Dialect *) PyMem_Malloc(sizeof(AK_Dialect));
     if (dialect == NULL) {
         return NULL;
     }
@@ -915,25 +914,25 @@ AK_DR_DialectNew(PyObject *delimiter,
     Py_XINCREF(skipinitialspace);
     Py_XINCREF(strict);
 
-    AK_CALL_WITH_GOTO(_set_char, "delimiter", &dialect->delimiter, delimiter, ',');
-    AK_CALL_WITH_GOTO(_set_bool, "doublequote", &dialect->doublequote, doublequote, true);
-    AK_CALL_WITH_GOTO(_set_char, "escapechar", &dialect->escapechar, escapechar, 0);
-    AK_CALL_WITH_GOTO(_set_str,
+    AK_CALL_WITH_GOTO(AK_Dialect_set_char, "delimiter", &dialect->delimiter, delimiter, ',');
+    AK_CALL_WITH_GOTO(AK_Dialect_set_bool, "doublequote", &dialect->doublequote, doublequote, true);
+    AK_CALL_WITH_GOTO(AK_Dialect_set_char, "escapechar", &dialect->escapechar, escapechar, 0);
+    AK_CALL_WITH_GOTO(AK_Dialect_set_str,
             "lineterminator",
             &dialect->lineterminator,
             lineterminator,
             "\r\n");
-    AK_CALL_WITH_GOTO(_set_char, "quotechar", &dialect->quotechar, quotechar, '"');
-    AK_CALL_WITH_GOTO(_set_int, "quoting", &dialect->quoting, quoting, QUOTE_MINIMAL);
-    AK_CALL_WITH_GOTO(_set_bool,
+    AK_CALL_WITH_GOTO(AK_Dialect_set_char, "quotechar", &dialect->quotechar, quotechar, '"');
+    AK_CALL_WITH_GOTO(AK_Dialect_set_int, "quoting", &dialect->quoting, quoting, QUOTE_MINIMAL);
+    AK_CALL_WITH_GOTO(AK_Dialect_set_bool,
             "skipinitialspace",
             &dialect->skipinitialspace,
             skipinitialspace,
             false);
-    AK_CALL_WITH_GOTO(_set_bool, "strict", &dialect->strict, strict, false);
+    AK_CALL_WITH_GOTO(AK_Dialect_set_bool, "strict", &dialect->strict, strict, false);
 
     /* validate options */
-    if (dialect_check_quoting(dialect->quoting))
+    if (AK_Dialect_check_quoting(dialect->quoting))
         goto err;
     if (dialect->delimiter == 0) {
         PyErr_SetString(PyExc_TypeError,
@@ -967,13 +966,12 @@ err:
 }
 
 void
-AK_DR_Dialect_Free(AK_DR_Dialect* dialect)
+AK_Dialect_Free(AK_Dialect* dialect)
 {
     PyMem_Free(dialect);
 }
 
 //------------------------------------------------------------------------------
-
 
 // reader
 
@@ -981,7 +979,7 @@ typedef struct {
     PyObject_HEAD
 
     PyObject *input_iter;   /* iterate over this for input lines */
-    AK_DR_Dialect *dialect;    /* parsing dialect */
+    AK_Dialect *dialect;    /* parsing dialect */
 
     PyObject *fields;           /* field list for current record */
     ParserState state;          /* current CSV parse state */
@@ -1057,7 +1055,7 @@ parse_add_char(ReaderObj *self, Py_UCS4 c)
 static int
 parse_process_char(ReaderObj *self, Py_UCS4 c)
 {
-    AK_DR_Dialect *dialect = self->dialect;
+    AK_Dialect *dialect = self->dialect;
 
     switch (self->state) {
     case START_RECORD: /* start of record */
@@ -1309,7 +1307,7 @@ Reader_dealloc(ReaderObj *self)
     PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_UnTrack(self);
     // Py_CLEAR(self->dialect);
-    AK_DR_Dialect_Free(self->dialect);
+    AK_Dialect_Free(self->dialect);
     self->dialect = NULL;
 
     Py_CLEAR(self->input_iter);
@@ -1420,7 +1418,7 @@ csv_reader(PyObject *iterable,
         return NULL;
     }
 
-    self->dialect = AK_DR_DialectNew(
+    self->dialect = AK_DialectNew(
             delimiter,
             doublequote,
             escapechar,
