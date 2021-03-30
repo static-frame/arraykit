@@ -1,6 +1,5 @@
 # include "Python.h"
 # include "structmember.h"
-# include "limits.h"
 # include "stdbool.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
@@ -300,14 +299,14 @@ static char* FALSE_UPPER = "FALSE";
 
 
 // Extended from pandas/_libs/src/parser/tokenizer.c
-static inline int64_t UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+static inline npy_int64 UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 {
     char tsep = '\0'; // thousands seperator; if null processing is skipped
-    int64_t int_min = LONG_LONG_MIN;
-    int64_t int_max = LONG_LONG_MAX;
+    npy_int64 int_min = NPY_MIN_INT64;
+    npy_int64 int_max = NPY_MAX_INT64;
     Py_UCS4 *p = p_item;
     int isneg = 0;
-    int64_t number = 0;
+    npy_int64 number = 0;
     int d;
     // Skip leading spaces.
     while (isspace_ascii(*p)) {
@@ -331,7 +330,7 @@ static inline int64_t UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     if (isneg) {
         // If number is greater than pre_min, at least one more digit can be processed without overflowing.
         int dig_pre_min = -(int_min % 10);
-        int64_t pre_min = int_min / 10;
+        npy_int64 pre_min = int_min / 10;
         d = *p;
         if (tsep != '\0') {
             while (1) {
@@ -370,7 +369,7 @@ static inline int64_t UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
         }
     } else {
         // If number is less than pre_max, at least one more digit can be processed without overflowing.
-        int64_t pre_max = int_max / 10;
+        npy_int64 pre_max = int_max / 10;
         int dig_pre_max = int_max % 10;
         d = *p;
         if (tsep != '\0') {
@@ -486,7 +485,7 @@ static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
     return -1;
 }
 
-static inline int64_t AK_CPL_ParseLong(AK_CodePointLine* cpl)
+static inline npy_int64 AK_CPL_ParseLong(AK_CodePointLine* cpl)
 {
     // char* c = AK_CPL_ToNewChars(cpl);
     // long v = PyOS_strtol(c, NULL, 10);
@@ -496,7 +495,7 @@ static inline int64_t AK_CPL_ParseLong(AK_CodePointLine* cpl)
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
     int error;
-    int64_t v = UCS4_to_int64(p, end, &error);
+    npy_int64 v = UCS4_to_int64(p, end, &error);
     return v;
 
 }
@@ -534,15 +533,16 @@ static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_LONGLONG);
+    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_INT64); // normalize to always be 64 even on windows
     // TODO: check error
 
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     // TODO: check error
 
-    npy_longlong *array_buffer = (npy_longlong*)PyArray_DATA((PyArrayObject*)array);
-    npy_longlong *end = array_buffer + count;
+    // Long will be 64 on unix, 32 on windows, which is expected
+    npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
+    npy_int64 *end = array_buffer + count;
 
     AK_CPL_CurrentReset(cpl);
     while (array_buffer < end) {
