@@ -156,7 +156,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
     if (!id) {
         return NULL;
     }
-    PyObject *found = PyDict_GetItem(memo, id);
+    PyObject *found = PyDict_GetItemWithError(memo, id);
     if (found) { // found will be NULL if not in dict
         Py_INCREF(found); // got a borrowed ref, increment first
         Py_DECREF(id);
