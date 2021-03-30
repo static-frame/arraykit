@@ -1424,7 +1424,6 @@ csv_reader(PyObject *iterable,
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-// AK_SequenceStrToArray1DAuto(PyObject* sequence)
 // Determine the type dynamically
 // Ideas: keep the same sequence and mutate it in-place with Python objects when necessary
 //      track observations through iteration to determine type to give to PyArray_FromAny
