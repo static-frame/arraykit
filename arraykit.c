@@ -190,9 +190,9 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
-    int size0 = PyArray_DIM(array, 0);
+    int size0 = (int)PyArray_DIM(array, 0);
     // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
-    int size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    int size1 = (int)(PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1));
     return Py_BuildValue("ii", size0, size1);
 }
 
@@ -314,14 +314,14 @@ _roll_1d_a(PyArrayObject* array, int shift)
     int success;
 
     // First Assign
-    success = assign_into_slice_from_slice(post, 0, shift, (PyObject*)array, -shift, PyArray_SIZE(array));
+    success = assign_into_slice_from_slice(post, 0, shift, (PyObject*)array, -shift, (int)PyArray_SIZE(array));
     if (success == -1) {
         Py_DECREF(post);
         return NULL;
     }
 
     // Second Assign
-    success = assign_into_slice_from_slice(post, shift, PyArray_SIZE(array), (PyObject*)array, 0, -shift);
+    success = assign_into_slice_from_slice(post, shift, (int)PyArray_SIZE(array), (PyObject*)array, 0, -shift);
     if (success == -1) {
         Py_DECREF(post);
         return NULL;
@@ -440,8 +440,8 @@ _roll_1d_c(PyArrayObject *array, int shift)
             char* dst_data = dataptr[1];
             npy_intp size = *sizeptr;
 
-            int offset = ((size - shift) % size) * itemsize;
-            int first_chunk = (size * itemsize) - offset;
+            npy_intp offset = ((size - shift) % size) * itemsize;
+            npy_intp first_chunk = (size * itemsize) - offset;
 
             memcpy(dst_data, src_data + offset, first_chunk);
             memcpy(dst_data + first_chunk, src_data, offset);
@@ -458,7 +458,7 @@ _roll_1d_c(PyArrayObject *array, int shift)
             PyObject* dst_ref = NULL;
 
             for (int i = 0; i < size; ++i) {
-                int offset = ((i + size - shift) % size) * itemsize;
+                npy_intp offset = ((i + size - shift) % size) * itemsize;
 
                 // Update our temp PyObject* 's
                 memcpy(&src_ref, src_data + offset, sizeof(src_ref));
@@ -558,8 +558,8 @@ _roll_1d_d(PyArrayObject *array, int shift)
         char* dst_data = dataptr[1];
         npy_intp size = *sizeptr;
 
-        int offset = ((size - shift) % size) * itemsize;
-        int first_chunk = (size * itemsize) - offset;
+        npy_intp offset = ((size - shift) % size) * itemsize;
+        npy_intp first_chunk = (size * itemsize) - offset;
 
         memcpy(dst_data, src_data + offset, first_chunk);
         memcpy(dst_data + first_chunk, src_data, offset);
@@ -568,9 +568,7 @@ _roll_1d_d(PyArrayObject *array, int shift)
         if (PyDataType_ISOBJECT(PyArray_DESCR(array))) {
             dst_data = dataptr[1];
             while (size--) {
-                PyObject* dst_ref = NULL;
-                memcpy(&dst_ref, dst_data, sizeof(dst_ref));
-                Py_INCREF(dst_ref);
+                Py_INCREF(*(PyObject**)dst_data);
                 dst_data += itemsize;
             }
         }
@@ -703,8 +701,8 @@ _roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
     npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
     npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
 
-    uint32_t NUM_ROWS = PyArray_DIM(array, 0); // 3 rows
-    uint32_t rowsize  = PyArray_DIM(array, 1); // 5 cols (or 5 elements in each row)
+    uint32_t NUM_ROWS = (uint32_t)PyArray_DIM(array, 0);
+    uint32_t rowsize  = (uint32_t)PyArray_DIM(array, 1);
 
     do {
         char* src_data = dataptr[0];
