@@ -58,14 +58,14 @@ class TestUnit(unittest.TestCase):
         # NOTE: floats will be truncated
         a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], int)
         self.assertEqual(a1.tolist(), [23, -54, 1000, 23])
-        self.assertEqual(a1.dtype, np.dtype(int))
+        self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
 
     def test_sequence_str_to_array_1d_int_2(self) -> None:
         # NOTE: empty strings get converted to zero
         a1 = iterable_str_to_array_1d(['23', '', '  -123000', '23'], int)
         self.assertEqual(a1.tolist(), [23, 0, -123000, 23])
-        self.assertEqual(a1.dtype, np.dtype(int))
+        self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
 
 
