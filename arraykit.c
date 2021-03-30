@@ -274,14 +274,15 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 // rolling
 
 static int
-assign_into_slice_from_slice(PyObject *dest, PyObject *src, PyObject *dest_slice, PyObject *src_slice)
+assign_into_slice_from_slice(PyObject *dst, int dst_start, int dst_stop,
+                             PyObject *src, int src_start, int src_stop)
 {
-    PyObject* shifted_src = PyObject_GetItem((PyObject*)src, src_slice);
+    PyObject* shifted_src = PySequence_GetSlice(src, src_start, src_stop);
     if (!shifted_src) {
         return -1;
     }
 
-    int success = PyObject_SetItem(dest, dest_slice, shifted_src);
+    int success = PySequence_SetSlice(dst, dst_start, dst_stop, shifted_src);
     Py_DECREF(shifted_src);
     return success;
 }
@@ -310,70 +311,23 @@ _roll_1d_a(PyArrayObject* array, int shift)
         return NULL;
     }
 
-    // Build integers
-    PyObject* zero = PyLong_FromLong(0);
-    PyObject* pos_shift = PyLong_FromLong(shift);
-    PyObject* neg_shift = PyLong_FromLong(-shift);
-    if (!zero || !pos_shift || !neg_shift) {
-        goto integer_build_failure;
-    }
-
-    // Build slices
-    PyObject* first_dest_slice = PySlice_New(zero, pos_shift, Py_None);     // [0:shift]
-    PyObject* first_src_slice = PySlice_New(neg_shift, Py_None, Py_None);   // [-shift:]
-    PyObject* second_dest_slice = PySlice_New(pos_shift, Py_None, Py_None); // [shift:]
-    PyObject* second_src_slice = PySlice_New(zero, neg_shift, Py_None);     // [0:-shift]
-    Py_DECREF(zero);
-    Py_DECREF(pos_shift);
-    Py_DECREF(neg_shift);
-    if (!first_dest_slice || !first_src_slice || !second_dest_slice || !second_src_slice) {
-        goto slice_build_failure;
-    }
-
     int success;
 
     // First Assign
-    success = assign_into_slice_from_slice(post, (PyObject*)array, first_dest_slice, first_src_slice);
-    Py_DECREF(first_dest_slice);
-    Py_DECREF(first_src_slice);
+    success = assign_into_slice_from_slice(post, 0, shift, (PyObject*)array, -shift, PyArray_SIZE(array));
     if (success == -1) {
-        Py_DECREF(second_dest_slice);
-        Py_DECREF(second_src_slice);
-        goto failure;
+        Py_DECREF(post);
+        return NULL;
     }
 
-    // First Assign
-    success = assign_into_slice_from_slice(post, (PyObject*)array, second_dest_slice, second_src_slice);
-    Py_DECREF(second_src_slice);
-    Py_DECREF(second_dest_slice);
+    // Second Assign
+    success = assign_into_slice_from_slice(post, shift, PyArray_SIZE(array), (PyObject*)array, 0, -shift);
     if (success == -1) {
-        goto failure;
+        Py_DECREF(post);
+        return NULL;
     }
 
     return post;
-
-// Handled potentially leaked integer objects
-integer_build_failure:
-    Py_XDECREF(zero);
-    Py_XDECREF(pos_shift);
-    Py_XDECREF(neg_shift);
-    goto failure;
-
-// Handled potentially leaked slice objects
-slice_build_failure:
-    // Integers objects have all been cleaned up.
-    Py_XDECREF(first_dest_slice);
-    Py_XDECREF(first_src_slice);
-    Py_XDECREF(second_dest_slice);
-    Py_XDECREF(second_src_slice);
-    goto failure;
-
-// Handle final object that will always exist at this point.
-failure:
-    // Integers objects have all been cleaned up.
-    // Slice objects have all been cleaned up.
-    Py_DECREF(post);
-    return NULL;
 }
 
 // Manual iteration using Numpy C api
@@ -599,8 +553,6 @@ _roll_1d_d(PyArrayObject *array, int shift)
     npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
     npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
 
-    uint8_t is_object = PyDataType_ISOBJECT(PyArray_DESCR(array));
-
     do {
         char* src_data = dataptr[0];
         char* dst_data = dataptr[1];
@@ -615,7 +567,7 @@ _roll_1d_d(PyArrayObject *array, int shift)
         // Increment ref counts of objects.
         if (PyDataType_ISOBJECT(PyArray_DESCR(array))) {
             dst_data = dataptr[1];
-            for (int i = 0; i < size; ++i) {
+            while (size--) {
                 PyObject* dst_ref = NULL;
                 memcpy(&dst_ref, dst_data, sizeof(dst_ref));
                 Py_INCREF(dst_ref);
