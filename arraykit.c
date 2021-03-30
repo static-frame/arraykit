@@ -43,6 +43,25 @@
         return NULL;\
     } while (0)
 
+# define _AK_DEBUG_BEGIN() \
+    do {                   \
+        fprintf(stderr, "XXX %s:%i:%s: ", __FILE__, __LINE__, __FUNCTION__);
+
+# define _AK_DEBUG_END()       \
+        fprintf(stderr, "\n"); \
+        fflush(stderr);        \
+    } while (0)
+
+# define AK_DEBUG_OBJ(obj)              \
+    _AK_DEBUG_BEGIN();                  \
+        fprintf(stderr, #obj " = ");    \
+        PyObject_Print(obj, stderr, 0); \
+    _AK_DEBUG_END()
+
+# define AK_DEBUG(msg)          \
+    _AK_DEBUG_BEGIN();          \
+        fprintf(stderr, #msg);  \
+    _AK_DEBUG_END()
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
