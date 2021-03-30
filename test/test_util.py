@@ -14,7 +14,7 @@ from arraykit import immutable_filter
 from performance.reference.util import mloc as mloc_ref
 #from performance.reference.util import roll_1d
 from arraykit import roll_1d
-from performance.reference.util import roll_2d
+from arraykit import roll_2d
 
 
 class TestUnit(unittest.TestCase):
@@ -192,6 +192,21 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(roll_1d(a1, -1).tolist(), [4, 5, 6, 3])
 
     #---------------------------------------------------------------------------
+    def test_roll_2d_row(self) -> None:
+        arr = np.arange(15).reshape(3, 5)
+
+        for shift in range(-10, 10):
+            np_result = np.roll(arr, shift, axis=0)
+            ak_result = roll_2d(arr, shift, axis=0)
+            self.assertTrue((np_result == ak_result).all())
+
+    def test_roll_2d_col(self) -> None:
+        arr = np.arange(15).reshape(3, 5)
+
+        for shift in range(-10, 10):
+            np_result = np.roll(arr, shift, axis=1)
+            ak_result = roll_2d(arr, shift, axis=1)
+            self.assertTrue((np_result == ak_result).all())
 
     def test_roll_2d_a(self) -> None:
         a1 = np.arange(12).reshape((3,4))
@@ -242,7 +257,7 @@ class TestUnit(unittest.TestCase):
                 )
 
     def test_roll_2d_f(self) -> None:
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             roll_2d(np.arange(4).reshape((2, 2)), 1, axis=2)
 
 

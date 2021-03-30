@@ -203,10 +203,7 @@ def roll_1d(array: np.ndarray, shift: int) -> np.ndarray:
     return post
 
 
-def roll_2d(array: np.ndarray,
-            shift: int,
-            axis: int
-            ) -> np.ndarray:
+def roll_2d(array: np.ndarray, shift: int, axis: int) -> np.ndarray:
     '''
     Specialized form of np.roll that, by focusing on the 2D solution
     '''

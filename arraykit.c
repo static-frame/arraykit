@@ -641,6 +641,325 @@ roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
     return _roll_1d_d(array, shift);         // Faster for primitives & objects!
 }
 
+// -----------------------------------------------------------------------------
+
+static PyObject *
+_roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
+{
+    /*
+    if axis == 0: # roll rows
+        post[0:shift, :] = array[-shift:, :]
+        post[shift:, :] = array[0:-shift, :]
+        return post
+
+    # roll columns
+    post[:, 0:shift] = array[:, -shift:]
+    post[:, shift:] = array[:, 0:-shift]
+    */
+    // Tell the constructor to automatically allocate the output.
+    // The data type of the output will match that of the input.
+    PyArrayObject *arrays[2];
+    npy_uint32 arrays_flags[2];
+    arrays[0] = array;
+    arrays[1] = NULL;
+    arrays_flags[0] = NPY_ITER_READONLY;
+    arrays_flags[1] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE;
+
+    // No inner iteration - inner loop is handled by CopyArray code
+    // Reference objects are OK.
+    int iter_flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+
+    // Construct the iterator
+    NpyIter *iter = NpyIter_MultiNew(
+            2,              // number of arrays
+            arrays,
+            iter_flags,
+            NPY_KEEPORDER,
+            NPY_NO_CASTING, // Both arrays will have the same dtype so casting isn't needed or allowed
+            arrays_flags,
+            NULL);          // We don't have to specify dtypes since it will use array's
+
+    /* Per the documentation for NPY_ITER_REFS_OK:
+
+        Indicates that arrays with reference types (object arrays or structured arrays
+        containing an object type) may be accepted and used in the iterator. If this flag
+        is enabled, the caller must be sure to check whether NpyIter_IterationNeedsAPI(iter)
+        is true, in which case it may not release the GIL during iteration.
+
+        However, `NpyIter_IterationNeedsAPI` is not documented at all. So.......
+    */
+
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
+
+    uint32_t NUM_ROWS = PyArray_DIM(array, 0); // 3 rows
+    uint32_t rowsize  = PyArray_DIM(array, 1); // 5 cols (or 5 elements in each row)
+
+    do {
+        char* src_data = dataptr[0];
+        char* dst_data = dataptr[1];
+        npy_intp size = *sizeptr;
+
+        if (axis == 0) {
+            /*
+            Shift by rows! This is the easy case.
+
+            Imagine we have this array:
+            [0 1 2]
+            [3 4 5]
+            [6 7 8]
+
+            In memory, this is stored contiguously as: [0 1 2 3 4 5 6 7 8]
+            Placing parentheses, we can visualize where the columns are like so:
+                [(0 1 2) (3 4 5) (6 7 8)]
+
+            Given this, all we are concerned about is two contiguous blocks of memory.
+
+            For example, if shift = 1, we can copy from row[1] -> END to the front
+
+            source = [(0 1 2) (3 4 5) (6 7 8)]
+                               | | |   | | |
+                         -----------------
+                       | | |   | | |
+                       V V V   V V V
+            buffer = [(3 4 5) (6 7 8) (X X X)]
+
+            Now, we fill in the missing tail bytes with row[0] from the src buffer
+
+            source = [(0 1 2) (3 4 5) (6 7 8)]
+                       | | |
+                         -----------------
+                                       | | |
+                                       V V V
+            buffer = [(3 4 5) (6 7 8) (0 1 2)]
+
+            Now, our internal memory represents the result of a row shift.
+            We can see this if we represent the final buffer as a 2D grid:
+
+            [6 7 8]
+            [0 1 2]
+            [3 4 5]
+            */
+
+            // Easiest case! Merely shift the rows
+            int offset = ((NUM_ROWS - shift) % NUM_ROWS) * rowsize * itemsize;
+            int first_chunk = (size * itemsize) - offset;
+
+            memcpy(dst_data, src_data + offset, first_chunk);
+            memcpy(dst_data + first_chunk, src_data, offset);
+        }
+        else {
+            /*
+            Shift by columns! This is the more difficult case.
+
+            Let's use a slightly different array
+            [0 1 2 3 4]
+            [5 6 7 8 9]
+            [A B C D E]
+
+            If we shift by 2, our goal array will be:
+            [3 4 0 1 2]
+            [8 9 5 6 7]
+            [D E A B C]
+
+            Alternatively, we want our contiguous memory to go from:
+
+            source = [(0 1 2 3 4) (5 6 7 8 9) (A B C D E)]
+            buffer = [(3 4 0 1 2) (8 9 5 6 7) (D E A B C)]
+
+            In order to do this as efficiently as possible, we first fill the result buffer with the source shifted.
+
+            source = [(0 1 2 3 4) (5 6 7 8 9) (A B C D E)]
+                        \ \ \ \ \   \ \ \ \ \   \ \ \
+                         \ \ \  ----  \ \ \ ----  \ \ \
+                          \ \ \    \ \ \ \ \   \ \ \ \ \
+            buffer = [(X X 0 1 2) (3 4 5 6 7) (8 9 A B C)]
+
+            Now, all that's left is to fix the incorrect values
+
+            buffer = [(X X 0 1 2) (3 4 5 6 7) (8 9 A B C)]
+                       ^ ^         ^ ^         ^ ^
+
+            We can fill these by copying the values from each row
+
+            source = [(0 1 2 3 4) (5 6 7 8 9) (A B C D E)]
+                             | |         | |         | |
+                        -------     -------     -------
+                       | |         | |         | |
+                       V V         V V         V V
+            buffer = [(3 4 0 1 2) (8 9 5 6 7) (D E A B C)]
+
+            Now, our internal memory represents the result of a row shift.
+            We can see this if we represent the final buffer as a 2D grid:
+
+            [3 4 0 1 2]
+            [8 9 5 6 7]
+            [D E A B C]
+            */
+            if (shift > rowsize / 2) {
+                /* SHIFT LEFT
+
+                This branch is optimized for cases where the offset is greater than half of the columns.
+
+                For this, instead of shifting right and being forced to fill in a large section for each row,
+                we shift left and only have to fill in small section
+
+                Example:
+
+                Inefficient
+                [0 1 2 3 4]   [0 1 2 3 4]
+                 \               | | | |
+                  ------        -------
+                         \     | | | |
+                         V     V V V V
+                [X X X X 0]   [1 2 3 4 0]
+
+                Efficient
+                [0 1 2 3 4]   [0 1 2 3 4]
+                  / / / /      |
+                  | | | |       -------
+                  | | | |              |
+                 / / / /               V
+                [1 2 3 4 X]   [1 2 3 4 0]
+                */
+                int offset = (rowsize - shift) * itemsize;
+                int num_bytes = (size * itemsize) - offset;
+                memcpy(dst_data, src_data+offset, num_bytes);
+
+                num_bytes = offset; // This is how much we need to copy for each column.
+
+                // Update the shifted portion of each row.
+                for (size_t i = 0; i < NUM_ROWS; ++i) {
+                    int row_offset = i * rowsize * itemsize;
+
+                    // We need to fill in the rightmost values of this row since we shifted by an offset
+                    int dst_offset = row_offset + ((rowsize * itemsize) - offset);
+                    int src_offset = row_offset;
+
+                    memcpy(dst_data + dst_offset, src_data + src_offset, num_bytes);
+                }
+            }
+            else {
+                // SHIFT RIGHT
+                int offset = shift * itemsize;
+                int num_bytes = (size * itemsize) - offset;
+                memcpy(dst_data+offset, src_data, num_bytes);
+
+                num_bytes = offset; // This is how much we need to copy for each column.
+
+                // Update the shifted portion of each row.
+                for (size_t i = 0; i < NUM_ROWS; ++i) {
+                    int row_offset = i * rowsize * itemsize;
+
+                    // We need to fill in the leftmost values of this row since we shifted by an offset
+                    int dst_offset = row_offset;
+                    int src_offset = row_offset + ((rowsize - shift) * itemsize);
+
+                    memcpy(dst_data + dst_offset, src_data + src_offset, num_bytes);
+                }
+            }
+        }
+    } while (iternext(iter));
+
+    // Get the result from the iterator object array
+    PyArrayObject *ret = NpyIter_GetOperandArray(iter)[1];
+    if (!ret) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+    Py_INCREF(ret);
+
+    if (NpyIter_Deallocate(iter) != NPY_SUCCEED) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+
+    return (PyObject*)ret;
+}
+
+static PyObject *
+roll_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    /* Algorithm.
+
+        size = array.shape[axis]
+
+        if shift != 0:
+            shift = shift % size
+
+        if size <= 1 or shift == 0:
+            return array.copy()
+
+        if shift < 0:
+            shift = size + shift
+
+        if axis == 0:
+            post[0:shift, :] = array[-shift:, :]
+            post[shift:, :] = array[0:-shift, :]
+            return post
+
+        post[:, 0:shift] = array[:, -shift:]
+        post[:, shift:] = array[:, 0:-shift]
+        return post
+    */
+    PyArrayObject *array;
+    int shift;
+    int axis;
+
+    static char *kwlist[] = {"array", "shift", "axis", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!ii:roll_1d",
+                                     kwlist,
+                                     &PyArray_Type, &array,
+                                     &shift, &axis))
+    {
+        return NULL;
+    }
+
+    if (axis != 0 && axis != 1) {
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
+        return NULL;
+    }
+
+    if (PyArray_NDIM(array) != 2) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 2D");
+        return NULL;
+    }
+
+    // Must be signed in order for modulo to work properly for negative shift values
+    int size = (int)PyArray_DIM(array, axis);
+
+    uint8_t is_empty = (size == 0);
+
+    if (!is_empty) {
+        shift = shift % size;
+        if (shift < 0) {
+            shift = size + shift;
+        }
+    }
+
+    if (is_empty || (shift == 0)) {
+        PyObject* copy = PyArray_Copy(array);
+        if (!copy) {
+            return NULL;
+        }
+        return copy;
+    }
+
+    return _roll_2d_a(array, (uint32_t)shift, axis);
+}
+
 
 //------------------------------------------------------------------------------
 // ArrayGO
@@ -919,6 +1238,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"roll_1d", roll_1d, METH_VARARGS, NULL},
+    {"roll_2d", (PyCFunction)roll_2d, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL},
 };
 
