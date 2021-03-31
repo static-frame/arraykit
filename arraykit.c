@@ -892,6 +892,85 @@ _roll_2d_a(PyArrayObject *array, npy_uint shift, int axis)
 }
 
 static PyObject *
+_roll_2d_b(PyArrayObject *array, npy_uint shift, int axis)
+{
+    // Create an empty array
+    PyArray_Descr* dtype = PyArray_DESCR(array);
+    Py_INCREF(dtype); // PyArray_Empty steals a reference to dtype
+
+    PyArrayObject* post = (PyArrayObject*)PyArray_Empty(
+                PyArray_NDIM(array),
+                PyArray_DIMS(array),
+                dtype,
+                0);
+    if (!post) {
+        return NULL;
+    }
+
+    npy_intp itemsize = dtype->elsize;
+    npy_intp size = PyArray_SIZE(array);
+
+    char* src_data = PyArray_BYTES(array);
+    char* dst_data = PyArray_BYTES(post);
+
+    npy_uint NUM_ROWS = (npy_uint)PyArray_DIM(array, 0);
+    npy_uint rowsize  = (npy_uint)PyArray_DIM(array, 1);
+    npy_uint bytes_in_row = rowsize * itemsize;
+    npy_uint total_bytes = size * itemsize;
+
+    if (axis == 0) {
+        // Easiest case! Merely shift the rows
+        npy_intp offset = (NUM_ROWS - shift) * bytes_in_row;
+        npy_intp chunksize = total_bytes - offset;
+
+        memcpy(dst_data, src_data + offset, chunksize);
+        memcpy(dst_data + chunksize, src_data, offset);
+    }
+    else {
+        if (shift > rowsize / 2) {
+            // SHIFT LEFT
+            npy_intp offset = (rowsize - shift) * itemsize;
+            npy_intp num_bytes = total_bytes - offset;
+            memcpy(dst_data, src_data + offset, num_bytes);
+
+            num_bytes = offset; // This is how much we need to copy for each column.
+
+            // Update the shifted portion of each row.
+            for (size_t i = 0; i < NUM_ROWS; ++i) {
+                npy_intp row_offset = i * bytes_in_row;
+
+                // We need to fill in the rightmost values of this row since we shifted by an offset
+                npy_intp dst_offset = row_offset + bytes_in_row - num_bytes;
+                npy_intp src_offset = row_offset;
+
+                memcpy(dst_data + dst_offset, src_data + src_offset, num_bytes);
+            }
+        }
+        else {
+            // SHIFT RIGHT
+            npy_intp offset = shift * itemsize;
+            npy_intp num_bytes = total_bytes - offset;
+            memcpy(dst_data + offset, src_data, num_bytes);
+
+            num_bytes = offset; // This is how much we need to copy for each column.
+
+            // Update the shifted portion of each row.
+            for (size_t i = 0; i < NUM_ROWS; ++i) {
+                npy_intp row_offset = i * bytes_in_row;
+
+                // We need to fill in the leftmost values of this row since we shifted by an offset
+                npy_intp dst_offset = row_offset;
+                npy_intp src_offset = row_offset + ((rowsize - shift) * itemsize);
+
+                memcpy(dst_data + dst_offset, src_data + src_offset, num_bytes);
+            }
+        }
+    }
+
+    return (PyObject*)post;
+}
+
+static PyObject *
 roll_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     /* Algorithm.
@@ -943,7 +1022,7 @@ roll_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     // Must be signed in order for modulo to work properly for negative shift values
     int size = (int)PyArray_DIM(array, axis);
 
-    uint8_t is_empty = (size == 0);
+    npy_uint8 is_empty = (size == 0);
 
     if (!is_empty) {
         shift = shift % size;
@@ -960,7 +1039,10 @@ roll_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return copy;
     }
 
-    return _roll_2d_a(array, (npy_uint)shift, axis);
+    if (0) {
+        return _roll_2d_a(array, (npy_uint)shift, axis);
+    }
+    return _roll_2d_b(array, (npy_uint)shift, axis);
 }
 
 
