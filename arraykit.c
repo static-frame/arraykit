@@ -633,16 +633,19 @@ roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
         return copy;
     }
 
-    //return _roll_1d_a(array, shift);       // Basically the same
-    //return _roll_1d_b(array, shift, size); // Way slower
-    //return _roll_1d_c(array, shift);       // Faster for primitives, same for objects
+    // Silence UnuSEd fUnCTioN warnings.
+    if (0) {
+        return _roll_1d_a(array, shift);       // Basically the same
+        return _roll_1d_b(array, shift, size); // Way slower
+        return _roll_1d_c(array, shift);       // Faster for primitives, same for objects
+    }
     return _roll_1d_d(array, shift);         // Faster for primitives & objects!
 }
 
 // -----------------------------------------------------------------------------
 
 static PyObject *
-_roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
+_roll_2d_a(PyArrayObject *array, npy_uint shift, int axis)
 {
     /*
     if axis == 0: # roll rows
@@ -701,13 +704,15 @@ _roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
     npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
     npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
 
-    uint32_t NUM_ROWS = (uint32_t)PyArray_DIM(array, 0);
-    uint32_t rowsize  = (uint32_t)PyArray_DIM(array, 1);
+    npy_uint NUM_ROWS = (npy_uint)PyArray_DIM(array, 0);
+    npy_uint rowsize  = (npy_uint)PyArray_DIM(array, 1);
+    npy_uint bytes_in_row = rowsize * itemsize;
 
     do {
-        char* src_data = dataptr[0];
-        char* dst_data = dataptr[1];
+        char *src_data = dataptr[0];
+        char *dst_data = dataptr[1];
         npy_intp size = *sizeptr;
+        npy_uint total_bytes = size * itemsize;
 
         if (axis == 0) {
             /*
@@ -719,12 +724,12 @@ _roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
             [6 7 8]
 
             In memory, this is stored contiguously as: [0 1 2 3 4 5 6 7 8]
-            Placing parentheses, we can visualize where the columns are like so:
+            Placing parentheses, we can visualize where the rows are like so:
                 [(0 1 2) (3 4 5) (6 7 8)]
 
             Given this, all we are concerned about is two contiguous blocks of memory.
 
-            For example, if shift = 1, we can copy from row[1] -> END to the front
+            For example, if shift = -1, we can copy from row[1] -> END to the front
 
             source = [(0 1 2) (3 4 5) (6 7 8)]
                                | | |   | | |
@@ -745,17 +750,17 @@ _roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
             Now, our internal memory represents the result of a row shift.
             We can see this if we represent the final buffer as a 2D grid:
 
+            [3 4 5]
             [6 7 8]
             [0 1 2]
-            [3 4 5]
             */
 
             // Easiest case! Merely shift the rows
-            int offset = ((NUM_ROWS - shift) % NUM_ROWS) * rowsize * itemsize;
-            int first_chunk = (size * itemsize) - offset;
+            npy_intp offset = (NUM_ROWS - shift) * bytes_in_row;
+            npy_intp chunksize = total_bytes - offset;
 
-            memcpy(dst_data, src_data + offset, first_chunk);
-            memcpy(dst_data + first_chunk, src_data, offset);
+            memcpy(dst_data, src_data + offset, chunksize);
+            memcpy(dst_data + chunksize, src_data, offset);
         }
         else {
             /*
@@ -813,7 +818,7 @@ _roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
                 For this, instead of shifting right and being forced to fill in a large section for each row,
                 we shift left and only have to fill in small section
 
-                Example:
+                Example: Shift by 4
 
                 Inefficient
                 [0 1 2 3 4]   [0 1 2 3 4]
@@ -831,38 +836,38 @@ _roll_2d_a(PyArrayObject *array, uint32_t shift, int axis)
                  / / / /               V
                 [1 2 3 4 X]   [1 2 3 4 0]
                 */
-                int offset = (rowsize - shift) * itemsize;
-                int num_bytes = (size * itemsize) - offset;
-                memcpy(dst_data, src_data+offset, num_bytes);
+                npy_intp offset = (rowsize - shift) * itemsize;
+                npy_intp num_bytes = total_bytes - offset;
+                memcpy(dst_data, src_data + offset, num_bytes);
 
                 num_bytes = offset; // This is how much we need to copy for each column.
 
                 // Update the shifted portion of each row.
                 for (size_t i = 0; i < NUM_ROWS; ++i) {
-                    int row_offset = i * rowsize * itemsize;
+                    npy_intp row_offset = i * bytes_in_row;
 
                     // We need to fill in the rightmost values of this row since we shifted by an offset
-                    int dst_offset = row_offset + ((rowsize * itemsize) - offset);
-                    int src_offset = row_offset;
+                    npy_intp dst_offset = row_offset + bytes_in_row - num_bytes;
+                    npy_intp src_offset = row_offset;
 
                     memcpy(dst_data + dst_offset, src_data + src_offset, num_bytes);
                 }
             }
             else {
                 // SHIFT RIGHT
-                int offset = shift * itemsize;
-                int num_bytes = (size * itemsize) - offset;
+                npy_intp offset = shift * itemsize;
+                npy_intp num_bytes = total_bytes - offset;
                 memcpy(dst_data+offset, src_data, num_bytes);
 
                 num_bytes = offset; // This is how much we need to copy for each column.
 
                 // Update the shifted portion of each row.
                 for (size_t i = 0; i < NUM_ROWS; ++i) {
-                    int row_offset = i * rowsize * itemsize;
+                    npy_intp row_offset = i * bytes_in_row;
 
                     // We need to fill in the leftmost values of this row since we shifted by an offset
-                    int dst_offset = row_offset;
-                    int src_offset = row_offset + ((rowsize - shift) * itemsize);
+                    npy_intp dst_offset = row_offset;
+                    npy_intp src_offset = row_offset + ((rowsize - shift) * itemsize);
 
                     memcpy(dst_data + dst_offset, src_data + src_offset, num_bytes);
                 }
@@ -913,7 +918,7 @@ roll_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     */
     PyArrayObject *array;
     int shift;
-    int axis;
+    int axis; // npy_intp
 
     static char *kwlist[] = {"array", "shift", "axis", NULL};
 
@@ -955,7 +960,7 @@ roll_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return copy;
     }
 
-    return _roll_2d_a(array, (uint32_t)shift, axis);
+    return _roll_2d_a(array, (npy_uint)shift, axis);
 }
 
 
