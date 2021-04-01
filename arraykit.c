@@ -200,7 +200,7 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CodePointLine: Mutation
 
-int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
+int AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 {
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
 
@@ -230,11 +230,41 @@ int AK_CPL_Append(AK_CodePointLine* cpl, PyObject* element)
     }
     // read offset_count, then increment
     cpl->offsets[cpl->offsets_count++] = element_length;
-
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
     return 0;
 }
+
+
+int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
+        Py_UCS4* field,
+        Py_ssize_t field_size)
+{
+
+    if ((cpl->buffer_count + field_size) >= cpl->buffer_capacity) {
+        // realloc
+        cpl->buffer_capacity *= 2; // needs to be max of this or field_size
+        cpl->buffer = PyMem_Realloc(cpl->buffer,
+                sizeof(Py_UCS4) * cpl->buffer_capacity);
+        // TODO: handle error
+        cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
+        cpl->pos_current = cpl->buffer + cpl->buffer_count;
+    }
+    if (cpl->offsets_count == cpl->offsets_capacity) {
+        // realloc
+        cpl->offsets_capacity *= 2;
+        cpl->offsets = PyMem_Realloc(cpl->offsets,
+                sizeof(Py_ssize_t) * cpl->offsets_capacity);
+        // TODO: handle error
+    }
+    memcpy(cpl->pos_current, field, field_size * sizeof(Py_UCS4));
+    // read offset_count, then increment
+    cpl->offsets[cpl->offsets_count++] = field_size;
+    cpl->buffer_count += field_size;
+    cpl->pos_current += field_size; // add to pointer
+    return 0;
+}
+
 
 //------------------------------------------------------------------------------
 // CodePointLine: Constructors
@@ -249,7 +279,7 @@ AK_CodePointLine* AK_CPL_FromIterable(PyObject* iterable)
 
     PyObject *element;
     while ((element = PyIter_Next(iter))) {
-        AK_CPL_Append(cpl, element);
+        AK_CPL_AppendObject(cpl, element);
         // TODO: handle error
         Py_DECREF(element);
     }
@@ -614,7 +644,7 @@ void AK_CPG_Free(AK_CodePointGrid* cpg)
 //------------------------------------------------------------------------------
 // CodePointGrid: Mutation
 
-static inline int AK_CPG_AppendAtLine(
+static inline int AK_CPG_AppendObjectAtLine(
         AK_CodePointGrid* cpg,
         int line,
         PyObject* element)
@@ -632,10 +662,38 @@ static inline int AK_CPG_AppendAtLine(
         cpg->lines[line] = AK_CPL_New();
         ++cpg->lines_count;
     }
-    AK_CPL_Append(cpg->lines[line], element);
+    AK_CPL_AppendObject(cpg->lines[line], element);
     // handle failure
     return 1;
 }
+
+
+static inline int AK_CPG_AppendPointsAtLine(
+        AK_CodePointGrid* cpg,
+        int line,
+        Py_UCS4* field,
+        Py_ssize_t field_size)
+{
+    if (line >= cpg->lines_capacity) {
+        cpg->lines_capacity *= 2;
+        // NOTE: as we sure we are only copying pointers?
+        cpg->lines = PyMem_Realloc(cpg->lines,
+                sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+        // TODO: handle error, initialize lines to NULL
+    }
+    // for now we assume sequential acesss, so should only check if equal
+    if (line >= cpg->lines_count) {
+        // initialize a CPL in this position
+        cpg->lines[line] = AK_CPL_New();
+        ++cpg->lines_count;
+    }
+
+
+    AK_CPL_AppendPoints(cpg->lines[line], field, field_size);
+    // handle failure
+    return 1;
+}
+
 
 //------------------------------------------------------------------------------
 // CodePointGrid: Constructors
@@ -664,7 +722,7 @@ AK_CodePointGrid* AK_CPG_FromIterable(
         inner_count = 0;
 
         while ((inner = PyIter_Next(inner_iter))) {
-            AK_CPG_AppendAtLine(cpg, *count_src, inner);
+            AK_CPG_AppendObjectAtLine(cpg, *count_src, inner);
             // TODO: handle error
             ++inner_count;
             Py_DECREF(inner);
@@ -1014,10 +1072,10 @@ AK_DR_parse_save_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
     if (field == NULL)
         return -1;
     if (dr->axis == 0) {
-        AK_CPG_AppendAtLine(cpg, dr->line_number, field);
+        AK_CPG_AppendObjectAtLine(cpg, dr->line_number, field);
     }
     else {
-        AK_CPG_AppendAtLine(cpg, dr->field_number, field);
+        AK_CPG_AppendObjectAtLine(cpg, dr->field_number, field);
     }
     Py_DECREF(field);
 

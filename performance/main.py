@@ -58,11 +58,11 @@ class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
 
     def int_uniform(self):
         self.file_like_int.seek(0)
-        _ = self.entry(self.file_like_int, self.dtypes_int, self.axis)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
 
     def bool_uniform(self):
         self.file_like_bool.seek(0)
-        _ = self.entry(self.file_like_bool, self.dtypes_bool, self.axis)
+        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
 
 
 class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
