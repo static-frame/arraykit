@@ -244,7 +244,6 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     return 1;
 }
 
-
 int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
         Py_UCS4* field,
         Py_ssize_t field_size)
@@ -260,6 +259,20 @@ int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
     cpl->pos_current += field_size; // add to pointer
     return 1;
 }
+
+int AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
+{
+    if (!AK_CPL_resize(cpl, 1)) {
+        return -1;
+    }
+    *cpl->pos_current = p;
+    // read offset_count, then increment
+    cpl->offsets[cpl->offsets_count++] = 1;
+    cpl->buffer_count += 1;
+    cpl->pos_current += 1; // add to pointer
+    return 1;
+}
+
 
 
 //------------------------------------------------------------------------------
@@ -666,19 +679,7 @@ AK_CPG_AppendObjectAtLine(
         PyObject* element)
 {
     AK_CPG_resize(cpg, line);
-    // if (line >= cpg->lines_capacity) {
-    //     cpg->lines_capacity *= 2;
-    //     // NOTE: as we sure we are only copying pointers?
-    //     cpg->lines = PyMem_Realloc(cpg->lines,
-    //             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
-    //     // TODO: handle error, initialize lines to NULL
-    // }
-    // // for now we assume sequential acesss, so should only check if equal
-    // if (line >= cpg->lines_count) {
-    //     // initialize a CPL in this position
-    //     cpg->lines[line] = AK_CPL_New();
-    //     ++cpg->lines_count;
-    // }
+    // handle failure
     AK_CPL_AppendObject(cpg->lines[line], element);
     // handle failure
     return 1;
@@ -692,25 +693,26 @@ AK_CPG_AppendPointsAtLine(
         Py_ssize_t field_size)
 {
     AK_CPG_resize(cpg, line);
-
-    // if (line >= cpg->lines_capacity) {
-    //     cpg->lines_capacity *= 2;
-    //     // NOTE: as we sure we are only copying pointers?
-    //     cpg->lines = PyMem_Realloc(cpg->lines,
-    //             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
-    //     // TODO: handle error, initialize lines to NULL
-    // }
-    // // for now we assume sequential acesss, so should only check if equal
-    // if (line >= cpg->lines_count) {
-    //     // initialize a CPL in this position
-    //     cpg->lines[line] = AK_CPL_New();
-    //     ++cpg->lines_count;
-    // }
-
+    // handle failure
     AK_CPL_AppendPoints(cpg->lines[line], field, field_size);
     // handle failure
     return 1;
 }
+
+static inline int
+AK_CPG_AppendPointAtLine(
+        AK_CodePointGrid* cpg,
+        int line,
+        Py_UCS4 p
+        )
+{
+    AK_CPG_resize(cpg, line);
+    // handle failure
+    AK_CPL_AppendPoint(cpg->lines[line], p);
+    // handle failure
+    return 1;
+}
+
 
 
 //------------------------------------------------------------------------------
