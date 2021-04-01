@@ -200,11 +200,11 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CodePointLine: Mutation
 
-int AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
+// Resize in place if necessary; noop if not. Return 1 on success.
+static inline int
+AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
 {
-    Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
-
-    if ((cpl->buffer_count + element_length) >= cpl->buffer_capacity) {
+    if ((cpl->buffer_count + count) >= cpl->buffer_capacity) {
         // realloc
         cpl->buffer_capacity *= 2; // needs to be max of this or element_length
         cpl->buffer = PyMem_Realloc(cpl->buffer,
@@ -220,6 +220,17 @@ int AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
                 sizeof(Py_ssize_t) * cpl->offsets_capacity);
         // TODO: handle error
     }
+    return 1;
+}
+
+int
+AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
+{
+    Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
+    if (!AK_CPL_resize(cpl, element_length)) {
+        return -1;
+    }
+
     // use PyUnicode_CheckExact
 
     if(!PyUnicode_AsUCS4(element,
@@ -232,7 +243,7 @@ int AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     cpl->offsets[cpl->offsets_count++] = element_length;
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
-    return 0;
+    return 1;
 }
 
 
@@ -241,28 +252,32 @@ int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
         Py_ssize_t field_size)
 {
 
-    if ((cpl->buffer_count + field_size) >= cpl->buffer_capacity) {
-        // realloc
-        cpl->buffer_capacity *= 2; // needs to be max of this or field_size
-        cpl->buffer = PyMem_Realloc(cpl->buffer,
-                sizeof(Py_UCS4) * cpl->buffer_capacity);
-        // TODO: handle error
-        cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
-        cpl->pos_current = cpl->buffer + cpl->buffer_count;
+    // if ((cpl->buffer_count + field_size) >= cpl->buffer_capacity) {
+    //     // realloc
+    //     cpl->buffer_capacity *= 2; // needs to be max of this or field_size
+    //     cpl->buffer = PyMem_Realloc(cpl->buffer,
+    //             sizeof(Py_UCS4) * cpl->buffer_capacity);
+    //     // TODO: handle error
+    //     cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
+    //     cpl->pos_current = cpl->buffer + cpl->buffer_count;
+    // }
+    // if (cpl->offsets_count == cpl->offsets_capacity) {
+    //     // realloc
+    //     cpl->offsets_capacity *= 2;
+    //     cpl->offsets = PyMem_Realloc(cpl->offsets,
+    //             sizeof(Py_ssize_t) * cpl->offsets_capacity);
+    //     // TODO: handle error
+    // }
+    if (!AK_CPL_resize(cpl, field_size)) {
+        return -1;
     }
-    if (cpl->offsets_count == cpl->offsets_capacity) {
-        // realloc
-        cpl->offsets_capacity *= 2;
-        cpl->offsets = PyMem_Realloc(cpl->offsets,
-                sizeof(Py_ssize_t) * cpl->offsets_capacity);
-        // TODO: handle error
-    }
+
     memcpy(cpl->pos_current, field, field_size * sizeof(Py_UCS4));
     // read offset_count, then increment
     cpl->offsets[cpl->offsets_count++] = field_size;
     cpl->buffer_count += field_size;
     cpl->pos_current += field_size; // add to pointer
-    return 0;
+    return 1;
 }
 
 
