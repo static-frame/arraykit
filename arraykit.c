@@ -981,7 +981,7 @@ typedef struct {
     PyObject *input_iter;   // iterate over this for input lines
     AK_Dialect *dialect;
 
-    PyObject *fields;           // field list for current record
+    // PyObject *fields;           // field list for current record
 
     ParserState state;          // current CSV parse state
     Py_UCS4 *field;             // temporary buffer
@@ -993,45 +993,37 @@ typedef struct {
 
     // NOTE: this may need to go, or could be used as an indicator in type evaluation
     int numeric_field;          // treat field as numeric
+    int axis;
+
 } AK_DelimitedReader;
 
 
 
 static inline int
-AL_DR_parse_save_field(AK_DelimitedReader *dr)
+AK_DR_parse_save_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
     PyObject *field;
 
     // NOTE: do not need to do this: instead, copy field into CPG
-    AK_DEBUG_OBJ(PyLong_FromLong(dr->line_number));
-    AK_DEBUG_OBJ(PyLong_FromLong(dr->field_number));
+    // AK_DEBUG_OBJ(PyLong_FromLong(dr->line_number));
+    // AK_DEBUG_OBJ(PyLong_FromLong(dr->field_number));
 
     field = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
             (void *) dr->field,
             dr->field_len);
     if (field == NULL)
         return -1;
+    if (dr->axis == 0) {
+        AK_CPG_AppendAtLine(cpg, dr->line_number, field);
+    }
+    else {
+        AK_CPG_AppendAtLine(cpg, dr->field_number, field);
+    }
+    Py_DECREF(field);
 
     dr->field_len = 0; // clear after copying
-
-    // NOTE: we may not want to use this unless dtype is not given
-    // if (dr->numeric_field) {
-    //     PyObject *tmp;
-    //     dr->numeric_field = 0;
-    //     tmp = PyNumber_Float(field);
-    //     Py_DECREF(field);
-    //     if (tmp == NULL)
-    //         return -1;
-    //     field = tmp;
-    // }
-    if (PyList_Append(dr->fields, field) < 0) {
-        Py_DECREF(field);
-        return -1;
-    }
-
     ++dr->field_number;
 
-    Py_DECREF(field);
     return 0;
 }
 
@@ -1063,7 +1055,7 @@ AK_DR_parse_add_char(AK_DelimitedReader *dr, Py_UCS4 c)
 }
 
 static int
-AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
+AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     AK_Dialect *dialect = dr->dialect;
 
@@ -1081,7 +1073,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
     case START_FIELD: /* expecting field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* save empty field - return [fields] */
-            if (AL_DR_parse_save_field(dr) < 0)
+            if (AK_DR_parse_save_field(dr, cpg) < 0)
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -1096,7 +1088,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
             /* ignore space at start of field */
             ;
         else if (c == dialect->delimiter) { /* save empty field */
-            if (AL_DR_parse_save_field(dr) < 0)
+            if (AK_DR_parse_save_field(dr, cpg) < 0)
                 return -1;
         }
         else { /* begin new unquoted field */
@@ -1130,7 +1122,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
     case IN_FIELD: /* in unquoted field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
-            if (AL_DR_parse_save_field(dr) < 0)
+            if (AK_DR_parse_save_field(dr, cpg) < 0)
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -1138,7 +1130,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
             dr->state = ESCAPED_CHAR;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AL_DR_parse_save_field(dr) < 0)
+            if (AK_DR_parse_save_field(dr, cpg) < 0)
                 return -1;
             dr->state = START_FIELD;
         }
@@ -1186,13 +1178,13 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
             dr->state = IN_QUOTED_FIELD;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AL_DR_parse_save_field(dr) < 0)
+            if (AK_DR_parse_save_field(dr, cpg) < 0)
                 return -1;
             dr->state = START_FIELD;
         }
         else if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
-            if (AL_DR_parse_save_field(dr) < 0)
+            if (AK_DR_parse_save_field(dr, cpg) < 0)
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -1228,11 +1220,6 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, Py_UCS4 c)
 static int
 AK_DR_line_reset(AK_DelimitedReader *dr)
 {
-    // a new fields list is created; will not be needed with CPG
-    Py_XSETREF(dr->fields, PyList_New(0));
-    if (dr->fields == NULL)
-        return -1;
-
     dr->field_len = 0;
     dr->state = START_RECORD;
     dr->numeric_field = 0;
@@ -1240,10 +1227,10 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
     return 0;
 }
 
-static PyObject *
-AK_DR_Next(AK_DelimitedReader *dr)
+static int
+AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    PyObject *fields = NULL;
+    // PyObject *fields = NULL;
     Py_UCS4 c;
     Py_ssize_t pos, linelen;
     unsigned int kind;
@@ -1251,21 +1238,21 @@ AK_DR_Next(AK_DelimitedReader *dr)
     PyObject *lineobj;
 
     if (AK_DR_line_reset(dr) < 0)
-        return NULL;
+        return 0;
     do {
         // get one line to parse
         lineobj = PyIter_Next(dr->input_iter);
         if (lineobj == NULL) {
-            /* End of input OR exception */
+            // End of input OR exception
             if (!PyErr_Occurred() && (dr->field_len != 0 ||
                     dr->state == IN_QUOTED_FIELD)) {
                 if (dr->dialect->strict)
                     PyErr_SetString(PyExc_RuntimeError,
                             "unexpected end of data");
-                else if (AL_DR_parse_save_field(dr) >= 0)
+                else if (AK_DR_parse_save_field(dr, cpg) >= 0)
                     break;
             }
-            return NULL;
+            return 0;
         }
         if (!PyUnicode_Check(lineobj)) {
             PyErr_Format(PyExc_RuntimeError,
@@ -1275,11 +1262,11 @@ AK_DR_Next(AK_DelimitedReader *dr)
                     Py_TYPE(lineobj)->tp_name
                     );
             Py_DECREF(lineobj);
-            return NULL;
+            return -1;
         }
         if (PyUnicode_READY(lineobj) == -1) {
             Py_DECREF(lineobj);
-            return NULL;
+            return -1;
         }
 
         ++dr->line_number; // initialized to -1
@@ -1295,26 +1282,24 @@ AK_DR_Next(AK_DelimitedReader *dr)
                              "line contains NUL");
                 goto exit;
             }
-            if (AK_DR_parse_process_char(dr, c) < 0) {
+            if (AK_DR_parse_process_char(dr, cpg, c) < 0) {
                 Py_DECREF(lineobj);
                 goto exit;
             }
             pos++;
         }
         Py_DECREF(lineobj);
-        if (AK_DR_parse_process_char(dr, 0) < 0)
+        if (AK_DR_parse_process_char(dr, cpg, 0) < 0)
             goto exit;
     } while (dr->state != START_RECORD);
 
-    fields = dr->fields;
-    dr->fields = NULL;
 exit:
-    AK_DEBUG_OBJ(fields);
-    return fields;
+    return 1;
 }
 
 static AK_DelimitedReader*
 AK_DR_New(PyObject *iterable,
+        int axis,
         PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
@@ -1329,8 +1314,9 @@ AK_DR_New(PyObject *iterable,
     if (!dr)
         return NULL;
 
-    dr->fields = NULL;
     dr->input_iter = NULL;
+    dr->axis = axis;
+
     dr->field = NULL;
     dr->field_size = 0;
     dr->line_number = -1;
@@ -1370,7 +1356,7 @@ AK_DR_Free(AK_DelimitedReader *dr)
     dr->dialect = NULL;
 
     Py_CLEAR(dr->input_iter);
-    Py_CLEAR(dr->fields);
+    // Py_CLEAR(dr->fields);
     if (dr->field != NULL) {
         PyMem_Free(dr->field);
         dr->field = NULL;
@@ -1463,8 +1449,9 @@ static PyObject*
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *file_like;
+    int axis = 0;
+
     PyObject *dtypes = NULL;
-    PyObject *axis = NULL;
 
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
@@ -1476,7 +1463,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OOOOOOOOOO:delimited_to_array", dtoa_kwarg_names,
+            "O|$OiOOOOOOOO:delimited_to_array", dtoa_kwarg_names,
             &file_like,
             // kwarg only
             &dtypes,
@@ -1491,7 +1478,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &strict))
         return NULL;
 
-    AK_DelimitedReader *delimited_reader = AK_DR_New(file_like,
+    AK_DelimitedReader *dr = AK_DR_New(file_like,
+            axis,
             delimiter,
             doublequote,
             escapechar,
@@ -1503,17 +1491,18 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
 
     // temp: collect rowsin a list
-    PyObject *list = PyList_New(0);
-    PyObject *line;
-    while ((line = AK_DR_Next(delimited_reader))) {
-        PyList_Append(list, line);
-    }
+    // PyObject *list = PyList_New(0);
+    // PyObject *line;
+    // while ((line = AK_DR_ProcessLine(dr))) {
+    //     PyList_Append(list, line);
+    // }
+    // Py_DECREF(list);
 
-    AK_CodePointGrid* cpg = AK_CPG_FromIterable(list, PyLong_AsLong(axis));
-    // TODO: handle error
+    // AK_CodePointGrid* cpg = AK_CPG_FromIterable(list, PyLong_AsLong(axis));
+    AK_CodePointGrid* cpg = AK_CPG_New();
+    while (AK_DR_ProcessLine(dr, cpg));
 
-    AK_DR_Free(delimited_reader);
-    Py_DECREF(list);
+    AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, dtypes);
     AK_CPG_Free(cpg);

@@ -136,7 +136,6 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(all(len(e) == 3 for e in post1))
 
 
-
     def test_delimited_to_arrays_b(self) -> None:
 
         msg = [
