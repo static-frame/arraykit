@@ -230,9 +230,7 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     if (!AK_CPL_resize(cpl, element_length)) {
         return -1;
     }
-
     // use PyUnicode_CheckExact
-
     if(!PyUnicode_AsUCS4(element,
             cpl->pos_current,
             cpl->pos_end - cpl->pos_current,
@@ -251,23 +249,6 @@ int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
         Py_UCS4* field,
         Py_ssize_t field_size)
 {
-
-    // if ((cpl->buffer_count + field_size) >= cpl->buffer_capacity) {
-    //     // realloc
-    //     cpl->buffer_capacity *= 2; // needs to be max of this or field_size
-    //     cpl->buffer = PyMem_Realloc(cpl->buffer,
-    //             sizeof(Py_UCS4) * cpl->buffer_capacity);
-    //     // TODO: handle error
-    //     cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
-    //     cpl->pos_current = cpl->buffer + cpl->buffer_count;
-    // }
-    // if (cpl->offsets_count == cpl->offsets_capacity) {
-    //     // realloc
-    //     cpl->offsets_capacity *= 2;
-    //     cpl->offsets = PyMem_Realloc(cpl->offsets,
-    //             sizeof(Py_ssize_t) * cpl->offsets_capacity);
-    //     // TODO: handle error
-    // }
     if (!AK_CPL_resize(cpl, field_size)) {
         return -1;
     }
@@ -659,10 +640,8 @@ void AK_CPG_Free(AK_CodePointGrid* cpg)
 //------------------------------------------------------------------------------
 // CodePointGrid: Mutation
 
-static inline int AK_CPG_AppendObjectAtLine(
-        AK_CodePointGrid* cpg,
-        int line,
-        PyObject* element)
+static inline int
+AK_CPG_resize(AK_CodePointGrid* cpg, int line)
 {
     if (line >= cpg->lines_capacity) {
         cpg->lines_capacity *= 2;
@@ -677,32 +656,56 @@ static inline int AK_CPG_AppendObjectAtLine(
         cpg->lines[line] = AK_CPL_New();
         ++cpg->lines_count;
     }
+    return 1;
+}
+
+static inline int
+AK_CPG_AppendObjectAtLine(
+        AK_CodePointGrid* cpg,
+        int line,
+        PyObject* element)
+{
+    AK_CPG_resize(cpg, line);
+    // if (line >= cpg->lines_capacity) {
+    //     cpg->lines_capacity *= 2;
+    //     // NOTE: as we sure we are only copying pointers?
+    //     cpg->lines = PyMem_Realloc(cpg->lines,
+    //             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+    //     // TODO: handle error, initialize lines to NULL
+    // }
+    // // for now we assume sequential acesss, so should only check if equal
+    // if (line >= cpg->lines_count) {
+    //     // initialize a CPL in this position
+    //     cpg->lines[line] = AK_CPL_New();
+    //     ++cpg->lines_count;
+    // }
     AK_CPL_AppendObject(cpg->lines[line], element);
     // handle failure
     return 1;
 }
 
-
-static inline int AK_CPG_AppendPointsAtLine(
+static inline int
+AK_CPG_AppendPointsAtLine(
         AK_CodePointGrid* cpg,
         int line,
         Py_UCS4* field,
         Py_ssize_t field_size)
 {
-    if (line >= cpg->lines_capacity) {
-        cpg->lines_capacity *= 2;
-        // NOTE: as we sure we are only copying pointers?
-        cpg->lines = PyMem_Realloc(cpg->lines,
-                sizeof(AK_CodePointLine*) * cpg->lines_capacity);
-        // TODO: handle error, initialize lines to NULL
-    }
-    // for now we assume sequential acesss, so should only check if equal
-    if (line >= cpg->lines_count) {
-        // initialize a CPL in this position
-        cpg->lines[line] = AK_CPL_New();
-        ++cpg->lines_count;
-    }
+    AK_CPG_resize(cpg, line);
 
+    // if (line >= cpg->lines_capacity) {
+    //     cpg->lines_capacity *= 2;
+    //     // NOTE: as we sure we are only copying pointers?
+    //     cpg->lines = PyMem_Realloc(cpg->lines,
+    //             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
+    //     // TODO: handle error, initialize lines to NULL
+    // }
+    // // for now we assume sequential acesss, so should only check if equal
+    // if (line >= cpg->lines_count) {
+    //     // initialize a CPL in this position
+    //     cpg->lines[line] = AK_CPL_New();
+    //     ++cpg->lines_count;
+    // }
 
     AK_CPL_AppendPoints(cpg->lines[line], field, field_size);
     // handle failure
@@ -1049,12 +1052,8 @@ AK_Dialect_Free(AK_Dialect* dialect)
 // reader
 
 typedef struct {
-    // PyObject_HEAD
-
     PyObject *input_iter;   // iterate over this for input lines
     AK_Dialect *dialect;
-
-    // PyObject *fields;           // field list for current record
 
     ParserState state;          // current CSV parse state
     Py_UCS4 *field;             // temporary buffer
@@ -1070,8 +1069,6 @@ typedef struct {
 
 } AK_DelimitedReader;
 
-
-
 static inline int
 AK_DR_parse_save_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
@@ -1086,6 +1083,7 @@ AK_DR_parse_save_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             dr->field_len);
     if (field == NULL)
         return -1;
+
     if (dr->axis == 0) {
         AK_CPG_AppendObjectAtLine(cpg, dr->line_number, field);
     }
@@ -1119,7 +1117,7 @@ AK_DR_parse_grow_buff(AK_DelimitedReader *dr)
 }
 
 static inline int
-AK_DR_parse_add_char(AK_DelimitedReader *dr, Py_UCS4 c)
+AK_DR_parse_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     if (dr->field_len == dr->field_size && !AK_DR_parse_grow_buff(dr))
         return -1;
@@ -1167,7 +1165,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
         else { /* begin new unquoted field */
             if (dialect->quoting == QUOTE_NONNUMERIC)
                 dr->numeric_field = 1;
-            if (AK_DR_parse_add_char(dr, c) < 0)
+            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = IN_FIELD;
         }
@@ -1175,14 +1173,14 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
 
     case ESCAPED_CHAR:
         if (c == '\n' || c=='\r') {
-            if (AK_DR_parse_add_char(dr, c) < 0)
+            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = AFTER_ESCAPED_CRNL;
             break;
         }
         if (c == '\0')
             c = '\n';
-        if (AK_DR_parse_add_char(dr, c) < 0)
+        if (AK_DR_parse_add_char(dr, cpg, c) < 0)
             return -1;
         dr->state = IN_FIELD;
         break;
@@ -1208,7 +1206,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
             dr->state = START_FIELD;
         }
         else { /* normal character - save in field */
-            if (AK_DR_parse_add_char(dr, c) < 0)
+            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
                 return -1;
         }
         break;
@@ -1229,7 +1227,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
             }
         }
         else { /* normal character - save in field */
-            if (AK_DR_parse_add_char(dr, c) < 0)
+            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
                 return -1;
         }
         break;
@@ -1237,7 +1235,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
     case ESCAPE_IN_QUOTED_FIELD:
         if (c == '\0')
             c = '\n';
-        if (AK_DR_parse_add_char(dr, c) < 0)
+        if (AK_DR_parse_add_char(dr, cpg, c) < 0)
             return -1;
         dr->state = IN_QUOTED_FIELD;
         break;
@@ -1246,7 +1244,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
         /* doublequote - seen a quote in a quoted field */
         if (dialect->quoting != QUOTE_NONE && c == dialect->quotechar) {
             /* save "" as " */
-            if (AK_DR_parse_add_char(dr, c) < 0)
+            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = IN_QUOTED_FIELD;
         }
@@ -1262,7 +1260,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
         else if (!dialect->strict) {
-            if (AK_DR_parse_add_char(dr, c) < 0)
+            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = IN_FIELD;
         }
