@@ -174,14 +174,14 @@ AK_CodePointLine* AK_CPL_New()
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
     // TODO: handle error
     cpl->buffer_count = 0;
-    cpl->buffer_capacity = 1000;
+    cpl->buffer_capacity = 1024;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
     // TODO: handle error
     cpl->pos_current = cpl->buffer;
     cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
 
     cpl->offsets_count = 0;
-    cpl->offsets_capacity = 500;
+    cpl->offsets_capacity = 512;
     cpl->offsets = (Py_ssize_t*)PyMem_Malloc(
             sizeof(Py_ssize_t) * cpl->offsets_capacity);
     // TODO: handle error
@@ -213,6 +213,7 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
         cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
         cpl->pos_current = cpl->buffer + cpl->buffer_count;
     }
+    // increment by at most one, so only need to check if equal
     if (cpl->offsets_count == cpl->offsets_capacity) {
         // realloc
         cpl->offsets_capacity *= 2;
@@ -244,33 +245,42 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     return 1;
 }
 
-int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
-        Py_UCS4* field,
-        Py_ssize_t field_size)
-{
-    if (!AK_CPL_resize(cpl, field_size)) {
-        return -1;
-    }
+// int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
+//         Py_UCS4* field,
+//         Py_ssize_t field_size)
+// {
+//     if (!AK_CPL_resize(cpl, field_size)) {
+//         return -1;
+//     }
 
-    memcpy(cpl->pos_current, field, field_size * sizeof(Py_UCS4));
-    // read offset_count, then increment
-    cpl->offsets[cpl->offsets_count++] = field_size;
-    cpl->buffer_count += field_size;
-    cpl->pos_current += field_size; // add to pointer
-    return 1;
-}
+//     memcpy(cpl->pos_current, field, field_size * sizeof(Py_UCS4));
+//     // read offset_count, then increment
+//     cpl->offsets[cpl->offsets_count++] = field_size;
+//     cpl->buffer_count += field_size;
+//     cpl->pos_current += field_size; // add to pointer
+//     return 1;
+// }
 
+// Add a single point to a line. This does not update offsets.
 int AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
 {
     if (!AK_CPL_resize(cpl, 1)) {
         return -1;
     }
-    *cpl->pos_current = p;
+    *cpl->pos_current++ = p;
     ++cpl->buffer_count;
-    ++cpl->pos_current; // add to pointer
     return 1;
 }
 
+// Append to offsets. This does not update buffer lines.
+int AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
+{
+    if (!AK_CPL_resize(cpl, 1)) {
+        return -1;
+    }
+    cpl->offsets[cpl->offsets_count++] = offset;
+    return 1;
+}
 
 
 //------------------------------------------------------------------------------
@@ -652,7 +662,7 @@ void AK_CPG_Free(AK_CodePointGrid* cpg)
 // CodePointGrid: Mutation
 
 static inline int
-AK_CPG_resize(AK_CodePointGrid* cpg, int line)
+AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
     if (line >= cpg->lines_capacity) {
         cpg->lines_capacity *= 2;
@@ -673,7 +683,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, int line)
 static inline int
 AK_CPG_AppendObjectAtLine(
         AK_CodePointGrid* cpg,
-        int line,
+        Py_ssize_t line,
         PyObject* element)
 {
     AK_CPG_resize(cpg, line);
@@ -683,24 +693,24 @@ AK_CPG_AppendObjectAtLine(
     return 1;
 }
 
-static inline int
-AK_CPG_AppendPointsAtLine(
-        AK_CodePointGrid* cpg,
-        int line,
-        Py_UCS4* field,
-        Py_ssize_t field_size)
-{
-    AK_CPG_resize(cpg, line);
-    // handle failure
-    AK_CPL_AppendPoints(cpg->lines[line], field, field_size);
-    // handle failure
-    return 1;
-}
+// static inline int
+// AK_CPG_AppendPointsAtLine(
+//         AK_CodePointGrid* cpg,
+//         Py_ssize_t line,
+//         Py_UCS4* field,
+//         Py_ssize_t field_size)
+// {
+//     AK_CPG_resize(cpg, line);
+//     // handle failure
+//     AK_CPL_AppendPoints(cpg->lines[line], field, field_size);
+//     // handle failure
+//     return 1;
+// }
 
 static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
-        int line,
+        Py_ssize_t line,
         Py_UCS4 p
         )
 {
@@ -710,6 +720,21 @@ AK_CPG_AppendPointAtLine(
     // handle failure
     return 1;
 }
+
+static inline int
+AK_CPG_AppendOffsetAtLine(
+        AK_CodePointGrid* cpg,
+        Py_ssize_t line,
+        Py_ssize_t offset)
+{
+    AK_CPG_resize(cpg, line);
+    // handle failure
+    AK_CPL_AppendOffset(cpg->lines[line], offset);
+    // handle failure
+    return 1;
+}
+
+
 
 
 
@@ -1056,77 +1081,91 @@ typedef struct {
     AK_Dialect *dialect;
 
     ParserState state;          // current CSV parse state
-    Py_UCS4 *field;             // temporary buffer
-    Py_ssize_t field_size;      // size of allocated buffer
-    Py_ssize_t field_len;       // length of current field
+    // Py_ssize_t field_size;
+    Py_ssize_t field_len;
 
     Py_ssize_t line_number;
     Py_ssize_t field_number;
 
-    // NOTE: this may need to go, or could be used as an indicator in type evaluation
-    int numeric_field;          // treat field as numeric
     int axis;
+    // NOTE: this may need to go, or could be used as an indicator in type evaluation
+    int numeric_field; // treat field as numeric
 
 } AK_DelimitedReader;
 
 static inline int
-AK_DR_parse_save_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
+AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    PyObject *field;
+    // PyObject *field;
 
-    // NOTE: do not need to do this: instead, copy field into CPG
-    // AK_DEBUG_OBJ(PyLong_FromLong(dr->line_number));
-    // AK_DEBUG_OBJ(PyLong_FromLong(dr->field_number));
+    // // NOTE: do not need to do this: instead, copy field into CPG
+    // // AK_DEBUG_OBJ(PyLong_FromLong(dr->line_number));
+    // // AK_DEBUG_OBJ(PyLong_FromLong(dr->field_number));
 
-    field = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
-            (void *) dr->field,
-            dr->field_len);
-    if (field == NULL)
-        return -1;
+    // field = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
+    //         (void *) dr->field,
+    //         dr->field_len);
+    // if (field == NULL)
+    //     return -1;
+
+    // if (dr->axis == 0) {
+    //     AK_CPG_AppendObjectAtLine(cpg, dr->line_number, field);
+    // }
+    // else {
+    //     AK_CPG_AppendObjectAtLine(cpg, dr->field_number, field);
+    // }
+    // Py_DECREF(field);
 
     if (dr->axis == 0) {
-        AK_CPG_AppendObjectAtLine(cpg, dr->line_number, field);
+        AK_CPG_AppendOffsetAtLine(cpg, dr->line_number, dr->field_len);
     }
     else {
-        AK_CPG_AppendObjectAtLine(cpg, dr->field_number, field);
+        AK_CPG_AppendOffsetAtLine(cpg, dr->field_number, dr->field_len);
     }
-    Py_DECREF(field);
 
     dr->field_len = 0; // clear after copying
-    ++dr->field_number;
+    ++dr->field_number; // increment after adding each offset
 
     return 0;
 }
 
-static int
-AK_DR_parse_grow_buff(AK_DelimitedReader *dr)
-{
-    assert((size_t)dr->field_size <= PY_SSIZE_T_MAX / sizeof(Py_UCS4));
+// static int
+// AK_DR_parse_grow_buff(AK_DelimitedReader *dr)
+// {
+//     assert((size_t)dr->field_size <= PY_SSIZE_T_MAX / sizeof(Py_UCS4));
 
-    Py_ssize_t field_size_new = dr->field_size ? 2 * dr->field_size : 4096;
-    Py_UCS4 *field_new = dr->field;
+//     Py_ssize_t field_size_new = dr->field_size ? 2 * dr->field_size : 4096;
+//     Py_UCS4 *field_new = dr->field;
 
-    PyMem_Resize(field_new, Py_UCS4, field_size_new);
-    if (field_new == NULL) {
-        PyErr_NoMemory();
-        return 0;
-    }
-    dr->field = field_new;
-    dr->field_size = field_size_new;
-    return 1;
-}
+//     PyMem_Resize(field_new, Py_UCS4, field_size_new);
+//     if (field_new == NULL) {
+//         PyErr_NoMemory();
+//         return 0;
+//     }
+//     dr->field = field_new;
+//     dr->field_size = field_size_new;
+//     return 1;
+// }
 
 static inline int
-AK_DR_parse_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
+AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
-    if (dr->field_len == dr->field_size && !AK_DR_parse_grow_buff(dr))
-        return -1;
-    dr->field[dr->field_len++] = c;
+    // if (dr->field_len == dr->field_size && !AK_DR_parse_grow_buff(dr))
+    //     return -1;
+    // dr->field[dr->field_len++] = c;
+    // return 0;
+    if (dr->axis == 0) {
+        AK_CPG_AppendPointAtLine(cpg, dr->line_number, c);
+    }
+    else {
+        AK_CPG_AppendPointAtLine(cpg, dr->field_number, c);
+    }
+    ++dr->field_len;
     return 0;
 }
 
 static int
-AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
+AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     AK_Dialect *dialect = dr->dialect;
 
@@ -1144,7 +1183,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
     case START_FIELD: /* expecting field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* save empty field - return [fields] */
-            if (AK_DR_parse_save_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg) < 0)
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -1159,13 +1198,13 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
             /* ignore space at start of field */
             ;
         else if (c == dialect->delimiter) { /* save empty field */
-            if (AK_DR_parse_save_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg) < 0)
                 return -1;
         }
         else { /* begin new unquoted field */
             if (dialect->quoting == QUOTE_NONNUMERIC)
                 dr->numeric_field = 1;
-            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = IN_FIELD;
         }
@@ -1173,14 +1212,14 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
 
     case ESCAPED_CHAR:
         if (c == '\n' || c=='\r') {
-            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = AFTER_ESCAPED_CRNL;
             break;
         }
         if (c == '\0')
             c = '\n';
-        if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+        if (AK_DR_add_char(dr, cpg, c) < 0)
             return -1;
         dr->state = IN_FIELD;
         break;
@@ -1193,7 +1232,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
     case IN_FIELD: /* in unquoted field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
-            if (AK_DR_parse_save_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg) < 0)
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -1201,12 +1240,12 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
             dr->state = ESCAPED_CHAR;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AK_DR_parse_save_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg) < 0)
                 return -1;
             dr->state = START_FIELD;
         }
         else { /* normal character - save in field */
-            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c) < 0)
                 return -1;
         }
         break;
@@ -1227,7 +1266,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
             }
         }
         else { /* normal character - save in field */
-            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c) < 0)
                 return -1;
         }
         break;
@@ -1235,7 +1274,7 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
     case ESCAPE_IN_QUOTED_FIELD:
         if (c == '\0')
             c = '\n';
-        if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+        if (AK_DR_add_char(dr, cpg, c) < 0)
             return -1;
         dr->state = IN_QUOTED_FIELD;
         break;
@@ -1244,23 +1283,23 @@ AK_DR_parse_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 
         /* doublequote - seen a quote in a quoted field */
         if (dialect->quoting != QUOTE_NONE && c == dialect->quotechar) {
             /* save "" as " */
-            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = IN_QUOTED_FIELD;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AK_DR_parse_save_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg) < 0)
                 return -1;
             dr->state = START_FIELD;
         }
         else if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
-            if (AK_DR_parse_save_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg) < 0)
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
         else if (!dialect->strict) {
-            if (AK_DR_parse_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c) < 0)
                 return -1;
             dr->state = IN_FIELD;
         }
@@ -1320,7 +1359,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                 if (dr->dialect->strict)
                     PyErr_SetString(PyExc_RuntimeError,
                             "unexpected end of data");
-                else if (AK_DR_parse_save_field(dr, cpg) >= 0)
+                else if (AK_DR_close_field(dr, cpg) >= 0)
                     break;
             }
             return 0;
@@ -1353,14 +1392,14 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                              "line contains NUL");
                 goto exit;
             }
-            if (AK_DR_parse_process_char(dr, cpg, c) < 0) {
+            if (AK_DR_process_char(dr, cpg, c) < 0) {
                 Py_DECREF(lineobj);
                 goto exit;
             }
             pos++;
         }
         Py_DECREF(lineobj);
-        if (AK_DR_parse_process_char(dr, cpg, 0) < 0)
+        if (AK_DR_process_char(dr, cpg, 0) < 0)
             goto exit;
     } while (dr->state != START_RECORD);
 
@@ -1388,8 +1427,8 @@ AK_DR_New(PyObject *iterable,
     dr->input_iter = NULL;
     dr->axis = axis;
 
-    dr->field = NULL;
-    dr->field_size = 0;
+    // dr->field = NULL;
+    // dr->field_size = 0;
     dr->line_number = -1;
 
     if (AK_DR_line_reset(dr) < 0) {
@@ -1428,10 +1467,10 @@ AK_DR_Free(AK_DelimitedReader *dr)
 
     Py_CLEAR(dr->input_iter);
     // Py_CLEAR(dr->fields);
-    if (dr->field != NULL) {
-        PyMem_Free(dr->field);
-        dr->field = NULL;
-    }
+    // if (dr->field != NULL) {
+    //     PyMem_Free(dr->field);
+    //     dr->field = NULL;
+    // }
     PyMem_Free(dr);
 }
 
