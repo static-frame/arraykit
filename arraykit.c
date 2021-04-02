@@ -266,10 +266,8 @@ int AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
         return -1;
     }
     *cpl->pos_current = p;
-    // read offset_count, then increment
-    cpl->offsets[cpl->offsets_count++] = 1;
-    cpl->buffer_count += 1;
-    cpl->pos_current += 1; // add to pointer
+    ++cpl->buffer_count;
+    ++cpl->pos_current; // add to pointer
     return 1;
 }
 
