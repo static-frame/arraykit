@@ -245,22 +245,6 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     return 1;
 }
 
-// int AK_CPL_AppendPoints(AK_CodePointLine* cpl,
-//         Py_UCS4* field,
-//         Py_ssize_t field_size)
-// {
-//     if (!AK_CPL_resize(cpl, field_size)) {
-//         return -1;
-//     }
-
-//     memcpy(cpl->pos_current, field, field_size * sizeof(Py_UCS4));
-//     // read offset_count, then increment
-//     cpl->offsets[cpl->offsets_count++] = field_size;
-//     cpl->buffer_count += field_size;
-//     cpl->pos_current += field_size; // add to pointer
-//     return 1;
-// }
-
 // Add a single point to a line. This does not update offsets.
 int AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
 {
@@ -281,7 +265,6 @@ int AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
     cpl->offsets[cpl->offsets_count++] = offset;
     return 1;
 }
-
 
 //------------------------------------------------------------------------------
 // CodePointLine: Constructors
@@ -619,8 +602,6 @@ static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
     return array;
 }
 
-
-
 // Returns a new reference.
 PyObject* AK_CPL_ToUnicode(AK_CodePointLine* cpl)
 {
@@ -693,20 +674,6 @@ AK_CPG_AppendObjectAtLine(
     return 1;
 }
 
-// static inline int
-// AK_CPG_AppendPointsAtLine(
-//         AK_CodePointGrid* cpg,
-//         Py_ssize_t line,
-//         Py_UCS4* field,
-//         Py_ssize_t field_size)
-// {
-//     AK_CPG_resize(cpg, line);
-//     // handle failure
-//     AK_CPL_AppendPoints(cpg->lines[line], field, field_size);
-//     // handle failure
-//     return 1;
-// }
-
 static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
@@ -733,9 +700,6 @@ AK_CPG_AppendOffsetAtLine(
     // handle failure
     return 1;
 }
-
-
-
 
 
 //------------------------------------------------------------------------------
@@ -841,14 +805,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-// CSV from CPython
-
-typedef enum {
-    START_RECORD, START_FIELD, ESCAPED_CHAR, IN_FIELD,
-    IN_QUOTED_FIELD, ESCAPE_IN_QUOTED_FIELD, QUOTE_IN_QUOTED_FIELD,
-    EAT_CRNL,AFTER_ESCAPED_CRNL
-} ParserState;
-
 
 // new dialect /////////////////////////////////////////////////////////////////
 
@@ -857,14 +813,14 @@ typedef enum {
     QUOTE_ALL,
     QUOTE_NONNUMERIC,
     QUOTE_NONE
-} QuoteStyle;
+} AK_DialectQuoteStyle;
 
 typedef struct {
-    QuoteStyle style;
+    AK_DialectQuoteStyle style;
     const char *name;
-} StyleDesc;
+} AK_DialectStyleDesc;
 
-static const StyleDesc quote_styles[] = {
+static const AK_DialectStyleDesc quote_styles[] = {
     { QUOTE_MINIMAL,    "QUOTE_MINIMAL" },
     { QUOTE_ALL,        "QUOTE_ALL" },
     { QUOTE_NONNUMERIC, "QUOTE_NONNUMERIC" },
@@ -963,7 +919,7 @@ AK_Dialect_set_str(const char *name, PyObject **target, PyObject *src, const cha
 static int
 AK_Dialect_check_quoting(int quoting)
 {
-    const StyleDesc *qs;
+    const AK_DialectStyleDesc *qs;
     for (qs = quote_styles; qs->name; qs++) {
         if ((int)qs->style == quoting)
             return 0;
@@ -1073,20 +1029,27 @@ AK_Dialect_Free(AK_Dialect* dialect)
 }
 
 //------------------------------------------------------------------------------
+// AK_DelimitedReader, based on _csv.c from CPython
 
-// reader
+typedef enum {
+    START_RECORD,
+    START_FIELD,
+    ESCAPED_CHAR,
+    IN_FIELD,
+    IN_QUOTED_FIELD,
+    ESCAPE_IN_QUOTED_FIELD,
+    QUOTE_IN_QUOTED_FIELD,
+    EAT_CRNL,
+    AFTER_ESCAPED_CRNL
+} AK_DR_ParserState;
 
 typedef struct {
     PyObject *input_iter;   // iterate over this for input lines
     AK_Dialect *dialect;
-
-    ParserState state;          // current CSV parse state
-    // Py_ssize_t field_size;
+    AK_DR_ParserState state;          // current CSV parse state
     Py_ssize_t field_len;
-
     Py_ssize_t line_number;
     Py_ssize_t field_number;
-
     int axis;
     // NOTE: this may need to go, or could be used as an indicator in type evaluation
     int numeric_field; // treat field as numeric
@@ -1096,71 +1059,17 @@ typedef struct {
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    // PyObject *field;
-
-    // // NOTE: do not need to do this: instead, copy field into CPG
-    // // AK_DEBUG_OBJ(PyLong_FromLong(dr->line_number));
-    // // AK_DEBUG_OBJ(PyLong_FromLong(dr->field_number));
-
-    // field = PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
-    //         (void *) dr->field,
-    //         dr->field_len);
-    // if (field == NULL)
-    //     return -1;
-
-    // if (dr->axis == 0) {
-    //     AK_CPG_AppendObjectAtLine(cpg, dr->line_number, field);
-    // }
-    // else {
-    //     AK_CPG_AppendObjectAtLine(cpg, dr->field_number, field);
-    // }
-    // Py_DECREF(field);
-
-    if (dr->axis == 0) {
-        AK_CPG_AppendOffsetAtLine(cpg, dr->line_number, dr->field_len);
-    }
-    else {
-        AK_CPG_AppendOffsetAtLine(cpg, dr->field_number, dr->field_len);
-    }
-
-    dr->field_len = 0; // clear after copying
-    ++dr->field_number; // increment after adding each offset
-
+    AK_CPG_AppendOffsetAtLine(cpg, dr->axis == 0 ? dr->line_number : dr->field_number, dr->field_len);
+    dr->field_len = 0; // clear to close
+    ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
     return 0;
 }
-
-// static int
-// AK_DR_parse_grow_buff(AK_DelimitedReader *dr)
-// {
-//     assert((size_t)dr->field_size <= PY_SSIZE_T_MAX / sizeof(Py_UCS4));
-
-//     Py_ssize_t field_size_new = dr->field_size ? 2 * dr->field_size : 4096;
-//     Py_UCS4 *field_new = dr->field;
-
-//     PyMem_Resize(field_new, Py_UCS4, field_size_new);
-//     if (field_new == NULL) {
-//         PyErr_NoMemory();
-//         return 0;
-//     }
-//     dr->field = field_new;
-//     dr->field_size = field_size_new;
-//     return 1;
-// }
 
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
-    // if (dr->field_len == dr->field_size && !AK_DR_parse_grow_buff(dr))
-    //     return -1;
-    // dr->field[dr->field_len++] = c;
-    // return 0;
-    if (dr->axis == 0) {
-        AK_CPG_AppendPointAtLine(cpg, dr->line_number, c);
-    }
-    else {
-        AK_CPG_AppendPointAtLine(cpg, dr->field_number, c);
-    }
-    ++dr->field_len;
+    AK_CPG_AppendPointAtLine(cpg, dr->axis == 0 ? dr->line_number : dr->field_number, c);
+    ++dr->field_len; // reset in AK_DR_close_field
     return 0;
 }
 
@@ -1464,16 +1373,9 @@ AK_DR_Free(AK_DelimitedReader *dr)
 {
     AK_Dialect_Free(dr->dialect);
     dr->dialect = NULL;
-
     Py_CLEAR(dr->input_iter);
-    // Py_CLEAR(dr->fields);
-    // if (dr->field != NULL) {
-    //     PyMem_Free(dr->field);
-    //     dr->field = NULL;
-    // }
     PyMem_Free(dr);
 }
-
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -1534,7 +1436,6 @@ AK_IterableStrToArray1D(
         AK_CPL_Free(cpl);
         return array;
 }
-
 
 //------------------------------------------------------------------------------
 // AK module public methods
@@ -1599,19 +1500,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
 
-
-    // temp: collect rowsin a list
-    // PyObject *list = PyList_New(0);
-    // PyObject *line;
-    // while ((line = AK_DR_ProcessLine(dr))) {
-    //     PyList_Append(list, line);
-    // }
-    // Py_DECREF(list);
-
-    // AK_CodePointGrid* cpg = AK_CPG_FromIterable(list, PyLong_AsLong(axis));
     AK_CodePointGrid* cpg = AK_CPG_New();
     while (AK_DR_ProcessLine(dr, cpg));
-
     AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, dtypes);
