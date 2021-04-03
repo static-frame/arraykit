@@ -804,8 +804,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
 // new dialect /////////////////////////////////////////////////////////////////
 
 typedef enum {
@@ -1335,9 +1333,6 @@ AK_DR_New(PyObject *iterable,
 
     dr->input_iter = NULL;
     dr->axis = axis;
-
-    // dr->field = NULL;
-    // dr->field_size = 0;
     dr->line_number = -1;
 
     if (AK_DR_line_reset(dr) < 0) {
