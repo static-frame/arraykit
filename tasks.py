@@ -4,8 +4,6 @@ import typing as tp
 
 import invoke
 
-
-
 @invoke.task
 def clean(context):
     '''Clean doc and build artifacts
