@@ -14,7 +14,6 @@ from arraykit import immutable_filter
 from performance.reference.util import mloc as mloc_ref
 #from performance.reference.util import roll_1d
 from arraykit import roll_1d
-from arraykit import roll_2d
 
 
 class TestUnit(unittest.TestCase):
@@ -190,75 +189,6 @@ class TestUnit(unittest.TestCase):
         a1 = np.array([3, 4, 5, 6])
         self.assertEqual(roll_1d(a1, 1).tolist(), [6, 3, 4, 5])
         self.assertEqual(roll_1d(a1, -1).tolist(), [4, 5, 6, 3])
-
-    #---------------------------------------------------------------------------
-    def test_roll_2d_row(self) -> None:
-        arr = np.arange(15).reshape(3, 5)
-
-        for shift in range(-10, 10):
-            np_result = np.roll(arr, shift, axis=0)
-            ak_result = roll_2d(arr, shift, axis=0)
-            self.assertTrue((np_result == ak_result).all())
-
-    def test_roll_2d_col(self) -> None:
-        arr = np.arange(15).reshape(3, 5)
-
-        for shift in range(-10, 10):
-            np_result = np.roll(arr, shift, axis=1)
-            ak_result = roll_2d(arr, shift, axis=1)
-            self.assertTrue((np_result == ak_result).all())
-
-    def test_roll_2d_a(self) -> None:
-        a1 = np.arange(12).reshape((3,4))
-
-        for i in range(a1.shape[0] + 1):
-            post = roll_2d(a1, i, axis=0)
-            self.assertEqual(post.tolist(), np.roll(a1, i, axis=0).tolist())
-
-            post = roll_2d(a1, -i, axis=0)
-            self.assertEqual(post.tolist(), np.roll(a1, -i, axis=0).tolist())
-
-        for i in range(a1.shape[1] + 1):
-            post = roll_2d(a1, i, axis=1)
-            self.assertEqual(post.tolist(), np.roll(a1, i, axis=1).tolist())
-
-            post = roll_2d(a1, -i, axis=1)
-            self.assertEqual(post.tolist(), np.roll(a1, -i, axis=1).tolist())
-
-    def test_roll_2d_b(self) -> None:
-        post = roll_2d(np.array([[]]), -4, axis=1)
-        self.assertEqual(post.shape, (1, 0))
-
-    def test_roll_2d_c(self) -> None:
-        a1 = np.arange(12).reshape((3,4))
-
-        self.assertEqual(roll_2d(a1, -2, axis=0).tolist(),
-                [[8, 9, 10, 11], [0, 1, 2, 3], [4, 5, 6, 7]])
-
-        self.assertEqual(roll_2d(a1, -2, axis=1).tolist(),
-                [[2, 3, 0, 1], [6, 7, 4, 5], [10, 11, 8, 9]])
-
-    def test_roll_2d_d(self) -> None:
-        a1 = np.arange(6).reshape((2, 3))
-
-        self.assertEqual(roll_2d(a1, 1, axis=1).tolist(),
-                [[2, 0, 1], [5, 3, 4]])
-        self.assertEqual(roll_2d(a1, -1, axis=1).tolist(),
-                [[1, 2, 0], [4, 5, 3]])
-
-    def test_roll_2d_e(self) -> None:
-        a1 = np.arange(6).reshape((3, 2))
-
-        self.assertEqual(roll_2d(a1, 1, axis=0).tolist(),
-                [[4, 5], [0, 1], [2, 3]]
-                )
-        self.assertEqual(roll_2d(a1, -1, axis=0).tolist(),
-                [[2, 3], [4, 5], [0, 1]]
-                )
-
-    def test_roll_2d_f(self) -> None:
-        with self.assertRaises(ValueError):
-            roll_2d(np.arange(4).reshape((2, 2)), 1, axis=2)
 
 
 if __name__ == '__main__':
