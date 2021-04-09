@@ -9,6 +9,19 @@ funcTF = partial(isin_array, array_is_unique=True, other_is_unique=False)
 funcFT = partial(isin_array, array_is_unique=False, other_is_unique=True)
 funcFF = partial(isin_array, array_is_unique=False, other_is_unique=False)
 
+class Obj:
+    def __init__(self, value):
+        self.v = value
+    def __hash__(self):
+        return hash(self.v)
+    def __eq__(self, other):
+        return self.v == other.v
+
+arr1 = np.array([[Obj(1), Obj(2), Obj(3)], [Obj(4), Obj(5), Obj(9)]], dtype=object)
+arr2 = np.array([Obj(1), Obj(4), Obj(7), Obj(9)], dtype=object)
+post = funcTT(array=arr1, other=arr2)
+print(post)
+
 arr1 = np.array([1, 5, 2, 3, 4, 5, 1], dtype=np.int_)
 arr2 = np.array([1, 4, 7, 9], dtype=np.int_)
 post = funcFF(array=arr1, other=arr2)
@@ -24,7 +37,6 @@ post = funcFF(array=arr1, other=arr2)
 arr1 = np.array([1, 5, 2, 3, 4, 5, 1], dtype=np.complex_)
 arr2 = np.array([1, 4, 7, 9], dtype=np.complex_)
 post = funcFF(array=arr1, other=arr2)
-exit(0)
 
 
 def test_arrays(arr1, arr2, expected, func):
