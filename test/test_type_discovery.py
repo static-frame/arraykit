@@ -366,6 +366,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process(' 23t3.9 '), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process(' 233.9!'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('4.3.5'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process('  .  '), TypeResolved.IS_STRING)
 
     def test_float_b(self) -> None:
         self.assertEqual(TypeField().process(' 4e3'), TypeResolved.IS_FLOAT)
