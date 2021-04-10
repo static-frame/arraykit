@@ -3,6 +3,7 @@
 
 
 import unittest
+import typing as tp
 from enum import Enum
 
 
@@ -44,14 +45,10 @@ Discover contiguous numeric, i.e., if contiguous sequence of digits, e, j, sign,
 '''
 
 
-
 # functions as needed in C implementation
 def is_digit(c: str) -> bool:
     #define isdigit_ascii(c) (((unsigned)(c) - '0') < 10u)
     return c.isdigit()
-
-def is_alpha(c: str) -> bool:
-    return c.isalpha()
 
 def is_space(c: str) -> bool:
     #define isspace_ascii(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
@@ -110,8 +107,13 @@ class TypeField:
     '''
     Estimate the type of a field. This estimate can be based on character type counts. Some ordering considerations will be ignored for convenience; if downstream parsing fails, fallback will be to a string type anyway.
     '''
-    def __init__(self):
-        self.resolved: TypeResolved = TypeResolved.IS_UNKNOWN
+    def __init__(self) -> None:
+        self.reset()
+        self.resolved_line: TypeResolved = TypeResolved.IS_UNKNOWN
+
+    def reset(self) -> None:
+        self.resolved_field: TypeResolved = TypeResolved.IS_UNKNOWN
+
         self.previous_leading_space = False
         self.previous_numeric = False
         self.contiguous_numeric = False
@@ -130,7 +132,7 @@ class TypeField:
         # update self based on c and position
         # return int where 1 means process more, 0 means stop, -1 means error
 
-        if self.resolved != TypeResolved.IS_UNKNOWN:
+        if self.resolved_field != TypeResolved.IS_UNKNOWN:
             return 0
 
         # evaluate space -------------------------------------------------------
@@ -160,7 +162,7 @@ class TypeField:
             self.count_sign += 1
             if self.count_sign > 2:
                 # complex numbers can have 2 signs, anything else is a string
-                self.resolved = TypeResolved.IS_STRING
+                self.resolved_field = TypeResolved.IS_STRING
                 return 0
             numeric = True
 
@@ -169,21 +171,21 @@ class TypeField:
             self.count_e += 1
             if pos_field == 0 or self.count_e > 1:
                 # true and false each only have one E
-                self.resolved = TypeResolved.IS_STRING
+                self.resolved_field = TypeResolved.IS_STRING
                 return 0
 
         elif is_j(c):
             numeric = True
             self.count_j += 1
             if pos_field == 0 or self.count_j > 1:
-                self.resolved = TypeResolved.IS_STRING
+                self.resolved_field = TypeResolved.IS_STRING
                 return 0
 
         elif is_decimal(c):
             numeric = True
             self.count_decimal += 1
             if self.count_decimal > 2: # complex can have 2!
-                self.resolved = TypeResolved.IS_STRING
+                self.resolved_field = TypeResolved.IS_STRING
                 return 0
 
         #-----------------------------------------------------------------------
@@ -205,12 +207,11 @@ class TypeField:
         else:
             if self.contiguous_numeric and not space:
                 # if we find a non-numeric, non-space, after contiguous numeric
-                self.resolved = TypeResolved.IS_STRING
+                self.resolved_field = TypeResolved.IS_STRING
                 return 0
             self.previous_numeric = False
 
         print(f'post: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=}')
-
 
         # evaluate character positions -----------------------------------------
 
@@ -234,58 +235,113 @@ class TypeField:
 
         elif pos_field == 3:
             if is_e(c) and self.count_bool == 3:
-                self.resolved = TypeResolved.IS_BOOL
+                self.resolved_field = TypeResolved.IS_BOOL
                 return 0
             if is_s(c):
                 self.count_bool -= 1
 
         elif pos_field == 4:
             if is_e(c) and self.count_bool == -4:
-                self.resolved = TypeResolved.IS_BOOL
+                self.resolved_field = TypeResolved.IS_BOOL
                 return 0
 
         return 1 # keep going
 
-
-    def process_type(self, count: int) -> None:
+    def resolve_field_type(self, count: int) -> None:
         '''
         As process char may abort early, provide final evaluation full count
         '''
-        if self.resolved != TypeResolved.IS_UNKNOWN:
-            return self.resolved
+        if count == 0:
+            return TypeResolved.IS_EMPTY
+        if self.resolved_field != TypeResolved.IS_UNKNOWN:
+            return self.resolved_field
         # determine
         if self.contiguous_numeric:
             # NOTE: have already handled cases with excessive counts
             if self.count_j == 0 and self.count_e == 0 and self.count_decimal == 0:
                 return TypeResolved.IS_INT
-            if self.count_j == 0 and (self.count_decimal > 0 or self.count_e > 0):
+            if self.count_j == 0 and (self.count_decimal == 1 or self.count_e > 0):
                 return TypeResolved.IS_FLOAT
             if self.count_j == 1:
                 return TypeResolved.IS_COMPLEX
         return TypeResolved.IS_STRING
 
+    @staticmethod
+    def resolve_line_type(previous: TypeResolved, new: TypeResolved) -> None:
+        if previous is TypeResolved.IS_UNKNOWN:
+            return new
+
+        # a string with anything else is a string
+        if previous is TypeResolved.IS_STRING or new is TypeResolved.IS_STRING:
+            return TypeResolved.IS_STRING
+
+        if previous is TypeResolved.IS_BOOL:
+            if new is TypeResolved.IS_BOOL:
+                return TypeResolved.IS_BOOL
+            else: # bool found with anything else is a string
+                return TypeResolved.IS_STRING
+
+        if previous is TypeResolved.IS_INT:
+            if (new is TypeResolved.IS_EMPTY
+                    or new is TypeResolved.IS_INT):
+                return TypeResolved.IS_INT
+            if new is TypeResolved.IS_FLOAT:
+                return TypeResolved.IS_FLOAT
+            if new is TypeResolved.IS_COMPLEX:
+                return TypeResolved.IS_COMPLEX
+
+        if previous is TypeResolved.IS_FLOAT:
+            if (new is TypeResolved.IS_EMPTY
+                    or new is TypeResolved.IS_INT
+                    or new is TypeResolved.IS_FLOAT):
+                return TypeResolved.IS_FLOAT
+            if new is TypeResolved.IS_COMPLEX:
+                return TypeResolved.IS_COMPLEX
+
+        if previous is TypeResolved.IS_COMPLEX:
+            if (new is TypeResolved.IS_EMPTY
+                    or new is TypeResolved.IS_INT
+                    or new is TypeResolved.IS_FLOAT
+                    or new is TypeResolved.IS_COMPLEX):
+                return TypeResolved.IS_COMPLEX
+
+        raise NotImplementedError(previous, new)
+
     def process(self, field: str) -> TypeResolved:
         print(f'process: {field=}')
-        for pos, char in enumerate(field):
-            if not self.process_char(char, pos):
-                break
-        return self.process_type(pos+1)
 
+        self.reset() # does not reset resolved_line
+        pos = 0
+        continue_process = 1
+        for char in field:
+            if continue_process:
+                continue_process = self.process_char(char, pos)
+            pos += 1 # results in count
 
+        # must call after all chars processed, does not set self.resolved field
+        rlt_new = self.resolve_field_type(pos)
+        self.resolved_line = self.resolve_line_type(self.resolved_line, rlt_new)
+        print(f'{self.resolved_line=}')
+        return self.resolved_line
+
+    def process_line(self, fields: tp.Iterable[str]) -> TypeResolved:
+        for field in fields:
+            self.process(field)
+        return self.resolved_line
 
 class TestUnit(unittest.TestCase):
 
-    def test_bool_a(self):
+    def test_bool_a(self) -> None:
         self.assertEqual(TypeField().process('   true'), TypeResolved.IS_BOOL)
         self.assertEqual(TypeField().process('FALSE'), TypeResolved.IS_BOOL)
         self.assertEqual(TypeField().process('  tals  '), TypeResolved.IS_STRING)
 
 
-    def test_str_a(self):
+    def test_str_a(self) -> None:
         self.assertEqual(TypeField().process('+++'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('   ee   '), TypeResolved.IS_STRING)
 
-    def test_int_a(self):
+    def test_int_a(self) -> None:
         self.assertEqual(TypeField().process(' 3'), TypeResolved.IS_INT)
         self.assertEqual(TypeField().process('3 '), TypeResolved.IS_INT)
         self.assertEqual(TypeField().process('  +3 '), TypeResolved.IS_INT)
@@ -301,7 +357,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process('  5 3 '), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('  5  3 '), TypeResolved.IS_STRING)
 
-    def test_float_a(self):
+    def test_float_a(self) -> None:
         self.assertEqual(TypeField().process(' .3'), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process('3. '), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process(' 2343. '), TypeResolved.IS_FLOAT)
@@ -309,29 +365,39 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(TypeField().process(' 23t3.9 '), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process(' 233.9!'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process('4.3.5'), TypeResolved.IS_STRING)
 
-    def test_float_b(self):
+    def test_float_b(self) -> None:
         self.assertEqual(TypeField().process(' 4e3'), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process(' 4e3e'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('4e3   e'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process('e99   '), TypeResolved.IS_STRING)
 
-    def test_float_known_false_positive(self):
+    def test_float_known_false_positive(self) -> None:
         # NOTE: we mark this as float because we do not observe that a number must follow e; assume this will fail in float conversion
         self.assertEqual(TypeField().process('8e'), TypeResolved.IS_FLOAT)
 
-    def test_complex_a(self):
+    def test_complex_a(self) -> None:
         self.assertEqual(TypeField().process('23j  '), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process(' 4e3j'), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process(' 4e3jw'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process(' J4e3j'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('-4.3+3j'), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process(' j4e3'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process('j11111    '), TypeResolved.IS_STRING)
 
-    def test_float_known_false_positive(self):
-        # NOTE: genfromtxt identifies this as string as j component is in position
+    def test_complex_b(self) -> None:
+        self.assertEqual(TypeField().process('2.3-3.5j  '), TypeResolved.IS_COMPLEX)
+
+    def test_float_known_false_positive(self) -> None:
+        # NOTE: genfromtxt identifies this as string as j component is in first position
         self.assertEqual(TypeField().process('23j-43'), TypeResolved.IS_COMPLEX)
 
 
+    def test_line_a(self) -> None:
+        self.assertEqual(TypeField().process_line(('25', '2.5', '')), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_line((' .1', '2.5', '')), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_line(('25', '', '')), TypeResolved.IS_INT)
 
 
 
