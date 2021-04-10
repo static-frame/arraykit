@@ -164,8 +164,8 @@ class TypeField:
 
         elif is_sign(c):
             self.count_sign += 1
-            if self.count_sign > 2:
-                # complex numbers can have 2 signs, anything else is a string
+            if self.count_sign > 4:
+                # complex numbers with E can have up to 4 signs, anything else is a string
                 self.resolved_field = TypeResolved.IS_STRING
                 return 0
             numeric = True
@@ -404,6 +404,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process('2.3-3.5j  '), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process('+23-35j  '), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process('+23-3.5j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process('-3e-10-3e-2j'), TypeResolved.IS_COMPLEX)
+
         self.assertEqual(TypeField().process('+23-3.5j  +'), TypeResolved.IS_STRING)
 
     def test_float_known_false_positive(self) -> None:
