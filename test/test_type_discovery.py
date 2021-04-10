@@ -402,10 +402,14 @@ class TestUnit(unittest.TestCase):
 
     def test_complex_b(self) -> None:
         self.assertEqual(TypeField().process('2.3-3.5j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process('+23-35j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process('+23-3.5j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process('+23-3.5j  +'), TypeResolved.IS_STRING)
 
     def test_float_known_false_positive(self) -> None:
         # NOTE: genfromtxt identifies this as string as j component is in first position
         self.assertEqual(TypeField().process('23j-43'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process('+23-3.5j3'), TypeResolved.IS_COMPLEX)
 
 
     def test_line_a(self) -> None:
