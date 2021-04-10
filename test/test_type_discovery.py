@@ -127,6 +127,9 @@ class TypeField:
         self.count_j = 0
         self.count_decimal = 0
 
+        # can be unbound in size
+        self.count_digit = 0
+
     def process_char(self, c: str, pos: int) -> int:
         # position is postion needs to be  dropping leading space
         # update self based on c and position
@@ -157,6 +160,7 @@ class TypeField:
 
         if is_digit(c):
             numeric = True
+            self.count_digit += 1
 
         elif is_sign(c):
             self.count_sign += 1
@@ -255,15 +259,20 @@ class TypeField:
             return TypeResolved.IS_EMPTY
         if self.resolved_field != TypeResolved.IS_UNKNOWN:
             return self.resolved_field
+
         # determine
         if self.contiguous_numeric:
             # NOTE: have already handled cases with excessive counts
+            if self.count_digit == 0:
+                # can have contiguous numerics like +ej.- but not digits
+                return TypeResolved.IS_STRING
             if self.count_j == 0 and self.count_e == 0 and self.count_decimal == 0:
                 return TypeResolved.IS_INT
             if self.count_j == 0 and (self.count_decimal == 1 or self.count_e > 0):
                 return TypeResolved.IS_FLOAT
             if self.count_j == 1:
                 return TypeResolved.IS_COMPLEX
+
         return TypeResolved.IS_STRING
 
     @staticmethod
@@ -366,13 +375,17 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process(' 23t3.9 '), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process(' 233.9!'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('4.3.5'), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process('  .  '), TypeResolved.IS_STRING)
 
     def test_float_b(self) -> None:
         self.assertEqual(TypeField().process(' 4e3'), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process(' 4e3e'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('4e3   e'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process('e99   '), TypeResolved.IS_STRING)
+
+    def test_float_c(self) -> None:
+        self.assertEqual(TypeField().process('  .  '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process('..'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process('e+j.'), TypeResolved.IS_STRING)
 
     def test_float_known_false_positive(self) -> None:
         # NOTE: we mark this as float because we do not observe that a number must follow e; assume this will fail in float conversion
@@ -399,8 +412,10 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_line(('25', '2.5', '')), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process_line((' .1', '2.5', '')), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process_line(('25', '', '')), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_line(('25', '2.5', 'e')), TypeResolved.IS_STRING)
 
-
+    def test_line_a(self) -> None:
+        self.assertEqual(TypeField().process_line(('  true', '  false', 'FALSE')), TypeResolved.IS_BOOL)
 
 if __name__ == '__main__':
     unittest.main()
