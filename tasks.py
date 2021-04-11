@@ -4,6 +4,7 @@ import typing as tp
 
 import invoke
 
+
 @invoke.task
 def clean(context):
     '''Clean doc and build artifacts
@@ -34,4 +35,5 @@ def lint(context):
     '''Run pylint static analysis.
     '''
     context.run('pylint -f colorized test performance')
+
 

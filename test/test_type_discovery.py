@@ -7,7 +7,7 @@ import typing as tp
 from enum import Enum
 
 
-'''
+_ = '''
 Discovery
 
 options:
@@ -38,9 +38,7 @@ is empty:
     if there is another float, will be interpreted as NaN
     if there are only integers, will be interpreted as -1
     if combined with False/True, will be interpreted as str
-'''
 
-'''
 Discover contiguous numeric, i.e., if contiguous sequence of digits, e, j, sign,decimal; then, after parse complete, look at e/j/decimal counts to determine numeric type
 '''
 

@@ -2,6 +2,7 @@
 persistent=no
 jobs=8
 unsafe-load-any-extension=y
+init-hook='import sys; sys.setrecursionlimit(20 * sys.getrecursionlimit())'
 
 [MESSAGES CONTROL]
 
