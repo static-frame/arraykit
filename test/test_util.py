@@ -105,13 +105,13 @@ class TestUnit(unittest.TestCase):
     #     # import ipdb; ipdb.set_trace()
 
     #---------------------------------------------------------------------------
-    def test_test_a(self) -> None:
-        from arraykit import _test
-        post = _test(
-                [['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE'],
-                ['g', 't', 'w', 'g', 'true', 'f']]
-                )
-        print(post)
+    # def test_test_a(self) -> None:
+    #     from arraykit import _test
+    #     post = _test(
+    #             [['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE'],
+    #             ['g', 't', 'w', 'g', 'true', 'f']]
+    #             )
+    #     print(post)
 
     #---------------------------------------------------------------------------
 

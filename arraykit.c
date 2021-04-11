@@ -154,7 +154,9 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 //------------------------------------------------------------------------------
 // CodePointLine: Type, New, Destrctor
 
+// A AK_CodePointLine stores a contiguous buffer of Py_UCS4 without null terminators between fields. Separately, we store an array of integers, where each integer is the size of each field. The total number of fields is given by offset_count.
 typedef struct {
+    // NOTE: should these be unsigned int types, like Py_uintptr_t?
     Py_ssize_t buffer_count; // accumulated number of code points
     Py_ssize_t buffer_capacity; // max number of code points
     Py_UCS4 *buffer;
@@ -163,8 +165,9 @@ typedef struct {
     Py_ssize_t offsets_capacity; // max number of elements
     Py_ssize_t *offsets;
 
+    Py_ssize_t offset_max; // observe max offset found across all
+
     Py_UCS4 *pos_current;
-    Py_UCS4 *pos_end;
     Py_ssize_t index_current;
 
 } AK_CodePointLine;
@@ -177,16 +180,16 @@ AK_CodePointLine* AK_CPL_New()
     cpl->buffer_capacity = 1024;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
     // TODO: handle error
-    cpl->pos_current = cpl->buffer;
-    cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
 
     cpl->offsets_count = 0;
     cpl->offsets_capacity = 512;
     cpl->offsets = (Py_ssize_t*)PyMem_Malloc(
             sizeof(Py_ssize_t) * cpl->offsets_capacity);
     // TODO: handle error
-    cpl->index_current = 0;
 
+    cpl->pos_current = cpl->buffer;
+    cpl->index_current = 0;
+    cpl->offset_max = 0;
     return cpl;
 }
 
@@ -210,7 +213,6 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
         cpl->buffer = PyMem_Realloc(cpl->buffer,
                 sizeof(Py_UCS4) * cpl->buffer_capacity);
         // TODO: handle error
-        cpl->pos_end = cpl->buffer + cpl->buffer_capacity;
         cpl->pos_current = cpl->buffer + cpl->buffer_count;
     }
     // increment by at most one, so only need to check if equal
@@ -234,7 +236,7 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     // use PyUnicode_CheckExact
     if(!PyUnicode_AsUCS4(element,
             cpl->pos_current,
-            cpl->pos_end - cpl->pos_current,
+            cpl->buffer + cpl->buffer_capacity - cpl->pos_current,
             0)) { // last zero means do not copy null
         return -1; // need to handle error
     }
@@ -242,11 +244,13 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     cpl->offsets[cpl->offsets_count++] = element_length;
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
+    if (element_length > cpl->offset_max) cpl->offset_max = element_length;
     return 1;
 }
 
 // Add a single point to a line. This does not update offsets.
-int AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
+int
+AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
 {
     if (!AK_CPL_resize(cpl, 1)) {
         return -1;
@@ -257,19 +261,23 @@ int AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
 }
 
 // Append to offsets. This does not update buffer lines.
-int AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
+int
+AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 {
     if (!AK_CPL_resize(cpl, 1)) {
         return -1;
     }
     cpl->offsets[cpl->offsets_count++] = offset;
+    if (offset > cpl->offset_max) cpl->offset_max = offset;
     return 1;
 }
 
 //------------------------------------------------------------------------------
 // CodePointLine: Constructors
 
-AK_CodePointLine* AK_CPL_FromIterable(PyObject* iterable)
+// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for testing.
+AK_CodePointLine*
+AK_CPL_FromIterable(PyObject* iterable)
 {
     PyObject *iter = PyObject_GetIter(iterable);
     // TODO: error handle
@@ -292,13 +300,15 @@ AK_CodePointLine* AK_CPL_FromIterable(PyObject* iterable)
 //------------------------------------------------------------------------------
 // CodePointLine: Navigation
 
-void AK_CPL_CurrentReset(AK_CodePointLine* cpl)
+void
+AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 {
     cpl->pos_current = cpl->buffer;
     cpl->index_current = 0;
 }
 
-static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
+static inline void
+AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
     // use index_current, then increment
     cpl->pos_current += cpl->offsets[cpl->index_current++];
@@ -317,18 +327,19 @@ static inline void AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 // CodePointLine: Element exporters
 
 // Return a null-terminated char array found at the curent position; this will need to be freed
-char* AK_CPL_ToNewChars(AK_CodePointLine* cpl)
-{
-    int points = cpl->offsets[cpl->index_current];
-    char* post = (char*)PyMem_Malloc(sizeof(char) * (points + 1));
-    // TODO: mask values before insertion
-    Py_UCS4 *p = cpl->pos_current;
-    for (int i=0; i<points; ++i) {
-        post[i] = *p++; // need to masks to size of char
-    }
-    post[points] = '\0';
-    return post;
-}
+// char*
+// AK_CPL_ToNewChars(AK_CodePointLine* cpl)
+// {
+//     int points = cpl->offsets[cpl->index_current];
+//     char* post = (char*)PyMem_Malloc(sizeof(char) * (points + 1));
+//     // TODO: mask values before insertion
+//     Py_UCS4 *p = cpl->pos_current;
+//     for (int i=0; i<points; ++i) {
+//         post[i] = *p++; // need to masks to size of char
+//     }
+//     post[points] = '\0';
+//     return post;
+// }
 
 
 //------------------------------------------------------------------------------
@@ -336,8 +347,8 @@ char* AK_CPL_ToNewChars(AK_CodePointLine* cpl)
 
 static char* TRUE_LOWER = "true";
 static char* TRUE_UPPER = "TRUE";
-static char* FALSE_LOWER = "false";
-static char* FALSE_UPPER = "FALSE";
+// static char* FALSE_LOWER = "false";
+// static char* FALSE_UPPER = "FALSE";
 
 #define isspace_ascii(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
 #define isdigit_ascii(c) (((unsigned)(c) - '0') < 10u)
@@ -348,7 +359,8 @@ static char* FALSE_UPPER = "FALSE";
 
 
 // Extended from pandas/_libs/src/parser/tokenizer.c
-static inline npy_int64 UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+static inline npy_int64
+UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 {
     char tsep = '\0'; // thousands seperator; if null processing is skipped
     npy_int64 int_min = NPY_MIN_INT64;
@@ -474,8 +486,9 @@ static inline npy_int64 UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 // NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
-    // must have at least 1 characters
+static inline int
+AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+    // must have at least 4 characters
     if (cpl->offsets[cpl->index_current] < 4) {
         return 0;
     }
@@ -484,6 +497,7 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
     int i = 0;
     char c;
 
+    // NOTE: consider permitting leading space
     for (;p < end; ++p) {
         c = *p;
         if (c == TRUE_LOWER[i] || c == TRUE_UPPER[i]) {
@@ -496,45 +510,9 @@ static inline int AK_CPL_IsTrue(AK_CodePointLine* cpl) {
     return 1; //matched all characters
 }
 
-// Parse full field and return 1 or 0 only for valid Boolean strings. Return 1 if True, 0 if False, -1 anything else
-static inline int AK_CPL_ParseBoolean(AK_CodePointLine* cpl) {
-    // must have only 4 or 5 characters
-    Py_ssize_t size = cpl->offsets[cpl->index_current];
-    if (size < 4 || size > 5) {
-        return -1;
-    }
 
-    Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + size; // size is either 4 or 5
-
-    int score = 0;
-    int i = 0;
-    char c;
-
-    for (;p < end; ++p) {
-        c = *p;
-        if (score >= 0 && (c == TRUE_LOWER[i] || c == TRUE_UPPER[i])) {
-            ++score;
-        }
-        else if (score <= 0 && (c == FALSE_LOWER[i] || c == FALSE_UPPER[i])) {
-            --score;
-        }
-        else {
-            return -1;
-        }
-        ++i;
-    }
-    // we might not need to look a the score value
-    if (score == 4) {
-       return 1;
-    }
-    else if (score == -5) {
-        return 0;
-    }
-    return -1;
-}
-
-static inline npy_int64 AK_CPL_ParseInt64(AK_CodePointLine* cpl)
+static inline npy_int64
+AK_CPL_ParseInt64(AK_CodePointLine* cpl)
 {
     // char* c = AK_CPL_ToNewChars(cpl);
     // long v = PyOS_strtol(c, NULL, 10);
@@ -552,7 +530,8 @@ static inline npy_int64 AK_CPL_ParseInt64(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CodePointLine: Exporters
 
-static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
+static inline PyObject*
+AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 {
     npy_intp dims[] = {cpl->offsets_count};
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
@@ -577,12 +556,13 @@ static inline PyObject* AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     return array;
 }
 
-
-static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
+static inline PyObject*
+AK_CPL_ToArrayInt(AK_CodePointLine* cpl)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_INT64); // normalize to always be 64 even on windows
+    // NOTE: normalize to always be 64 even on windows
+    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_INT64);
     // TODO: check error
 
     // assuming this is contiguous
@@ -602,8 +582,40 @@ static inline PyObject* AK_CPL_ToArrayLong(AK_CodePointLine* cpl)
     return array;
 }
 
-// Returns a new reference.
-PyObject* AK_CPL_ToUnicode(AK_CodePointLine* cpl)
+static inline PyObject*
+AK_CPL_ToArrayString(AK_CodePointLine* cpl)
+{
+    Py_ssize_t count = cpl->offsets_count;
+    npy_intp dims[] = {count};
+
+    // NOTE: use cpl->offset_max to get size of unicde type
+    return NULL;
+
+    // PyArray_Descr *dtype = PyArray_DescrFromType(NPY_INT64);
+    // // TODO: check error
+
+    // // assuming this is contiguous
+    // PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // // TODO: check error
+
+    // // Long will be 64 on unix, 32 on windows, which is expected
+    // npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
+    // npy_int64 *end = array_buffer + count;
+
+    // AK_CPL_CurrentReset(cpl);
+    // while (array_buffer < end) {
+    //     *array_buffer++ = AK_CPL_ParseInt64(cpl);
+    //     AK_CPL_CurrentAdvance(cpl);
+    // }
+    // PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    // return array;
+}
+
+
+
+// Return a contiguous string of data stored in the buffer, without delimiters. Returns a new reference.
+static inline PyObject*
+AK_CPL_ToUnicode(AK_CodePointLine* cpl)
 {
     return PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
             cpl->buffer,
@@ -620,7 +632,8 @@ typedef struct {
     AK_CodePointLine **lines; // array of pointers
 } AK_CodePointGrid;
 
-AK_CodePointGrid* AK_CPG_New()
+AK_CodePointGrid*
+AK_CPG_New()
 {
     AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
     cpg->lines_count = 0;
@@ -631,7 +644,8 @@ AK_CodePointGrid* AK_CPG_New()
     return cpg;
 }
 
-void AK_CPG_Free(AK_CodePointGrid* cpg)
+void
+AK_CPG_Free(AK_CodePointGrid* cpg)
 {
     for (int i=0; i < cpg->lines_count; ++i) {
         AK_CPL_Free(cpg->lines[i]);
@@ -786,7 +800,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
             array = AK_CPL_ToArrayBoolean(cpg->lines[i]);
         }
         else if (PyDataType_ISINTEGER(dtype)) {
-            array = AK_CPL_ToArrayLong(cpg->lines[i]);
+            array = AK_CPL_ToArrayInt(cpg->lines[i]);
         }
         else if (PyDataType_ISCOMPLEX(dtype)) {
             AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
@@ -804,7 +818,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 
 
 //------------------------------------------------------------------------------
-// new dialect /////////////////////////////////////////////////////////////////
+// AK_Dialect
 
 typedef enum {
     QUOTE_MINIMAL,
@@ -1057,7 +1071,9 @@ typedef struct {
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    AK_CPG_AppendOffsetAtLine(cpg, dr->axis == 0 ? dr->line_number : dr->field_number, dr->field_len);
+    AK_CPG_AppendOffsetAtLine(cpg,
+            dr->axis == 0 ? dr->line_number : dr->field_number,
+            dr->field_len);
     dr->field_len = 0; // clear to close
     ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
     return 0;
@@ -1071,6 +1087,7 @@ AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     return 0;
 }
 
+// Process each char and update AK_DelimitedReader state. When appropriate, call AK_DR_add_char to accumulate field characters, AK_DR_close_field to end a field
 static int
 AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
@@ -1244,10 +1261,10 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
     return 0;
 }
 
+// Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid
 static int
 AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    // PyObject *fields = NULL;
     Py_UCS4 c;
     Py_ssize_t pos, linelen;
     unsigned int kind;
@@ -1375,26 +1392,6 @@ AK_DR_Free(AK_DelimitedReader *dr)
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-// Determine the type dynamically
-// Ideas: keep the same sequence and mutate it in-place with Python objects when necessary
-//      track observations through iteration to determine type to give to PyArray_FromAny
-
-// Only identify things that are not true strings and need conversion: bools, int, float, complex
-// genfromtxt behavior:
-// if one complex and the rest are floats: complex
-// if any non-numeric strings (other than nan) found with other numerics: str
-// if all bool str (case insensitive): bool
-// if all integer (no decimal: is this local dependent?): int
-// if intger with nan: float
-// nans interpreted as: empty cell, any case of "nan"; not "na"
-// None is never converted to object; None and True go to string (even with dtype object)
-//      'None' and 'True' given in array construction is the same, same for astype(object)
-
-// Complex Numbers
-// Python `complex()` will take any string that looks a like a float; if a "+"" is present the second component must have a "j", otherwise a "complex() arg is a malformed string" is raised. Outer parenthesis are optional, but must be balanced if present
-// NP genfromtxt will interpret complex numbers with dtype None; Parenthesis are optional. With dtype complex, complex notations will be interpreted. Balanced parenthesis are not required; unbalanced parenthesis, as well as missing "j", do not raise and instead result in NaNs.
-
-
 // Convert an sequence of strings to a 1D array.
 static inline PyObject*
 AK_IterableStrToArray1D(
@@ -1421,7 +1418,7 @@ AK_IterableStrToArray1D(
             // TODO: handle error
         }
         else if (PyDataType_ISINTEGER(dtype)) {
-            array = AK_CPL_ToArrayLong(cpl);
+            array = AK_CPL_ToArrayInt(cpl);
             // TODO: handle error
         }
         else {
@@ -1505,9 +1502,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     return arrays; // could be NULL
 }
 
-// If dtype_specifier is given, always try to return that dtype
-// If dtype of object is given, leave strings
-// If dtype of None is given, discover
+
 static PyObject *
 iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
 {
@@ -1523,14 +1518,14 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
     return array;
 }
 
-static PyObject *
-_test(PyObject *Py_UNUSED(m), PyObject *value)
-{
-    AK_CodePointGrid* cpg = AK_CPG_FromIterable(value, 1);
-    PyObject* post = AK_CPG_ToUnicodeList(cpg);
-    AK_CPG_Free(cpg);
-    return post;
-}
+// static PyObject *
+// _test(PyObject *Py_UNUSED(m), PyObject *value)
+// {
+//     AK_CodePointGrid* cpg = AK_CPG_FromIterable(value, 1);
+//     PyObject* post = AK_CPG_ToUnicodeList(cpg);
+//     AK_CPG_Free(cpg);
+//     return post;
+// }
 
 
 //------------------------------------------------------------------------------
@@ -1934,7 +1929,7 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
-    {"_test", _test, METH_O, NULL},
+    // {"_test", _test, METH_O, NULL},
     {NULL},
 };
 

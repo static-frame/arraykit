@@ -21,7 +21,7 @@ init-hook='import sys; sys.setrecursionlimit(20 * sys.getrecursionlimit())'
 #Missing class docstring                  C0115
 #Missing function or method docstring     C0116
 #import-outside-toplevel                  C0415
-#Line too long                            C0301
+#Line too long                            C0301s
 #Trailing newlines                        C0305
 #Exactly one space required after comma   C0326
 #Wrong hanging indentation                C0330
