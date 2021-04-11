@@ -64,12 +64,6 @@ def is_paren_close(c: str) -> bool:
 def is_decimal(c: str) -> bool:
     return c == '.'
 
-# def ismatch(c: str, match: str) -> str:
-#     '''Do a case insensitive character match, given the upper case character.
-#     '''
-#     # can go from upper to lower with | 0x20, to upper with & 0x5f
-#     assert ord(match) <= 90 # must be upper case
-#     return c == match or c == chr(ord(match) | 0x20)
 
 def is_a(c: str) -> bool:
     return c == 'a' or c == 'A'
