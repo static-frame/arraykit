@@ -38,7 +38,7 @@ class Perf:
 #-------------------------------------------------------------------------------
 class DelimitedToArraysPandas(Perf):
     NUMBER = 40
-    FUNCTIONS = ('bool_uniform', 'int_uniform')
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform')
 
     def pre(self):
         records_int = [','.join(str(x) for x in range(1000))] * 1000
@@ -47,6 +47,9 @@ class DelimitedToArraysPandas(Perf):
         records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * 1000
         self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
+        records_str = [','.join('foobar' for x in range(1000))] * 1000
+        self.file_like_str = io.StringIO('\n'.join(records_str))
+
 class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
     entry = staticmethod(delimited_to_arrays_ak)
 
@@ -54,6 +57,7 @@ class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
         super().pre()
         self.dtypes_int = [int] * 1000
         self.dtypes_bool = [bool] * 1000
+        self.dtypes_str = [str] * 1000
         self.axis = 1
 
     def int_uniform(self):
@@ -64,6 +68,10 @@ class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
         self.file_like_bool.seek(0)
         _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
 
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
+
 
 class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
     import pandas
@@ -73,6 +81,7 @@ class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
         super().pre()
         self.dtypes_int = {i: int for i in range(1000)}
         self.dtypes_bool = {i: bool for i in range(1000)}
+        self.dtypes_str = {i: object for i in range(1000)}
 
     def int_uniform(self):
         self.file_like_int.seek(0)
@@ -82,6 +91,9 @@ class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
         self.file_like_bool.seek(0)
         _ = self.entry(self.file_like_bool, dtype=self.dtypes_bool)
 
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtype=self.dtypes_str)
 
 #-------------------------------------------------------------------------------
 class DelimitedToArraysGenft(Perf):

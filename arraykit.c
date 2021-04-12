@@ -583,32 +583,31 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl)
 }
 
 static inline PyObject*
-AK_CPL_ToArrayString(AK_CodePointLine* cpl)
+AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    // NOTE: use cpl->offset_max to get size of unicde type
-    return NULL;
+    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
+    // TODO: check error
 
-    // PyArray_Descr *dtype = PyArray_DescrFromType(NPY_INT64);
-    // // TODO: check error
+    Py_ssize_t offset_max = cpl->offset_max;
+    dtype->elsize = offset_max * 4;
+    // assuming this is contiguous
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // TODO: check error
 
-    // // assuming this is contiguous
-    // PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    // // TODO: check error
+    Py_UCS4 *array_buffer = (Py_UCS4*)PyArray_DATA((PyArrayObject*)array);
+    Py_UCS4 *end = array_buffer + count * 4;
 
-    // // Long will be 64 on unix, 32 on windows, which is expected
-    // npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
-    // npy_int64 *end = array_buffer + count;
-
-    // AK_CPL_CurrentReset(cpl);
-    // while (array_buffer < end) {
-    //     *array_buffer++ = AK_CPL_ParseInt64(cpl);
-    //     AK_CPL_CurrentAdvance(cpl);
-    // }
-    // PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
-    // return array;
+    AK_CPL_CurrentReset(cpl);
+    while (array_buffer < end) {
+        memcpy(array_buffer, cpl->pos_current, cpl->offsets[cpl->index_current] * 4);
+        array_buffer += offset_max;
+        AK_CPL_CurrentAdvance(cpl);
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
 }
 
 
@@ -801,6 +800,9 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
         }
         else if (PyDataType_ISINTEGER(dtype)) {
             array = AK_CPL_ToArrayInt(cpg->lines[i]);
+        }
+        else if (PyDataType_ISSTRING(dtype)) {
+            array = AK_CPL_ToArrayUnicode(cpg->lines[i]);
         }
         else if (PyDataType_ISCOMPLEX(dtype)) {
             AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
@@ -1419,6 +1421,10 @@ AK_IterableStrToArray1D(
         }
         else if (PyDataType_ISINTEGER(dtype)) {
             array = AK_CPL_ToArrayInt(cpl);
+            // TODO: handle error
+        }
+        else if (PyDataType_ISSTRING(dtype)) {
+            array = AK_CPL_ToArrayUnicode(cpl);
             // TODO: handle error
         }
         else {

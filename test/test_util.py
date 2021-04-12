@@ -69,6 +69,14 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
 
 
+    def test_sequence_str_to_array_1d_str_1(self) -> None:
+        # NOTE: floats will be truncated
+        a1 = iterable_str_to_array_1d(['aa', 'bbb', 'cc', 'dddd '], str)
+        self.assertEqual(a1.dtype, np.dtype('<U5'))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cc', 'dddd '])
+
+
     # def test_sequence_str_to_array_1d_c(self) -> None:
     #     with self.assertRaises(ValueError):
     #         _ = iterable_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
