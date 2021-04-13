@@ -820,7 +820,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 
 
 //------------------------------------------------------------------------------
-// AK_Dialect
+// AK_Dialect, based on _csv.c from CPython
 
 typedef enum {
     QUOTE_MINIMAL,
@@ -1084,7 +1084,9 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
-    AK_CPG_AppendPointAtLine(cpg, dr->axis == 0 ? dr->line_number : dr->field_number, c);
+    AK_CPG_AppendPointAtLine(cpg,
+            dr->axis == 0 ? dr->line_number : dr->field_number,
+            c);
     ++dr->field_len; // reset in AK_DR_close_field
     return 0;
 }
@@ -1253,6 +1255,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     return 0;
 }
 
+// Called once at the start of processing each line in AK_DR_ProcessLine.
 static int
 AK_DR_line_reset(AK_DelimitedReader *dr)
 {
@@ -1298,7 +1301,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                     Py_TYPE(lineobj)->tp_name
                     );
             Py_DECREF(lineobj);
-            return -1;
+            return -1; // check that client takes only > 0
         }
         if (PyUnicode_READY(lineobj) == -1) {
             Py_DECREF(lineobj);
@@ -1499,7 +1502,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             strict);
 
     AK_CodePointGrid* cpg = AK_CPG_New();
-    while (AK_DR_ProcessLine(dr, cpg));
+    while (AK_DR_ProcessLine(dr, cpg)); // check for -1
     AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, dtypes);
