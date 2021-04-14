@@ -82,17 +82,17 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cc', 'dddd '])
 
-    def test_sequence_str_to_array_1d_str_3(self) -> None:
-        a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U2'))
-        self.assertEqual(a1.dtype.str, '<U2')
-        self.assertFalse(a1.flags.writeable)
-        self.assertEqual(a1.tolist(), ['aa', 'bb', 'cc', ' d'])
+    # def test_sequence_str_to_array_1d_str_3(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U2'))
+    #     self.assertEqual(a1.dtype.str, '<U2')
+    #     self.assertFalse(a1.flags.writeable)
+    #     self.assertEqual(a1.tolist(), ['aa', 'bb', 'cc', ' d'])
 
-    def test_sequence_str_to_array_1d_str_3(self) -> None:
-        a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U4'))
-        self.assertEqual(a1.dtype.str, '<U4')
-        self.assertFalse(a1.flags.writeable)
-        self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cccc', ' ddd'])
+    # def test_sequence_str_to_array_1d_str_3(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U4'))
+    #     self.assertEqual(a1.dtype.str, '<U4')
+    #     self.assertFalse(a1.flags.writeable)
+    #     self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cccc', ' ddd'])
 
 
 
