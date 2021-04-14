@@ -593,6 +593,10 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     Py_ssize_t field_points;
     int capped_points;
 
+    if (!dtype) {
+        AK_NOT_IMPLEMENTED("got a null dtype");
+    }
+
     if (dtype->elsize == 0) {
         field_points = cpl->offset_max;
         dtype->elsize = field_points * sizeof(Py_UCS4);
@@ -609,14 +613,15 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // TODO: check error
 
     Py_UCS4 *array_buffer = (Py_UCS4*)PyArray_DATA((PyArrayObject*)array);
-    Py_UCS4 *end = array_buffer + count * field_points * sizeof(Py_UCS4);
+    Py_UCS4 *end = array_buffer + (count * field_points * sizeof(Py_UCS4));
+
     AK_CPL_CurrentReset(cpl);
 
     if (capped_points) {
         Py_ssize_t copy_bytes;
         while (array_buffer < end) {
 
-            if (cpl->offsets[cpl->index_current] > field_points) {
+            if (cpl->offsets[cpl->index_current] >= field_points) {
                 copy_bytes = field_points * sizeof(Py_UCS4);
             } else {
                 copy_bytes = cpl->offsets[cpl->index_current] * sizeof(Py_UCS4);

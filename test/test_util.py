@@ -95,6 +95,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cccc', ' ddd'])
 
 
+
+
     # def test_sequence_str_to_array_1d_c(self) -> None:
     #     with self.assertRaises(ValueError):
     #         _ = iterable_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
@@ -210,21 +212,21 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([a.tolist() for a in post0],
                 [[True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343], [True, True, False], [10, -2000, 82342343]])
 
-    def test_delimited_to_arrays_e(self) -> None:
+    # def test_delimited_to_arrays_e(self) -> None:
 
-        msg = [
-            ','.join(['True', '10', 'foo'] * 20),
-            ','.join(['True', '-2000', 'bar'] * 20),
-            ','.join(['False', '82342343', 'baz'] * 20),
-        ]
+    #     msg = [
+    #         ','.join(['True', '10', 'foo'] * 20),
+    #         ','.join(['True', '-2000', 'bar'] * 20),
+    #         ','.join(['False', '82342343', 'baz'] * 20),
+    #     ]
 
-        dtypes0 = [bool, int, str] * 20
-        post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
-        self.assertTrue(isinstance(post0, list))
-        self.assertEqual(len(post0), 60)
-        self.assertTrue(all(len(e) == 3 for e in post0))
-        self.assertEqual([x.dtype.str for x in post0],
-                ['|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3'])
+    #     dtypes0 = [bool, int, str] * 20
+    #     post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
+    #     self.assertTrue(isinstance(post0, list))
+    #     self.assertEqual(len(post0), 60)
+    #     self.assertTrue(all(len(e) == 3 for e in post0))
+    #     self.assertEqual([x.dtype.str for x in post0],
+    #             ['|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3'])
 
     #---------------------------------------------------------------------------
 
