@@ -582,34 +582,64 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl)
     return array;
 }
 
+// Create a fixed sized unicode array. Ownership is taken of the passed dtype, and it will be mutated if elsize is 0.
 static inline PyObject*
-AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
+AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
-
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
     // TODO: check error
 
-    Py_ssize_t offset_max = cpl->offset_max;
-    dtype->elsize = offset_max * 4;
+    Py_ssize_t field_points;
+    int capped_points;
+
+    if (dtype->elsize == 0) {
+        field_points = cpl->offset_max;
+        dtype->elsize = field_points * sizeof(Py_UCS4);
+        capped_points = 0;
+    }
+    else {
+        // assume that elsize is already given in units of 4
+        field_points = dtype->elsize / sizeof(Py_UCS4);
+        capped_points = 1;
+    }
+
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     // TODO: check error
 
     Py_UCS4 *array_buffer = (Py_UCS4*)PyArray_DATA((PyArrayObject*)array);
-    Py_UCS4 *end = array_buffer + count * 4;
-
+    Py_UCS4 *end = array_buffer + count * field_points * sizeof(Py_UCS4);
     AK_CPL_CurrentReset(cpl);
-    while (array_buffer < end) {
-        memcpy(array_buffer, cpl->pos_current, cpl->offsets[cpl->index_current] * 4);
-        array_buffer += offset_max;
-        AK_CPL_CurrentAdvance(cpl);
+
+    if (capped_points) {
+        Py_ssize_t copy_bytes;
+        while (array_buffer < end) {
+
+            if (cpl->offsets[cpl->index_current] > field_points) {
+                copy_bytes = field_points * sizeof(Py_UCS4);
+            } else {
+                copy_bytes = cpl->offsets[cpl->index_current] * sizeof(Py_UCS4);
+            }
+            memcpy(array_buffer,
+                    cpl->pos_current,
+                    copy_bytes);
+            array_buffer += field_points;
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else { // faster we always know the offset will fit
+        while (array_buffer < end) {
+            memcpy(array_buffer,
+                    cpl->pos_current,
+                    cpl->offsets[cpl->index_current] * sizeof(Py_UCS4));
+            array_buffer += field_points;
+            AK_CPL_CurrentAdvance(cpl);
+        }
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
-
 
 
 // Return a contiguous string of data stored in the buffer, without delimiters. Returns a new reference.
@@ -789,6 +819,10 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
         else { // converter2 set NULL for None
             PyArray_DescrConverter2(dtype_specifier, &dtype);
         }
+        if (dtype) {
+            dtype = PyArray_DescrNew(dtype);
+            Py_INCREF(dtype);
+        }
 
         PyObject* array;
 
@@ -802,7 +836,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
             array = AK_CPL_ToArrayInt(cpg->lines[i]);
         }
         else if (PyDataType_ISSTRING(dtype)) {
-            array = AK_CPL_ToArrayUnicode(cpg->lines[i]);
+            array = AK_CPL_ToArrayUnicode(cpg->lines[i], dtype);
         }
         else if (PyDataType_ISCOMPLEX(dtype)) {
             AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
@@ -1411,6 +1445,11 @@ AK_IterableStrToArray1D(
         else { // converter2 set NULL for None
             PyArray_DescrConverter2(dtype_specifier, &dtype);
         }
+        // make a copy as we will give ownership to array and might mutate
+        if (dtype) {
+            dtype = PyArray_DescrNew(dtype);
+            Py_INCREF(dtype);
+        }
 
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence);
         PyObject* array;
@@ -1427,7 +1466,7 @@ AK_IterableStrToArray1D(
             // TODO: handle error
         }
         else if (PyDataType_ISSTRING(dtype)) {
-            array = AK_CPL_ToArrayUnicode(cpl);
+            array = AK_CPL_ToArrayUnicode(cpl, dtype);
             // TODO: handle error
         }
         else {
@@ -1523,8 +1562,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
     {
         return NULL;
     }
-    PyObject* array = AK_IterableStrToArray1D(iterable, dtype_specifier);
-    return array;
+    return AK_IterableStrToArray1D(iterable, dtype_specifier);
 }
 
 // static PyObject *
