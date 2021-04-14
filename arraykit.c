@@ -819,10 +819,11 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
         else { // converter2 set NULL for None
             PyArray_DescrConverter2(dtype_specifier, &dtype);
         }
-        if (dtype) {
-            dtype = PyArray_DescrNew(dtype);
-            Py_INCREF(dtype);
+        if (dtype == NULL) {
+            AK_NOT_IMPLEMENTED("got null dtype");
         }
+        dtype = PyArray_DescrNew(dtype);
+        Py_INCREF(dtype);
 
         PyObject* array;
 
