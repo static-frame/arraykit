@@ -88,7 +88,7 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bbb'])
 
-    def test_sequence_str_to_array_1d_str_3(self) -> None:
+    def test_sequence_str_to_array_1d_str_4(self) -> None:
         a1 = iterable_str_to_array_1d(['aaaaaaaaaa', 'bbb'], str)
         self.assertEqual(a1.dtype.str, '<U10')
         self.assertFalse(a1.flags.writeable)

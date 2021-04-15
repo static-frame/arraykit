@@ -654,12 +654,22 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
     npy_intp dims[] = {count};
 
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
+    dtype = PyArray_DescrNew(dtype); // this is necessary to avoid mutating a common dtype
+
     // TODO: check error
+    Py_ssize_t field_points;
+    int capped_points;
 
-    Py_ssize_t field_points = cpl->offset_max;
-    dtype->elsize = field_points * 4;
-
-
+    if (dtype->elsize == 0) {
+        field_points = cpl->offset_max;
+        dtype->elsize = field_points * sizeof(Py_UCS4);
+        capped_points = 0;
+    }
+    else {
+        // assume that elsize is already given in units of 4
+        field_points = dtype->elsize / sizeof(Py_UCS4);
+        capped_points = 1;
+    }
 
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
@@ -669,10 +679,31 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
     Py_UCS4 *end = array_buffer + count * field_points;
 
     AK_CPL_CurrentReset(cpl);
-    while (array_buffer < end) {
-        memcpy(array_buffer, cpl->pos_current, cpl->offsets[cpl->index_current] * 4);
-        array_buffer += field_points;
-        AK_CPL_CurrentAdvance(cpl);
+
+    if (capped_points) {
+        Py_ssize_t copy_bytes;
+        while (array_buffer < end) {
+
+            if (cpl->offsets[cpl->index_current] >= field_points) {
+                copy_bytes = field_points * sizeof(Py_UCS4);
+            } else {
+                copy_bytes = cpl->offsets[cpl->index_current] * sizeof(Py_UCS4);
+            }
+            memcpy(array_buffer,
+                    cpl->pos_current,
+                    copy_bytes);
+            array_buffer += field_points;
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else { // faster we always know the offset will fit
+        while (array_buffer < end) {
+            memcpy(array_buffer,
+                    cpl->pos_current,
+                    cpl->offsets[cpl->index_current] * sizeof(Py_UCS4));
+            array_buffer += field_points;
+            AK_CPL_CurrentAdvance(cpl);
+        }
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
