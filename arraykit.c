@@ -654,8 +654,7 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
     npy_intp dims[] = {count};
 
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
-    Py_INCREF(dtype);
-    // dtype = PyArray_DescrNew(dtype); // this is necessary to avoid mutating a common dtype
+    dtype = PyArray_DescrNew(dtype); // this is necessary to avoid mutating a common dtype
 
     // TODO: check error
     Py_ssize_t field_points;
