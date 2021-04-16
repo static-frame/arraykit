@@ -150,6 +150,26 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
+// Given a dtype_specifier, which might be a dtype, assign a fresh dtype object (or NULL) to dtype_returned. Returns 1 on success.
+int
+AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
+{
+    PyArray_Descr* dtype;
+    if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
+        dtype = (PyArray_Descr* )dtype_specifier;
+    }
+    else { // converter2 set NULL for None
+        PyArray_DescrConverter2(dtype_specifier, &dtype);
+    }
+    // make a copy as we will give ownership to array and might mutate
+    if (dtype) {
+        dtype = PyArray_DescrNew(dtype);
+        // this can fail
+    }
+    *dtype_returned = dtype;
+    return 1;
+}
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 // CodePointLine: Type, New, Destrctor
@@ -648,13 +668,13 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl)
 
 
 static inline PyObject*
-AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
+AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
-    dtype = PyArray_DescrNew(dtype); // this is necessary to avoid mutating a common dtype
+    // PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
+    // dtype = PyArray_DescrNew(dtype); // this is necessary to avoid mutating a common dtype
 
     // TODO: check error
     Py_ssize_t field_points;
@@ -883,18 +903,22 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
             return NULL;
         }
 
-        PyArray_Descr* dtype;
-        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
-            dtype = (PyArray_Descr* )dtype_specifier;
-        }
-        else { // converter2 set NULL for None
-            PyArray_DescrConverter2(dtype_specifier, &dtype);
-        }
-        if (dtype == NULL) {
-            AK_NOT_IMPLEMENTED("got null dtype");
-        }
-        // dtype = PyArray_DescrNew(dtype);
-        // Py_INCREF(dtype);
+        PyArray_Descr* dtype = NULL;
+        AK_DTypeFromSpecifier(dtype_specifier, &dtype);
+        // TODO: handle error?
+
+        // if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
+        //     dtype = (PyArray_Descr* )dtype_specifier;
+        // }
+        // else { // converter2 set NULL for None
+        //     PyArray_DescrConverter2(dtype_specifier, &dtype);
+        // }
+        // // make a copy as we will give ownership to array and might mutate
+        // if (dtype) {
+        //     dtype = PyArray_DescrNew(dtype);
+        //     // Py_INCREF(dtype);
+        // }
+
 
         PyObject* array;
 
@@ -908,7 +932,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
             array = AK_CPL_ToArrayInt(cpg->lines[i]);
         }
         else if (PyDataType_ISSTRING(dtype)) {
-            array = AK_CPL_ToArrayUnicode(cpg->lines[i]);
+            array = AK_CPL_ToArrayUnicode(cpg->lines[i], dtype);
         }
         else if (PyDataType_ISCOMPLEX(dtype)) {
             AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
@@ -1510,17 +1534,20 @@ AK_IterableStrToArray1D(
         PyObject *dtype_specifier)
 {
         // Convert specifier into a dtype if necessary
-        PyArray_Descr* dtype;
-        if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
-            dtype = (PyArray_Descr* )dtype_specifier;
-        }
-        else { // converter2 set NULL for None
-            PyArray_DescrConverter2(dtype_specifier, &dtype);
-        }
-        // make a copy as we will give ownership to array and might mutate
+        PyArray_Descr* dtype = NULL;
+        AK_DTypeFromSpecifier(dtype_specifier, &dtype);
+        // TODO: handle error?
+
+        // if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
+        //     dtype = (PyArray_Descr* )dtype_specifier;
+        // }
+        // else { // converter2 set NULL for None
+        //     PyArray_DescrConverter2(dtype_specifier, &dtype);
+        // }
+        // // make a copy as we will give ownership to array and might mutate
         // if (dtype) {
         //     dtype = PyArray_DescrNew(dtype);
-        //     Py_INCREF(dtype);
+        //     // Py_INCREF(dtype);
         // }
 
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence);
@@ -1538,7 +1565,7 @@ AK_IterableStrToArray1D(
             // TODO: handle error
         }
         else if (PyDataType_ISSTRING(dtype)) {
-            array = AK_CPL_ToArrayUnicode(cpl);
+            array = AK_CPL_ToArrayUnicode(cpl, dtype);
             // TODO: handle error
         }
         else {
