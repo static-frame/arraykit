@@ -658,17 +658,18 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
 
     // TODO: check error
     Py_ssize_t field_points;
-    int capped_points;
+    bool capped_points;
 
     if (dtype->elsize == 0) {
         field_points = cpl->offset_max;
         dtype->elsize = field_points * sizeof(Py_UCS4);
-        capped_points = 0;
+        capped_points = false;
     }
     else {
         // assume that elsize is already given in units of 4
+        assert(dtype->elsize % 4 == 0);
         field_points = dtype->elsize / sizeof(Py_UCS4);
-        capped_points = 1;
+        capped_points = true;
     }
 
     // assuming this is contiguous
@@ -681,9 +682,9 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl)
     AK_CPL_CurrentReset(cpl);
 
     if (capped_points) {
+        // NOTE: is it worth branching for this special case?
         Py_ssize_t copy_bytes;
         while (array_buffer < end) {
-
             if (cpl->offsets[cpl->index_current] >= field_points) {
                 copy_bytes = field_points * sizeof(Py_UCS4);
             } else {
