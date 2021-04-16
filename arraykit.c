@@ -905,20 +905,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 
         PyArray_Descr* dtype = NULL;
         AK_DTypeFromSpecifier(dtype_specifier, &dtype);
-        // TODO: handle error?
-
-        // if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
-        //     dtype = (PyArray_Descr* )dtype_specifier;
-        // }
-        // else { // converter2 set NULL for None
-        //     PyArray_DescrConverter2(dtype_specifier, &dtype);
-        // }
-        // // make a copy as we will give ownership to array and might mutate
-        // if (dtype) {
-        //     dtype = PyArray_DescrNew(dtype);
-        //     // Py_INCREF(dtype);
-        // }
-
+        // TODO: handle error
 
         PyObject* array;
 
@@ -1536,19 +1523,7 @@ AK_IterableStrToArray1D(
         // Convert specifier into a dtype if necessary
         PyArray_Descr* dtype = NULL;
         AK_DTypeFromSpecifier(dtype_specifier, &dtype);
-        // TODO: handle error?
-
-        // if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
-        //     dtype = (PyArray_Descr* )dtype_specifier;
-        // }
-        // else { // converter2 set NULL for None
-        //     PyArray_DescrConverter2(dtype_specifier, &dtype);
-        // }
-        // // make a copy as we will give ownership to array and might mutate
-        // if (dtype) {
-        //     dtype = PyArray_DescrNew(dtype);
-        //     // Py_INCREF(dtype);
-        // }
+        // TODO: handle error
 
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence);
         PyObject* array;
