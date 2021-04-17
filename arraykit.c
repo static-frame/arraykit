@@ -151,7 +151,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 // Given a dtype_specifier, which might be a dtype, assign a fresh dtype object (or NULL) to dtype_returned. Returns 1 on success.
-int
+static inline int
 AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 {
     PyArray_Descr* dtype;
