@@ -63,9 +63,10 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(str(resolve_dtype(a1.dtype, a2.dtype)),
                 'datetime64[D]')
-        self.assertEqual(resolve_dtype(a1.dtype, a3.dtype),
-                np.dtype('<M8[ns]'))
-
+        self.assertEqual(resolve_dtype(a1.dtype, a3.dtype).kind, 'M')
+        self.assertEqual(
+                np.datetime_data(resolve_dtype(a1.dtype, a3.dtype)),
+                ('ns', 1))
         self.assertEqual(resolve_dtype(a1.dtype, a4.dtype),
                 np.dtype('O'))
 
@@ -108,7 +109,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(resolve_dtype_iter((a1.dtype, a4.dtype, a6.dtype, a5.dtype)), np.object_)
 
         # mixed strings go to the largest
-        self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)), np.dtype('<U10'))
+        self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).kind, 'U')
+        self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).itemsize, 40)
 
     #---------------------------------------------------------------------------
 
