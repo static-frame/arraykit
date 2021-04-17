@@ -197,7 +197,7 @@ class TestUnit(unittest.TestCase):
         memo = {id(a1): a1}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertTrue(mloc(a1) == mloc(a2))
+        self.assertEqual(mloc(a1), mloc(a2))
 
 
     def test_array_deepcopy_c1(self) -> None:
