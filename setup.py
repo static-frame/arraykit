@@ -41,6 +41,7 @@ setup(
     keywords='numpy array',
     packages=[],
     package_data={'': ['arraykit.pyi', 'py.typed']},
+    include_package_data=True,
     ext_modules=[
         Extension(
             name='arraykit',
