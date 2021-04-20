@@ -225,6 +225,25 @@ class TestUnit(unittest.TestCase):
         self.assertIn(id(a1), memo)
 
 
+    def test_array_deepcopy_d(self) -> None:
+        memo = {}
+        mutable = [3, 4, 5]
+        a1 = np.array((None, 'foo', True, mutable))
+        a2 = array_deepcopy(a1, memo=memo)
+
+
+    def test_array_deepcopy_e(self) -> None:
+        a1 = np.array((3, 4, 5))
+        with self.assertRaises(TypeError):
+            # memo argument must be a dictionary
+            a2 = array_deepcopy(a1, memo=None)
+
+    def test_array_deepcopy_f(self) -> None:
+        a1 = np.array((3, 4, 5))
+        a2 = array_deepcopy(a1)
+        self.assertNotEqual(id(a1), id(a2))
+
+
 if __name__ == '__main__':
     unittest.main()
 
