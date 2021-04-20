@@ -40,7 +40,7 @@ setup(
     ],
     keywords='numpy array',
     packages=[],
-    package_data={'': ['*.pyi']},
+    package_data={'arraykit': ['arraykit.pyi', 'py.typed']},
     ext_modules=[
         Extension(
             name='arraykit',
