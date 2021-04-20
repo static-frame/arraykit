@@ -39,7 +39,7 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='numpy array',
-    packages=[],
+    packages=[''],
     package_data={'': ['arraykit.pyi', 'py.typed']},
     include_package_data=True,
     ext_modules=[
