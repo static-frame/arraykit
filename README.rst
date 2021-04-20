@@ -35,8 +35,8 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
-0.1.3
-.......
+0.1.3 dev
+............
 
 ``array_deepcopy`` now accepts kwargs and makes the ``memo`` dict optional.
 
