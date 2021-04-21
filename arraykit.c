@@ -380,7 +380,7 @@ static char* TRUE_UPPER = "TRUE";
 
 // Extended from pandas/_libs/src/parser/tokenizer.c
 static inline npy_int64
-UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 {
     char tsep = '\0'; // thousands seperator; if null processing is skipped
     npy_int64 int_min = NPY_MIN_INT64;
@@ -489,16 +489,6 @@ UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             }
         }
     }
-    // Skip trailing spaces.
-    // while (isspace_ascii(*p)) {
-    //     ++p;
-    //     if (p >= end) {return number;}
-    // }
-    // // Did we use up all the characters?
-    // if (*p) {
-    //     *error = ERROR_INVALID_CHARS;
-    //     return 0;
-    // }
     *error = 0;
     return number;
 }
@@ -506,8 +496,8 @@ UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 // NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
-static inline int
-AK_CPL_IsTrue(AK_CodePointLine* cpl) {
+static inline bool
+AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     // must have at least 4 characters
     if (cpl->offsets[cpl->index_current] < 4) {
         return 0;
@@ -524,15 +514,16 @@ AK_CPL_IsTrue(AK_CodePointLine* cpl) {
             ++i;
         }
         else {
-            return 0;
+            return false;
         }
     }
-    return 1; //matched all characters
+    return true; //matched all characters
 }
 
 
+
 static inline npy_int64
-AK_CPL_ParseInt64(AK_CodePointLine* cpl)
+AK_CPL_current_to_int64(AK_CodePointLine* cpl)
 {
     // char* c = AK_CPL_ToNewChars(cpl);
     // long v = PyOS_strtol(c, NULL, 10);
@@ -542,7 +533,8 @@ AK_CPL_ParseInt64(AK_CodePointLine* cpl)
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
     int error;
-    npy_int64 v = UCS4_to_int64(p, end, &error);
+    npy_int64 v = AK_UCS4_to_int64(p, end, &error);
+    // NOTE: not handling errors
     return v;
 
 }
@@ -567,7 +559,7 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
-        if (AK_CPL_IsTrue(cpl)) {
+        if (AK_CPL_current_to_bool(cpl)) {
             array_buffer[i] = 1;
         }
         AK_CPL_CurrentAdvance(cpl);
@@ -576,27 +568,57 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     return array;
 }
 
+// Given a type of signed integer, return the corresponding array.
 static inline PyObject*
-AK_CPL_ToArrayInt(AK_CodePointLine* cpl)
+AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
-    // NOTE: normalize to always be 64 even on windows
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_INT64);
-    // TODO: check error
 
-    // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    // TODO: check error
+    if (!array) {
+        return NULL;
+    }
 
-    // Long will be 64 on unix, 32 on windows, which is expected
-    npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
-    npy_int64 *end = array_buffer + count;
+    if (dtype->elsize == 8) {
+        npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
+        npy_int64 *end = array_buffer + count;
 
-    AK_CPL_CurrentReset(cpl);
-    while (array_buffer < end) {
-        *array_buffer++ = AK_CPL_ParseInt64(cpl);
-        AK_CPL_CurrentAdvance(cpl);
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = AK_CPL_current_to_int64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 4) {
+        npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
+        npy_int32 *end = array_buffer + count;
+
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 2) {
+        npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
+        npy_int16 *end = array_buffer + count;
+
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 1) {
+        npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
+        npy_int8 *end = array_buffer + count;
+
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
@@ -625,7 +647,9 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    // TODO: check error
+    if (!array) {
+        return NULL;
+    }
 
     Py_UCS4 *array_buffer = (Py_UCS4*)PyArray_DATA((PyArrayObject*)array);
     Py_UCS4 *end = array_buffer + count * field_points;
@@ -680,51 +704,42 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         capped_points = true;
     }
 
-    // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    // TODO: check error
+    if (!array) {
+        return NULL;
+    }
 
     char *array_buffer = (char*)PyArray_DATA((PyArrayObject*)array);
     char *end = array_buffer + count * field_points;
+    Py_ssize_t copy_points;
 
     AK_CPL_CurrentReset(cpl);
 
-    if (capped_points) {
-        Py_ssize_t copy_bytes;
+    while (array_buffer < end) {
+        if (!capped_points || cpl->offsets[cpl->index_current] < field_points) {
+            // if not capped, or capped and offset is less than field points, use offset
+            copy_points = cpl->offsets[cpl->index_current];
+        }
+        else {
+            // if capped and offset is greater than feild points, use field points
+            copy_points = field_points;
+        }
 
-        while (array_buffer < end) {
-            // if (cpl->offsets[cpl->index_current] >= field_points) {
-            //     copy_bytes = field_points;
-            // } else {
-            //     copy_bytes = cpl->offsets[cpl->index_current];
-            // }
-            // memcpy(array_buffer,
-            //         cpl->pos_current,
-            //         copy_bytes);
-            array_buffer += field_points;
-            AK_CPL_CurrentAdvance(cpl);
+        Py_UCS4 *p = cpl->pos_current;
+        Py_UCS4 *p_end = p + copy_points;
+        char *field_end = array_buffer + field_points;
+
+        while (p < p_end) {
+            *array_buffer++ = (char)*p++; // truncate
         }
-    }
-    else {
-        while (array_buffer < end) {
-            Py_UCS4 *p = cpl->pos_current;
-            Py_UCS4 *p_end = cpl->pos_current + cpl->offsets[cpl->index_current];
-            char *field_end = array_buffer + field_points;
-            while (p < p_end) {
-                *array_buffer++ = (char)*p; // truncate
-                ++p;
-            }
-            while (array_buffer < field_end) {
-                ++array_buffer;
-            }
-            AK_CPL_CurrentAdvance(cpl);
-        }
+        array_buffer = field_end;
+        AK_CPL_CurrentAdvance(cpl);
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
 
-// Generic handler for converting a CPL to an array.
+// Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated.
 static inline PyObject*
 AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     if (!dtype) {
@@ -734,7 +749,7 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
         return AK_CPL_ToArrayBoolean(cpl);
     }
     else if (PyDataType_ISINTEGER(dtype)) {
-        return AK_CPL_ToArrayInt(cpl);
+        return AK_CPL_ToArrayInt(cpl, dtype);
     }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
         return AK_CPL_ToArrayUnicode(cpl, dtype);

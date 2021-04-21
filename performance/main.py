@@ -116,7 +116,7 @@ class DelimitedToArraysGenftAK(DelimitedToArraysGenft):
 
     def int_uniform(self):
         self.file_like_int.seek(0)
-        _ = self.entry(self.file_like_int, self.dtypes_int, 0)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=0)
 
 class DelimitedToArraysGenftREF(DelimitedToArraysGenft):
     entry = staticmethod(np.genfromtxt)

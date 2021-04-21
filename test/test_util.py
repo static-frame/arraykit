@@ -58,18 +58,83 @@ class TestUnit(unittest.TestCase):
 
     def test_iterable_str_to_array_1d_int_1(self) -> None:
         # NOTE: floats will be truncated
-        a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], int)
+        a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], np.int64)
         self.assertEqual(a1.tolist(), [23, -54, 1000, 23])
         self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
 
     def test_iterable_str_to_array_1d_int_2(self) -> None:
         # NOTE: empty strings get converted to zero
-        a1 = iterable_str_to_array_1d(['23', '', '  -123000', '23'], int)
+        a1 = iterable_str_to_array_1d(['23', '', '  -123000', '23'], np.int64)
         self.assertEqual(a1.tolist(), [23, 0, -123000, 23])
         self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_int_3a(self) -> None:
+        a1 = iterable_str_to_array_1d([
+                str(9_223_372_036_854_775_807),
+                '0',
+                str(-9_223_372_036_854_775_808)], np.int64)
+        self.assertEqual(a1.tolist(), [9223372036854775807, 0, -9223372036854775808])
+        self.assertEqual(a1.dtype, np.dtype(np.int64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_int_3b(self) -> None:
+        a1 = iterable_str_to_array_1d([
+                str(9_223_372_036_854_775_808),
+                '0',
+                str(-9_223_372_036_854_775_809)], np.int64)
+        # NOTE: overflow may not be stable
+        self.assertEqual(a1.tolist(), [0, 0, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.int64))
+        self.assertFalse(a1.flags.writeable)
+
+
+
+    def test_iterable_str_to_array_1d_int_4(self) -> None:
+        # NOTE: floats will be truncated
+        a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], np.int32)
+        self.assertEqual(a1.tolist(), [23, -54, 1000, 23])
+        self.assertEqual(a1.dtype, np.dtype(np.int32))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_int_5(self) -> None:
+        a1 = iterable_str_to_array_1d([
+                str(2_147_483_647),
+                '0',
+                str(-2_147_483_648)], np.int32)
+        self.assertEqual(a1.tolist(), [2147483647, 0, -2147483648])
+        self.assertEqual(a1.dtype, np.dtype(np.int32))
+        self.assertFalse(a1.flags.writeable)
+
+
+    def test_iterable_str_to_array_1d_int_6(self) -> None:
+        a1 = iterable_str_to_array_1d([
+                str(2_147_483_647_000),
+                '0',
+                str(-2_147_483_648_000)], np.int32)
+        # NOTE: overflow characteristics may not be stable
+        self.assertEqual(a1.tolist(), [-1000, 0, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.int32))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_int_7(self) -> None:
+        a1 = iterable_str_to_array_1d([
+                str(32_767),
+                '0',
+                str(-32_768)], np.int16)
+        self.assertEqual(a1.tolist(), [32767, 0, -32768])
+        self.assertEqual(a1.dtype, np.dtype(np.int16))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_int_8(self) -> None:
+        a1 = iterable_str_to_array_1d([
+                str(127),
+                '0',
+                str(-128)], np.int8)
+        self.assertEqual(a1.tolist(), [127, 0, -128])
+        self.assertEqual(a1.dtype, np.dtype(np.int8))
+        self.assertFalse(a1.flags.writeable)
 
 
 
@@ -121,13 +186,19 @@ class TestUnit(unittest.TestCase):
     def test_iterable_str_to_array_1d_bytes_1(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', 'dddddd', ''], np.dtype('|S3'))
         self.assertEqual(a1.dtype.str, '|S3')
-        print(a1)
-        # import ipdb; ipdb.set_trace()
+        self.assertEqual(a1.tolist(), [b'aa', b'bbb', b'ccc', b'ddd', b''])
+        self.assertFalse(a1.flags.writeable)
 
     def test_iterable_str_to_array_1d_bytes_2(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', 'dddddd', ''], bytes)
         self.assertEqual(a1.dtype.str, '|S6')
         self.assertEqual(a1.tolist(), [b'aa', b'bbb', b'ccccc', b'dddddd', b''])
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_bytes_3(self) -> None:
+        a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', 'dddddd', ''], np.dtype('|S1'))
+        self.assertEqual(a1.dtype.str, '|S1')
+        self.assertEqual(a1.tolist(), [b'a', b'b', b'c', b'd', b''])
         self.assertFalse(a1.flags.writeable)
 
 
