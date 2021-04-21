@@ -21,7 +21,7 @@ class TestUnit(unittest.TestCase):
 
 
 
-    # def test_sequence_str_to_array_1d_a(self) -> None:
+    # def test_iterable_str_to_array_1d_a(self) -> None:
     #     a1 = iterable_str_to_array_1d(['1', '3', '4'], int)
     #     self.assertEqual(a1.tolist(), [1, 3, 4])
     #     self.assertEqual(a1.dtype, np.dtype(int))
@@ -36,33 +36,34 @@ class TestUnit(unittest.TestCase):
     #     self.assertEqual(a3.dtype, np.dtype('O'))
 
 
-    def test_sequence_str_to_array_1d_bool_1(self) -> None:
+    def test_iterable_str_to_array_1d_bool_1(self) -> None:
         a1 = iterable_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
         self.assertEqual(a1.tolist(), [True, False, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
-    def test_sequence_str_to_array_1d_bool_2(self) -> None:
+    def test_iterable_str_to_array_1d_bool_2(self) -> None:
         a1 = iterable_str_to_array_1d(['true', 'True', 'TRUE', 't'], bool)
         self.assertEqual(a1.tolist(), [True, True, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
-    def test_sequence_str_to_array_1d_bool_3(self) -> None:
+    def test_iterable_str_to_array_1d_bool_3(self) -> None:
         a1 = iterable_str_to_array_1d(['sd', 'er', 'TRUE', 'twerwersdfsd'], bool)
         self.assertEqual(a1.tolist(), [False, False, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
 
-    def test_sequence_str_to_array_1d_int_1(self) -> None:
+
+    def test_iterable_str_to_array_1d_int_1(self) -> None:
         # NOTE: floats will be truncated
         a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], int)
         self.assertEqual(a1.tolist(), [23, -54, 1000, 23])
         self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
 
-    def test_sequence_str_to_array_1d_int_2(self) -> None:
+    def test_iterable_str_to_array_1d_int_2(self) -> None:
         # NOTE: empty strings get converted to zero
         a1 = iterable_str_to_array_1d(['23', '', '  -123000', '23'], int)
         self.assertEqual(a1.tolist(), [23, 0, -123000, 23])
@@ -71,44 +72,45 @@ class TestUnit(unittest.TestCase):
 
 
 
-    def test_sequence_str_to_array_1d_str_1(self) -> None:
+
+    def test_iterable_str_to_array_1d_str_1(self) -> None:
         a1 = iterable_str_to_array_1d(['    sdf  ', '  we', 'aaa', 'qqqqq '], str)
         self.assertEqual(a1.dtype.str, '<U9')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['    sdf  ', '  we', 'aaa', 'qqqqq '])
 
-    def test_sequence_str_to_array_1d_str_2(self) -> None:
+    def test_iterable_str_to_array_1d_str_2(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'cc', 'dddd '], str)
         self.assertEqual(a1.dtype.str, '<U5')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cc', 'dddd '])
 
-    def test_sequence_str_to_array_1d_str_3(self) -> None:
+    def test_iterable_str_to_array_1d_str_3(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb'], str)
         self.assertEqual(a1.dtype.str, '<U3')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bbb'])
 
-    def test_sequence_str_to_array_1d_str_4(self) -> None:
+    def test_iterable_str_to_array_1d_str_4(self) -> None:
         a1 = iterable_str_to_array_1d(['aaaaaaaaaa', 'bbb'], str)
         self.assertEqual(a1.dtype.str, '<U10')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aaaaaaaaaa', 'bbb'])
 
 
-    def test_sequence_str_to_array_1d_str_5(self) -> None:
+    def test_iterable_str_to_array_1d_str_5(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U2'))
         self.assertEqual(a1.dtype.str, '<U2')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bb', 'cc', ' d'])
 
-    def test_sequence_str_to_array_1d_str_6(self) -> None:
+    def test_iterable_str_to_array_1d_str_6(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U4'))
         self.assertEqual(a1.dtype.str, '<U4')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bbb', 'cccc', ' ddd'])
 
-    def test_sequence_str_to_array_1d_str_7(self) -> None:
+    def test_iterable_str_to_array_1d_str_7(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd ', ''], np.dtype('<U8'))
         self.assertEqual(a1.dtype.str, '<U8')
         self.assertFalse(a1.flags.writeable)
@@ -116,7 +118,20 @@ class TestUnit(unittest.TestCase):
 
 
 
-    # def test_sequence_str_to_array_1d_c(self) -> None:
+    def test_iterable_str_to_array_1d_bytes_1(self) -> None:
+        a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', 'dddddd', ''], np.dtype('|S3'))
+        self.assertEqual(a1.dtype.str, '|S3')
+        print(a1)
+        # import ipdb; ipdb.set_trace()
+
+    def test_iterable_str_to_array_1d_bytes_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', 'dddddd', ''], bytes)
+        self.assertEqual(a1.dtype.str, '|S6')
+        self.assertEqual(a1.tolist(), [b'aa', b'bbb', b'ccccc', b'dddddd', b''])
+        self.assertFalse(a1.flags.writeable)
+
+
+    # def test_iterable_str_to_array_1d_c(self) -> None:
     #     with self.assertRaises(ValueError):
     #         _ = iterable_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
 
@@ -125,26 +140,26 @@ class TestUnit(unittest.TestCase):
     #     self.assertEqual(a1.dtype, np.dtype(float))
 
 
-    # def test_sequence_str_to_array_1d_d1(self) -> None:
+    # def test_iterable_str_to_array_1d_d1(self) -> None:
     #     a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
     #     self.assertEqual(a1.dtype, np.dtype(complex))
     #     self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
 
-    # def test_sequence_str_to_array_1d_d2(self) -> None:
+    # def test_iterable_str_to_array_1d_d2(self) -> None:
     #     a1 = iterable_str_to_array_1d(['3+0j', '100+nanj'], complex)
     #     self.assertEqual(a1.dtype, np.dtype(complex))
 
-    # def test_sequence_str_to_array_1d_d3(self) -> None:
+    # def test_iterable_str_to_array_1d_d3(self) -> None:
     #     a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
     #     self.assertEqual(a1.dtype, np.dtype(complex))
     #     self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
 
-    # def test_sequence_str_to_array_1d_d4(self) -> None:
+    # def test_iterable_str_to_array_1d_d4(self) -> None:
     #     with self.assertRaises(ValueError):
     #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
 
 
-    # def test_sequence_str_to_array_1d_e(self) -> None:
+    # def test_iterable_str_to_array_1d_e(self) -> None:
 
     #     a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
     #     self.assertEqual(a1.dtype, np.dtype('<M8[D]'))

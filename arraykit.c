@@ -602,81 +602,12 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl)
     return array;
 }
 
-// Create a fixed sized unicode array. Ownership is taken of the passed dtype, and it will be mutated if elsize is 0.
-// static inline PyObject*
-// AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
-// {
-//     Py_ssize_t count = cpl->offsets_count;
-//     npy_intp dims[] = {count};
-//     // TODO: check error
-
-//     Py_ssize_t field_points;
-//     int capped_points;
-
-//     if (!dtype) {
-//         AK_NOT_IMPLEMENTED("got a null dtype");
-//     }
-
-//     if (dtype->elsize == 0) {
-//         field_points = cpl->offset_max;
-//         dtype->elsize = field_points * sizeof(Py_UCS4);
-//         capped_points = 0;
-//     }
-//     else {
-//         // assume that elsize is already given in units of 4
-//         field_points = dtype->elsize / sizeof(Py_UCS4);
-//         capped_points = 1;
-//     }
-
-//     // assuming this is contiguous
-//     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-//     // TODO: check error
-
-//     Py_UCS4 *array_buffer = (Py_UCS4*)PyArray_DATA((PyArrayObject*)array);
-//     Py_UCS4 *end = array_buffer + (count * field_points * sizeof(Py_UCS4));
-
-//     AK_CPL_CurrentReset(cpl);
-
-//     if (capped_points) {
-//         Py_ssize_t copy_bytes;
-//         while (array_buffer < end) {
-
-//             if (cpl->offsets[cpl->index_current] >= field_points) {
-//                 copy_bytes = field_points * sizeof(Py_UCS4);
-//             } else {
-//                 copy_bytes = cpl->offsets[cpl->index_current] * sizeof(Py_UCS4);
-//             }
-//             memcpy(array_buffer,
-//                     cpl->pos_current,
-//                     copy_bytes);
-//             array_buffer += field_points;
-//             AK_CPL_CurrentAdvance(cpl);
-//         }
-//     }
-//     else { // faster we always know the offset will fit
-//         while (array_buffer < end) {
-//             memcpy(array_buffer,
-//                     cpl->pos_current,
-//                     cpl->offsets[cpl->index_current] * sizeof(Py_UCS4));
-//             array_buffer += field_points;
-//             AK_CPL_CurrentAdvance(cpl);
-//         }
-//     }
-//     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
-//     return array;
-// }
-
-
 static inline PyObject*
 AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    // PyArray_Descr *dtype = PyArray_DescrFromType(NPY_UNICODE);
-    // dtype = PyArray_DescrNew(dtype); // this is necessary to avoid mutating a common dtype
-
-    // TODO: check error
     Py_ssize_t field_points;
     bool capped_points;
 
@@ -687,7 +618,7 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
     else {
         // assume that elsize is already given in units of 4
-        assert(dtype->elsize % 4 == 0);
+        assert(dtype->elsize % sizeof(Py_UCS4) == 0);
         field_points = dtype->elsize / sizeof(Py_UCS4);
         capped_points = true;
     }
@@ -730,7 +661,94 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
+static inline PyObject*
+AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+{
+    Py_ssize_t count = cpl->offsets_count;
+    npy_intp dims[] = {count};
 
+    Py_ssize_t field_points;
+    bool capped_points;
+
+    if (dtype->elsize == 0) {
+        field_points = cpl->offset_max;
+        dtype->elsize = field_points;
+        capped_points = false;
+    }
+    else {
+        field_points = dtype->elsize;
+        capped_points = true;
+    }
+
+    // assuming this is contiguous
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // TODO: check error
+
+    char *array_buffer = (char*)PyArray_DATA((PyArrayObject*)array);
+    char *end = array_buffer + count * field_points;
+
+    AK_CPL_CurrentReset(cpl);
+
+    if (capped_points) {
+        Py_ssize_t copy_bytes;
+
+        while (array_buffer < end) {
+            // if (cpl->offsets[cpl->index_current] >= field_points) {
+            //     copy_bytes = field_points;
+            // } else {
+            //     copy_bytes = cpl->offsets[cpl->index_current];
+            // }
+            // memcpy(array_buffer,
+            //         cpl->pos_current,
+            //         copy_bytes);
+            array_buffer += field_points;
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else {
+        while (array_buffer < end) {
+            Py_UCS4 *p = cpl->pos_current;
+            Py_UCS4 *p_end = cpl->pos_current + cpl->offsets[cpl->index_current];
+            char *field_end = array_buffer + field_points;
+            while (p < p_end) {
+                *array_buffer++ = (char)*p; // truncate
+                ++p;
+            }
+            while (array_buffer < field_end) {
+                ++array_buffer;
+            }
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
+// Generic handler for converting a CPL to an array.
+static inline PyObject*
+AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
+    if (!dtype) {
+        AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
+    }
+    else if (PyDataType_ISBOOL(dtype)) {
+        return AK_CPL_ToArrayBoolean(cpl);
+    }
+    else if (PyDataType_ISINTEGER(dtype)) {
+        return AK_CPL_ToArrayInt(cpl);
+    }
+    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
+        return AK_CPL_ToArrayUnicode(cpl, dtype);
+    }
+    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'S') {
+        return AK_CPL_ToArrayBytes(cpl, dtype);
+    }
+    else if (PyDataType_ISCOMPLEX(dtype)) {
+        AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
+    }
+    else {
+        AK_NOT_IMPLEMENTED("no handling for other dtypes yet");
+    }
+}
 
 
 // Return a contiguous string of data stored in the buffer, without delimiters. Returns a new reference.
@@ -895,6 +913,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
 {
     PyObject* list = PyList_New(cpg->lines_count);
     // handle error
+
     for (int i = 0; i < cpg->lines_count; ++i) {
 
         PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
@@ -907,26 +926,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
         AK_DTypeFromSpecifier(dtype_specifier, &dtype);
         // TODO: handle error
 
-        PyObject* array;
-
-        if (!dtype) {
-            AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
-        }
-        else if (PyDataType_ISBOOL(dtype)) {
-            array = AK_CPL_ToArrayBoolean(cpg->lines[i]);
-        }
-        else if (PyDataType_ISINTEGER(dtype)) {
-            array = AK_CPL_ToArrayInt(cpg->lines[i]);
-        }
-        else if (PyDataType_ISSTRING(dtype)) {
-            array = AK_CPL_ToArrayUnicode(cpg->lines[i], dtype);
-        }
-        else if (PyDataType_ISCOMPLEX(dtype)) {
-            AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
-        }
-        else {
-            AK_NOT_IMPLEMENTED("no handling for other dtypes yet");
-        }
+        PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
 
         if (PyList_SetItem(list, i, array)) { // steals reference
            // handle error
@@ -1526,28 +1526,9 @@ AK_IterableStrToArray1D(
         // TODO: handle error
 
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence);
-        PyObject* array;
-
-        if (!dtype) {
-            AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
-        }
-        else if (PyDataType_ISBOOL(dtype)) {
-            array = AK_CPL_ToArrayBoolean(cpl);
-            // TODO: handle error
-        }
-        else if (PyDataType_ISINTEGER(dtype)) {
-            array = AK_CPL_ToArrayInt(cpl);
-            // TODO: handle error
-        }
-        else if (PyDataType_ISSTRING(dtype)) {
-            array = AK_CPL_ToArrayUnicode(cpl, dtype);
-            // TODO: handle error
-        }
-        else {
-            AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
-        }
-
+        PyObject* array = AK_CPL_ToArray(cpl, dtype);
         AK_CPL_Free(cpl);
+
         return array;
 }
 
