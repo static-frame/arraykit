@@ -147,10 +147,16 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
 
-    def test_iterable_str_to_array_1d_uint_2(self) -> None:
+    def test_iterable_str_to_array_1d_uint_2a(self) -> None:
         a1 = iterable_str_to_array_1d([str(18_446_744_073_709_551_615), '0'], np.uint64)
-        # import ipdb; ipdb.set_trace()
         self.assertEqual(a1.tolist(), [18446744073709551615, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.uint64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_uint_2a(self) -> None:
+        a1 = iterable_str_to_array_1d([str(18_446_744_073_709_551_616), '0'], np.uint64)
+        # overflow for now simply returns 0
+        self.assertEqual(a1.tolist(), [0, 0])
         self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
 
@@ -164,6 +170,25 @@ class TestUnit(unittest.TestCase):
                 [18446744073709551, 184467440737095516, 1844674407370955161, 0])
         self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_uint_4(self) -> None:
+        a1 = iterable_str_to_array_1d([str(4294967295), '0'], np.uint32)
+        self.assertEqual(a1.tolist(), [4294967295, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.uint32))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_uint_4(self) -> None:
+        a1 = iterable_str_to_array_1d([str(65535), '0'], np.uint16)
+        self.assertEqual(a1.tolist(), [65535, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.uint16))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_uint_4(self) -> None:
+        a1 = iterable_str_to_array_1d([str(255), '0'], np.uint8)
+        self.assertEqual(a1.tolist(), [255, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.uint8))
+        self.assertFalse(a1.flags.writeable)
+
 
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:

@@ -514,8 +514,8 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
         return 0;
     } else if (*p == '+') {
         p++;
+        if (p >= end) {return number;}
     }
-    if (p >= end) {return number;}
 
     // Check that there is a first digit.
     if (!isdigit_ascii(*p)) {
@@ -591,15 +591,17 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     return true; //matched all characters
 }
 
-// NOTE: using PyOS_strtol was an alternative, but neede to be passed a null-terminated char, which would require copying the data out of the CPL.
+// NOTE: using PyOS_strtol was an alternative, but needed to be passed a null-terminated char, which would require copying the data out of the CPL. This approach reads directly from the CPL without copying.
 static inline npy_int64
 AK_CPL_current_to_int64(AK_CodePointLine* cpl)
 {
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
-    int error;
+    int error = 0;
     npy_int64 v = AK_UCS4_to_int64(p, end, &error);
-    // NOTE: not handling errors
+    if (error > 0) {
+        return 0;
+    }
     return v;
 }
 
@@ -610,9 +612,9 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
     int error = 0;
     npy_uint64 v = AK_UCS4_to_uint64(p, end, &error);
-    // if (error > 0) {
-    //     return 0;
-    // }
+    if (error > 0) {
+        return 0;
+    }
     return v;
 }
 
@@ -881,14 +883,15 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     if (!dtype) {
         AK_NOT_IMPLEMENTED("no handling for undefined dtype yet");
     }
-    else if (PyDataType_ISBOOL(dtype)) {
+
+    if (PyDataType_ISBOOL(dtype)) {
         return AK_CPL_ToArrayBoolean(cpl);
+    }
+    else if (PyDataType_ISUNSIGNED(dtype)) { // must come before integer check
+        return AK_CPL_ToArrayUInt(cpl, dtype);
     }
     else if (PyDataType_ISINTEGER(dtype)) {
         return AK_CPL_ToArrayInt(cpl, dtype);
-    }
-    else if (PyDataType_ISUNSIGNED(dtype)) {
-        return AK_CPL_ToArrayUInt(cpl, dtype);
     }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
         return AK_CPL_ToArrayUnicode(cpl, dtype);
