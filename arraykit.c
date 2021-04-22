@@ -500,7 +500,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     char tsep = '\0'; // thousands seperator; if null processing is skipped
 
     npy_uint64 pre_max = NPY_MAX_UINT64 / 10;
-    npy_int64 dig_pre_max = NPY_MAX_UINT64 % 10;
+    int dig_pre_max = NPY_MAX_UINT64 % 10;
     npy_uint64 number = 0;
     int d;
 

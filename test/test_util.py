@@ -150,7 +150,7 @@ class TestUnit(unittest.TestCase):
     def test_iterable_str_to_array_1d_uint_2(self) -> None:
         a1 = iterable_str_to_array_1d([str(18_446_744_073_709_551_615), '0'], np.uint64)
         # import ipdb; ipdb.set_trace()
-        # self.assertEqual(a1.tolist(), [23, 54, 1000, 23])
+        self.assertEqual(a1.tolist(), [18446744073709551615, 0])
         self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
 
