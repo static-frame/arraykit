@@ -54,6 +54,11 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_bool_4(self) -> None:
+        a1 = iterable_str_to_array_1d(['false', '  true  ', '  false  ', 'true'], bool)
+        self.assertEqual(a1.tolist(), [False, True, False, True])
+        self.assertEqual(a1.dtype, np.dtype(bool))
+        self.assertFalse(a1.flags.writeable)
 
 
     def test_iterable_str_to_array_1d_int_1(self) -> None:
@@ -88,8 +93,6 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), [0, 0, 0])
         self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
-
-
 
     def test_iterable_str_to_array_1d_int_4(self) -> None:
         # NOTE: floats will be truncated
@@ -134,6 +137,21 @@ class TestUnit(unittest.TestCase):
                 str(-128)], np.int8)
         self.assertEqual(a1.tolist(), [127, 0, -128])
         self.assertEqual(a1.dtype, np.dtype(np.int8))
+        self.assertFalse(a1.flags.writeable)
+
+
+
+    def test_iterable_str_to_array_1d_uint_1(self) -> None:
+        a1 = iterable_str_to_array_1d(['23', '54', '  1000', '23  '], np.uint64)
+        self.assertEqual(a1.tolist(), [23, 54, 1000, 23])
+        self.assertEqual(a1.dtype, np.dtype(np.uint64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_uint_2(self) -> None:
+        a1 = iterable_str_to_array_1d([str(18_446_744_073_709_551_615), '0'], np.uint64)
+        # import ipdb; ipdb.set_trace()
+        # self.assertEqual(a1.tolist(), [23, 54, 1000, 23])
+        self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
 
 

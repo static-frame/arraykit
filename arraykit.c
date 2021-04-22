@@ -378,23 +378,23 @@ static char* TRUE_UPPER = "TRUE";
 #define ERROR_INVALID_CHARS 3
 
 
-// Extended from pandas/_libs/src/parser/tokenizer.c
+// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c
 static inline npy_int64
 AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 {
     char tsep = '\0'; // thousands seperator; if null processing is skipped
     npy_int64 int_min = NPY_MIN_INT64;
     npy_int64 int_max = NPY_MAX_INT64;
-    Py_UCS4 *p = p_item;
     int isneg = 0;
     npy_int64 number = 0;
     int d;
-    // Skip leading spaces.
+
+    Py_UCS4 *p = p_item;
+
     while (isspace_ascii(*p)) {
         ++p;
         if (p >= end) {return number;}
     }
-    // Handle sign.
     if (*p == '-') {
         isneg = 1;
         ++p;
@@ -493,6 +493,76 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     return number;
 }
 
+// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c
+static inline npy_uint64
+AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
+
+    char tsep = '\0'; // thousands seperator; if null processing is skipped
+
+    npy_uint64 pre_max = NPY_MAX_UINT64 / 10;
+    npy_int64 dig_pre_max = NPY_MAX_UINT64 % 10;
+    npy_uint64 number = 0;
+    int d;
+
+    Py_UCS4 *p = p_item;
+    while (isspace_ascii(*p)) {
+        ++p;
+        if (p >= end) {return number;}
+    }
+    if (*p == '-') {
+        *error = ERROR_INVALID_CHARS;
+        return 0;
+    } else if (*p == '+') {
+        p++;
+    }
+    if (p >= end) {return number;}
+
+    // Check that there is a first digit.
+    if (!isdigit_ascii(*p)) {
+        *error = ERROR_NO_DIGITS;
+        return 0;
+    }
+    // If number is less than pre_max, at least one more digit can be processed without overflowing.
+    d = *p;
+    if (tsep != '\0') {
+        while (1) {
+            if (d == tsep) {
+                ++p;
+                if (p >= end) {return number;}
+                d = *p;
+                continue;
+            } else if (!isdigit_ascii(d)) {
+                break;
+            }
+            if ((number < pre_max) ||
+                ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                number = number * 10 + (d - '0');
+                ++p;
+                if (p >= end) {return number;}
+                d = *p;
+            } else {
+                *error = ERROR_OVERFLOW;
+                return 0;
+            }
+        }
+    } else {
+        while (isdigit_ascii(d)) {
+            if ((number < pre_max) ||
+                ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                number = number * 10 + (d - '0');
+                ++p;
+                if (p >= end) {return number;}
+                d = *p;
+            } else {
+                *error = ERROR_OVERFLOW;
+                return 0;
+            }
+        }
+    }
+    *error = 0;
+    return number;
+}
+
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 // NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
@@ -507,7 +577,8 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     int i = 0;
     char c;
 
-    // NOTE: consider permitting leading space
+    while (isspace_ascii(*p)) p++;
+
     for (;p < end; ++p) {
         c = *p;
         if (c == TRUE_LOWER[i] || c == TRUE_UPPER[i]) {
@@ -520,24 +591,31 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     return true; //matched all characters
 }
 
-
-
+// NOTE: using PyOS_strtol was an alternative, but neede to be passed a null-terminated char, which would require copying the data out of the CPL.
 static inline npy_int64
 AK_CPL_current_to_int64(AK_CodePointLine* cpl)
 {
-    // char* c = AK_CPL_ToNewChars(cpl);
-    // long v = PyOS_strtol(c, NULL, 10);
-    // PyMem_Free(c);
-    // return v;
-
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
     int error;
     npy_int64 v = AK_UCS4_to_int64(p, end, &error);
     // NOTE: not handling errors
     return v;
-
 }
+
+static inline npy_uint64
+AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
+{
+    Py_UCS4 *p = cpl->pos_current;
+    Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
+    int error = 0;
+    npy_uint64 v = AK_UCS4_to_uint64(p, end, &error);
+    // if (error > 0) {
+    //     return 0;
+    // }
+    return v;
+}
+
 
 //------------------------------------------------------------------------------
 // CodePointLine: Exporters
@@ -579,11 +657,9 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (!array) {
         return NULL;
     }
-
     if (dtype->elsize == 8) {
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
-
         AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_int64(cpl);
@@ -593,7 +669,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else if (dtype->elsize == 4) {
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
-
         AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl);
@@ -603,7 +678,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else if (dtype->elsize == 2) {
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
-
         AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl);
@@ -613,16 +687,78 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else if (dtype->elsize == 1) {
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
-
         AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
+    else {
+        PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
+        Py_DECREF(array);
+        return NULL;
+    }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
+
+
+// Given a type of signed integer, return the corresponding array.
+static inline PyObject*
+AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+{
+    Py_ssize_t count = cpl->offsets_count;
+    npy_intp dims[] = {count};
+
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    if (!array) {
+        return NULL;
+    }
+    if (dtype->elsize == 8) {
+        npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
+        npy_uint64 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = AK_CPL_current_to_uint64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 4) {
+        npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
+        npy_uint32 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 2) {
+        npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
+        npy_uint16 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 1) {
+        npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
+        npy_uint8 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
+        Py_DECREF(array);
+        return NULL;
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
 
 static inline PyObject*
 AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
@@ -739,7 +875,7 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-// Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated.
+// Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. Might return NULL if array creation fails; an exception should be set.
 static inline PyObject*
 AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     if (!dtype) {
@@ -750,6 +886,9 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     }
     else if (PyDataType_ISINTEGER(dtype)) {
         return AK_CPL_ToArrayInt(cpl, dtype);
+    }
+    else if (PyDataType_ISUNSIGNED(dtype)) {
+        return AK_CPL_ToArrayUInt(cpl, dtype);
     }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
         return AK_CPL_ToArrayUnicode(cpl, dtype);
@@ -1139,14 +1278,14 @@ AK_DialectNew(PyObject *delimiter,
         goto err;
     if (dialect->delimiter == 0) {
         PyErr_SetString(PyExc_TypeError,
-                        "\"delimiter\" must be a 1-character string");
+                "\"delimiter\" must be a 1-character string");
         goto err;
     }
     if (quotechar == Py_None && quoting == NULL)
         dialect->quoting = QUOTE_NONE;
     if (dialect->quoting != QUOTE_NONE && dialect->quotechar == 0) {
         PyErr_SetString(PyExc_TypeError,
-                        "quotechar must be set if quoting enabled");
+               "quotechar must be set if quoting enabled");
         goto err;
     }
     if (dialect->lineterminator == 0) {
