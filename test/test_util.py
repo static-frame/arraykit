@@ -154,6 +154,11 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_uint_3(self) -> None:
+        a1 = iterable_str_to_array_1d([str(18_446_744_073_709_551), '0'], np.uint64)
+        self.assertEqual(a1.tolist(), [18446744073709551, 0])
+        self.assertEqual(a1.dtype, np.dtype(np.uint64))
+        self.assertFalse(a1.flags.writeable)
 
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:

@@ -751,7 +751,7 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         }
     }
     else {
-        PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
+        PyErr_SetString(PyExc_TypeError, "cannot create array from unsigned integer itemsize");
         Py_DECREF(array);
         return NULL;
     }
