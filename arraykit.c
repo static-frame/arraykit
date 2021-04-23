@@ -190,6 +190,9 @@ typedef struct {
     Py_UCS4 *pos_current;
     Py_ssize_t index_current;
 
+    char *field;
+
+
 } AK_CodePointLine;
 
 AK_CodePointLine* AK_CPL_New()
@@ -210,6 +213,9 @@ AK_CodePointLine* AK_CPL_New()
     cpl->pos_current = cpl->buffer;
     cpl->index_current = 0;
     cpl->offset_max = 0;
+
+    cpl->field = NULL;
+
     return cpl;
 }
 
@@ -217,6 +223,9 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
     PyMem_Free(cpl->offsets);
+    if (cpl->field) {
+        PyMem_Free(cpl->field);
+    }
     PyMem_Free(cpl);
 }
 
@@ -343,23 +352,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 //     }
 // }
 
-//------------------------------------------------------------------------------
-// CodePointLine: Element exporters
-
-// Return a null-terminated char array found at the curent position; this will need to be freed
-// char*
-// AK_CPL_ToNewChars(AK_CodePointLine* cpl)
-// {
-//     int points = cpl->offsets[cpl->index_current];
-//     char* post = (char*)PyMem_Malloc(sizeof(char) * (points + 1));
-//     // TODO: mask values before insertion
-//     Py_UCS4 *p = cpl->pos_current;
-//     for (int i=0; i<points; ++i) {
-//         post[i] = *p++; // need to masks to size of char
-//     }
-//     post[points] = '\0';
-//     return post;
-// }
 
 
 //------------------------------------------------------------------------------
@@ -367,8 +359,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 
 static char* TRUE_LOWER = "true";
 static char* TRUE_UPPER = "TRUE";
-// static char* FALSE_LOWER = "false";
-// static char* FALSE_UPPER = "FALSE";
 
 #define isspace_ascii(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
 #define isdigit_ascii(c) (((unsigned)(c) - '0') < 10u)
@@ -564,6 +554,30 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
 }
 
 
+
+// Set the internal field to the current field.
+static inline char*
+AK_CPL_current_to_field(AK_CodePointLine* cpl)
+{
+    if (!cpl->field) {
+        cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
+    }
+    Py_UCS4 *p = cpl->pos_current;
+    Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+    char *t = cpl->field;
+
+    while (p < end) {
+        if (isspace_ascii(*p)) {
+            ++p;
+            continue;
+        }
+        *t++ = (char)*p++;
+    }
+    *t = '\0';
+    // AK_DEBUG_OBJ(PyUnicode_FromString(cpl->field));
+    return cpl->field;
+}
+
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 // NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
 static inline bool
@@ -618,6 +632,12 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
     return v;
 }
 
+static inline npy_float64
+AK_CPL_current_to_float64(AK_CodePointLine* cpl)
+{
+    return PyOS_string_to_double(AK_CPL_current_to_field(cpl), NULL, NULL);
+}
+
 
 //------------------------------------------------------------------------------
 // CodePointLine: Exporters
@@ -647,6 +667,65 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
+
+
+// Given a type of signed integer, return the corresponding array.
+static inline PyObject*
+AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+{
+    Py_ssize_t count = cpl->offsets_count;
+    npy_intp dims[] = {count};
+
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    if (!array) {
+        return NULL;
+    }
+    // if (dtype->elsize == 16) {
+    //     npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
+    //     npy_float128 *end = array_buffer + count;
+    //     AK_CPL_CurrentReset(cpl);
+    //     while (array_buffer < end) {
+    //         *array_buffer++ = (npy_float128*)AK_CPL_current_to_float64(cpl);
+    //         AK_CPL_CurrentAdvance(cpl);
+    //     }
+    // }
+    if (dtype->elsize == 8) {
+        npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
+        npy_float64 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = AK_CPL_current_to_float64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 4) {
+        npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
+        npy_float32 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 2) {
+        npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
+        npy_float16 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
+        Py_DECREF(array);
+        return NULL;
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
+
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
@@ -887,17 +966,20 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     if (PyDataType_ISBOOL(dtype)) {
         return AK_CPL_ToArrayBoolean(cpl);
     }
+    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
+        return AK_CPL_ToArrayUnicode(cpl, dtype);
+    }
+    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'S') {
+        return AK_CPL_ToArrayBytes(cpl, dtype);
+    }
     else if (PyDataType_ISUNSIGNED(dtype)) { // must come before integer check
         return AK_CPL_ToArrayUInt(cpl, dtype);
     }
     else if (PyDataType_ISINTEGER(dtype)) {
         return AK_CPL_ToArrayInt(cpl, dtype);
     }
-    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
-        return AK_CPL_ToArrayUnicode(cpl, dtype);
-    }
-    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'S') {
-        return AK_CPL_ToArrayBytes(cpl, dtype);
+    else if (PyDataType_ISFLOAT(dtype)) {
+        return AK_CPL_ToArrayFloat(cpl, dtype);
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
         AK_NOT_IMPLEMENTED("no handling for complex dtype yet");

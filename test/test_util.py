@@ -61,6 +61,7 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
 
 
+
     def test_iterable_str_to_array_1d_int_1(self) -> None:
         # NOTE: floats will be truncated
         a1 = iterable_str_to_array_1d(['23', '-54', '  1000', '23  '], np.int64)
@@ -189,6 +190,31 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.uint8))
         self.assertFalse(a1.flags.writeable)
 
+
+
+    def test_iterable_str_to_array_1d_float_1(self) -> None:
+        a1 = iterable_str_to_array_1d(['23.1', '54.5', '1000.2', '23.'], float)
+        self.assertEqual(a1.tolist(),[23.1, 54.5, 1000.2, 23.0])
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_float_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['23.1', '   54.5    ', '   1000.2', '23.   '], float)
+        self.assertEqual(a1.tolist(),[23.1, 54.5, 1000.2, 23.0])
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_float_3(self) -> None:
+        a1 = iterable_str_to_array_1d(['23.1', '   54', '   1000.2', '23'], float)
+        self.assertEqual(a1.tolist(),[23.1, 54.0, 1000.2, 23.0])
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_float_4(self) -> None:
+        a1 = iterable_str_to_array_1d(['23', '   54', '   1000', '23'], float)
+        self.assertEqual(a1.tolist(),[23.0, 54.0, 1000.0, 23.0])
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
 
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:
