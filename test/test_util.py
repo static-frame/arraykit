@@ -216,6 +216,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.float64))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_float_5(self) -> None:
+        a1 = iterable_str_to_array_1d(['inf', '   nan', '   1e-200', '1.5e34'], float)
+        self.assertEqual(str(a1.tolist()), '[inf, nan, 1e-200, 1.5e+34]')
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
+
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:
         a1 = iterable_str_to_array_1d(['    sdf  ', '  we', 'aaa', 'qqqqq '], str)

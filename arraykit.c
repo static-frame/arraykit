@@ -559,6 +559,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
 static inline char*
 AK_CPL_current_to_field(AK_CodePointLine* cpl)
 {
+    // NOTE: we assume this is only called after offset_max is complete
     if (!cpl->field) {
         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
     }

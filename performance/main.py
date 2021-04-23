@@ -41,17 +41,22 @@ class Perf:
 #-------------------------------------------------------------------------------
 class DelimitedToArraysPandas(Perf):
     NUMBER = 40
-    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform')
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
     def pre(self):
-        records_int = [','.join(str(x) for x in range(1000))] * 1000
+        count_row = 2_000
+
+        records_int = [','.join(str(x) for x in range(1000))] * count_row
         self.file_like_int = io.StringIO('\n'.join(records_int))
 
-        records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * 1000
+        records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * count_row
         self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
-        records_str = [','.join('foobar' for x in range(1000))] * 1000
+        records_str = [','.join('foobar' for x in range(1000))] * count_row
         self.file_like_str = io.StringIO('\n'.join(records_str))
+
+        records_float = [','.join('1.2345' for x in range(1000))] * count_row
+        self.file_like_float = io.StringIO('\n'.join(records_float))
 
 class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
     entry = staticmethod(delimited_to_arrays_ak)
@@ -61,6 +66,7 @@ class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
         self.dtypes_int = [int] * 1000
         self.dtypes_bool = [bool] * 1000
         self.dtypes_str = [str] * 1000
+        self.dtypes_float = [float] * 1000
         self.axis = 1
 
     def int_uniform(self):
@@ -75,6 +81,10 @@ class DelimitedToArraysPandasAK(DelimitedToArraysPandas):
         self.file_like_str.seek(0)
         _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
 
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
+
 
 class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
     import pandas
@@ -85,6 +95,7 @@ class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
         self.dtypes_int = {i: int for i in range(1000)}
         self.dtypes_bool = {i: bool for i in range(1000)}
         self.dtypes_str = {i: object for i in range(1000)}
+        self.dtypes_float = {i: float for i in range(1000)}
 
     def int_uniform(self):
         self.file_like_int.seek(0)
@@ -97,6 +108,13 @@ class DelimitedToArraysPandasREF(DelimitedToArraysPandas):
     def str_uniform(self):
         self.file_like_str.seek(0)
         _ = self.entry(self.file_like_str, dtype=self.dtypes_str)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtype=self.dtypes_float)
+
+
+
 
 #-------------------------------------------------------------------------------
 class DelimitedToArraysGenft(Perf):
