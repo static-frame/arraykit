@@ -1,5 +1,5 @@
 import unittest
-# import datetime
+import datetime
 import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
@@ -222,6 +222,15 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.float64))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_float_6(self) -> None:
+
+        a1 = iterable_str_to_array_1d(['3.2', '3', 'inf', '-inf'], np.float128)
+        self.assertEqual(a1.tolist(), [3.2, 3, np.inf, -np.inf])
+        self.assertEqual(a1.dtype, np.float128)
+        self.assertFalse(a1.flags.writeable)
+
+
+
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:
         a1 = iterable_str_to_array_1d(['    sdf  ', '  we', 'aaa', 'qqqqq '], str)
@@ -246,6 +255,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype.str, '<U10')
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aaaaaaaaaa', 'bbb'])
+
 
 
     def test_iterable_str_to_array_1d_str_5(self) -> None:
@@ -287,14 +297,6 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
 
 
-    # def test_iterable_str_to_array_1d_c(self) -> None:
-    #     with self.assertRaises(ValueError):
-    #         _ = iterable_str_to_array_1d(['3.2', 'fo', 'nan', 'inf', 'NaN'], float)
-
-    #     a1 = iterable_str_to_array_1d(['3.2', 'nan', 'inf', 'NaN'], float)
-    #     self.assertEqual(str(a1.tolist()), '[3.2, nan, inf, nan]')
-    #     self.assertEqual(a1.dtype, np.dtype(float))
-
 
     # def test_iterable_str_to_array_1d_d1(self) -> None:
     #     a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
@@ -315,12 +317,12 @@ class TestUnit(unittest.TestCase):
     #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
 
 
-    # def test_iterable_str_to_array_1d_e(self) -> None:
+    def test_iterable_str_to_array_1d_dt64_1(self) -> None:
 
-    #     a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
-    #     self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
-    #     self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
-    #     # import ipdb; ipdb.set_trace()
+        # NOTE: this works, but cannot yet use np.datetime64 as an argument to automatically determine
+        a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], 'datetime64[D]')
+        self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
+        self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
 
     #---------------------------------------------------------------------------
     # def test_test_a(self) -> None:
@@ -418,7 +420,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([x.dtype.str for x in post0],
                 ['|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3', '|b1', '<i8', '<U3'])
 
-    def test_delimited_to_arrays_e(self) -> None:
+    def test_delimited_to_arrays_f(self) -> None:
 
         msg = [
             ','.join(['True', '10', 'foo'] * 2),
@@ -433,6 +435,26 @@ class TestUnit(unittest.TestCase):
                 [['T', 'T', 'F'], ['1', '-', '8'], ['f', 'b', 'b'], ['T', 'T', 'F'], ['1', '-', '8'], ['f', 'b', 'b']])
         self.assertEqual([x.dtype.str for x in post0],
                 ['<U1', '<U1', '<U1', '<U1', '<U1', '<U1'])
+
+
+    def test_delimited_to_arrays_g(self) -> None:
+
+        msg = [
+            'false,100,inf,red',
+            'true,200,6.5,blue',
+            'True,-234,3.2e-10,green',
+        ]
+
+        dtypes0 = [bool, int, float, str]
+        post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
+        self.assertEqual([a.dtype.kind for a in post0],
+                ['b', 'i', 'f', 'U'])
+
+        self.assertEqual([a.tolist() for a in post0],
+                    [[False, True, True],
+                    [100, 200, -234],
+                    [np.inf, 6.5, 3.2e-10],
+                    ['red', 'blue', 'green']])
 
 
     #---------------------------------------------------------------------------

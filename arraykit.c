@@ -681,16 +681,17 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (!array) {
         return NULL;
     }
-    // if (dtype->elsize == 16) {
-    //     npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
-    //     npy_float128 *end = array_buffer + count;
-    //     AK_CPL_CurrentReset(cpl);
-    //     while (array_buffer < end) {
-    //         *array_buffer++ = (npy_float128*)AK_CPL_current_to_float64(cpl);
-    //         AK_CPL_CurrentAdvance(cpl);
-    //     }
-    // }
-    if (dtype->elsize == 8) {
+    if (dtype->elsize == 16) {
+        npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
+        npy_float128 *end = array_buffer + count;
+        AK_CPL_CurrentReset(cpl);
+        while (array_buffer < end) {
+            // NOTE: cannot cast to npy_float128 here
+            *array_buffer++ = AK_CPL_current_to_float64(cpl);
+            AK_CPL_CurrentAdvance(cpl);
+        }
+    }
+    else if (dtype->elsize == 8) {
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
@@ -981,6 +982,15 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     }
     else if (PyDataType_ISFLOAT(dtype)) {
         return AK_CPL_ToArrayFloat(cpl, dtype);
+    }
+    else if (PyDataType_ISDATETIME(dtype)) {
+        PyArray_Descr* dtype_temp = PyArray_DescrFromType(NPY_BYTE);
+        PyArray_Descr* dtype_pre = PyArray_DescrNew(dtype_temp);
+        Py_DECREF(dtype_temp);
+        PyObject* array_temp = AK_CPL_ToArrayBytes(cpl, dtype_pre);
+        PyObject* array = PyArray_CastToType((PyArrayObject*)array_temp, dtype, 0);
+        Py_DECREF(array_temp);
+        return array;
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
         AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
