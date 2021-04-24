@@ -298,16 +298,16 @@ class TestUnit(unittest.TestCase):
 
 
 
-    def test_iterable_str_to_array_1d_d1(self) -> None:
+    def test_iterable_str_to_array_1d_complex_1(self) -> None:
         a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
         self.assertEqual(a1.dtype, np.dtype(complex))
         self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
 
-    def test_iterable_str_to_array_1d_d2(self) -> None:
+    def test_iterable_str_to_array_1d_complex_2(self) -> None:
         a1 = iterable_str_to_array_1d(['3+0j', '100+nanj'], complex)
         self.assertEqual(a1.dtype, np.dtype(complex))
 
-    def test_iterable_str_to_array_1d_d3(self) -> None:
+    def test_iterable_str_to_array_1d_complex_3(self) -> None:
         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
         self.assertEqual(a1.dtype, np.dtype(complex))
         self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
