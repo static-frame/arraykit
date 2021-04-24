@@ -298,31 +298,44 @@ class TestUnit(unittest.TestCase):
 
 
 
-    # def test_iterable_str_to_array_1d_d1(self) -> None:
-    #     a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
-    #     self.assertEqual(a1.dtype, np.dtype(complex))
-    #     self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
+    def test_iterable_str_to_array_1d_d1(self) -> None:
+        a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
+        self.assertEqual(a1.tolist(), [(3+0j), (100+0j)])
 
-    # def test_iterable_str_to_array_1d_d2(self) -> None:
-    #     a1 = iterable_str_to_array_1d(['3+0j', '100+nanj'], complex)
-    #     self.assertEqual(a1.dtype, np.dtype(complex))
+    def test_iterable_str_to_array_1d_d2(self) -> None:
+        a1 = iterable_str_to_array_1d(['3+0j', '100+nanj'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
 
-    # def test_iterable_str_to_array_1d_d3(self) -> None:
-    #     a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
-    #     self.assertEqual(a1.dtype, np.dtype(complex))
-    #     self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
+    def test_iterable_str_to_array_1d_d3(self) -> None:
+        a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+4.2j'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
+        self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
 
+    # NOTE: this causes a seg fault
     # def test_iterable_str_to_array_1d_d4(self) -> None:
     #     with self.assertRaises(ValueError):
     #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
 
 
     def test_iterable_str_to_array_1d_dt64_1(self) -> None:
-
-        # NOTE: this works, but cannot yet use np.datetime64 as an argument to automatically determine
         a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], 'datetime64[D]')
         self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
+        self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+
+    def test_iterable_str_to_array_1d_dt64_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
+        self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+
+    def test_iterable_str_to_array_1d_dt64_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
+        self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+
 
     #---------------------------------------------------------------------------
     # def test_test_a(self) -> None:

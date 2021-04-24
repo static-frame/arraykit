@@ -958,6 +958,51 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
+static inline PyObject*
+AK_CPL_ToArrayDatetime(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+{
+    PyArray_Descr *dtype_temp = PyArray_DescrFromType(NPY_STRING);
+    if (!dtype_temp) {
+        return NULL;
+    }
+
+    PyArray_Descr *dtype_pre = PyArray_DescrNew(dtype_temp);
+    if (!dtype_pre) {
+        return NULL;
+    }
+    Py_DECREF(dtype_temp);
+
+    PyObject* array_temp = AK_CPL_ToArrayBytes(cpl, dtype_pre); // will steal dtype_pre
+    PyObject *array = PyArray_CastToType((PyArrayObject*)array_temp, dtype, 0);
+    Py_DECREF(array_temp);
+
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
+static inline PyObject*
+AK_CPL_ToArrayComplex(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+{
+    PyArray_Descr *dtype_temp = PyArray_DescrFromType(NPY_STRING);
+    if (!dtype_temp) {
+        return NULL;
+    }
+
+    PyArray_Descr *dtype_pre = PyArray_DescrNew(dtype_temp);
+    if (!dtype_pre) {
+        return NULL;
+    }
+    Py_DECREF(dtype_temp);
+
+    PyObject* array_temp = AK_CPL_ToArrayBytes(cpl, dtype_pre); // will steal dtype_pre
+    PyObject *array = PyArray_CastToType((PyArrayObject*)array_temp, dtype, 0);
+    Py_DECREF(array_temp);
+
+    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
+    return array;
+}
+
+
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. Might return NULL if array creation fails; an exception should be set.
 static inline PyObject*
 AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
@@ -984,16 +1029,10 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
         return AK_CPL_ToArrayFloat(cpl, dtype);
     }
     else if (PyDataType_ISDATETIME(dtype)) {
-        PyArray_Descr* dtype_temp = PyArray_DescrFromType(NPY_BYTE);
-        PyArray_Descr* dtype_pre = PyArray_DescrNew(dtype_temp);
-        Py_DECREF(dtype_temp);
-        PyObject* array_temp = AK_CPL_ToArrayBytes(cpl, dtype_pre);
-        PyObject* array = PyArray_CastToType((PyArrayObject*)array_temp, dtype, 0);
-        Py_DECREF(array_temp);
-        return array;
+        return AK_CPL_ToArrayDatetime(cpl, dtype);
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
-        AK_NOT_IMPLEMENTED("no handling for complex dtype yet");
+        return AK_CPL_ToArrayComplex(cpl, dtype);
     }
     else {
         AK_NOT_IMPLEMENTED("no handling for other dtypes yet");
