@@ -181,3 +181,103 @@ def array_deepcopy(
     if memo is not None:
         memo[ident] = post
     return post
+
+
+def _isin_1d(
+        array: np.ndarray,
+        other: tp.FrozenSet[tp.Any]
+        ) -> np.ndarray:
+    '''
+    Iterate over an 1D array to build a 1D Boolean ndarray representing whether or not the original element is in the set
+
+    Args:
+        array: The source array
+        other: The set of elements being looked for
+    '''
+    result: np.ndarray = np.empty(array.shape, dtype=DTYPE_BOOL)
+
+    for i, element in enumerate(array):
+        result[i] = element in other
+
+    result.flags.writeable = False
+    return result
+
+
+def _isin_2d(
+        array: np.ndarray,
+        other: tp.FrozenSet[tp.Any]
+        ) -> np.ndarray:
+    '''
+    Iterate over an 2D array to build a 2D, immutable, Boolean ndarray representing whether or not the original element is in the set
+
+    Args:
+        array: The source array
+        other: The set of elements being looked for
+    '''
+    result: np.ndarray = np.empty(array.shape, dtype=DTYPE_BOOL)
+
+    for (i, j), v in np.ndenumerate(array):
+        result[i, j] = v in other
+
+    result.flags.writeable = False
+    return result
+
+
+def isin_array(*,
+        array: np.ndarray,
+        array_is_unique: bool,
+        other: np.ndarray,
+        other_is_unique: bool,
+        ) -> np.ndarray:
+    '''Core isin processing after other has been converted to an array.
+    '''
+    if array.dtype == DTYPE_OBJECT or other.dtype == DTYPE_OBJECT:
+        # both funcs return immutable arrays
+        func = _isin_1d if array.ndim == 1 else _isin_2d
+        try:
+            return func(array, frozenset(other)) # Isolate the frozenset creation to it's own try-except
+        except TypeError: # only occur when something is unhashable.
+            pass
+
+    assume_unique = array_is_unique and other_is_unique
+    func = np.in1d if array.ndim == 1 else np.isin
+
+    result = func(array, other, assume_unique=assume_unique) #type: ignore
+    result.flags.writeable = False
+
+    return result
+
+
+def unique(ar, return_inverse=False):
+
+    ar = np.asanyarray(ar).flatten()
+
+    if return_inverse:
+        perm = ar.argsort(kind='quicksort')
+        aux = ar[perm]
+    else:
+        ar.sort()
+        aux = ar
+
+    mask = np.empty(aux.shape, dtype=np.bool_)
+    mask[:1] = True
+    if aux.dtype.kind in "cfmM" and np.isnan(aux[-1]):
+        if aux.dtype.kind == "c":  # for complex all NaNs are considered equivalent
+            aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
+        else:
+            aux_firstnan = np.searchsorted(aux, aux[-1], side='left')
+
+        mask[1:aux_firstnan] = (aux[1:aux_firstnan] != aux[:aux_firstnan - 1])
+        mask[aux_firstnan] = True
+        mask[aux_firstnan + 1:] = False
+    else:
+        mask[1:] = aux[1:] != aux[:-1]
+
+    ret = aux[mask]
+    if return_inverse:
+        imask = np.cumsum(mask) - 1
+        inv_idx = np.empty(mask.shape, dtype=np.intp)
+        inv_idx[perm] = imask
+        return ret, inv_idx
+
+    return ret

@@ -5,6 +5,8 @@
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 # include "numpy/arrayobject.h"
+# include "numpy/arrayscalars.h" // Needed for Datetime scalar expansions
+# include "numpy/ufuncobject.h"
 
 //------------------------------------------------------------------------------
 // Macros
@@ -40,6 +42,12 @@
         PyErr_SetString(PyExc_NotImplementedError, msg);\
         return NULL;\
     } while (0)
+
+// To simplify lines merely checking for `!value`
+# define AK_RETURN_NULL_IF_NOT(obj) \
+    if (!obj) { \
+        return NULL; \
+    }
 
 # define _AK_DEBUG_BEGIN() \
     do {                   \
@@ -117,9 +125,8 @@ PyArray_Descr*
 AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
-    if (iterator == NULL) {
-        return NULL;
-    }
+    AK_RETURN_NULL_IF_NOT(iterator);
+
     PyArray_Descr *resolved = NULL;
     PyArray_Descr *dtype;
     while ((dtype = (PyArray_Descr*) PyIter_Next(iterator))) {
@@ -249,9 +256,9 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
-    int size0 = PyArray_DIM(array, 0);
+    npy_intp size0 = PyArray_DIM(array, 0);
     // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
-    int size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    npy_intp size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
     return Py_BuildValue("ii", size0, size1);
 }
 
@@ -335,11 +342,8 @@ static PyObject *
 resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
-    if (!PyArg_ParseTuple(args, "O!O!:resolve_dtype",
-                          &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
-    {
-        return NULL;
-    }
+    AK_RETURN_NULL_IF_NOT(PyArg_ParseTuple(args, "O!O!:resolve_dtype",
+                          &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2));
     return (PyObject *)AK_ResolveDTypes(d1, d2);
 }
 
@@ -347,6 +351,203 @@ static PyObject *
 resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     return (PyObject *)AK_ResolveDTypeIter(arg);
+}
+
+//------------------------------------------------------------------------------
+// isin
+
+static PyObject *
+AK_isin_array_dtype_use_np(PyArrayObject *array, PyArrayObject *other, int assume_unique)
+{
+    PyObject* result = NULL;
+
+    PyObject* args = PyTuple_Pack(2, (PyObject*)array, (PyObject*)other);
+    AK_RETURN_NULL_IF_NOT(args);
+
+    PyObject* kwarg = PyDict_New();
+    if (!kwarg) {
+        Py_DECREF(args);
+        return NULL;
+    }
+
+    PyObject* assume_unique_obj = PyLong_FromLong((long)assume_unique);
+    if (!assume_unique_obj) {
+        goto failure;
+    }
+
+    int success = PyDict_SetItemString(kwarg, "assume_unique", assume_unique_obj);
+    Py_DECREF(assume_unique_obj);
+    if (success == -1) {
+        goto failure;
+    }
+
+    PyObject* numpy = PyImport_ImportModule("numpy");
+    if (!numpy) {
+        goto failure;
+    }
+
+    PyObject* func = PyObject_GetAttrString(numpy, PyArray_NDIM(array) == 1 ? "in1d": "isin");
+    Py_DECREF(numpy);
+    if (!func) {
+        goto failure;
+    }
+
+    result = PyObject_Call(func, args, kwarg);
+    Py_DECREF(func);
+failure:
+    // These will always exist.
+    Py_DECREF(args);
+    Py_DECREF(kwarg);
+
+    return result;
+}
+
+static PyObject *
+AK_isin_array_object(PyArrayObject *array, PyArrayObject *other)
+{
+    /*  Algorithm:
+
+        for loc, element in loc_iter(array):
+            result[loc] = element in set(other)
+    */
+
+    PyObject *compare_elements = PyFrozenSet_New((PyObject*)other);
+    AK_RETURN_NULL_IF_NOT(compare_elements);
+
+    PyArrayObject *arrays[2];
+    npy_uint32 arrays_flags[2];
+    PyArray_Descr *op_dtypes[2];
+    arrays[0] = array;
+    arrays[1] = NULL;
+    arrays_flags[0] = NPY_ITER_READONLY;
+    arrays_flags[1] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE;
+    op_dtypes[0] = PyArray_DescrFromType(NPY_OBJECT);
+    op_dtypes[1] = PyArray_DescrFromType(NPY_BOOL);
+
+    // No inner iteration - inner loop is handled by CopyArray code
+    // Reference objects are OK.
+    int iter_flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+
+    // Construct the iterator
+    NpyIter *iter = NpyIter_MultiNew(
+            2,              // number of arrays
+            arrays,
+            iter_flags,
+            NPY_KEEPORDER,  // Maintain existing order for `array`
+            NPY_NO_CASTING, // No casting will be required
+            arrays_flags,
+            op_dtypes);
+
+    if (!iter) {
+        Py_DECREF(compare_elements);
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        Py_DECREF(compare_elements);
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    // If we don't need the GIL, iteration can be multi-threaded!
+    NPY_BEGIN_THREADS_DEF;
+    if (!NpyIter_IterationNeedsAPI(iter)) {
+        // This will likely never happen, since I am pretty sure that object
+        // dtypes need the API. However, I don't know enough about the internals
+        // of numpy iteration to know that this will *never happen....
+        NPY_BEGIN_THREADS;
+    }
+
+    do {
+        char* src_data = dataptr[0];
+        char* dst_data = dataptr[1];
+        npy_intp size = sizeptr[0];
+        npy_intp src_stride = strideptr[0];
+        npy_intp dst_stride = strideptr[1];
+
+        PyObject* obj_ref = NULL;
+
+        while (size--) {
+            // Object arrays contains pointers to PyObjects, so we will only temporarily
+            // look at the reference here.
+            memcpy(&obj_ref, src_data, sizeof(obj_ref));
+
+            // 5. Assign into result whether or not the element exists in the set
+            // int found = PySequence_Contains(compare_elements, ((PyObject**)data)[0]);
+            npy_bool found = (npy_bool)PySequence_Contains(compare_elements, obj_ref);
+
+            if (found == -1) {
+                NpyIter_Deallocate(iter);
+                Py_DECREF(compare_elements);
+                return NULL;
+            }
+
+            *dst_data = found;
+
+            src_data += src_stride;
+            dst_data += dst_stride;
+        }
+
+        // Increment the iterator to the next inner loop
+    } while(iternext(iter));
+
+    NPY_END_THREADS;
+
+    Py_DECREF(compare_elements);
+
+    // If the API was needed, it may have thrown an error
+    if (NpyIter_IterationNeedsAPI(iter) && PyErr_Occurred()) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    // Get the result from the iterator object array
+    PyObject *ret = (PyObject*)NpyIter_GetOperandArray(iter)[1];
+    if (!ret) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+    Py_INCREF(ret);
+
+    if (NpyIter_Deallocate(iter) != NPY_SUCCEED) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+
+    return ret;
+}
+
+static PyObject *
+isin_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    int array_is_unique, other_is_unique;
+    PyArrayObject *array, *other;
+
+    static char *kwlist[] = {"array", "array_is_unique", "other", "other_is_unique", NULL};
+
+    AK_RETURN_NULL_IF_NOT(PyArg_ParseTupleAndKeywords(args, kwargs, "O!iO!i:isin_array",
+                                     kwlist,
+                                     &PyArray_Type, &array, &array_is_unique,
+                                     &PyArray_Type, &other, &other_is_unique));
+
+    if (PyArray_NDIM(other) != 1) {
+        return PyErr_Format(PyExc_TypeError, "Expected other to be 1-dimensional");
+    }
+
+    PyArray_Descr* array_dtype = PyArray_DTYPE(array);
+    PyArray_Descr* other_dtype = PyArray_DTYPE(other);
+
+    // Use Python sets to handle object arrays
+    if (PyDataType_ISOBJECT(array_dtype) || PyDataType_ISOBJECT(other_dtype)) {
+        return AK_isin_array_object(array, other);
+    }
+    // Use numpy in1d logic for dtype arrays
+    return AK_isin_array_dtype_use_np(array, other, array_is_unique && other_is_unique);
 }
 
 //------------------------------------------------------------------------------
@@ -414,13 +615,10 @@ ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
     int parsed = PyArg_ParseTupleAndKeywords(
         args, kwargs, "O|$p:ArrayGO", argnames, &iterable, &own_iterable
     );
-    if (!parsed) {
-        return NULL;
-    }
+    AK_RETURN_NULL_IF_NOT(parsed);
+
     ArrayGOObject *self = (ArrayGOObject *)cls->tp_alloc(cls, 0);
-    if (!self) {
-        return NULL;
-    }
+    AK_RETURN_NULL_IF_NOT(self);
 
     if (PyArray_Check(iterable)) {
         if (!PyDataType_ISOBJECT(PyArray_DESCR((PyArrayObject *)iterable))) {
@@ -463,9 +661,8 @@ ArrayGO_append(ArrayGOObject *self, PyObject *value)
 {
     if (!self->list) {
         self->list = PyList_New(1);
-        if (!self->list) {
-            return NULL;
-        }
+        AK_RETURN_NULL_IF_NOT(self->list);
+
         Py_INCREF(value);
         PyList_SET_ITEM(self->list, 0, value);
     }
@@ -481,9 +678,8 @@ ArrayGO_extend(ArrayGOObject *self, PyObject *values)
 {
     if (!self->list) {
         self->list = PySequence_List(values);
-        if (!self->list) {
-            return NULL;
-        }
+        AK_RETURN_NULL_IF_NOT(self->list);
+
         Py_RETURN_NONE;
     }
     Py_ssize_t len = PyList_Size(self->list);
@@ -626,6 +822,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"array_deepcopy", array_deepcopy, METH_VARARGS, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"isin_array", (PyCFunction)isin_array, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL},
 };
 
