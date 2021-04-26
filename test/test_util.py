@@ -10,6 +10,7 @@ from arraykit import column_1d_filter
 from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
+from arraykit import array_deepcopy
 
 from performance.reference.util import mloc as mloc_ref
 #from performance.reference.util import roll_1d
@@ -64,9 +65,10 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(str(resolve_dtype(a1.dtype, a2.dtype)),
                 'datetime64[D]')
-        self.assertEqual(resolve_dtype(a1.dtype, a3.dtype),
-                np.dtype('<M8[ns]'))
-
+        self.assertEqual(resolve_dtype(a1.dtype, a3.dtype).kind, 'M')
+        self.assertEqual(
+                np.datetime_data(resolve_dtype(a1.dtype, a3.dtype)),
+                ('ns', 1))
         self.assertEqual(resolve_dtype(a1.dtype, a4.dtype),
                 np.dtype('O'))
 
@@ -109,7 +111,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(resolve_dtype_iter((a1.dtype, a4.dtype, a6.dtype, a5.dtype)), np.object_)
 
         # mixed strings go to the largest
-        self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)), np.dtype('<U10'))
+        self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).kind, 'U')
+        self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).itemsize, 40)
 
     #---------------------------------------------------------------------------
 
@@ -170,6 +173,58 @@ class TestUnit(unittest.TestCase):
             row_1d_filter(a1.reshape(1,2,5))
 
     #---------------------------------------------------------------------------
+
+    def test_array_deepcopy_a1(self) -> None:
+        a1 = np.arange(10)
+        memo = {}
+        a2 = array_deepcopy(a1, memo)
+
+        self.assertNotEqual(id(a1), id(a2))
+        self.assertNotEqual(mloc(a1), mloc(a2))
+        self.assertFalse(a2.flags.writeable)
+        self.assertEqual(a1.dtype, a2.dtype)
+
+    def test_array_deepcopy_a2(self) -> None:
+        a1 = np.arange(10)
+        memo = {}
+        a2 = array_deepcopy(a1, memo)
+
+        self.assertNotEqual(id(a1), id(a2))
+        self.assertNotEqual(mloc(a1), mloc(a2))
+        self.assertIn(id(a1), memo)
+        self.assertEqual(memo[id(a1)].tolist(), a2.tolist())
+        self.assertFalse(a2.flags.writeable)
+
+
+    def test_array_deepcopy_b(self) -> None:
+        a1 = np.arange(10)
+        memo = {id(a1): a1}
+        a2 = array_deepcopy(a1, memo)
+
+        self.assertEqual(mloc(a1), mloc(a2))
+
+
+    def test_array_deepcopy_c1(self) -> None:
+        mutable = [np.nan]
+        memo = {}
+        a1 = np.array((None, 'foo', True, mutable))
+        a2 = array_deepcopy(a1, memo)
+
+        self.assertNotEqual(id(a1), id(a2))
+        self.assertNotEqual(mloc(a1), mloc(a2))
+        self.assertNotEqual(id(a1[3]), id(a2[3]))
+        self.assertFalse(a2.flags.writeable)
+
+    def test_array_deepcopy_c2(self) -> None:
+        memo = {}
+        mutable = [np.nan]
+        a1 = np.array((None, 'foo', True, mutable))
+        a2 = array_deepcopy(a1, memo)
+        self.assertNotEqual(id(a1), id(a2))
+        self.assertNotEqual(mloc(a1), mloc(a2))
+        self.assertNotEqual(id(a1[3]), id(a2[3]))
+        self.assertFalse(a2.flags.writeable)
+        self.assertIn(id(a1), memo)
 
     def test_roll_1d_a(self) -> None:
         a1 = np.arange(12, dtype=float)
