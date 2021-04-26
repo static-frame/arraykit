@@ -11,10 +11,9 @@ from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
+from arraykit import roll_1d
 
 from performance.reference.util import mloc as mloc_ref
-#from performance.reference.util import roll_1d
-from arraykit import roll_1d
 
 
 class TestUnit(unittest.TestCase):
