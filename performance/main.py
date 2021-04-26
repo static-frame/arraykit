@@ -4,6 +4,7 @@
 import timeit
 import argparse
 
+from automap import FrozenAutoMap
 import numpy as np
 
 from performance.reference.util import mloc as mloc_ref
@@ -16,6 +17,7 @@ from performance.reference.util import row_1d_filter as row_1d_filter_ref
 from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
+from performance.reference.util import is_gen_copy_values as is_gen_copy_values_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -29,6 +31,7 @@ from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
+from arraykit import is_gen_copy_values as is_gen_copy_values_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -251,6 +254,31 @@ class ArrayGOPerfREF(ArrayGOPerf):
 
 
 #-------------------------------------------------------------------------------
+class IsGenCopyValues(Perf):
+    NUMBER = 1000
+
+    def pre(self):
+        self.objects = [
+            [1, 2, 3],
+            (1, 2, 3),
+            FrozenAutoMap((1, 2, 3)),
+            {1, 2, 3},
+            {1:1, 2:2, 3:3},
+        ]
+
+    def main(self):
+        for _ in range(100):
+            for obj in self.objects:
+                self.entry(obj)
+
+class IsGenCopyValuesAK(IsGenCopyValues):
+    entry = staticmethod(is_gen_copy_values_ak)
+
+class IsGenCopyValuesREF(IsGenCopyValues):
+    entry = staticmethod(is_gen_copy_values_ref)
+
+#-------------------------------------------------------------------------------
+
 
 def get_arg_parser():
 

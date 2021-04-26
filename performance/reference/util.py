@@ -1,5 +1,7 @@
 import typing as tp
 from copy import deepcopy
+from collections import abc
+from automap import FrozenAutoMap  # pylint: disable = E0611
 
 import numpy as np
 
@@ -24,6 +26,11 @@ DTYPE_COMPLEX_DEFAULT = np.dtype(np.complex128)
 
 DTYPES_BOOL = (DTYPE_BOOL,)
 DTYPES_INEXACT = (DTYPE_FLOAT_DEFAULT, DTYPE_COMPLEX_DEFAULT)
+
+DICTLIKE_TYPES = (abc.Set, dict, FrozenAutoMap)
+
+# iterables that cannot be used in NP array constructors; asumes that dictlike types have already been identified
+INVALID_ITERABLE_FOR_ARRAY = (abc.ValuesView, abc.KeysView)
 
 
 def mloc(array: np.ndarray) -> int:
@@ -158,7 +165,6 @@ def resolve_dtype_iter(dtypes: tp.Iterable[np.dtype]) -> np.dtype:
     return dt_resolve
 
 
-
 def array_deepcopy(
         array: np.ndarray,
         memo: tp.Optional[tp.Dict[int, tp.Any]],
@@ -181,3 +187,19 @@ def array_deepcopy(
     if memo is not None:
         memo[ident] = post
     return post
+
+
+def is_gen_copy_values(values: tp.Iterable[tp.Any]) -> tp.Tuple[bool, bool]:
+    '''
+    Returns:
+        copy_values: True if values cannot be used in an np.array constructor.`
+    '''
+    if hasattr(values, '__len__'):
+        if isinstance(values, DICTLIKE_TYPES + INVALID_ITERABLE_FOR_ARRAY):
+            # Dict-like iterables need copies
+            return False, True
+
+        return False, False
+
+    # We are a generator and all generators need copies
+    return True, True

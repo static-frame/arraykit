@@ -1,5 +1,6 @@
 import unittest
 
+from automap import FrozenAutoMap
 import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
@@ -11,6 +12,7 @@ from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
+from arraykit import is_gen_copy_values
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -224,9 +226,24 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a2.flags.writeable)
         self.assertIn(id(a1), memo)
 
+    def test_is_gen_copy_values(self) -> None:
+        self.assertEqual((True, True), is_gen_copy_values((x for x in range(3))))
+
+        l = [1, 2, 3]
+        t = (1, 2, 3)
+        fam = FrozenAutoMap((1, 2, 3))
+        s = {1, 2, 3}
+        d = {1:1, 2:2, 3:3}
+
+        self.assertEqual((False, False), is_gen_copy_values(l))
+        self.assertEqual((False, False), is_gen_copy_values(t))
+
+        self.assertEqual((False, True), is_gen_copy_values(fam))
+        self.assertEqual((False, True), is_gen_copy_values(d.keys()))
+        self.assertEqual((False, True), is_gen_copy_values(d.values()))
+        self.assertEqual((False, True), is_gen_copy_values(d))
+        self.assertEqual((False, True), is_gen_copy_values(s))
+
 
 if __name__ == '__main__':
     unittest.main()
-
-
-

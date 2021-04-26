@@ -1,5 +1,6 @@
 # include "Python.h"
 # include "structmember.h"
+# include <stdbool.h>
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -349,6 +350,110 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
+typedef enum IsGenCopyValues {
+    ERR,
+    IS_GEN,
+    NOT_GEN_COPY,
+    NOT_GEN_NO_COPY
+} IsGenCopyValues;
+
+static IsGenCopyValues
+AK_is_gen_copy_values(PyObject *arg)
+{
+    /*
+    Returns:
+        -1: for failure
+         0: is a generator
+         1: a non-generator that needs to be copied
+         2: a non-generator that does not needs to be copied
+    */
+    if(PyObject_HasAttrString(arg, "__len__")) {
+        if (PySet_Check(arg) || PyDict_Check(arg) ||
+            PyDictValues_Check(arg) || PyDictKeys_Check(arg))
+        {
+            return NOT_GEN_COPY;
+        }
+
+        PyObject *automap = PyImport_ImportModule("automap");
+        if (!automap) {
+            return ERR;
+        }
+
+        PyObject *frozenAutoMap = PyObject_GetAttrString(automap, "FrozenAutoMap");
+        Py_DECREF(automap);
+        if (!frozenAutoMap) {
+            return ERR;
+        }
+
+        int is_frozen_automap = PyObject_IsInstance(arg, frozenAutoMap);
+        Py_DECREF(frozenAutoMap);
+
+        if (is_frozen_automap) {
+            return NOT_GEN_COPY;
+        }
+
+        return NOT_GEN_NO_COPY;
+    }
+
+    return IS_GEN;
+}
+
+static PyObject*
+is_gen_copy_values(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    // This only exists to allow `AK_is_gen_copy_values` to be tested
+
+    PyObject *is_gen = Py_False;
+    PyObject *needs_copy = Py_False;
+
+    switch (AK_is_gen_copy_values(arg))
+    {
+    case ERR:
+        return NULL;
+    case IS_GEN:
+        is_gen = Py_True;
+        needs_copy = Py_True;
+        break;
+    case NOT_GEN_COPY:
+        needs_copy = Py_True;
+        break;
+    case NOT_GEN_NO_COPY:
+        break;
+    }
+
+    Py_INCREF(is_gen);
+    Py_INCREF(needs_copy);
+
+    PyObject *ret = PyTuple_Pack(2, is_gen, needs_copy);
+    if (!ret) {
+        Py_DECREF(is_gen);
+        Py_DECREF(needs_copy);
+        return NULL;
+    }
+
+    return ret;
+}
+
+// static IsGenCopyValues
+// prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *arg)
+// {
+//     bool is_gen = false;
+//     bool needs_copy = false;
+
+//     switch (AK_is_gen_copy_values(arg))
+//     {
+//     case ERR:
+//         return NULL;
+//     case IS_GEN:
+//         is_gen = true;
+//         needs_copy = true;
+//         break;
+//     case NOT_GEN_COPY:
+//         needs_copy = true;
+//     }
+
+// }
+
 //------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
@@ -626,6 +731,8 @@ static PyMethodDef arraykit_methods[] =  {
     {"array_deepcopy", array_deepcopy, METH_VARARGS, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"is_gen_copy_values", is_gen_copy_values, METH_O, NULL},
+    //{"prepare_iter_for_array", prepare_iter_for_array, METH_O, NULL},
     {NULL},
 };
 
