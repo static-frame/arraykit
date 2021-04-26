@@ -3,7 +3,7 @@ from setuptools import setup
 import numpy as np  # type: ignore
 
 
-AK_VERSION = '0.1.0'
+AK_VERSION = '0.1.2'
 
 
 def get_long_description() -> str:
@@ -39,8 +39,9 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='numpy array',
-    packages=[],
-    package_data={'': ['*.pyi']},
+    packages=[''],
+    package_data={'': ['arraykit.pyi', 'py.typed']},
+    include_package_data=True,
     ext_modules=[
         Extension(
             name='arraykit',

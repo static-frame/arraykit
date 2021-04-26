@@ -14,6 +14,7 @@ from performance.reference.util import row_1d_filter as row_1d_filter_ref
 from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
 from performance.reference.util import isin_array as isin_array_ref
+from performance.reference.util import array_deepcopy as array_deepcopy_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -27,6 +28,7 @@ from arraykit import row_1d_filter as row_1d_filter_ak
 from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import isin_array as isin_array_ak
+from arraykit import array_deepcopy as array_deepcopy_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -198,6 +200,33 @@ class ResolveDTypeIterAK(ResolveDTypeIter):
 
 class ResolveDTypeIterREF(ResolveDTypeIter):
     entry = staticmethod(resolve_dtype_iter_ref)
+
+
+#-------------------------------------------------------------------------------
+class ArrayDeepcopy(Perf):
+    FUNCTIONS = ('memo_new', 'memo_shared')
+    NUMBER = 500
+
+    def pre(self):
+        self.array1 = np.arange(100_000)
+        self.array2 = np.full(100_000, None)
+        self.array2[0] = [np.nan] # add a mutable
+        self.memo = {}
+
+    def memo_new(self):
+        memo = {}
+        self.entry(self.array1, memo)
+        self.entry(self.array2, memo)
+
+    def memo_shared(self):
+        self.entry(self.array1, self.memo)
+        self.entry(self.array2, self.memo)
+
+class ArrayDeepcopyAK(ArrayDeepcopy):
+    entry = staticmethod(array_deepcopy_ak)
+
+class ArrayDeepcopyREF(ArrayDeepcopy):
+    entry = staticmethod(array_deepcopy_ref)
 
 
 #-------------------------------------------------------------------------------
@@ -467,12 +496,14 @@ def get_arg_parser():
         help='Provide one or more performance tests by name.')
     return p
 
+
 def main():
     options = get_arg_parser().parse_args()
     match = None if not options.names else set(options.names)
 
     records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
     for cls_perf in Perf.__subclasses__(): # only get one level
+        print(cls_perf)
         cls_map = {}
         if match and cls_perf.__name__ not in match:
             continue
