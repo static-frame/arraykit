@@ -1,3 +1,4 @@
+import typing as tp
 import unittest
 
 from automap import FrozenAutoMap
@@ -13,8 +14,10 @@ from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import is_gen_copy_values
+from arraykit import prepare_iter_for_array
 
 from performance.reference.util import mloc as mloc_ref
+#from performance.reference.util import prepare_iter_for_array
 
 
 class TestUnit(unittest.TestCase):
@@ -243,6 +246,162 @@ class TestUnit(unittest.TestCase):
         self.assertEqual((False, True), is_gen_copy_values(d.values()))
         self.assertEqual((False, True), is_gen_copy_values(d))
         self.assertEqual((False, True), is_gen_copy_values(s))
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_a(self) -> None:
+        v1 = ('a', 'b', 'c')
+        resolved, has_tuple, values = prepare_iter_for_array(v1)
+        self.assertEqual(resolved, None)
+
+        v22 = ('a', 'b', 3)
+        resolved, has_tuple, values = prepare_iter_for_array(v22)
+        self.assertEqual(resolved, object)
+
+        v3 = ('a', 'b', (1, 2))
+        resolved, has_tuple, values = prepare_iter_for_array(v3)
+        self.assertEqual(resolved, object)
+        self.assertTrue(has_tuple)
+
+        v4 = (1, 2, 4.3, 2)
+        resolved, has_tuple, values = prepare_iter_for_array(v4)
+        self.assertEqual(resolved, None)
+
+        v5 = (1, 2, 4.3, 2, None)
+        resolved, has_tuple, values = prepare_iter_for_array(v5)
+        self.assertEqual(resolved, None)
+
+        v6 = (1, 2, 4.3, 2, 'g')
+        resolved, has_tuple, values = prepare_iter_for_array(v6)
+        self.assertEqual(resolved, object)
+
+        v7 = ()
+        resolved, has_tuple, values = prepare_iter_for_array(v7)
+        self.assertEqual(resolved, None)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_b(self) -> None:
+        v1 = iter(('a', 'b', 'c'))
+        resolved, has_tuple, values = prepare_iter_for_array(v1)
+        self.assertEqual(resolved, None)
+
+        v2 = iter(('a', 'b', 3))
+        resolved, has_tuple, values = prepare_iter_for_array(v2)
+        self.assertEqual(resolved, object)
+
+        v3 = iter(('a', 'b', (1, 2)))
+        resolved, has_tuple, values = prepare_iter_for_array(v3)
+        self.assertEqual(resolved, object)
+        self.assertTrue(has_tuple)
+
+        v4 = range(4)
+        resolved, has_tuple, values = prepare_iter_for_array(v4)
+        self.assertEqual(resolved, None)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_c(self) -> None:
+        a = [True, False, True]
+        resolved, has_tuple, values = prepare_iter_for_array(a)
+        self.assertEqual(id(a), id(values))
+
+        resolved, has_tuple, values = prepare_iter_for_array(iter(a))
+        self.assertNotEqual(id(a), id(values))
+
+        self.assertEqual(resolved, None)
+        self.assertEqual(has_tuple, False)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_d(self) -> None:
+        a = [3, 2, (3,4)]
+        resolved, has_tuple, values = prepare_iter_for_array(a)
+        self.assertEqual(id(a), id(values))
+        self.assertTrue(has_tuple)
+
+        resolved, has_tuple, values = prepare_iter_for_array(iter(a))
+        self.assertNotEqual(id(a), id(values))
+
+        self.assertEqual(resolved, object)
+        self.assertEqual(has_tuple, True)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_e(self) -> None:
+        a = [300000000000000002, 5000000000000000001]
+        resolved, has_tuple, values = prepare_iter_for_array(a)
+        self.assertEqual(id(a), id(values))
+
+        resolved, has_tuple, values = prepare_iter_for_array(iter(a))
+        self.assertNotEqual(id(a), id(values))
+        self.assertEqual(resolved, None)
+        self.assertEqual(has_tuple, False)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_f(self) -> None:
+
+        def a() -> tp.Iterator[tp.Any]:
+            for i in range(3):
+                yield i
+            yield None
+
+        resolved, has_tuple, values = prepare_iter_for_array(a())
+        self.assertEqual(values, [0, 1, 2, None])
+        self.assertEqual(resolved, None)
+        self.assertEqual(has_tuple, False)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_g(self) -> None:
+
+        def a() -> tp.Iterator[tp.Any]:
+            yield None
+            for i in range(3):
+                yield i
+
+        resolved, has_tuple, values = prepare_iter_for_array(a())
+        self.assertEqual(values, [None, 0, 1, 2])
+        self.assertEqual(resolved, None)
+        self.assertEqual(has_tuple, False)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_h(self) -> None:
+
+        def a() -> tp.Iterator[tp.Any]:
+            yield 10
+            yield None
+            for i in range(3):
+                yield i
+            yield (3,4)
+
+        resolved, has_tuple, values = prepare_iter_for_array(a())
+        self.assertEqual(values, [10, None, 0, 1, 2, (3,4)])
+        self.assertEqual(resolved, object)
+        # we stop evaluation after finding object
+        self.assertEqual(has_tuple, True)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_i(self) -> None:
+        a0 = range(3, 7)
+        resolved, has_tuple, values = prepare_iter_for_array(a0)
+        # a copy is not made
+        self.assertEqual(id(a0), id(values))
+        self.assertEqual(resolved, None)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_j(self) -> None:
+        # this case was found through hypothesis
+        a0 = [0.0, 36_028_797_018_963_969]
+        resolved, has_tuple, values = prepare_iter_for_array(a0)
+        self.assertEqual(resolved, object)
+
+    @unittest.skip('Not ready')
+    def test_resolve_type_iter_k(self) -> None:
+        resolved, has_tuple, values = prepare_iter_for_array((x for x in ())) #type: ignore
+        self.assertEqual(resolved, None)
+        self.assertEqual(len(values), 0)
+        self.assertEqual(has_tuple, False)
+
+    def test_resolve_type_iter_l(self) -> None:
+        self.assertEqual((None, False, []), prepare_iter_for_array([], True))
+        self.assertEqual((None, False, ()), prepare_iter_for_array((), True))
+        self.assertEqual((None, False, {}), prepare_iter_for_array({}, True))
+        self.assertEqual((None, False, set()), prepare_iter_for_array(set(), True))
 
 
 if __name__ == '__main__':

@@ -434,25 +434,61 @@ is_gen_copy_values(PyObject *Py_UNUSED(m), PyObject *arg)
     return ret;
 }
 
-// static IsGenCopyValues
-// prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *arg)
-// {
-//     bool is_gen = false;
-//     bool needs_copy = false;
+static PyObject*
+prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *values;
+    int restrict_copy;
 
-//     switch (AK_is_gen_copy_values(arg))
-//     {
-//     case ERR:
-//         return NULL;
-//     case IS_GEN:
-//         is_gen = true;
-//         needs_copy = true;
-//         break;
-//     case NOT_GEN_COPY:
-//         needs_copy = true;
-//     }
+    static char *kwlist[] = {"values", "restrict_copy", NULL};
 
-// }
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi:prepare_iter_for_array",
+                                     kwlist,
+                                     &values,
+                                     &restrict_copy))
+    {
+        return NULL;
+    }
+
+    bool is_gen = false;
+    bool needs_copy = false;
+
+    switch (AK_is_gen_copy_values(values))
+    {
+    case ERR:
+        return NULL;
+    case IS_GEN:
+        is_gen = true;
+        needs_copy = true;
+        break;
+    case NOT_GEN_COPY:
+        needs_copy = true;
+        break;
+    case NOT_GEN_NO_COPY:
+        break;
+    }
+
+    if (!is_gen) {
+        ssize_t len = PyObject_Length(values);
+        if (len == -1) {
+            return NULL;
+        }
+        if (len == 0) {
+            Py_INCREF(Py_None);
+            Py_INCREF(Py_False);
+            PyObject *ret = PyTuple_Pack(3, Py_None, Py_False, values);
+            if (!ret) {
+                Py_DECREF(Py_None);
+                Py_DECREF(Py_False);
+                return NULL;
+            }
+            return ret;
+        }
+    }
+
+    Py_INCREF(Py_True);
+    return Py_True;
+}
 
 //------------------------------------------------------------------------------
 // ArrayGO
@@ -732,7 +768,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"is_gen_copy_values", is_gen_copy_values, METH_O, NULL},
-    //{"prepare_iter_for_array", prepare_iter_for_array, METH_O, NULL},
+    {"prepare_iter_for_array", (PyCFunction)prepare_iter_for_array, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL},
 };
 

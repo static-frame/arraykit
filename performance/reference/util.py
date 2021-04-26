@@ -1,9 +1,12 @@
 import typing as tp
 from copy import deepcopy
 from collections import abc
+from enum import Enum
 from automap import FrozenAutoMap  # pylint: disable = E0611
 
 import numpy as np
+
+DtypeSpecifier = tp.Optional[tp.Union[str, np.dtype, type]]
 
 DTYPE_DATETIME_KIND = 'M'
 DTYPE_TIMEDELTA_KIND = 'm'
@@ -27,10 +30,18 @@ DTYPE_COMPLEX_DEFAULT = np.dtype(np.complex128)
 DTYPES_BOOL = (DTYPE_BOOL,)
 DTYPES_INEXACT = (DTYPE_FLOAT_DEFAULT, DTYPE_COMPLEX_DEFAULT)
 
+INEXACT_TYPES = (float, complex, np.inexact) # inexact matches floating, complexfloating
+
 DICTLIKE_TYPES = (abc.Set, dict, FrozenAutoMap)
 
-# iterables that cannot be used in NP array constructors; asumes that dictlike types have already been identified
+# iterables that cannot be used in NP array constructors; asumes that dictlike
+# types have already been identified
 INVALID_ITERABLE_FOR_ARRAY = (abc.ValuesView, abc.KeysView)
+
+# integers above this value will occasionally, once coerced to a float (64 or 128)
+# in an NP array, will not match a hash lookup as a key in a dictionary;
+# an NP array of int or object will work
+INT_MAX_COERCIBLE_TO_FLOAT = 1_000_000_000_000_000
 
 
 def mloc(array: np.ndarray) -> int:
@@ -203,3 +214,83 @@ def is_gen_copy_values(values: tp.Iterable[tp.Any]) -> tp.Tuple[bool, bool]:
 
     # We are a generator and all generators need copies
     return True, True
+
+
+def prepare_iter_for_array(
+        values: tp.Iterable[tp.Any],
+        restrict_copy: bool = False
+        ) -> tp.Tuple[DtypeSpecifier, bool, tp.Sequence[tp.Any]]:
+    '''
+    Determine an appropriate DtypeSpecifier for values in an iterable.
+    This does not try to determine the actual dtype, but instead, if the DtypeSpecifier needs to be
+    object rather than None (which lets NumPy auto detect).
+    This is expected to only operate on 1D data.
+
+    Args:
+        values: can be a generator that will be exhausted in processing;
+                if a generator, a copy will be made and returned as values.
+        restrict_copy: if True, reject making a copy, even if a generator is given
+    Returns:
+        resolved, has_tuple, values
+    '''
+
+    is_gen, copy_values = is_gen_copy_values(values)
+
+    if not is_gen and len(values) == 0: #type: ignore
+        return None, False, values #type: ignore
+
+    if restrict_copy:
+        copy_values = False
+
+    v_iter = iter(values)
+
+    if copy_values:
+        values_post = []
+
+    resolved = None # None is valid specifier if the type is not ambiguous
+    has_tuple = False
+    has_str = False
+    has_enum = False
+    has_non_str = False
+    has_inexact = False
+    has_big_int = False
+
+    for v in v_iter:
+        if copy_values:
+            # if a generator, have to make a copy while iterating
+            # for array construction, cannot use dictlike, so must convert to list
+            values_post.append(v)
+
+        if resolved != object:
+            value_type = type(v)
+
+            # need to get tuple subclasses, like NamedTuple
+            if isinstance(v, (tuple, list)) or hasattr(v, '__slots__'):
+                # identify SF types by if they have __slots__ defined; they also must be assigned after array creation, so we treat them like tuples
+                has_tuple = True
+            elif isinstance(v, Enum):
+                # must check isinstance, as Enum types are always derived from Enum
+                has_enum = True
+            elif value_type == str or value_type == np.str_:
+                # must compare to both string types
+                has_str = True
+            else:
+                has_non_str = True
+                if value_type in INEXACT_TYPES:
+                    has_inexact = True
+                elif value_type == int and abs(v) > INT_MAX_COERCIBLE_TO_FLOAT:
+                    has_big_int = True
+
+            if has_tuple or has_enum or (has_str and has_non_str):
+                resolved = object
+            elif has_big_int and has_inexact:
+                resolved = object
+        else: # resolved is object, can exit
+            if copy_values:
+                values_post.extend(v_iter)
+            break
+
+    # NOTE: we break before finding a tuple, but our treatment of object types, downstream, will always assign them in the appropriate way
+    if copy_values:
+        return resolved, has_tuple, values_post
+    return resolved, has_tuple, values #type: ignore
