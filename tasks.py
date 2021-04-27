@@ -10,7 +10,10 @@ def clean(context):
     '''
     context.run(f"{sys.executable} setup.py develop --uninstall", echo=True)
 
-    for artifact in ("*.egg-info", "*.so", "build", "dist", ".hypothesis"):
+    for artifact in ("*.egg-info", "build", "dist", ".hypothesis"):
+        context.run(f"rm -rf {artifact}", echo=True)
+
+    for artifact in ("arraykit/*.so",):
         context.run(f"rm -rf {artifact}", echo=True)
 
     # context.run("black .", echo=True)@task(clean)

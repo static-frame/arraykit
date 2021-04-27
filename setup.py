@@ -39,12 +39,12 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='numpy array',
-    packages=[''],
-    package_data={'': ['arraykit.pyi', 'py.typed']},
+    packages=['arraykit'],
+    package_data={'arraykit': ['arraykit.pyi', 'py.typed']},
     include_package_data=True,
     ext_modules=[
         Extension(
-            name='arraykit',
+            name='arraykit.arraykit_ext', # build into module
             sources=['arraykit.c'],
             include_dirs=[np.get_include()],
             define_macros=[("AK_VERSION", AK_VERSION)],
