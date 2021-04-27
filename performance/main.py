@@ -1,6 +1,4 @@
-
-
-
+import typing as tp
 import timeit
 import argparse
 
@@ -18,6 +16,7 @@ from performance.reference.util import resolve_dtype as resolve_dtype_ref
 from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import is_gen_copy_values as is_gen_copy_values_ref
+from performance.reference.util import prepare_iter_for_array as prepare_iter_for_array_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -32,6 +31,7 @@ from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import is_gen_copy_values as is_gen_copy_values_ak
+from arraykit import prepare_iter_for_array as prepare_iter_for_array_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -276,6 +276,73 @@ class IsGenCopyValuesAK(IsGenCopyValues):
 
 class IsGenCopyValuesREF(IsGenCopyValues):
     entry = staticmethod(is_gen_copy_values_ref)
+
+
+#-------------------------------------------------------------------------------
+class PrepareIterForArray(Perf):
+    NUMBER = 10000
+
+    def pre(self):
+        def a() -> tp.Iterator[tp.Any]:
+            for i in range(3):
+                yield i
+            yield None
+
+        def b() -> tp.Iterator[tp.Any]:
+            yield None
+            for i in range(3):
+                yield i
+
+        def c() -> tp.Iterator[tp.Any]:
+            yield 10
+            yield None
+            for i in range(3):
+                yield i
+            yield (3,4)
+
+        self.iterables = [
+                #('a', 'b', 'c'),
+                # iter(('a', 'b', 'c') * 500),
+
+                #('a', 'b', 3),
+                # iter(('a', 'b', 3)),
+
+                # ('a', 'b', (1, 2)),
+                # iter(('a', 'b', (1, 2))),
+
+                #[True, False, True],
+                # iter([True, False, True]),
+
+                # (1, 2, 4.3, 2),
+                # (1, 2, 4.3, 2, None),
+                # (1, 2, 4.3, 2, 'g'),
+                # range(4),
+                # [3, 2, (3,4)],
+                # iter([3, 2, (3,4)]),
+                # [300000000000000002, 5000000000000000001],
+                # iter([300000000000000002, 5000000000000000001]),
+                # a(),
+                # b(),
+                # c(),
+                # range(3, 7),
+                #[0.0, 36_028_797_018_963_969],
+                #(x for x in ()),
+                list(),
+                tuple(),
+                dict(),
+                set(),
+        ]
+
+    def main(self):
+        for restrict_copy in (True, False):
+            for iterable in self.iterables:
+                self.entry(iterable, restrict_copy=restrict_copy)
+
+class PrepareIterForArrayAK(PrepareIterForArray):
+    entry = staticmethod(prepare_iter_for_array_ak)
+
+class PrepareIterForArrayREF(PrepareIterForArray):
+    entry = staticmethod(prepare_iter_for_array_ref)
 
 #-------------------------------------------------------------------------------
 

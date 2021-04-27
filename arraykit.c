@@ -357,6 +357,26 @@ typedef enum IsGenCopyValues {
     NOT_GEN_NO_COPY
 } IsGenCopyValues;
 
+static int
+AK_obj_is_instance_of(PyObject *obj, const char *module_name, const char *module_type_name)
+{
+    PyObject *module = PyImport_ImportModule(module_name);
+    if (!module) {
+        return -1;
+    }
+
+    PyObject *type = PyObject_GetAttrString(module, module_type_name);
+    Py_DECREF(module);
+    if (!type) {
+        return -1;
+    }
+
+    int is_of_type = PyObject_IsInstance(obj, type);
+    Py_DECREF(type);
+
+    return is_of_type;
+}
+
 static IsGenCopyValues
 AK_is_gen_copy_values(PyObject *arg)
 {
@@ -374,25 +394,17 @@ AK_is_gen_copy_values(PyObject *arg)
             return NOT_GEN_COPY;
         }
 
-        PyObject *automap = PyImport_ImportModule("automap");
-        if (!automap) {
+        switch (AK_obj_is_instance_of(arg, "automap", "FrozenAutoMap"))
+        {
+        case -1:
             return ERR;
-        }
 
-        PyObject *frozenAutoMap = PyObject_GetAttrString(automap, "FrozenAutoMap");
-        Py_DECREF(automap);
-        if (!frozenAutoMap) {
-            return ERR;
-        }
+        case 0:
+            return NOT_GEN_NO_COPY;
 
-        int is_frozen_automap = PyObject_IsInstance(arg, frozenAutoMap);
-        Py_DECREF(frozenAutoMap);
-
-        if (is_frozen_automap) {
+        default:
             return NOT_GEN_COPY;
         }
-
-        return NOT_GEN_NO_COPY;
     }
 
     return IS_GEN;
@@ -438,11 +450,11 @@ static PyObject*
 prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *values;
-    int restrict_copy;
+    int restrict_copy = 0; // False by default
 
     static char *kwlist[] = {"values", "restrict_copy", NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi:prepare_iter_for_array",
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p:prepare_iter_for_array",
                                      kwlist,
                                      &values,
                                      &restrict_copy))
@@ -451,7 +463,7 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     bool is_gen = false;
-    bool needs_copy = false;
+    bool copy_values = false;
 
     switch (AK_is_gen_copy_values(values))
     {
@@ -459,26 +471,28 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     case IS_GEN:
         is_gen = true;
-        needs_copy = true;
+        copy_values = true;
         break;
     case NOT_GEN_COPY:
-        needs_copy = true;
+        copy_values = true;
         break;
     case NOT_GEN_NO_COPY:
         break;
     }
 
+    ssize_t len;
+
     if (!is_gen) {
-        ssize_t len = PyObject_Length(values);
+        len = PyObject_Size(values);
         if (len == -1) {
             return NULL;
         }
         if (len == 0) {
-            Py_INCREF(Py_None);
             Py_INCREF(Py_False);
-            PyObject *ret = PyTuple_Pack(3, Py_None, Py_False, values);
+            Py_INCREF(Py_False);
+            PyObject *ret = PyTuple_Pack(3, Py_False, Py_False, values);
             if (!ret) {
-                Py_DECREF(Py_None);
+                Py_DECREF(Py_False);
                 Py_DECREF(Py_False);
                 return NULL;
             }
@@ -486,8 +500,139 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         }
     }
 
-    Py_INCREF(Py_True);
-    return Py_True;
+    PyObject *copied_values = NULL;
+
+    if (restrict_copy) {
+        copy_values = false;
+    }
+    else if (copy_values) {
+        copied_values = PyList_New(0);
+        if (!copied_values) {
+            return NULL;
+        }
+    }
+
+    len = 0;
+    bool is_object = false;
+    bool has_tuple = false;
+    bool has_str = false;
+    bool has_enum = false;
+    bool has_non_str = false;
+    bool has_inexact = false;
+    bool has_big_int = false;
+
+    PyObject *int_max_coercible_to_float = PyLong_FromLong(1000000000000000);
+    if (!int_max_coercible_to_float) {
+        goto failure;
+    }
+
+    PyObject *iterator = PyObject_GetIter(values);
+    if (!iterator) {
+        Py_DECREF(int_max_coercible_to_float);
+        goto failure;
+    }
+    PyObject *item = NULL;
+
+    while ((item = PyIter_Next(iterator))) {
+        if (copy_values) {
+            if (-1 == PyList_Append(copied_values, item)) {
+                goto iteration_failure;
+            }
+            ++len;
+        }
+        int enum_success = AK_obj_is_instance_of(item, "enum", "Enum");
+        if (enum_success == -1) {
+            goto iteration_failure;
+        }
+
+        // These three API calls always succeed.
+        if (PyList_Check(item) || PyTuple_Check(item) || PyObject_HasAttrString(item, "__slots__")) {
+            has_tuple = true;
+        }
+        else if (enum_success) {
+            has_enum = true;
+        }
+        // This API call always succeeds
+        else if (PyUnicode_Check(item)) {
+            has_str = true;
+        }
+        else {
+            has_non_str = true;
+
+            // These two API calls always succeed
+            if (PyFloat_Check(item) || PyComplex_Check(item)) {
+                has_inexact = true;
+            }
+            else if PyLong_Check(item) {
+                PyObject *abs_v = PyNumber_Absolute(item);
+                if (!abs_v) {
+                    goto iteration_failure;
+                }
+
+                int success = PyObject_RichCompareBool(abs_v, int_max_coercible_to_float, Py_GT);
+                Py_DECREF(abs_v);
+                if (success == -1) {
+                    goto iteration_failure;
+                }
+
+                has_big_int |= success;
+            }
+        }
+
+        if (has_tuple | has_enum | (has_str & has_non_str)) {
+            is_object = true;
+        }
+        else if (has_big_int & has_inexact) {
+            is_object = true;
+        }
+
+        if (is_object) {
+            if (copy_values) {
+                if (-1 == PyList_SetSlice(copied_values, len, len, iterator)) {
+                    goto iteration_failure;
+                }
+            }
+            Py_DECREF(item);
+            break;
+        }
+
+        Py_DECREF(item);
+    }
+
+    Py_DECREF(iterator);
+    Py_DECREF(int_max_coercible_to_float);
+
+    if (PyErr_Occurred()) {
+        goto failure;
+    }
+
+    PyObject *is_object_obj = PyBool_FromLong(is_object);
+    if (!is_object_obj) {
+        goto failure;
+    }
+
+    PyObject *is_tuple_obj = PyBool_FromLong(has_tuple);
+    if (!is_tuple_obj) {
+        Py_DECREF(is_object_obj);
+        goto failure;
+    }
+
+    if (copy_values) {
+        PyObject *ret = PyTuple_Pack(3, is_object_obj, is_tuple_obj, copied_values);
+        Py_DECREF(copied_values);
+        return ret;
+    }
+
+    return PyTuple_Pack(3, is_object_obj, is_tuple_obj, values);
+
+iteration_failure:
+    Py_DECREF(int_max_coercible_to_float);
+    Py_DECREF(iterator);
+    Py_DECREF(item);
+
+failure:
+    Py_XDECREF(copied_values);
+    return NULL;
 }
 
 //------------------------------------------------------------------------------
