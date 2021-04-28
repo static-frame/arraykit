@@ -294,13 +294,15 @@ class IsNaElementPerf(Perf):
         for val in (
                 1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
             ):
-            for sign in (1, -1):
-                for ctor in float_classes:
-                    self.values.append(ctor(sign * val))
+            for ctor in float_classes:
+                self.values.append(ctor(val))
+                self.values.append(ctor(-val))
 
-                for ctor in cfloat_classes:
-                    self.values.append(ctor(complex(sign * val, val)))
-                    self.values.append(ctor(complex(val, sign * val)))
+            for ctor in cfloat_classes:
+                self.values.append(ctor(complex(val, val)))
+                self.values.append(ctor(complex(-val, val)))
+                self.values.append(ctor(complex(val, -val)))
+                self.values.append(ctor(complex(-val, -val)))
 
     def main(self):
         for _ in range(10):
