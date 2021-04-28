@@ -261,13 +261,9 @@ class TestPrepareIterUnit(unittest.TestCase):
         self.assertEqual(is_object, True)
         self.assertTrue(has_tuple)
 
-        # TODO: These tests inexplicably fails on Python 3.6 -> why!!
-        # https://github.com/InvestmentSystems/arraykit/pull/43/checks?check_run_id=2460697121#step:7:612
         is_object, has_tuple, values = prepare_iter_for_array((1, 2, 4.3, 2))
         self.assertEqual(is_object, False)
 
-        # TODO: These tests inexplicably fails on Python 3.6 -> why!!
-        # https://github.com/InvestmentSystems/arraykit/pull/43/checks?check_run_id=2460828552#step:7:613
         is_object, has_tuple, values = prepare_iter_for_array((1, 2, 4.3, 2, None))
         self.assertEqual(is_object, False)
 

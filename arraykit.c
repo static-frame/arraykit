@@ -484,13 +484,20 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     bool has_inexact = false;
     bool has_big_int = false;
 
-    PyObject *int_max_coercible_to_float = PyLong_FromLong(1000000000000000);
+    PyObject *enumClass = PyObject_GetAttrString(m, "Enum");
+    if (!enumClass) {
+        goto failure;
+    }
+
+    PyObject *int_max_coercible_to_float = PyLong_FromLongLong(1000000000000000ll);
     if (!int_max_coercible_to_float) {
+        Py_DECREF(enumClass);
         goto failure;
     }
 
     PyObject *iterator = PyObject_GetIter(values);
     if (!iterator) {
+        Py_DECREF(enumClass);
         Py_DECREF(int_max_coercible_to_float);
         goto failure;
     }
@@ -504,11 +511,16 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
             ++len;
         }
 
+        int enum_success = PyObject_IsInstance(item, enumClass);
+        if (enum_success == -1) {
+            goto iteration_failure;
+        }
+
         // These three API calls always succeed.
         if (PyList_Check(item) || PyTuple_Check(item) || PyObject_HasAttrString(item, "__slots__")) {
             has_tuple = true;
         }
-        else if (PyObject_TypeCheck(item, &PyEnum_Type)) {
+        else if (enum_success) {
             has_enum = true;
         }
         // This API call always succeeds
@@ -559,6 +571,7 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     }
 
     Py_DECREF(iterator);
+    Py_DECREF(enumClass);
     Py_DECREF(int_max_coercible_to_float);
 
     if (PyErr_Occurred()) {
@@ -590,6 +603,7 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     return ret;
 
 iteration_failure:
+    Py_DECREF(enumClass);
     Py_DECREF(int_max_coercible_to_float);
     Py_DECREF(iterator);
     Py_DECREF(item);
@@ -890,28 +904,48 @@ PyInit_arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
+    if (!m) {
+        return NULL;
+    }
 
     PyObject *automap_module = PyImport_ImportModule("automap");
     if (!automap_module) {
-        Py_XDECREF(m);
+        Py_DECREF(m);
         return NULL;
     }
 
-    PyObject *frozenAutoMap = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
+    PyObject *frozenAutoMapClass = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
     Py_DECREF(automap_module);
-    if (!frozenAutoMap) {
-        Py_XDECREF(m);
+    if (!frozenAutoMapClass) {
+        Py_DECREF(m);
         return NULL;
     }
 
-    if (!m ||
-        PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
+    PyObject *enum_module = PyImport_ImportModule("enum");
+    if (!enum_module) {
+        Py_DECREF(frozenAutoMapClass);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    PyObject *enumClass = PyObject_GetAttrString(enum_module, "Enum");
+    Py_DECREF(enum_module);
+    if (!enumClass) {
+        Py_DECREF(frozenAutoMapClass);
+        Py_DECREF(enumClass);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    if (PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
-        PyModule_AddObject(m, "FrozenAutoMap", frozenAutoMap))
+        PyModule_AddObject(m, "FrozenAutoMap", frozenAutoMapClass) ||
+        PyModule_AddObject(m, "Enum", enumClass))
     {
-        Py_DECREF(frozenAutoMap);
-        Py_XDECREF(m);
+        Py_DECREF(frozenAutoMapClass);
+        Py_DECREF(enum_module);
+        Py_DECREF(m);
         return NULL;
     }
     return m;
