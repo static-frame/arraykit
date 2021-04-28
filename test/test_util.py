@@ -232,15 +232,11 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(isna_element(np.timedelta64('NaT')))
 
         nan = np.nan
-        nanjs = [
+        complex_nans = [
                 complex(nan, 0),
-                -complex(nan, 0),
                 complex(-nan, 0),
-                -complex(-nan, 0),
                 complex(0, nan),
-                -complex(0, nan),
                 complex(0, -nan),
-                -complex(0, -nan),
         ]
 
         float_classes = [float, np.float16, np.float32, np.float64]
