@@ -274,7 +274,7 @@ class TestUnit(unittest.TestCase):
             ):
             for sign in (1, -1):
                 for ctor in (np.float16, np.float32, np.float64, float):
-                    self.assertFalse(isna_element((ctor(sign * val))))
+                    self.assertFalse(isna_element(ctor(sign * val)))
 
                 if hasattr(np, 'float128'):
                     self.assertFalse(isna_element((np.float128(sign * val))))
