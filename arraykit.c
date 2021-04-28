@@ -358,7 +358,7 @@ typedef enum IsGenCopyValues {
 } IsGenCopyValues;
 
 static IsGenCopyValues
-AK_is_gen_copy_values(PyObject *arg, PyObject *frozen_automap_type)
+AK_is_gen_copy_values(PyObject *arg, PyObject *frozenAutoMap)
 {
     if(PyObject_HasAttrString(arg, "__len__")) {
         if (PySet_Check(arg) || PyDict_Check(arg) ||
@@ -367,7 +367,7 @@ AK_is_gen_copy_values(PyObject *arg, PyObject *frozen_automap_type)
             return NOT_GEN_COPY;
         }
 
-        switch (PyObject_IsInstance(arg, frozen_automap_type))
+        switch (PyObject_IsInstance(arg, frozenAutoMap))
         {
         case -1:
             return ERR;
@@ -384,26 +384,20 @@ AK_is_gen_copy_values(PyObject *arg, PyObject *frozen_automap_type)
 }
 
 static PyObject*
-is_gen_copy_values(PyObject *Py_UNUSED(m), PyObject *arg)
+is_gen_copy_values(PyObject *m, PyObject *arg)
 {
     // This only exists to allow `AK_is_gen_copy_values` to be tested
+
+    PyObject *frozenAutoMap = PyObject_GetAttrString(m, "FrozenAutoMap");
+    if (!frozenAutoMap) {
+        return NULL;
+    }
 
     PyObject *is_gen = Py_False;
     PyObject *copy_values = Py_False;
 
-    PyObject *automap_module = PyImport_ImportModule("automap");
-    if (!automap_module) {
-        return NULL;
-    }
-
-    PyObject *frozen_automap_type = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
-    Py_DECREF(automap_module);
-    if (!frozen_automap_type) {
-        return NULL;
-    }
-
-    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(arg, frozen_automap_type);
-    Py_DECREF(frozen_automap_type);
+    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(arg, frozenAutoMap);
+    Py_DECREF(frozenAutoMap);
 
     if (is_gen_ret == IS_GEN) {
         is_gen = Py_True;
@@ -420,7 +414,7 @@ is_gen_copy_values(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 static PyObject*
-prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
 {
     PyObject *values;
     int restrict_copy = 0; // False by default
@@ -435,22 +429,16 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    PyObject *automap_module = PyImport_ImportModule("automap");
-    if (!automap_module) {
-        return NULL;
-    }
-
-    PyObject *frozen_automap_type = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
-    Py_DECREF(automap_module);
-    if (!frozen_automap_type) {
+    PyObject *frozenAutoMap = PyObject_GetAttrString(m, "FrozenAutoMap");
+    if (!frozenAutoMap) {
         return NULL;
     }
 
     bool is_gen = false;
     bool copy_values = false;
 
-    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(values, frozen_automap_type);
-    Py_DECREF(frozen_automap_type);
+    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(values, frozenAutoMap);
+    Py_DECREF(frozenAutoMap);
 
     if (is_gen_ret == IS_GEN) {
         is_gen = true;
@@ -501,21 +489,9 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         goto failure;
     }
 
-    PyObject *enum_module = PyImport_ImportModule("enum");
-    if (!enum_module) {
-        goto failure;
-    }
-
-    PyObject *enum_type = PyObject_GetAttrString(enum_module, "Enum");
-    Py_DECREF(enum_module);
-    if (!enum_type) {
-        goto failure;
-    }
-
     PyObject *iterator = PyObject_GetIter(values);
     if (!iterator) {
         Py_DECREF(int_max_coercible_to_float);
-        Py_DECREF(enum_type);
         goto failure;
     }
     PyObject *item = NULL;
@@ -528,17 +504,11 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             ++len;
         }
 
-        // Clean this up
-        int enum_success = 0;//PyObject_IsInstance(item, enum_type);
-        if (enum_success == -1) {
-            goto iteration_failure;
-        }
-
         // These three API calls always succeed.
         if (PyList_Check(item) || PyTuple_Check(item) || PyObject_HasAttrString(item, "__slots__")) {
             has_tuple = true;
         }
-        else if (enum_success) {
+        else if (PyObject_TypeCheck(item, &PyEnum_Type)) {
             has_enum = true;
         }
         // This API call always succeeds
@@ -620,7 +590,6 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     return ret;
 
 iteration_failure:
-    Py_DECREF(enum_type);
     Py_DECREF(int_max_coercible_to_float);
     Py_DECREF(iterator);
     Py_DECREF(item);
@@ -921,11 +890,27 @@ PyInit_arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
+
+    PyObject *automap_module = PyImport_ImportModule("automap");
+    if (!automap_module) {
+        Py_XDECREF(m);
+        return NULL;
+    }
+
+    PyObject *frozenAutoMap = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
+    Py_DECREF(automap_module);
+    if (!frozenAutoMap) {
+        Py_XDECREF(m);
+        return NULL;
+    }
+
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
-        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType))
+        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
+        PyModule_AddObject(m, "FrozenAutoMap", frozenAutoMap))
     {
+        Py_DECREF(frozenAutoMap);
         Py_XDECREF(m);
         return NULL;
     }

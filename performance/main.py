@@ -1,6 +1,7 @@
 import typing as tp
 import timeit
 import argparse
+from enum import Enum
 
 from automap import FrozenAutoMap
 import numpy as np
@@ -280,7 +281,8 @@ class IsGenCopyValuesREF(IsGenCopyValues):
 
 #-------------------------------------------------------------------------------
 class PrepareIterForArray(Perf):
-    NUMBER = 10000
+    NUMBER = 5
+    FUNCTIONS = ('iter_small', 'iter_large')
 
     def pre(self):
         def a() -> tp.Iterator[tp.Any]:
@@ -300,30 +302,22 @@ class PrepareIterForArray(Perf):
                 yield i
             yield (3,4)
 
-        self.iterables = [
+        class E(Enum):
+            A = 1
+            B = 2
+            C = 3
+
+        self.small_iterables = [
                 ('a', 'b', 'c'),
-                iter(('a', 'b', 'c') * 500),
-
                 ('a', 'b', 3),
-                iter(('a', 'b', 3)),
-
                 ('a', 'b', (1, 2)),
-                iter(('a', 'b', (1, 2))),
-
                 [True, False, True],
-                iter([True, False, True]),
-
                 (1, 2, 4.3, 2),
                 (1, 2, 4.3, 2, None),
                 (1, 2, 4.3, 2, 'g'),
                 range(4),
                 [3, 2, (3,4)],
-                iter([3, 2, (3,4)]),
                 [300000000000000002, 5000000000000000001],
-                iter([300000000000000002, 5000000000000000001]),
-                a(),
-                b(),
-                c(),
                 range(3, 7),
                 [0.0, 36_028_797_018_963_969],
                 (x for x in ()),
@@ -331,11 +325,40 @@ class PrepareIterForArray(Perf):
                 tuple(),
                 dict(),
                 set(),
+                FrozenAutoMap((1, 2, 3, 4, 5, 6)),
+                [E.A, E.B, E.C],
         ]
 
-    def main(self):
+        self.small_iterables.extend([iter(iterable) for iterable in self.small_iterables])
+        self.small_iterables.extend((a(), b(), c()))
+
+        self.large_iterables = [
+                ('a', 'b', 'c') * 10000,
+                ('a', 'b', 'c') * 10000 + (1, ),
+                ('a', 'b', 'c') * 10000 + ((1, 2), ),
+                [True, False, True] * 10000,
+                (1, 2, 4.3, 2) * 10000,
+                (1, 2, 4.3, 2) * 10000 + (None, ),
+                (1, 2, 4.3, 2) * 10000 + ('g', ),
+                range(10000),
+                [3, 2, 1] * 10000 + [(3,4)],
+                [300000000000000002] * 20000 + [5000000000000000001],
+                range(30000, 40000),
+                [0.0] * 20000 + [36_028_797_018_963_969],
+                FrozenAutoMap(range(10000)),
+                [E.A, E.B, E.C] * 10000,
+        ]
+        self.large_iterables.extend([iter(iterable) for iterable in self.large_iterables])
+
+    def iter_small(self):
+        for _ in range(2000):
+            for restrict_copy in (True, False):
+                for iterable in self.small_iterables:
+                    self.entry(iterable, restrict_copy=restrict_copy)
+
+    def iter_large(self):
         for restrict_copy in (True, False):
-            for iterable in self.iterables:
+            for iterable in self.large_iterables:
                 self.entry(iterable, restrict_copy=restrict_copy)
 
 class PrepareIterForArrayAK(PrepareIterForArray):
@@ -364,7 +387,6 @@ def main():
 
     records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
     for cls_perf in Perf.__subclasses__(): # only get one level
-        print(cls_perf)
         cls_map = {}
         if match and cls_perf.__name__ not in match:
             continue
@@ -385,7 +407,7 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
-    width = 24
+    width = 32
     for record in records:
         print(''.join(
             (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
