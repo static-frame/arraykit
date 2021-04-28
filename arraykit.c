@@ -357,36 +357,9 @@ typedef enum IsGenCopyValues {
     NOT_GEN_NO_COPY
 } IsGenCopyValues;
 
-static int
-AK_obj_is_instance_of(PyObject *obj, const char *module_name, const char *module_type_name)
-{
-    PyObject *module = PyImport_ImportModule(module_name);
-    if (!module) {
-        return -1;
-    }
-
-    PyObject *type = PyObject_GetAttrString(module, module_type_name);
-    Py_DECREF(module);
-    if (!type) {
-        return -1;
-    }
-
-    int is_of_type = PyObject_IsInstance(obj, type);
-    Py_DECREF(type);
-
-    return is_of_type;
-}
-
 static IsGenCopyValues
-AK_is_gen_copy_values(PyObject *arg)
+AK_is_gen_copy_values(PyObject *arg, PyObject *frozen_automap_type)
 {
-    /*
-    Returns:
-        -1: for failure
-         0: is a generator
-         1: a non-generator that needs to be copied
-         2: a non-generator that does not needs to be copied
-    */
     if(PyObject_HasAttrString(arg, "__len__")) {
         if (PySet_Check(arg) || PyDict_Check(arg) ||
             PyDictValues_Check(arg) || PyDictKeys_Check(arg))
@@ -394,7 +367,7 @@ AK_is_gen_copy_values(PyObject *arg)
             return NOT_GEN_COPY;
         }
 
-        switch (AK_obj_is_instance_of(arg, "automap", "FrozenAutoMap"))
+        switch (PyObject_IsInstance(arg, frozen_automap_type))
         {
         case -1:
             return ERR;
@@ -416,34 +389,34 @@ is_gen_copy_values(PyObject *Py_UNUSED(m), PyObject *arg)
     // This only exists to allow `AK_is_gen_copy_values` to be tested
 
     PyObject *is_gen = Py_False;
-    PyObject *needs_copy = Py_False;
+    PyObject *copy_values = Py_False;
 
-    switch (AK_is_gen_copy_values(arg))
-    {
-    case ERR:
+    PyObject *automap_module = PyImport_ImportModule("automap");
+    if (!automap_module) {
         return NULL;
-    case IS_GEN:
+    }
+
+    PyObject *frozen_automap_type = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
+    Py_DECREF(automap_module);
+    if (!frozen_automap_type) {
+        return NULL;
+    }
+
+    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(arg, frozen_automap_type);
+    Py_DECREF(frozen_automap_type);
+
+    if (is_gen_ret == IS_GEN) {
         is_gen = Py_True;
-        needs_copy = Py_True;
-        break;
-    case NOT_GEN_COPY:
-        needs_copy = Py_True;
-        break;
-    case NOT_GEN_NO_COPY:
-        break;
+        copy_values = Py_True;
     }
-
-    Py_INCREF(is_gen);
-    Py_INCREF(needs_copy);
-
-    PyObject *ret = PyTuple_Pack(2, is_gen, needs_copy);
-    if (!ret) {
-        Py_DECREF(is_gen);
-        Py_DECREF(needs_copy);
+    else if (is_gen_ret == NOT_GEN_COPY) {
+        copy_values = Py_True;
+    }
+    else if (is_gen_ret == ERR) {
         return NULL;
     }
 
-    return ret;
+    return PyTuple_Pack(2, is_gen, copy_values);
 }
 
 static PyObject*
@@ -462,22 +435,32 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    PyObject *automap_module = PyImport_ImportModule("automap");
+    if (!automap_module) {
+        return NULL;
+    }
+
+    PyObject *frozen_automap_type = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
+    Py_DECREF(automap_module);
+    if (!frozen_automap_type) {
+        return NULL;
+    }
+
     bool is_gen = false;
     bool copy_values = false;
 
-    switch (AK_is_gen_copy_values(values))
-    {
-    case ERR:
-        return NULL;
-    case IS_GEN:
+    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(values, frozen_automap_type);
+    Py_DECREF(frozen_automap_type);
+
+    if (is_gen_ret == IS_GEN) {
         is_gen = true;
         copy_values = true;
-        break;
-    case NOT_GEN_COPY:
+    }
+    else if (is_gen_ret == NOT_GEN_COPY) {
         copy_values = true;
-        break;
-    case NOT_GEN_NO_COPY:
-        break;
+    }
+    else if (is_gen_ret == ERR) {
+        return NULL;
     }
 
     ssize_t len;
@@ -488,15 +471,7 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             return NULL;
         }
         if (len == 0) {
-            Py_INCREF(Py_False);
-            Py_INCREF(Py_False);
-            PyObject *ret = PyTuple_Pack(3, Py_False, Py_False, values);
-            if (!ret) {
-                Py_DECREF(Py_False);
-                Py_DECREF(Py_False);
-                return NULL;
-            }
-            return ret;
+            return PyTuple_Pack(3, Py_False, Py_False, values);
         }
     }
 
@@ -526,9 +501,21 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         goto failure;
     }
 
+    PyObject *enum_module = PyImport_ImportModule("enum");
+    if (!enum_module) {
+        goto failure;
+    }
+
+    PyObject *enum_type = PyObject_GetAttrString(enum_module, "Enum");
+    Py_DECREF(enum_module);
+    if (!enum_type) {
+        goto failure;
+    }
+
     PyObject *iterator = PyObject_GetIter(values);
     if (!iterator) {
         Py_DECREF(int_max_coercible_to_float);
+        Py_DECREF(enum_type);
         goto failure;
     }
     PyObject *item = NULL;
@@ -540,7 +527,9 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             }
             ++len;
         }
-        int enum_success = AK_obj_is_instance_of(item, "enum", "Enum");
+
+        // Clean this up
+        int enum_success = 0;//PyObject_IsInstance(item, enum_type);
         if (enum_success == -1) {
             goto iteration_failure;
         }
@@ -559,7 +548,7 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         else {
             has_non_str = true;
 
-            // These two API calls always succeed
+            // These two API calls always succeed. 96% sure this catches np types
             if (PyFloat_Check(item) || PyComplex_Check(item)) {
                 has_inexact = true;
             }
@@ -619,13 +608,19 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     if (copy_values) {
         PyObject *ret = PyTuple_Pack(3, is_object_obj, is_tuple_obj, copied_values);
+        Py_DECREF(is_object_obj);
+        Py_DECREF(is_tuple_obj);
         Py_DECREF(copied_values);
         return ret;
     }
 
-    return PyTuple_Pack(3, is_object_obj, is_tuple_obj, values);
+    PyObject *ret = PyTuple_Pack(3, is_object_obj, is_tuple_obj, values);
+    Py_DECREF(is_object_obj);
+    Py_DECREF(is_tuple_obj);
+    return ret;
 
 iteration_failure:
+    Py_DECREF(enum_type);
     Py_DECREF(int_max_coercible_to_float);
     Py_DECREF(iterator);
     Py_DECREF(item);
