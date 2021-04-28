@@ -277,7 +277,7 @@ class TestUnit(unittest.TestCase):
                     self.assertFalse(isna_element(ctor(sign * val)))
 
                 if hasattr(np, 'float128'):
-                    self.assertFalse(isna_element((np.float128(sign * val))))
+                    self.assertFalse(isna_element(np.float128(sign * val)))
 
         self.assertFalse(isna_element(1))
         self.assertFalse(isna_element('str'))
