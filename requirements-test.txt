@@ -3,4 +3,4 @@ numpy==1.16.5
 pytest==3.8.0
 pylint==2.7.4
 invoke==1.4.0
-
+automap==0.4.8
