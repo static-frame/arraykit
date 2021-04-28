@@ -228,6 +228,9 @@ class TestUnit(unittest.TestCase):
         self.assertIn(id(a1), memo)
 
     def test_isna_element_true(self) -> None:
+        class FloatSubclass(float): pass
+        class ComplexSubclass(complex): pass
+
         self.assertTrue(isna_element(np.datetime64('NaT')))
         self.assertTrue(isna_element(np.timedelta64('NaT')))
 
@@ -239,11 +242,11 @@ class TestUnit(unittest.TestCase):
                 complex(0, -nan),
         ]
 
-        float_classes = [float, np.float16, np.float32, np.float64]
+        float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
         if hasattr(np, 'float128'):
             float_classes.append(np.float128)
 
-        cfloat_classes = [complex, np.complex64, np.complex128]
+        cfloat_classes = [complex, np.complex64, np.complex128, ComplexSubclass]
         if hasattr(np, 'complex256'):
             cfloat_classes.append(np.complex256)
 
@@ -252,16 +255,12 @@ class TestUnit(unittest.TestCase):
             self.assertTrue(isna_element(float_class(-nan)))
 
         for cfloat_class in cfloat_classes:
-            for nanj in nanjs:
-                self.assertTrue(isna_element(cfloat_class(nanj)))
+            for complex_nan in complex_nans:
+                self.assertTrue(isna_element(cfloat_class(complex_nan)))
 
         self.assertTrue(isna_element(float('NaN')))
         self.assertTrue(isna_element(-float('NaN')))
         self.assertTrue(isna_element(None))
-
-        class FloatSubclass(float): pass
-        self.assertTrue(isna_element(FloatSubclass(nan)))
-        self.assertTrue(isna_element(FloatSubclass(-nan)))
 
     def test_isna_element_false(self) -> None:
         # Test a wide range of float values, with different precision, across types

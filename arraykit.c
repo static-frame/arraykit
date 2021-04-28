@@ -381,7 +381,7 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
     }
     # endif
 
-    // NaNj
+    // Complex NaN
     if (PyComplex_Check(arg)) {
         Py_complex val = ((PyComplexObject*)arg)->cval;
         return PyBool_FromLong(isnan(val.real) || isnan(val.imag));

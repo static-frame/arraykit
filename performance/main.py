@@ -256,6 +256,7 @@ class IsNaElementPerf(Perf):
 
     def pre(self):
         class FloatSubclass(float): pass
+        class ComplexSubclass(complex): pass
 
         self.values = [
                 # Na-elements
@@ -266,7 +267,7 @@ class IsNaElementPerf(Perf):
         ]
 
         nan = np.nan
-        nanjs = [
+        complex_nans = [
                 complex(nan, 0),
                 complex(-nan, 0),
                 complex(0, nan),
@@ -277,7 +278,7 @@ class IsNaElementPerf(Perf):
         if hasattr(np, 'float128'):
             float_classes.append(np.float128)
 
-        cfloat_classes = [complex, np.complex64, np.complex128]
+        cfloat_classes = [complex, np.complex64, np.complex128, ComplexSubclass]
         if hasattr(np, 'complex256'):
             cfloat_classes.append(np.complex256)
 
@@ -287,8 +288,8 @@ class IsNaElementPerf(Perf):
             self.values.append(ctor(-nan))
 
         for ctor in cfloat_classes:
-            for nanj in nanjs:
-                self.values.append(ctor(nanj))
+            for complex_nan in complex_nans:
+                self.values.append(ctor(complex_nan))
 
         # Append a wide range of float values, with different precision, across types
         for val in (
