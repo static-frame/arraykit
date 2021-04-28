@@ -268,13 +268,9 @@ class IsNaElementPerf(Perf):
         nan = np.nan
         nanjs = [
                 complex(nan, 0),
-                -complex(nan, 0),
                 complex(-nan, 0),
-                -complex(-nan, 0),
                 complex(0, nan),
-                -complex(0, nan),
                 complex(0, -nan),
-                -complex(0, -nan),
         ]
 
         float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
@@ -366,4 +362,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
