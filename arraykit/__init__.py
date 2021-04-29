@@ -1,3 +1,2 @@
-from . arraykit_ext import *
-from . arraykit_ext import __version__
-
+from ._arraykit import *
+from ._arraykit import __version__

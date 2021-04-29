@@ -40,12 +40,12 @@ setup(
     ],
     keywords='numpy array',
     packages=['arraykit'],
-    package_data={'arraykit': ['arraykit.pyi', 'py.typed']},
+    package_data={'arraykit': ['__init__.pyi', 'py.typed']},
     include_package_data=True,
     ext_modules=[
         Extension(
-            name='arraykit.arraykit_ext', # build into module
-            sources=['arraykit.c'],
+            name='arraykit._arraykit', # build into module
+            sources=['arraykit/_arraykit.c'],
             include_dirs=[np.get_include()],
             define_macros=[("AK_VERSION", AK_VERSION)],
         ),

@@ -48,7 +48,7 @@ class TestUnit(unittest.TestCase):
     # @unittest.skip('not sure if pyi is in right location')
     def test_interface(self) -> None:
 
-        fp = os.path.join(os.path.dirname(ak.__file__), 'arraykit.pyi')
+        fp = os.path.join(os.path.dirname(ak.__file__), '__init__.pyi')
 
         with open(fp) as f:
             msg = f.read()
@@ -64,7 +64,3 @@ class TestUnit(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-
-
-

@@ -634,7 +634,7 @@ static struct PyModuleDef arraykit_module = {
 };
 
 PyObject *
-PyInit_arraykit_ext(void)
+PyInit__arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
