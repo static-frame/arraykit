@@ -630,7 +630,7 @@ static PyMethodDef arraykit_methods[] =  {
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, "arraykit_ext", NULL, -1, arraykit_methods,
+    PyModuleDef_HEAD_INIT, "_arraykit", NULL, -1, arraykit_methods,
 };
 
 PyObject *

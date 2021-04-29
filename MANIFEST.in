@@ -1,1 +1,1 @@
-include arraykit/arraykit.pyi arraykit/py.typed
+include arraykit/__init__.pyi arraykit/py.typed
