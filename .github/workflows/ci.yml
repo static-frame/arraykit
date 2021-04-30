@@ -51,7 +51,7 @@ jobs:
           CIBW_BUILD: cp${{ matrix.major }}${{ matrix.minor }}-*
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-test.txt
-          CIBW_TEST_COMMAND: pytest {project}
+          CIBW_TEST_COMMAND: pytest {project}/test
       - uses: actions/upload-artifact@master
         with:
           name: dist
