@@ -6,6 +6,9 @@ import unittest
 import typing as tp
 from enum import Enum
 
+from hypothesis import strategies as st
+from hypothesis import given
+
 
 _ = '''
 Discovery
@@ -74,6 +77,9 @@ def is_e(c: str) -> bool:
 def is_f(c: str) -> bool:
     return c == 'f' or c == 'F'
 
+def is_i(c: str) -> bool:
+    return c == 'i' or c == 'I'
+
 def is_j(c: str) -> bool:
     return c == 'j' or c == 'J'
 
@@ -119,6 +125,7 @@ class TypeField:
         self.previous_leading_space = False
         self.previous_numeric = False
         self.contiguous_numeric = False
+        self.leading_sign = False
 
         self.count_leading_space = 0
         self.count_bool = 0 # signed, not greater than +/- 5
@@ -129,6 +136,7 @@ class TypeField:
         self.count_j = 0
         self.count_decimal = 0
         self.count_nan = 0
+        self.count_inf = 0
         self.count_paren_open = 0
         self.count_paren_close = 0
 
@@ -176,6 +184,9 @@ class TypeField:
             self.count_digit += 1
 
         elif is_sign(c):
+            if pos_field == 0:
+                self.leading_sign = True
+
             self.count_sign += 1
             if self.count_sign > 4:
                 # complex numbers with E can have up to 4 signs, anything else is a string
@@ -228,7 +239,8 @@ class TypeField:
             if pos_field == 0:
                 self.contiguous_numeric = True
                 self.previous_numeric = True
-                return 1 # E can not be in first position
+                if not self.leading_sign:
+                    return 1 # E can not be in first position
 
             # pos_field > 0
             if not self.previous_numeric:
@@ -236,15 +248,16 @@ class TypeField:
                 self.contiguous_numeric = False
 
             self.previous_numeric = True
-
-            # NOTE: we need to consider possible Boolean scenario
-            if self.contiguous_numeric or not is_e(c):
-                return 1
+            # due to signed inf/nan, cannot take this short exit
+            # if self.contiguous_numeric:
+            #     return 1
         else: # not numeric, could be space or notspace
             if self.contiguous_numeric and not space:
+                self.contiguous_numeric = False
+                # due to signed inf/nan, cannot take this short exit
                 # if we find a non-numeric, non-space, after contiguous numeric
-                self.resolved_field = TypeResolved.IS_STRING
-                return 0
+                # self.resolved_field = TypeResolved.IS_STRING
+                # return 0
             self.previous_numeric = False
 
 
@@ -254,6 +267,9 @@ class TypeField:
 
         # print(f'post: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=} {self.count_notspace=}')
 
+        if pos_field > 0 and self.leading_sign and self.count_sign == 1:
+            pos_field -= 1
+
         if pos_field == 0:
             if is_t(c):
                 self.count_bool += 1
@@ -261,6 +277,8 @@ class TypeField:
                 self.count_bool -= 1
             elif is_n(c):
                 self.count_nan += 1
+            elif is_i(c):
+                self.count_inf += 1
 
         elif pos_field == 1:
             if is_r(c):
@@ -268,6 +286,8 @@ class TypeField:
             elif is_a(c):
                 self.count_bool -= 1
                 self.count_nan += 1
+            elif is_n(c):
+                self.count_inf += 1
 
         elif pos_field == 2:
             if is_u(c):
@@ -276,12 +296,15 @@ class TypeField:
                 self.count_bool -= 1
             elif is_n(c):
                 self.count_nan += 1
+            elif is_f(c):
+                self.count_inf += 1
 
         elif pos_field == 3:
             if is_e(c):
                 self.count_bool += 1
             if is_s(c):
                 self.count_bool -= 1
+
         elif pos_field == 4:
             if is_e(c) and self.count_bool == -4:
                 self.count_bool -= 1
@@ -297,11 +320,19 @@ class TypeField:
 
         if self.resolved_field != TypeResolved.IS_UNKNOWN:
             return self.resolved_field
+
         if self.count_bool == 4 and self.count_notspace == 4:
             return TypeResolved.IS_BOOL
         if self.count_bool == -5 and self.count_notspace == 5:
             return TypeResolved.IS_BOOL
         if self.count_nan == 3 and self.count_notspace == 3:
+            return TypeResolved.IS_FLOAT
+        if self.count_inf == 3 and self.count_notspace == 3:
+            return TypeResolved.IS_FLOAT
+
+        if self.leading_sign and self.count_nan == 3 and self.count_notspace == 4:
+            return TypeResolved.IS_FLOAT
+        if self.leading_sign and self.count_inf == 3 and self.count_notspace == 4:
             return TypeResolved.IS_FLOAT
 
         # determine
@@ -475,6 +506,19 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(TypeField().process_field('NaN3   '), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process_field(' N an   '), TypeResolved.IS_STRING)
+
+    def test_float_e(self) -> None:
+        self.assertEqual(TypeField().process_field('-inf'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('inf'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('INF   '), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' +InF   '), TypeResolved.IS_FLOAT)
+
+    def test_float_f(self) -> None:
+        self.assertEqual(TypeField().process_field('-nan'), TypeResolved.IS_FLOAT)
+        # self.assertEqual(TypeField().process_field('nan'), TypeResolved.IS_FLOAT)
+        # self.assertEqual(TypeField().process_field('nan   '), TypeResolved.IS_FLOAT)
+        # self.assertEqual(TypeField().process_field(' +nan   '), TypeResolved.IS_FLOAT)
+
 
 
     def test_float_known_false_positive(self) -> None:
