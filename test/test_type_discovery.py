@@ -478,8 +478,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_field('  5  3 '), TypeResolved.IS_STRING)
 
     @given(st.floats())
-    def test_float_propert(self, v) -> None
-        print(v)
+    def test_float_propert(self, v) -> None:
+        self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_FLOAT)
 
     def test_float_a(self) -> None:
         self.assertEqual(TypeField().process_field(' .3'), TypeResolved.IS_FLOAT)
