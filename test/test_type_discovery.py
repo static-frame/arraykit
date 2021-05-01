@@ -125,7 +125,8 @@ class TypeField:
         self.previous_leading_space = False
         self.previous_numeric = False
         self.contiguous_numeric = False
-        self.leading_sign = False
+
+        self.last_sign_pos = -1
 
         self.count_leading_space = 0
         self.count_bool = 0 # signed, not greater than +/- 5
@@ -137,6 +138,7 @@ class TypeField:
         self.count_decimal = 0
         self.count_nan = 0
         self.count_inf = 0
+
         self.count_paren_open = 0
         self.count_paren_close = 0
 
@@ -158,14 +160,12 @@ class TypeField:
         if is_space(c):
             if pos == 0:
                 self.previous_leading_space = True
-
             if self.previous_leading_space:
                 self.count_leading_space += 1
                 return 1
             space = True
         else:
             self.count_notspace += 1
-
 
         self.previous_leading_space = False # this char is not space
 
@@ -178,14 +178,8 @@ class TypeField:
         if space:
             pass
 
-        elif is_digit(c):
-            numeric = True
-            digit = True
-            self.count_digit += 1
-
         elif is_sign(c):
-            if pos_field == 0:
-                self.leading_sign = True
+            self.last_sign_pos = pos_field
 
             self.count_sign += 1
             if self.count_sign > 4:
@@ -193,6 +187,11 @@ class TypeField:
                 self.resolved_field = TypeResolved.IS_STRING
                 return 0
             numeric = True
+
+        elif is_digit(c):
+            numeric = True
+            digit = True
+            self.count_digit += 1
 
         elif is_paren_open(c):
             numeric = True
@@ -239,8 +238,14 @@ class TypeField:
             if pos_field == 0:
                 self.contiguous_numeric = True
                 self.previous_numeric = True
-                if not self.leading_sign:
-                    return 1 # E can not be in first position
+
+            # complex numbers can have numerics following inf/nan
+            # if self.count_inf == 3 or self.count_nan == 3:
+            #     # notspace counts are already incremented, must include the current character
+            #     if ((not self.previous_sign and self.count_notspace == 4) or
+            #             (self.previous_sign and self.count_notspace == 5)):
+            #         self.contiguous_numeric = True
+            #         self.previous_numeric = True
 
             # pos_field > 0
             if not self.previous_numeric:
@@ -248,16 +253,11 @@ class TypeField:
                 self.contiguous_numeric = False
 
             self.previous_numeric = True
-            # due to signed inf/nan, cannot take this short exit
-            # if self.contiguous_numeric:
-            #     return 1
+
         else: # not numeric, could be space or notspace
             if self.contiguous_numeric and not space:
                 self.contiguous_numeric = False
-                # due to signed inf/nan, cannot take this short exit
-                # if we find a non-numeric, non-space, after contiguous numeric
-                # self.resolved_field = TypeResolved.IS_STRING
-                # return 0
+
             self.previous_numeric = False
 
 
@@ -265,11 +265,14 @@ class TypeField:
         if space or digit:
             return 1
 
-        # print(f'post: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=} {self.count_notspace=}')
-
-        if pos_field > 0 and self.leading_sign and self.count_sign == 1:
+        # if we have a last sign, it takes precedence over use count_paren_open as a shfit
+        if self.last_sign_pos >= 0:
+            pos_field -= (self.last_sign_pos + 1)
+        elif self.count_paren_open and pos_field > 0:
+            # can only be 1 and in pos_field 0
             pos_field -= 1
 
+        # import ipdb; ipdb.set_trace()
         if pos_field == 0:
             if is_t(c):
                 self.count_bool += 1
@@ -309,6 +312,9 @@ class TypeField:
             if is_e(c) and self.count_bool == -4:
                 self.count_bool -= 1
 
+        # print(f'post: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=} {self.last_sign_pos=} {self.count_nan=} {self.count_inf=} {self.count_notspace=}')
+
+
         return 1
 
     def resolve_field_type(self, count: int) -> None:
@@ -325,17 +331,7 @@ class TypeField:
             return TypeResolved.IS_BOOL
         if self.count_bool == -5 and self.count_notspace == 5:
             return TypeResolved.IS_BOOL
-        if self.count_nan == 3 and self.count_notspace == 3:
-            return TypeResolved.IS_FLOAT
-        if self.count_inf == 3 and self.count_notspace == 3:
-            return TypeResolved.IS_FLOAT
 
-        if self.leading_sign and self.count_nan == 3 and self.count_notspace == 4:
-            return TypeResolved.IS_FLOAT
-        if self.leading_sign and self.count_inf == 3 and self.count_notspace == 4:
-            return TypeResolved.IS_FLOAT
-
-        # determine
         if self.contiguous_numeric:
             # NOTE: have already handled cases with excessive counts
             if self.count_digit == 0:
@@ -346,7 +342,9 @@ class TypeField:
                     and self.count_e == 0
                     and self.count_decimal == 0
                     and self.count_paren_open == 0
-                    and self.count_paren_close == 0):
+                    and self.count_paren_close == 0
+                    and self.count_nan == 0
+                    and self.count_inf == 0):
                 return TypeResolved.IS_INT
 
             if (self.count_j == 0
@@ -365,6 +363,29 @@ class TypeField:
                     (self.count_paren_open == 1 and self.count_paren_close == 1)
                     ):
                 return TypeResolved.IS_COMPLEX
+
+        # not contiguous numeric, has inf or nan in some combination
+        elif self.count_j == 0:
+            # float nan and inf that might be signed
+            if self.count_nan == 3 and self.count_sign + self.count_nan == self.count_notspace:
+                return TypeResolved.IS_FLOAT
+            if self.count_inf == 3 and self.count_sign + self.count_inf == self.count_notspace:
+                return TypeResolved.IS_FLOAT
+
+        elif self.count_j == 1:
+            # special cases of complex that do not present as contiguous numeric because of inf/nan
+            # TODO: count numeric?
+            if self.count_inf == 3 or self.count_inf == 6:
+                return TypeResolved.IS_COMPLEX
+            # if self.previous_sign and self.count_inf == 3 and self.count_notspace == 5:
+            #     return TypeResolved.IS_COMPLEX
+
+            if self.count_nan == 3 or self.count_nan == 6:
+                return TypeResolved.IS_COMPLEX
+            # if self.previous_sign and self.count_nan == 3 and self.count_notspace == 5:
+            #     return TypeResolved.IS_COMPLEX
+
+            # import ipdb; ipdb.set_trace()
 
         return TypeResolved.IS_STRING
 
@@ -461,6 +482,11 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_field('+++'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process_field('   ee   '), TypeResolved.IS_STRING)
 
+
+    @given(st.integers())
+    def test_int_property(self, v) -> None:
+        self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_INT)
+
     def test_int_a(self) -> None:
         self.assertEqual(TypeField().process_field(' 3'), TypeResolved.IS_INT)
         self.assertEqual(TypeField().process_field('3 '), TypeResolved.IS_INT)
@@ -478,7 +504,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_field('  5  3 '), TypeResolved.IS_STRING)
 
     @given(st.floats())
-    def test_float_propert(self, v) -> None:
+    def test_float_property(self, v) -> None:
         self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_FLOAT)
 
     def test_float_a(self) -> None:
@@ -523,11 +549,15 @@ class TestUnit(unittest.TestCase):
         # self.assertEqual(TypeField().process_field('nan   '), TypeResolved.IS_FLOAT)
         # self.assertEqual(TypeField().process_field(' +nan   '), TypeResolved.IS_FLOAT)
 
-
-
     def test_float_known_false_positive(self) -> None:
         # NOTE: we mark this as float because we do not observe that a number must follow e; assume this will fail in float conversion
         self.assertEqual(TypeField().process_field('8e'), TypeResolved.IS_FLOAT)
+
+
+    @given(st.complex_numbers())
+    def test_complex_property(self, v) -> None:
+        # print(v, TypeField().process_field(str(v)))
+        self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_COMPLEX)
 
     def test_complex_a(self) -> None:
         self.assertEqual(TypeField().process_field('23j  '), TypeResolved.IS_COMPLEX)
@@ -556,12 +586,41 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_field(' (((23+3j'), TypeResolved.IS_STRING)
         self.assertEqual(TypeField().process_field(' 2(3+3j) '), TypeResolved.IS_STRING)
 
+    def test_complex_d(self) -> None:
+        self.assertEqual(TypeField().process_field(' infj'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' -infj'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' +infj'), TypeResolved.IS_COMPLEX)
+
+        self.assertEqual(TypeField().process_field(' nanj'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' -nanj  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' +nanj'), TypeResolved.IS_COMPLEX)
+
+    def test_complex_e(self) -> None:
+        self.assertEqual(TypeField().process_field(' inf+0j'), TypeResolved.IS_COMPLEX)
+
+    def test_complex_f(self) -> None:
+        self.assertEqual(TypeField().process_field(' inf+nanj'), TypeResolved.IS_COMPLEX)
+
+    def test_complex_g(self) -> None:
+        self.assertEqual(TypeField().process_field(' inf-infj'), TypeResolved.IS_COMPLEX)
+
+    def test_complex_h(self) -> None:
+        self.assertEqual(TypeField().process_field(' -0+infj'), TypeResolved.IS_COMPLEX)
+
+    def test_complex_i(self) -> None:
+        self.assertEqual(TypeField().process_field('(inf+0j)'), TypeResolved.IS_COMPLEX)
+
+    def test_complex_j(self) -> None:
+        self.assertEqual(TypeField().process_field('(-0+infj)'), TypeResolved.IS_COMPLEX)
+
 
     def test_complex_known_false_positive(self) -> None:
         # NOTE: genfromtxt identifies this as string as j component is in first position
         self.assertEqual(TypeField().process_field('23j-43'), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process_field('+23-3.5j3'), TypeResolved.IS_COMPLEX)
         self.assertEqual(TypeField().process_field('(23+)3j '), TypeResolved.IS_COMPLEX)
+
+
 
 
     def test_line_a(self) -> None:

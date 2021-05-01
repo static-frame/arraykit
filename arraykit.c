@@ -192,7 +192,6 @@ typedef struct {
 
     char *field;
 
-
 } AK_CodePointLine;
 
 AK_CodePointLine* AK_CPL_New()
