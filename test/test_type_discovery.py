@@ -193,6 +193,7 @@ class TypeField:
             digit = True
             self.count_digit += 1
 
+        # TODO: do not tret paren_open as numeric, but as a type of space that can only occur at boundaries of field
         elif is_paren_open(c):
             numeric = True
             self.count_paren_open += 1
