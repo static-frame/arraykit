@@ -111,6 +111,59 @@ class TypeResolved(Enum):
     IS_STRING = 6
     IS_EMPTY = 7
 
+    @classmethod
+    def resolve(cls, previous: 'TypeResolved', new: 'TypeResolved') -> None:
+        if new is cls.IS_UNKNOWN:
+            return cls.IS_STRING
+
+        if (previous is cls.IS_UNKNOWN
+                or previous is cls.IS_EMPTY):
+            return new
+
+        # a string with anything else is a string
+        if (previous is cls.IS_STRING
+                or new is cls.IS_STRING):
+            return cls.IS_STRING
+
+        if previous is cls.IS_BOOL:
+            if (new is cls.IS_EMPTY
+                    or new is cls.IS_BOOL):
+                return cls.IS_BOOL
+            else: # bool found with anything else except empty is a string
+                return cls.IS_STRING
+        if new is cls.IS_BOOL:
+            if previous is cls.IS_EMPTY:
+                return cls.IS_BOOL
+            else:
+                return cls.IS_STRING
+
+
+        if previous is cls.IS_INT:
+            if (new is cls.IS_EMPTY
+                    or new is cls.IS_INT):
+                return cls.IS_INT
+            if new is cls.IS_FLOAT:
+                return cls.IS_FLOAT
+            if new is cls.IS_COMPLEX:
+                return cls.IS_COMPLEX
+
+        if previous is cls.IS_FLOAT:
+            if (new is cls.IS_EMPTY
+                    or new is cls.IS_INT
+                    or new is cls.IS_FLOAT):
+                return cls.IS_FLOAT
+            if new is cls.IS_COMPLEX:
+                return cls.IS_COMPLEX
+
+        # if previous is cls.IS_COMPLEX:
+        #     if (new is cls.IS_EMPTY
+        #             or new is cls.IS_INT
+        #             or new is cls.IS_FLOAT
+        #             or new is cls.IS_COMPLEX):
+        return cls.IS_COMPLEX
+
+        raise NotImplementedError(previous, new)
+
 class TypeField:
     '''
     Estimate the type of a field. This estimate can be based on character type counts. Some ordering considerations will be ignored for convenience; if downstream parsing fails, fallback will be to a string type anyway.
@@ -380,58 +433,6 @@ class TypeField:
 
         return TypeResolved.IS_STRING
 
-    @staticmethod
-    def resolve_line_type(previous: TypeResolved, new: TypeResolved) -> None:
-        if new is TypeResolved.IS_UNKNOWN:
-            return TypeResolved.IS_STRING
-
-        if (previous is TypeResolved.IS_UNKNOWN
-                or previous is TypeResolved.IS_EMPTY):
-            return new
-
-        # a string with anything else is a string
-        if (previous is TypeResolved.IS_STRING
-                or new is TypeResolved.IS_STRING):
-            return TypeResolved.IS_STRING
-
-        if previous is TypeResolved.IS_BOOL:
-            if (new is TypeResolved.IS_EMPTY
-                    or new is TypeResolved.IS_BOOL):
-                return TypeResolved.IS_BOOL
-            else: # bool found with anything else except empty is a string
-                return TypeResolved.IS_STRING
-        if new is TypeResolved.IS_BOOL:
-            if previous is TypeResolved.IS_EMPTY:
-                return TypeResolved.IS_BOOL
-            else:
-                return TypeResolved.IS_STRING
-
-
-        if previous is TypeResolved.IS_INT:
-            if (new is TypeResolved.IS_EMPTY
-                    or new is TypeResolved.IS_INT):
-                return TypeResolved.IS_INT
-            if new is TypeResolved.IS_FLOAT:
-                return TypeResolved.IS_FLOAT
-            if new is TypeResolved.IS_COMPLEX:
-                return TypeResolved.IS_COMPLEX
-
-        if previous is TypeResolved.IS_FLOAT:
-            if (new is TypeResolved.IS_EMPTY
-                    or new is TypeResolved.IS_INT
-                    or new is TypeResolved.IS_FLOAT):
-                return TypeResolved.IS_FLOAT
-            if new is TypeResolved.IS_COMPLEX:
-                return TypeResolved.IS_COMPLEX
-
-        # if previous is TypeResolved.IS_COMPLEX:
-        #     if (new is TypeResolved.IS_EMPTY
-        #             or new is TypeResolved.IS_INT
-        #             or new is TypeResolved.IS_FLOAT
-        #             or new is TypeResolved.IS_COMPLEX):
-        return TypeResolved.IS_COMPLEX
-
-        raise NotImplementedError(previous, new)
 
     def process_field(self, field: str) -> TypeResolved:
         # NOTE: return TypeResolved is not necessary
@@ -446,7 +447,7 @@ class TypeField:
 
         # must call after all chars processed, does not set self.resolved field
         rlt_new = self.resolve_field_type(pos)
-        self.parsed_line = self.resolve_line_type(self.parsed_line, rlt_new)
+        self.parsed_line = TypeResolved.resolve(self.parsed_line, rlt_new)
         # print(f'{self.parsed_line=}')
         return self.parsed_line # returning this is just for testing
 
