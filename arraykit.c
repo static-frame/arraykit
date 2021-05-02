@@ -170,6 +170,270 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
     return 1;
 }
 
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// TypePArser: Type, New, Destrctor
+
+#define AK_is_digit(c) (((unsigned)(c) - '0') < 10u)
+#define AK_is_space(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
+#define AK_is_sign(c) (((c) == '+') || ((c) == '-'))
+#define AK_is_paren_open(c) ((c) == '(')
+#define AK_is_paren_close(c) ((c) == ')')
+#define AK_is_decimal(c) ((c) == '.')
+
+#define AK_is_a(c) (((c) == 'a') || ((c) == 'A'))
+#define AK_is_e(c) (((c) == 'e') || ((c) == 'E'))
+#define AK_is_f(c) (((c) == 'f') || ((c) == 'F'))
+#define AK_is_i(c) (((c) == 'i') || ((c) == 'I'))
+#define AK_is_j(c) (((c) == 'j') || ((c) == 'J'))
+#define AK_is_l(c) (((c) == 'l') || ((c) == 'L'))
+#define AK_is_n(c) (((c) == 'n') || ((c) == 'N'))
+#define AK_is_r(c) (((c) == 'r') || ((c) == 'R'))
+#define AK_is_s(c) (((c) == 's') || ((c) == 'S'))
+#define AK_is_t(c) (((c) == 't') || ((c) == 'T'))
+#define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
+
+typedef enum {
+    TPS_UNKNOWN,
+    TPS_BOOL,
+    TPS_INT,
+    TPS_FLOAT,
+    TPS_COMPLEX,
+    TPS_STRING,
+    TPS_EMPTY
+} AK_TypeParserState;
+
+typedef struct {
+    bool contiguous_leading_space;
+    bool previous_numeric;
+    bool contiguous_numeric;
+
+    // counting will always stop before 8 or less
+    npy_int8 count_bool;
+    npy_int8 count_sign;
+    npy_int8 count_e;
+    npy_int8 count_j;
+    npy_int8 count_decimal;
+    npy_int8 count_nan;
+    npy_int8 count_inf;
+    npy_int8 count_paren_open;
+    npy_int8 count_paren_close;
+
+    // bound by number of chars in field
+    Py_ssize_t last_sign_pos; // signed
+    Py_ssize_t count_leading_space;
+    Py_ssize_t count_digit;
+    Py_ssize_t count_not_space;
+
+    AK_TypeParserState parsed_field;
+    AK_TypeParserState parsed_line;
+
+} AK_TypeParser;
+
+// Initialize all state.
+void AK_TP_reset_field(AK_TypeParser* tp)
+{
+    tp->previous_numeric = false;
+    tp->contiguous_numeric = false;
+    tp->contiguous_leading_space = false;
+
+    tp->count_bool = 0;
+    tp->count_sign = 0;
+    tp->count_e = 0;
+    tp->count_j = 0;
+    tp->count_decimal = 0;
+    tp->count_nan = 0;
+    tp->count_inf = 0;
+    tp->count_paren_open = 0;
+    tp->count_paren_close = 0;
+
+    tp->last_sign_pos = -1;
+    tp->count_leading_space = 0;
+    tp->count_digit = 0;
+    tp->count_not_space = 0;
+
+    tp->parsed_field = TPS_UNKNOWN;
+    // NOTE: do not reset parsed_line
+}
+
+AK_TypeParser* AK_TP_New()
+{
+    AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
+    // TODO: handle error
+    AK_TP_reset_field(tp);
+    tp->parsed_line = TPS_UNKNOWN;
+    return tp;
+}
+
+void AK_TP_Free(AK_TypeParser* tp)
+{
+    PyMem_Free(tp);
+}
+
+//------------------------------------------------------------------------------
+// TypePArser: char, field processors
+
+bool AK_TP_process_char(AK_TypeParser* tp,
+        char c, // downcast UCS4 before entering?
+        Py_ssize_t pos)
+{
+    if (tp->parsed_field != TPS_UNKNOWN) { // if known, do nothing
+        return false;
+    }
+
+    // evaluate space ..........................................................
+    bool space = false;
+    if (AK_is_space(c)) {
+        if (pos == 0) {
+            tp->contiguous_leading_space = true;
+        }
+        if (tp->contiguous_leading_space) {
+            ++tp->count_leading_space;
+            return true;
+        }
+        space = true;
+    }
+    else if (AK_is_paren_open(c)) {
+        ++tp->count_paren_open;
+        ++tp->count_leading_space;
+        space = true;
+        // open paren permitted only in first non-space position
+        if ((pos > 0 && !tp->contiguous_leading_space) || tp->count_paren_open > 1) {
+            tp->parsed_field = TPS_STRING;
+            return false;
+        }
+    }
+    else if (AK_is_paren_close(c)) {
+        ++tp->count_paren_close;
+        space = true;
+        // NOTE: might evaluate if previous is contiguous numeric
+        if (tp->count_paren_close) {
+            tp->parsed_field = TPS_STRING;
+            return false;
+        }
+    }
+    else {
+        ++tp->count_not_space;
+    }
+    // no longer in contiguous leading space
+    tp->contiguous_leading_space = false;
+    Py_ssize_t pos_field = pos - tp->count_leading_space;
+
+    // evaluate numeric, non-positional ........................................
+    bool numeric = false;
+    bool digit = false;
+
+    if (space) {}
+    else if (AK_is_digit(c)) {
+        ++tp->count_digit;
+        digit = true;
+        numeric = true;
+    }
+    else if (AK_is_decimal(c)) {
+        ++tp->count_decimal;
+        if (tp->count_decimal > 2) { // complex can have 2
+            tp->parsed_field = TPS_STRING;
+            return false;
+        }
+        numeric = true;
+    }
+    else if (AK_is_sign(c)) {
+        ++tp->count_sign;
+        if (tp->count_sign > 4) { // complex can have 4
+            tp->parsed_field = TPS_STRING;
+            return false;
+        }
+        tp->last_sign_pos = pos_field;
+        numeric = true;
+    }
+    else if (AK_is_e(c)) {
+        ++tp->count_e;
+        if ((pos_field == 0) || (tp->count_e > 2)) {
+            // can never lead field; true or false have one E; complex can have 2
+            tp->parsed_field = TPS_STRING;
+            return false;
+        }
+        numeric = true;
+    }
+    else if (AK_is_j(c)) {
+        ++tp->count_j;
+        if ((pos_field == 0) || (tp->count_j > 1)) {
+            // can never lead field; complex can have 1
+            tp->parsed_field = TPS_STRING;
+            return false;
+        }
+        numeric = true;
+    }
+
+    // evaluate contiguous numeric .............................................
+    if (numeric) {
+        if (pos_field == 0) {
+            tp->contiguous_numeric = true;
+            tp->previous_numeric = true;
+        }
+        if (!tp->previous_numeric) {
+            tp->contiguous_numeric = false;
+        }
+        tp->previous_numeric = true; // this char is numeric for next eval
+    }
+    else { // not numeric
+        // only mark as not contiguous_numeric if non space as might be trailing space
+        if (tp->contiguous_numeric && !space) {
+            tp->contiguous_numeric = false;
+        }
+        tp->previous_numeric = false;
+    }
+
+    // evaluate character positions ............................................
+    if (space || digit) {
+        return true;
+    }
+    if (tp->last_sign_pos >= 0) { // initialized to -1
+        pos_field -= tp->last_sign_pos + 1;
+    }
+
+    switch (pos_field) {
+        case 0:
+            if      (AK_is_t(c)) {++tp->count_bool;}
+            else if (AK_is_f(c)) {--tp->count_bool;}
+            else if (AK_is_n(c)) {++tp->count_nan;}
+            else if (AK_is_i(c)) {++tp->count_inf;}
+            break;
+        case 1:
+            if      (AK_is_r(c)) {++tp->count_bool;} // true
+            else if (AK_is_a(c)) {
+                --tp->count_bool; // false
+                ++tp->count_nan;
+                }
+            else if (AK_is_n(c)) {++tp->count_inf;}
+            break;
+        case 2:
+            if      (AK_is_u(c)) {++tp->count_bool;}
+            else if (AK_is_l(c)) {--tp->count_bool;}
+            else if (AK_is_n(c)) {++tp->count_nan;}
+            else if (AK_is_f(c)) {++tp->count_inf;}
+            break;
+        case 3:
+            if      (AK_is_e(c)) {++tp->count_bool;} // true
+            else if (AK_is_s(c)) {--tp->count_bool;} // false
+            break;
+        case 4:
+            if      (AK_is_e(c)) {--tp->count_bool;} // false
+            break;
+    }
+
+    // continue processing
+    return true;
+}
+
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 // CodePointLine: Type, New, Destrctor
@@ -191,6 +455,7 @@ typedef struct {
     Py_ssize_t index_current;
 
     char *field;
+    AK_TypeParser *type_parser;
 
 } AK_CodePointLine;
 
@@ -213,7 +478,9 @@ AK_CodePointLine* AK_CPL_New()
     cpl->index_current = 0;
     cpl->offset_max = 0;
 
+    // optional, dynamic values
     cpl->field = NULL;
+    cpl->type_parser = NULL;
 
     return cpl;
 }
@@ -224,6 +491,9 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
     PyMem_Free(cpl->offsets);
     if (cpl->field) {
         PyMem_Free(cpl->field);
+    }
+    if (cpl->type_parser) {
+        PyMem_Free(cpl->type_parser);
     }
     PyMem_Free(cpl);
 }
@@ -359,9 +629,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 static char* TRUE_LOWER = "true";
 static char* TRUE_UPPER = "TRUE";
 
-#define isspace_ascii(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
-#define isdigit_ascii(c) (((unsigned)(c) - '0') < 10u)
-
 #define ERROR_NO_DIGITS 1
 #define ERROR_OVERFLOW 2
 #define ERROR_INVALID_CHARS 3
@@ -380,7 +647,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 
     Py_UCS4 *p = p_item;
 
-    while (isspace_ascii(*p)) {
+    while (AK_is_space(*p)) {
         ++p;
         if (p >= end) {return number;}
     }
@@ -393,7 +660,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     if (p >= end) {return number;}
 
     // Check that there is a first digit.
-    if (!isdigit_ascii(*p)) {
+    if (!AK_is_digit(*p)) {
         *error = ERROR_NO_DIGITS;
         return 0;
     }
@@ -409,7 +676,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                     if (p >= end) {return number;}
                     d = *p;
                     continue;
-                } else if (!isdigit_ascii(d)) {
+                } else if (!AK_is_digit(d)) {
                     break;
                 }
                 if ((number > pre_min) ||
@@ -424,7 +691,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                 }
             }
         } else {
-            while (isdigit_ascii(d)) {
+            while (AK_is_digit(d)) {
                 if ((number > pre_min) ||
                     ((number == pre_min) && (d - '0' <= dig_pre_min))) {
                     number = number * 10 - (d - '0');
@@ -449,7 +716,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                     if (p >= end) {return number;}
                     d = *p;
                     continue;
-                } else if (!isdigit_ascii(d)) {
+                } else if (!AK_is_digit(d)) {
                     break;
                 }
                 if ((number < pre_max) ||
@@ -464,7 +731,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                 }
             }
         } else {
-            while (isdigit_ascii(d)) {
+            while (AK_is_digit(d)) {
                 if ((number < pre_max) ||
                     ((number == pre_max) && (d - '0' <= dig_pre_max))) {
                     number = number * 10 + (d - '0');
@@ -494,7 +761,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     int d;
 
     Py_UCS4 *p = p_item;
-    while (isspace_ascii(*p)) {
+    while (AK_is_space(*p)) {
         ++p;
         if (p >= end) {return number;}
     }
@@ -507,7 +774,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     }
 
     // Check that there is a first digit.
-    if (!isdigit_ascii(*p)) {
+    if (!AK_is_digit(*p)) {
         *error = ERROR_NO_DIGITS;
         return 0;
     }
@@ -520,7 +787,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
                 if (p >= end) {return number;}
                 d = *p;
                 continue;
-            } else if (!isdigit_ascii(d)) {
+            } else if (!AK_is_digit(d)) {
                 break;
             }
             if ((number < pre_max) ||
@@ -535,7 +802,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
             }
         }
     } else {
-        while (isdigit_ascii(d)) {
+        while (AK_is_digit(d)) {
             if ((number < pre_max) ||
                 ((number == pre_max) && (d - '0' <= dig_pre_max))) {
                 number = number * 10 + (d - '0');
@@ -567,7 +834,7 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
     char *t = cpl->field;
 
     while (p < end) {
-        if (isspace_ascii(*p)) {
+        if (AK_is_space(*p)) {
             ++p;
             continue;
         }
@@ -591,7 +858,7 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     int i = 0;
     char c;
 
-    while (isspace_ascii(*p)) p++;
+    while (AK_is_space(*p)) p++;
 
     for (;p < end; ++p) {
         c = *p;

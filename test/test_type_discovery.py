@@ -117,15 +117,14 @@ class TypeField:
     '''
     def __init__(self) -> None:
         self.reset()
-        self.resolved_line: TypeResolved = TypeResolved.IS_UNKNOWN
+        self.parsed_line: TypeResolved = TypeResolved.IS_UNKNOWN
 
     def reset(self) -> None:
-        self.resolved_field: TypeResolved = TypeResolved.IS_UNKNOWN
+        self.parsed_field: TypeResolved = TypeResolved.IS_UNKNOWN
 
-        self.previous_leading_space = False
         self.previous_numeric = False
+        self.contiguous_leading_space = False
         self.contiguous_numeric = False
-
 
         # numeric symbols; values do not need to be greater than 8
         self.count_bool = 0 # signed, not greater than +/- 5
@@ -149,7 +148,7 @@ class TypeField:
         # update self based on c and position
         # return int where 1 means process more, 0 means stop, -1 means error
 
-        if self.resolved_field != TypeResolved.IS_UNKNOWN:
+        if self.parsed_field != TypeResolved.IS_UNKNOWN:
             return 0
 
         # evaluate space -------------------------------------------------------
@@ -157,8 +156,8 @@ class TypeField:
 
         if is_space(c):
             if pos == 0:
-                self.previous_leading_space = True
-            if self.previous_leading_space:
+                self.contiguous_leading_space = True
+            if self.contiguous_leading_space:
                 self.count_leading_space += 1
                 return 1
             space = True
@@ -167,19 +166,20 @@ class TypeField:
             self.count_leading_space += 1
             space = True
             # open paren only permitted first non-space position
-            if pos > 0 and not self.previous_leading_space or self.count_paren_open > 1:
-                self.resolved_field = TypeResolved.IS_STRING
+            if (pos > 0 and not self.contiguous_leading_space) or self.count_paren_open > 1:
+                self.parsed_field = TypeResolved.IS_STRING
                 return 0
         elif is_paren_close(c):
             self.count_paren_close += 1
             space = True
             # # NOTE: not evaluating that this is on last position of contiguous numeric
             if self.count_paren_close > 1:
-                self.resolved_field = TypeResolved.IS_STRING
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
         else:
             self.count_notspace += 1
 
-        self.previous_leading_space = False # this char is not space
+        self.contiguous_leading_space = False
 
         pos_field = pos - self.count_leading_space
 
@@ -190,41 +190,43 @@ class TypeField:
         if space:
             pass
 
-        elif is_sign(c):
-            self.last_sign_pos = pos_field
-            self.count_sign += 1
-            if self.count_sign > 4:
-                # complex numbers with E can have up to 4 signs, anything else is a string
-                self.resolved_field = TypeResolved.IS_STRING
-                return 0
-            numeric = True
-
         elif is_digit(c):
             numeric = True
             digit = True
             self.count_digit += 1
 
-        elif is_e(c): # only character that is numeric and bool
+        elif is_decimal(c):
+            self.count_decimal += 1
+            if self.count_decimal > 2: # complex can have 2!
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
             numeric = True
+
+        elif is_sign(c):
+            self.count_sign += 1
+            if self.count_sign > 4:
+                # complex numbers with E can have up to 4 signs, anything else is a string
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
+            self.last_sign_pos = pos_field
+            numeric = True
+
+
+        elif is_e(c): # only character that is numeric and bool
             self.count_e += 1
             if pos_field == 0 or self.count_e > 2:
                 # true and false each only have one E, complex can have 2
-                self.resolved_field = TypeResolved.IS_STRING
+                self.parsed_field = TypeResolved.IS_STRING
                 return 0
+            numeric = True
 
         elif is_j(c):
-            numeric = True
             self.count_j += 1
             if pos_field == 0 or self.count_j > 1:
-                self.resolved_field = TypeResolved.IS_STRING
+                self.parsed_field = TypeResolved.IS_STRING
                 return 0
-
-        elif is_decimal(c):
             numeric = True
-            self.count_decimal += 1
-            if self.count_decimal > 2: # complex can have 2!
-                self.resolved_field = TypeResolved.IS_STRING
-                return 0
+
 
         #-----------------------------------------------------------------------
         # print(f' pre: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=}')
@@ -252,7 +254,7 @@ class TypeField:
 
         # if we have a last sign, it takes precedence over use count_paren_open as a shfit
         if self.last_sign_pos >= 0:
-            pos_field -= (self.last_sign_pos + 1)
+            pos_field -= self.last_sign_pos + 1
 
         if pos_field == 0:
             if is_t(c):
@@ -290,7 +292,7 @@ class TypeField:
                 self.count_bool -= 1
 
         elif pos_field == 4:
-            if is_e(c) and self.count_bool == -4:
+            if is_e(c):
                 self.count_bool -= 1
 
         # print(f'post: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=} {self.last_sign_pos=} {self.count_nan=} {self.count_inf=} {self.count_notspace=}')
@@ -305,8 +307,8 @@ class TypeField:
         if count == 0:
             return TypeResolved.IS_EMPTY
 
-        if self.resolved_field != TypeResolved.IS_UNKNOWN:
-            return self.resolved_field
+        if self.parsed_field != TypeResolved.IS_UNKNOWN:
+            return self.parsed_field
 
         if self.count_bool == 4 and self.count_notspace == 4:
             return TypeResolved.IS_BOOL
@@ -424,7 +426,7 @@ class TypeField:
     def process_field(self, field: str) -> TypeResolved:
         # NOTE: return TypeResolved is not necessary
 
-        self.reset() # does not reset resolved_line
+        self.reset() # does not reset parsed_line
         pos = 0
         continue_process = 1
         for char in field:
@@ -434,16 +436,16 @@ class TypeField:
 
         # must call after all chars processed, does not set self.resolved field
         rlt_new = self.resolve_field_type(pos)
-        self.resolved_line = self.resolve_line_type(self.resolved_line, rlt_new)
-        # print(f'{self.resolved_line=}')
-        return self.resolved_line # returning this is just for testing
+        self.parsed_line = self.resolve_line_type(self.parsed_line, rlt_new)
+        # print(f'{self.parsed_line=}')
+        return self.parsed_line # returning this is just for testing
 
     def get_resolved(self) -> TypeResolved:
-        if self.resolved_line is TypeResolved.IS_EMPTY:
+        if self.parsed_line is TypeResolved.IS_EMPTY:
             return TypeResolved.IS_FLOAT
-        if self.resolved_line is TypeResolved.IS_UNKNOWN:
+        if self.parsed_line is TypeResolved.IS_UNKNOWN:
             return TypeResolved.IS_STRING
-        return self.resolved_line
+        return self.parsed_line
 
     def process_line(self, fields: tp.Iterable[str]) -> TypeResolved:
         for field in fields:
