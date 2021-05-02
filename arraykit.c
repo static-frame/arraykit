@@ -200,6 +200,7 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 #define AK_is_t(c) (((c) == 't') || ((c) == 'T'))
 #define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
 
+//------------------------------------------------------------------------------
 typedef enum {
     TPS_UNKNOWN,
     TPS_BOOL,
@@ -209,6 +210,44 @@ typedef enum {
     TPS_STRING,
     TPS_EMPTY
 } AK_TypeParserState;
+
+AK_TypeParserState
+AK_TPS_resolve(AK_TypeParserState previous, AK_TypeParserState new) {
+    // unlikely case
+    if (new == TPS_UNKNOWN) {return TPS_STRING;}
+
+    // propagate new if previous is unknown or empty
+    if ((previous == TPS_UNKNOWN) || (previous == TPS_EMPTY)) {return new;}
+
+    // if either are string, go to string
+    if (previous == TPS_STRING || new == TPS_STRING) {return TPS_STRING;}
+
+    // handle both new, previous bool directly
+    if (previous == TPS_BOOL) {
+        if (new == TPS_EMPTY || new == TPS_BOOL) {return TPS_BOOL;}
+        else {return TPS_STRING;} // bool found with anything except empty is string
+    }
+    if (new == TPS_BOOL) {
+        if (previous == TPS_EMPTY) {return TPS_BOOL;}
+        else {return TPS_STRING;} // bool found with anything except empty is string
+    }
+
+    // numerical promotion
+    if (previous == TPS_INT) {
+        if (new == TPS_EMPTY || new == TPS_INT) {return TPS_INT;}
+        if (new == TPS_FLOAT) {return TPS_FLOAT;}
+        if (new == TPS_COMPLEX) {return TPS_COMPLEX;}
+    }
+    if (previous == TPS_FLOAT) {
+        if (new == TPS_EMPTY || new == TPS_INT || new == TPS_FLOAT) {return TPS_FLOAT;}
+        if (new == TPS_COMPLEX) {return TPS_COMPLEX;}
+    }
+    // previous == TPS_COMPLEX, new is TPS_EMPTY, TPS_INT, TPS_FLOAT, or TPS_COMPLEX
+    return TPS_COMPLEX;
+}
+
+//------------------------------------------------------------------------------
+
 
 typedef struct {
     bool contiguous_leading_space;
@@ -263,7 +302,8 @@ void AK_TP_reset_field(AK_TypeParser* tp)
     // NOTE: do not reset parsed_line
 }
 
-AK_TypeParser* AK_TP_New()
+AK_TypeParser*
+AK_TP_New()
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
     // TODO: handle error
@@ -272,7 +312,8 @@ AK_TypeParser* AK_TP_New()
     return tp;
 }
 
-void AK_TP_Free(AK_TypeParser* tp)
+void
+AK_TP_Free(AK_TypeParser* tp)
 {
     PyMem_Free(tp);
 }
@@ -280,7 +321,8 @@ void AK_TP_Free(AK_TypeParser* tp)
 //------------------------------------------------------------------------------
 // TypePArser: char, field processors
 
-bool AK_TP_process_char(AK_TypeParser* tp,
+bool
+AK_TP_process_char(AK_TypeParser* tp,
         char c, // downcast UCS4 before entering?
         Py_ssize_t pos)
 {
@@ -428,11 +470,19 @@ bool AK_TP_process_char(AK_TypeParser* tp,
             if      (AK_is_e(c)) {--tp->count_bool;} // false
             break;
     }
-
     // continue processing
     return true;
 }
 
+
+
+// After field is complete, call process_field to evaluate and set parsed_line
+void
+AK_TP_process_field(AK_TypeParser* tp,
+        Py_ssize_t count)
+{
+
+}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

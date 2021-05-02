@@ -382,20 +382,30 @@ class TypeField:
 
     @staticmethod
     def resolve_line_type(previous: TypeResolved, new: TypeResolved) -> None:
-        if previous is TypeResolved.IS_UNKNOWN:
-            return new
-        if previous is TypeResolved.IS_EMPTY:
+        if new is TypeResolved.IS_UNKNOWN:
+            return TypeResolved.IS_STRING
+
+        if (previous is TypeResolved.IS_UNKNOWN
+                or previous is TypeResolved.IS_EMPTY):
             return new
 
         # a string with anything else is a string
-        if previous is TypeResolved.IS_STRING or new is TypeResolved.IS_STRING:
+        if (previous is TypeResolved.IS_STRING
+                or new is TypeResolved.IS_STRING):
             return TypeResolved.IS_STRING
 
         if previous is TypeResolved.IS_BOOL:
-            if new is TypeResolved.IS_BOOL:
+            if (new is TypeResolved.IS_EMPTY
+                    or new is TypeResolved.IS_BOOL):
                 return TypeResolved.IS_BOOL
-            else: # bool found with anything else is a string
+            else: # bool found with anything else except empty is a string
                 return TypeResolved.IS_STRING
+        if new is TypeResolved.IS_BOOL:
+            if previous is TypeResolved.IS_EMPTY:
+                return TypeResolved.IS_BOOL
+            else:
+                return TypeResolved.IS_STRING
+
 
         if previous is TypeResolved.IS_INT:
             if (new is TypeResolved.IS_EMPTY
@@ -414,12 +424,12 @@ class TypeField:
             if new is TypeResolved.IS_COMPLEX:
                 return TypeResolved.IS_COMPLEX
 
-        if previous is TypeResolved.IS_COMPLEX:
-            if (new is TypeResolved.IS_EMPTY
-                    or new is TypeResolved.IS_INT
-                    or new is TypeResolved.IS_FLOAT
-                    or new is TypeResolved.IS_COMPLEX):
-                return TypeResolved.IS_COMPLEX
+        # if previous is TypeResolved.IS_COMPLEX:
+        #     if (new is TypeResolved.IS_EMPTY
+        #             or new is TypeResolved.IS_INT
+        #             or new is TypeResolved.IS_FLOAT
+        #             or new is TypeResolved.IS_COMPLEX):
+        return TypeResolved.IS_COMPLEX
 
         raise NotImplementedError(previous, new)
 
@@ -647,6 +657,21 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_line(('3', '', '4.')), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process_line(('3', '', '4e3')), TypeResolved.IS_FLOAT)
         self.assertEqual(TypeField().process_line(('3', '', '(4e3)')), TypeResolved.IS_COMPLEX)
+
+        self.assertEqual(TypeField().process_line(('3', '', '(4e3)', 'True')), TypeResolved.IS_STRING)
+
+
+    def test_line_e(self) -> None:
+        self.assertEqual(TypeField().process_line(('foo', '', '', 'bar')), TypeResolved.IS_STRING)
+
+        self.assertEqual(TypeField().process_line(('', '', '', 'bar')), TypeResolved.IS_STRING)
+
+    def test_line_f(self) -> None:
+        # EMPTY is treated as False
+        self.assertEqual(TypeField().process_line(('', '', '', 'True')), TypeResolved.IS_BOOL)
+
+        self.assertEqual(TypeField().process_line(('True', '')), TypeResolved.IS_BOOL)
+
 
 
 if __name__ == '__main__':
