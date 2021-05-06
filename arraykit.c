@@ -1143,7 +1143,9 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (!array) {
         return NULL;
     }
+
     if (dtype->elsize == 16) {
+        # ifdef PyFloat128ArrType_Type
         npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
         npy_float128 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
@@ -1152,6 +1154,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             *array_buffer++ = AK_CPL_current_to_float64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        # endif
     }
     else if (dtype->elsize == 8) {
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
