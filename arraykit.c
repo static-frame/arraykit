@@ -16,6 +16,11 @@
 # define PyDataType_ISBOOL(obj) \
     PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
 
+// Py_UNREACHABLE() isn't available in Python 3.6:
+# ifndef Py_UNREACHABLE
+# define Py_UNREACHABLE() Py_FatalError("https://xkcd.com/2200")
+# endif
+
 // Given a PyObject, raise if not an array.
 # define AK_CHECK_NUMPY_ARRAY(O)                                              \
     if (!PyArray_Check(O)) {                                                  \
