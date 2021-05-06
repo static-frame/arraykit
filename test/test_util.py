@@ -223,11 +223,11 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
 
     def test_iterable_str_to_array_1d_float_6(self) -> None:
-
-        a1 = iterable_str_to_array_1d(['3.2', '3', 'inf', '-inf'], np.float128)
-        self.assertEqual(a1.tolist(), [3.2, 3, np.inf, -np.inf])
-        self.assertEqual(a1.dtype, np.float128)
-        self.assertFalse(a1.flags.writeable)
+        if hasattr(np, 'float128'):
+            a1 = iterable_str_to_array_1d(['3.2', '3', 'inf', '-inf'], np.float128)
+            self.assertEqual(a1.tolist(), [3.2, 3, np.inf, -np.inf])
+            self.assertEqual(a1.dtype, np.float128)
+            self.assertFalse(a1.flags.writeable)
 
 
 
@@ -343,7 +343,7 @@ class TestUnit(unittest.TestCase):
 
     def test_iterable_str_to_array_1d_parse_1(self) -> None:
         a1 = iterable_str_to_array_1d(['20', '30'], None)
-        self.assertEqual(a1.dtype, np.dtype(int))
+        self.assertEqual(a1.dtype, np.dtype(np.int64))
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [20, 30])
 
@@ -455,7 +455,7 @@ class TestUnit(unittest.TestCase):
             ','.join(['False', '82342343', 'baz'] * 20),
         ]
 
-        dtypes0 = [bool, int, str] * 20
+        dtypes0 = [bool, np.int64, str] * 20
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 60)
