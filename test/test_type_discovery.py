@@ -384,6 +384,7 @@ class TypeField:
                 return TypeResolved.IS_INT
 
             if (self.count_j == 0
+                    and self.count_sign <= 2
                     and self.count_paren_open == 0
                     and self.count_paren_close == 0
                     and (self.count_decimal == 1 or self.count_e == 1)):
@@ -418,16 +419,15 @@ class TypeField:
 
         elif self.count_j == 1:
             # special cases of complex that do not present as contiguous numeric because of inf/nan
-            # TODO: count numeric?
-            if self.count_inf == 3 or self.count_inf == 6:
+            if self.count_inf == 3 or self.count_inf == 6 and (
+                    self.count_sign + self.count_inf + 1 == self.count_notspace
+                    ):
                 return TypeResolved.IS_COMPLEX
-            # if self.previous_sign and self.count_inf == 3 and self.count_notspace == 5:
-            #     return TypeResolved.IS_COMPLEX
+            if self.count_nan == 3 or self.count_nan == 6 and (
+                    self.count_sign + self.count_nan + 1 == self.count_notspace
+                    ):
+                return TypeResolved.IS_COMPLEX
 
-            if self.count_nan == 3 or self.count_nan == 6:
-                return TypeResolved.IS_COMPLEX
-            # if self.previous_sign and self.count_nan == 3 and self.count_notspace == 5:
-            #     return TypeResolved.IS_COMPLEX
 
             # import ipdb; ipdb.set_trace()
 

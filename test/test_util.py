@@ -338,6 +338,36 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
+
+
+
+    def test_iterable_str_to_array_1d_parse_1(self) -> None:
+        a1 = iterable_str_to_array_1d(['20', '30'], None)
+        self.assertEqual(a1.dtype, np.dtype(int))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), [20, 30])
+
+    def test_iterable_str_to_array_1d_parse_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['true', 'true', ''], None)
+        self.assertEqual(a1.dtype, np.dtype(bool))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), [True, True, False])
+
+    def test_iterable_str_to_array_1d_parse_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['1.5  ', '   4.5', 'inf   '], None)
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), [1.5, 4.5, np.inf])
+
+    def test_iterable_str_to_array_1d_parse_2(self) -> None:
+        a1 = iterable_str_to_array_1d(['b', 'ee', 't'], None)
+        self.assertEqual(a1.dtype, np.dtype('<U2'))
+        self.assertFalse(a1.flags.writeable)
+        self.assertEqual(a1.tolist(), ['b', 'ee', 't'])
+
+
+
+    #---------------------------------------------------------------------------
     # def test_test_a(self) -> None:
     #     from arraykit import _test
     #     post = _test(
@@ -468,6 +498,28 @@ class TestUnit(unittest.TestCase):
                     [100, 200, -234],
                     [np.inf, 6.5, 3.2e-10],
                     ['red', 'blue', 'green']])
+
+
+
+    # def test_delimited_to_arrays_h(self) -> None:
+
+    #     msg = [
+    #         'false,100,inf,red',
+    #         'true,200,6.5,blue',
+    #         'True,-234,3.2e-10,green',
+    #     ]
+
+    #     dtypes0 = [bool, int, None, str]
+    #     post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
+    #     self.assertEqual([a.dtype.kind for a in post0],
+    #             ['b', 'i', 'f', 'U'])
+
+    #     self.assertEqual([a.tolist() for a in post0],
+    #                 [[False, True, True],
+    #                 [100, 200, -234],
+    #                 [np.inf, 6.5, 3.2e-10],
+    #                 ['red', 'blue', 'green']])
+
 
 
     #---------------------------------------------------------------------------
