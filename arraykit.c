@@ -257,12 +257,14 @@ AK_TPS_to_dtype(AK_TypeParserState state) {
 
     switch(state) {
         case TPS_UNKNOWN:
+            // AK_DEBUG("TPS_to_dtype: UNKNOWN");
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_EMPTY:
             dtype = PyArray_DescrFromType(NPY_FLOAT64);
             break;
         case TPS_STRING:
+            // AK_DEBUG("TPS_to_dtype: STRING");
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_BOOL:
@@ -657,6 +659,7 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     cpl->field = NULL;
 
     if (type_parse) {
+        // AK_DEBUG("AK_CodePointLin calling AK_TP_New()");
         cpl->type_parser = AK_TP_New();
     }
     else {
@@ -743,13 +746,15 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 
 // Add a single point to a line. This does not update offsets. This is valled when updating a character.
 int
-AK_CPL_AppendPoint(AK_CodePointLine* cpl, Py_UCS4 p)
+AK_CPL_AppendPoint(AK_CodePointLine* cpl,
+        Py_UCS4 p,
+        Py_ssize_t pos)
 {
     if (!AK_CPL_resize(cpl, 1)) {
         return -1;
     }
     if (cpl->type_parser) {
-        AK_TP_process_char(cpl->type_parser, (char)p, cpl->buffer_count);
+        AK_TP_process_char(cpl->type_parser, (char)p, pos);
     }
     *cpl->pos_current++ = p;
     ++cpl->buffer_count;
@@ -767,7 +772,8 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
         AK_TP_process_field(cpl->type_parser, offset);
     }
     cpl->offsets[cpl->offsets_count++] = offset;
-    if (offset > cpl->offset_max) cpl->offset_max = offset;
+
+    if (offset > cpl->offset_max) {cpl->offset_max = offset;}
     return 1;
 }
 
@@ -1480,6 +1486,7 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
         // get from CPL
         if (cpl->type_parser) {
             // will return a fresh instance
+            // AK_DEBUG("CPL calling AK_TPS_to_dtype");
             dtype = AK_TPS_to_dtype(cpl->type_parser->parsed_line);
         }
         else {
@@ -1567,6 +1574,8 @@ static inline int
 AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
     if (line >= cpg->lines_capacity) {
+        assert(line == cpg->lines_capacity);
+
         cpg->lines_capacity *= 2;
         // NOTE: as we sure we are only copying pointers?
         cpg->lines = PyMem_Realloc(cpg->lines,
@@ -1575,6 +1584,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     }
     // for now we assume sequential growth, so should only check if equal
     if (line >= cpg->lines_count) {
+        assert(line == cpg->lines_count);
         // determine if we need to parse types
         bool type_parse = false;
         if (!cpg->dtypes) {
@@ -1586,7 +1596,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
                 type_parse = true;
             }
         }
-        // initialize a CPL in this position
+        // Always initialize a CPL in the new position
         cpg->lines[line] = AK_CPL_New(type_parse);
         ++cpg->lines_count;
     }
@@ -1611,12 +1621,13 @@ static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
         Py_ssize_t line,
+        Py_ssize_t field_len,
         Py_UCS4 p
         )
 {
     AK_CPG_resize(cpg, line);
     // handle failure
-    AK_CPL_AppendPoint(cpg->lines[line], p);
+    AK_CPL_AppendPoint(cpg->lines[line], p, field_len);
     // handle failure
     return 1;
 }
@@ -1986,6 +1997,7 @@ AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     AK_CPG_AppendPointAtLine(cpg,
             dr->axis == 0 ? dr->line_number : dr->field_number,
+            dr->field_len,
             c);
     ++dr->field_len; // reset in AK_DR_close_field
     return 0;
@@ -2448,6 +2460,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
 
+    // Consume all lines from dr and load into cpg
     while (AK_DR_ProcessLine(dr, cpg)); // check for -1
     AK_DR_Free(dr);
 

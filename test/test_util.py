@@ -518,7 +518,7 @@ class TestUnit(unittest.TestCase):
                     [[False, True, True],
                     [100, 200, -234],
                     [np.inf, 6.5, 3.2e-10],
-                    ['red', 'blue', 'green']])
+                    ['     red', '     blue', ' green']])
 
 
 
