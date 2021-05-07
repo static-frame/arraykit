@@ -217,7 +217,7 @@ typedef enum {
 } AK_TypeParserState;
 
 AK_TypeParserState
-AK_TPS_resolve(AK_TypeParserState previous, AK_TypeParserState new) {
+AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     // unlikely case
     if (new == TPS_UNKNOWN) {return TPS_STRING;}
 
@@ -251,7 +251,7 @@ AK_TPS_resolve(AK_TypeParserState previous, AK_TypeParserState new) {
 }
 
 PyArray_Descr*
-AK_TPS_to_dtype(AK_TypeParserState state) {
+AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
     PyArray_Descr *dtype_final;
 
@@ -362,7 +362,7 @@ AK_TP_Free(AK_TypeParser* tp)
 // TypePArser: char, field processors
 
 bool
-AK_TP_process_char(AK_TypeParser* tp,
+AK_TP_ProcessChar(AK_TypeParser* tp,
         char c,
         Py_ssize_t pos)
 {
@@ -515,15 +515,14 @@ AK_TP_process_char(AK_TypeParser* tp,
     return true;
 }
 
-
-
+// This private function is used by AK_TP_ProcessField to evalaute the state of the AK_TypeParser and determine the the resolved AK_TypeParserState.
 AK_TypeParserState
 AK_TP_resolve_field(AK_TypeParser* tp,
         Py_ssize_t count)
 {
     if (count == 0) {return TPS_EMPTY;}
 
-    // if parsed_field was set in AK_TP_process_char
+    // if parsed_field was set in AK_TP_ProcessChar
     if (tp->parsed_field != TPS_UNKNOWN) {return tp->parsed_field;}
 
     if (tp->count_bool == 4 && tp->count_not_space == 4) {
@@ -590,10 +589,12 @@ AK_TP_resolve_field(AK_TypeParser* tp,
         }
     }
     else if (tp->count_j == 1) {
-        if ((tp->count_nan == 3 || tp->count_nan == 6) && tp->count_sign + tp->count_nan + 1 == tp->count_not_space) {
+        if ((tp->count_nan == 3 || tp->count_nan == 6) &&
+                tp->count_sign + tp->count_nan + 1 == tp->count_not_space) {
             return TPS_COMPLEX;
         }
-        if ((tp->count_inf == 3 || tp->count_inf == 6) && tp->count_sign + tp->count_inf + 1 == tp->count_not_space) {
+        if ((tp->count_inf == 3 || tp->count_inf == 6) &&
+                tp->count_sign + tp->count_inf + 1 == tp->count_not_space) {
             return TPS_COMPLEX;
         }
     }
@@ -601,13 +602,15 @@ AK_TP_resolve_field(AK_TypeParser* tp,
 }
 
 
-// After field is complete, call process_field to evaluate and set parsed_line
+// After field is complete, call AK_TP_ProcessField to evaluate and set the current parsed_line. This will be called for each field, updating the parsed_field values as this advances.
 void
-AK_TP_process_field(AK_TypeParser* tp,
+AK_TP_ProcessField(AK_TypeParser* tp,
         Py_ssize_t count)
 {
-    // resolve with previous parsed_line (or unkown if just initialized)
-    tp->parsed_line = AK_TPS_resolve(tp->parsed_line, AK_TP_resolve_field(tp, count));
+    if (tp->parsed_line != TPS_STRING) {
+        // resolve with previous parsed_line (or unkown if just initialized)
+        tp->parsed_line = AK_TPS_Resolve(tp->parsed_line, AK_TP_resolve_field(tp, count));
+    }
     AK_TP_reset_field(tp);
 }
 
@@ -722,18 +725,17 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
             0)) { // last zero means do not copy null
         return -1; // need to handle error
     }
-    // TODO: if we have a type_parser, need to process chars, then field
     if (cpl->type_parser) {
         Py_UCS4* p = cpl->pos_current;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
         bool run = true;
         for (; p < end; ++p) {
-            run = AK_TP_process_char(cpl->type_parser, (char)*p, pos);
+            run = AK_TP_ProcessChar(cpl->type_parser, (char)*p, pos);
             if (!run) {break;}
             ++pos;
         }
-        AK_TP_process_field(cpl->type_parser, element_length);
+        AK_TP_ProcessField(cpl->type_parser, element_length);
     }
 
     // read offset_count, then increment
@@ -754,7 +756,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         return -1;
     }
     if (cpl->type_parser) {
-        AK_TP_process_char(cpl->type_parser, (char)p, pos);
+        AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
     *cpl->pos_current++ = p;
     ++cpl->buffer_count;
@@ -769,7 +771,7 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
         return -1;
     }
     if (cpl->type_parser) {
-        AK_TP_process_field(cpl->type_parser, offset);
+        AK_TP_ProcessField(cpl->type_parser, offset);
     }
     cpl->offsets[cpl->offsets_count++] = offset;
 
@@ -819,17 +821,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
     cpl->pos_current += cpl->offsets[cpl->index_current++];
 }
 
-// static inline void AK_CPL_CurrentRetreat(AK_CodePointLine* cpl)
-// {
-//     if (cpl->index_current > 0) {
-//         // decrement index_current, then use
-//         // remove the offset at this new position
-//         cpl->pos_current -= cpl->offsets[--cpl->index_current];
-//     }
-// }
-
-
-
 //------------------------------------------------------------------------------
 // CodePointLine: Code Point Parsers
 
@@ -839,7 +830,6 @@ static char* TRUE_UPPER = "TRUE";
 #define ERROR_NO_DIGITS 1
 #define ERROR_OVERFLOW 2
 #define ERROR_INVALID_CHARS 3
-
 
 // Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c
 static inline npy_int64
@@ -1486,8 +1476,8 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
         // get from CPL
         if (cpl->type_parser) {
             // will return a fresh instance
-            // AK_DEBUG("CPL calling AK_TPS_to_dtype");
-            dtype = AK_TPS_to_dtype(cpl->type_parser->parsed_line);
+            // AK_DEBUG("CPL calling AK_TPS_ToDtype");
+            dtype = AK_TPS_ToDtype(cpl->type_parser->parsed_line);
         }
         else {
             AK_NOT_IMPLEMENTED("no handling for x dtype yet");
