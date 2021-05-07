@@ -501,24 +501,24 @@ class TestUnit(unittest.TestCase):
 
 
 
-    # def test_delimited_to_arrays_h(self) -> None:
+    def test_delimited_to_arrays_h(self) -> None:
 
-    #     msg = [
-    #         'false,100,inf,red',
-    #         'true,200,6.5,blue',
-    #         'True,-234,3.2e-10,green',
-    #     ]
+        msg = [
+            'false, 100,  inf,     red',
+            'true,  200,  6.5,     blue',
+            'True,  -234, 3.2e-10, green',
+        ]
 
-    #     dtypes0 = [bool, int, None, str]
-    #     post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
-    #     self.assertEqual([a.dtype.kind for a in post0],
-    #             ['b', 'i', 'f', 'U'])
+        post0 = delimited_to_arrays(msg, dtypes=None, axis=1)
+        # import ipdb; ipdb.set_trace()
+        self.assertEqual([a.dtype.kind for a in post0],
+                ['b', 'i', 'f', 'U'])
 
-    #     self.assertEqual([a.tolist() for a in post0],
-    #                 [[False, True, True],
-    #                 [100, 200, -234],
-    #                 [np.inf, 6.5, 3.2e-10],
-    #                 ['red', 'blue', 'green']])
+        self.assertEqual([a.tolist() for a in post0],
+                    [[False, True, True],
+                    [100, 200, -234],
+                    [np.inf, 6.5, 3.2e-10],
+                    ['red', 'blue', 'green']])
 
 
 

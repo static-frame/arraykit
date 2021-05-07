@@ -2441,22 +2441,10 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
 
-    //
-    // bool *type_parse_active = (bool*)PyMem_Malloc(sizeof(bool) * PySequence_Length(dtypes));
-
-    // PyObject* dtype_iter = PyObject_GetIter(dtypes);
-    // if (dtype_iter == NULL) {
-    //     AK_DR_Free(dr);
-    //     return NULL;
-    // }
-
-    // PyObject* dtype_specifier;
-    // Py_ssize_t pos = 0;
-    // while ((dtype_specifier = PyIter_Next(dtype_iter))) {
-    //     type_parse_active[pos] = dtype_specifier == Py_None;
-    //     ++pos;
-    // }
-
+    if (dtypes == Py_None) {
+        // Py_DECREF(dtypes); not sure if this is needed
+        dtypes = NULL;
+    }
     Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
 
