@@ -10,17 +10,17 @@
 //------------------------------------------------------------------------------
 // Macros
 //------------------------------------------------------------------------------
+// Py_UNREACHABLE() isn't available in Python 3.6:
+# ifndef Py_UNREACHABLE
+# define Py_UNREACHABLE() Py_FatalError("https://xkcd.com/2200")
+# endif
 
 // Bug in NumPy < 1.16 (https://github.com/numpy/numpy/pull/12131):
 # undef PyDataType_ISBOOL
 # define PyDataType_ISBOOL(obj) \
     PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
 
-// Py_UNREACHABLE() isn't available in Python 3.6:
-# ifndef Py_UNREACHABLE
-# define Py_UNREACHABLE() Py_FatalError("https://xkcd.com/2200")
-# endif
-
+//------------------------------------------------------------------------------
 // Given a PyObject, raise if not an array.
 # define AK_CHECK_NUMPY_ARRAY(O)                                              \
     if (!PyArray_Check(O)) {                                                  \
@@ -206,7 +206,7 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 #define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
 
 //------------------------------------------------------------------------------
-typedef enum {
+typedef enum AK_TypeParserState {
     TPS_UNKNOWN,
     TPS_BOOL,
     TPS_INT,
@@ -615,6 +615,206 @@ AK_TP_ProcessField(AK_TypeParser* tp,
 }
 
 //------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------
+// UCS4 array processors
+
+static char* TRUE_LOWER = "true";
+static char* TRUE_UPPER = "TRUE";
+
+#define ERROR_NO_DIGITS 1
+#define ERROR_OVERFLOW 2
+#define ERROR_INVALID_CHARS 3
+
+// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c
+static inline npy_int64
+AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+{
+    char tsep = '\0'; // thousands seperator; if null processing is skipped
+    npy_int64 int_min = NPY_MIN_INT64;
+    npy_int64 int_max = NPY_MAX_INT64;
+    int isneg = 0;
+    npy_int64 number = 0;
+    int d;
+
+    Py_UCS4 *p = p_item;
+
+    while (AK_is_space(*p)) {
+        ++p;
+        if (p >= end) {return number;}
+    }
+    if (*p == '-') {
+        isneg = 1;
+        ++p;
+    } else if (*p == '+') {
+        ++p;
+    }
+    if (p >= end) {return number;}
+
+    // Check that there is a first digit.
+    if (!AK_is_digit(*p)) {
+        *error = ERROR_NO_DIGITS;
+        return 0;
+    }
+    if (isneg) {
+        // If number is greater than pre_min, at least one more digit can be processed without overflowing.
+        int dig_pre_min = -(int_min % 10);
+        npy_int64 pre_min = int_min / 10;
+        d = *p;
+        if (tsep != '\0') {
+            while (1) {
+                if (d == tsep) {
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                    continue;
+                } else if (!AK_is_digit(d)) {
+                    break;
+                }
+                if ((number > pre_min) ||
+                    ((number == pre_min) && (d - '0' <= dig_pre_min))) {
+                    number = number * 10 - (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        } else {
+            while (AK_is_digit(d)) {
+                if ((number > pre_min) ||
+                    ((number == pre_min) && (d - '0' <= dig_pre_min))) {
+                    number = number * 10 - (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        }
+    } else {
+        // If number is less than pre_max, at least one more digit can be processed without overflowing.
+        npy_int64 pre_max = int_max / 10;
+        int dig_pre_max = int_max % 10;
+        d = *p;
+        if (tsep != '\0') {
+            while (1) {
+                if (d == tsep) {
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                    continue;
+                } else if (!AK_is_digit(d)) {
+                    break;
+                }
+                if ((number < pre_max) ||
+                    ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                    number = number * 10 + (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        } else {
+            while (AK_is_digit(d)) {
+                if ((number < pre_max) ||
+                    ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                    number = number * 10 + (d - '0');
+                    ++p;
+                    if (p >= end) {return number;}
+                    d = *p;
+                } else {
+                    *error = ERROR_OVERFLOW;
+                    return 0;
+                }
+            }
+        }
+    }
+    *error = 0;
+    return number;
+}
+
+// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c
+static inline npy_uint64
+AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
+
+    char tsep = '\0'; // thousands seperator; if null processing is skipped
+
+    npy_uint64 pre_max = NPY_MAX_UINT64 / 10;
+    int dig_pre_max = NPY_MAX_UINT64 % 10;
+    npy_uint64 number = 0;
+    int d;
+
+    Py_UCS4 *p = p_item;
+    while (AK_is_space(*p)) {
+        ++p;
+        if (p >= end) {return number;}
+    }
+    if (*p == '-') {
+        *error = ERROR_INVALID_CHARS;
+        return 0;
+    } else if (*p == '+') {
+        p++;
+        if (p >= end) {return number;}
+    }
+
+    // Check that there is a first digit.
+    if (!AK_is_digit(*p)) {
+        *error = ERROR_NO_DIGITS;
+        return 0;
+    }
+    // If number is less than pre_max, at least one more digit can be processed without overflowing.
+    d = *p;
+    if (tsep != '\0') {
+        while (1) {
+            if (d == tsep) {
+                ++p;
+                if (p >= end) {return number;}
+                d = *p;
+                continue;
+            } else if (!AK_is_digit(d)) {
+                break;
+            }
+            if ((number < pre_max) ||
+                ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                number = number * 10 + (d - '0');
+                ++p;
+                if (p >= end) {return number;}
+                d = *p;
+            } else {
+                *error = ERROR_OVERFLOW;
+                return 0;
+            }
+        }
+    } else {
+        while (AK_is_digit(d)) {
+            if ((number < pre_max) ||
+                ((number == pre_max) && (d - '0' <= dig_pre_max))) {
+                number = number * 10 + (d - '0');
+                ++p;
+                if (p >= end) {return number;}
+                d = *p;
+            } else {
+                *error = ERROR_OVERFLOW;
+                return 0;
+            }
+        }
+    }
+    *error = 0;
+    return number;
+}
+
+
+
+
 //------------------------------------------------------------------------------
 // CodePointLine: Type, New, Destrctor
 
@@ -822,202 +1022,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 }
 
 //------------------------------------------------------------------------------
-// CodePointLine: Code Point Parsers
-
-static char* TRUE_LOWER = "true";
-static char* TRUE_UPPER = "TRUE";
-
-#define ERROR_NO_DIGITS 1
-#define ERROR_OVERFLOW 2
-#define ERROR_INVALID_CHARS 3
-
-// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c
-static inline npy_int64
-AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
-{
-    char tsep = '\0'; // thousands seperator; if null processing is skipped
-    npy_int64 int_min = NPY_MIN_INT64;
-    npy_int64 int_max = NPY_MAX_INT64;
-    int isneg = 0;
-    npy_int64 number = 0;
-    int d;
-
-    Py_UCS4 *p = p_item;
-
-    while (AK_is_space(*p)) {
-        ++p;
-        if (p >= end) {return number;}
-    }
-    if (*p == '-') {
-        isneg = 1;
-        ++p;
-    } else if (*p == '+') {
-        ++p;
-    }
-    if (p >= end) {return number;}
-
-    // Check that there is a first digit.
-    if (!AK_is_digit(*p)) {
-        *error = ERROR_NO_DIGITS;
-        return 0;
-    }
-    if (isneg) {
-        // If number is greater than pre_min, at least one more digit can be processed without overflowing.
-        int dig_pre_min = -(int_min % 10);
-        npy_int64 pre_min = int_min / 10;
-        d = *p;
-        if (tsep != '\0') {
-            while (1) {
-                if (d == tsep) {
-                    ++p;
-                    if (p >= end) {return number;}
-                    d = *p;
-                    continue;
-                } else if (!AK_is_digit(d)) {
-                    break;
-                }
-                if ((number > pre_min) ||
-                    ((number == pre_min) && (d - '0' <= dig_pre_min))) {
-                    number = number * 10 - (d - '0');
-                    ++p;
-                    if (p >= end) {return number;}
-                    d = *p;
-                } else {
-                    *error = ERROR_OVERFLOW;
-                    return 0;
-                }
-            }
-        } else {
-            while (AK_is_digit(d)) {
-                if ((number > pre_min) ||
-                    ((number == pre_min) && (d - '0' <= dig_pre_min))) {
-                    number = number * 10 - (d - '0');
-                    ++p;
-                    if (p >= end) {return number;}
-                    d = *p;
-                } else {
-                    *error = ERROR_OVERFLOW;
-                    return 0;
-                }
-            }
-        }
-    } else {
-        // If number is less than pre_max, at least one more digit can be processed without overflowing.
-        npy_int64 pre_max = int_max / 10;
-        int dig_pre_max = int_max % 10;
-        d = *p;
-        if (tsep != '\0') {
-            while (1) {
-                if (d == tsep) {
-                    ++p;
-                    if (p >= end) {return number;}
-                    d = *p;
-                    continue;
-                } else if (!AK_is_digit(d)) {
-                    break;
-                }
-                if ((number < pre_max) ||
-                    ((number == pre_max) && (d - '0' <= dig_pre_max))) {
-                    number = number * 10 + (d - '0');
-                    ++p;
-                    if (p >= end) {return number;}
-                    d = *p;
-                } else {
-                    *error = ERROR_OVERFLOW;
-                    return 0;
-                }
-            }
-        } else {
-            while (AK_is_digit(d)) {
-                if ((number < pre_max) ||
-                    ((number == pre_max) && (d - '0' <= dig_pre_max))) {
-                    number = number * 10 + (d - '0');
-                    ++p;
-                    if (p >= end) {return number;}
-                    d = *p;
-                } else {
-                    *error = ERROR_OVERFLOW;
-                    return 0;
-                }
-            }
-        }
-    }
-    *error = 0;
-    return number;
-}
-
-// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c
-static inline npy_uint64
-AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
-
-    char tsep = '\0'; // thousands seperator; if null processing is skipped
-
-    npy_uint64 pre_max = NPY_MAX_UINT64 / 10;
-    int dig_pre_max = NPY_MAX_UINT64 % 10;
-    npy_uint64 number = 0;
-    int d;
-
-    Py_UCS4 *p = p_item;
-    while (AK_is_space(*p)) {
-        ++p;
-        if (p >= end) {return number;}
-    }
-    if (*p == '-') {
-        *error = ERROR_INVALID_CHARS;
-        return 0;
-    } else if (*p == '+') {
-        p++;
-        if (p >= end) {return number;}
-    }
-
-    // Check that there is a first digit.
-    if (!AK_is_digit(*p)) {
-        *error = ERROR_NO_DIGITS;
-        return 0;
-    }
-    // If number is less than pre_max, at least one more digit can be processed without overflowing.
-    d = *p;
-    if (tsep != '\0') {
-        while (1) {
-            if (d == tsep) {
-                ++p;
-                if (p >= end) {return number;}
-                d = *p;
-                continue;
-            } else if (!AK_is_digit(d)) {
-                break;
-            }
-            if ((number < pre_max) ||
-                ((number == pre_max) && (d - '0' <= dig_pre_max))) {
-                number = number * 10 + (d - '0');
-                ++p;
-                if (p >= end) {return number;}
-                d = *p;
-            } else {
-                *error = ERROR_OVERFLOW;
-                return 0;
-            }
-        }
-    } else {
-        while (AK_is_digit(d)) {
-            if ((number < pre_max) ||
-                ((number == pre_max) && (d - '0' <= dig_pre_max))) {
-                number = number * 10 + (d - '0');
-                ++p;
-                if (p >= end) {return number;}
-                d = *p;
-            } else {
-                *error = ERROR_OVERFLOW;
-                return 0;
-            }
-        }
-    }
-    *error = 0;
-    return number;
-}
-
-
-
 // Set the internal field to the current field.
 static inline char*
 AK_CPL_current_to_field(AK_CodePointLine* cpl)
@@ -1043,7 +1047,6 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
 }
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
-// NP's Boolean conversion in genfromtxt: https://github.com/numpy/numpy/blob/0721406ede8b983b8689d8b70556499fc2aea28a/numpy/lib/_iotools.py#L386
 static inline bool
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     // must have at least 4 characters
@@ -1723,7 +1726,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 //------------------------------------------------------------------------------
 // AK_Dialect, based on _csv.c from CPython
 
-typedef enum {
+typedef enum AK_DialectQuoteStyle {
     QUOTE_MINIMAL,
     QUOTE_ALL,
     QUOTE_NONNUMERIC,
@@ -1735,7 +1738,7 @@ typedef struct AK_DialectStyleDesc{
     const char *name;
 } AK_DialectStyleDesc;
 
-static const AK_DialectStyleDesc quote_styles[] = {
+static const AK_DialectStyleDesc AK_Dialect_quote_styles[] = {
     { QUOTE_MINIMAL,    "QUOTE_MINIMAL" },
     { QUOTE_ALL,        "QUOTE_ALL" },
     { QUOTE_NONNUMERIC, "QUOTE_NONNUMERIC" },
@@ -1835,7 +1838,7 @@ static int
 AK_Dialect_check_quoting(int quoting)
 {
     const AK_DialectStyleDesc *qs;
-    for (qs = quote_styles; qs->name; qs++) {
+    for (qs = AK_Dialect_quote_styles; qs->name; qs++) {
         if ((int)qs->style == quoting)
             return 0;
     }
@@ -1857,12 +1860,12 @@ typedef struct AK_Dialect{
 
 
 // check types and convert to C values
-#define AK_CALL_WITH_GOTO(meth, name, target, src, default) \
+#define AK_Dialect_CALL_SETTER(meth, name, target, src, default) \
     if (meth(name, target, src, default)) \
-        goto err
+        goto error
 
 static AK_Dialect*
-AK_DialectNew(PyObject *delimiter,
+AK_Dialect_New(PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
         PyObject *lineterminator,
@@ -1886,46 +1889,70 @@ AK_DialectNew(PyObject *delimiter,
     Py_XINCREF(skipinitialspace);
     Py_XINCREF(strict);
 
-    AK_CALL_WITH_GOTO(AK_Dialect_set_char, "delimiter", &dialect->delimiter, delimiter, ',');
-    AK_CALL_WITH_GOTO(AK_Dialect_set_bool, "doublequote", &dialect->doublequote, doublequote, true);
-    AK_CALL_WITH_GOTO(AK_Dialect_set_char, "escapechar", &dialect->escapechar, escapechar, 0);
-    AK_CALL_WITH_GOTO(AK_Dialect_set_str,
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
+            "delimiter",
+            &dialect->delimiter,
+            delimiter,
+            ',');
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
+            "doublequote",
+            &dialect->doublequote,
+            doublequote,
+            true);
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
+            "escapechar",
+            &dialect->escapechar,
+            escapechar,
+            0);
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_str,
             "lineterminator",
             &dialect->lineterminator,
             lineterminator,
             "\r\n");
-    AK_CALL_WITH_GOTO(AK_Dialect_set_char, "quotechar", &dialect->quotechar, quotechar, '"');
-    AK_CALL_WITH_GOTO(AK_Dialect_set_int, "quoting", &dialect->quoting, quoting, QUOTE_MINIMAL);
-    AK_CALL_WITH_GOTO(AK_Dialect_set_bool,
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
+            "quotechar",
+            &dialect->quotechar,
+            quotechar,
+            '"');
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_int,
+            "quoting",
+            &dialect->quoting,
+            quoting,
+            QUOTE_MINIMAL);
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
             "skipinitialspace",
             &dialect->skipinitialspace,
             skipinitialspace,
             false);
-    AK_CALL_WITH_GOTO(AK_Dialect_set_bool, "strict", &dialect->strict, strict, false);
+    AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
+            "strict",
+            &dialect->strict,
+            strict,
+            false);
 
     /* validate options */
     if (AK_Dialect_check_quoting(dialect->quoting))
-        goto err;
+        goto error;
+
     if (dialect->delimiter == 0) {
         PyErr_SetString(PyExc_TypeError,
                 "\"delimiter\" must be a 1-character string");
-        goto err;
+        goto error;
     }
     if (quotechar == Py_None && quoting == NULL)
         dialect->quoting = QUOTE_NONE;
     if (dialect->quoting != QUOTE_NONE && dialect->quotechar == 0) {
         PyErr_SetString(PyExc_TypeError,
                "quotechar must be set if quoting enabled");
-        goto err;
+        goto error;
     }
     if (dialect->lineterminator == 0) {
         PyErr_SetString(PyExc_TypeError, "lineterminator must be set");
-        goto err;
+        goto error;
     }
     return dialect;
-err:
+error:
     Py_CLEAR(dialect);
-
     Py_CLEAR(delimiter);
     Py_CLEAR(doublequote);
     Py_CLEAR(escapechar);
@@ -1946,7 +1973,7 @@ AK_Dialect_Free(AK_Dialect* dialect)
 //------------------------------------------------------------------------------
 // AK_DelimitedReader, based on _csv.c from CPython
 
-typedef enum {
+typedef enum AK_DR_DelimitedReaderState {
     START_RECORD,
     START_FIELD,
     ESCAPED_CHAR,
@@ -1956,12 +1983,12 @@ typedef enum {
     QUOTE_IN_QUOTED_FIELD,
     EAT_CRNL,
     AFTER_ESCAPED_CRNL
-} AK_DR_ParserState;
+} AK_DR_DelimitedReaderState;
 
 typedef struct AK_DelimitedReader{
     PyObject *input_iter;   // iterate over this for input lines
     AK_Dialect *dialect;
-    AK_DR_ParserState state;          // current CSV parse state
+    AK_DR_DelimitedReaderState state;          // current CSV parse state
     Py_ssize_t field_len;
     Py_ssize_t line_number;
     Py_ssize_t field_number;
@@ -2270,7 +2297,7 @@ AK_DR_New(PyObject *iterable,
         return NULL;
     }
 
-    dr->dialect = AK_DialectNew(
+    dr->dialect = AK_Dialect_New(
             delimiter,
             doublequote,
             escapechar,
@@ -2384,7 +2411,7 @@ error:
 // AK module public methods
 //------------------------------------------------------------------------------
 
-static char *dtoa_kwarg_names[] = {
+static char *delimited_to_ararys_kwarg_names[] = {
     "file_like",
     "dtypes",
     "axis",
@@ -2417,7 +2444,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiOOOOOOOO:delimited_to_array", dtoa_kwarg_names,
+            "O|$OiOOOOOOOO:delimited_to_array",
+            delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only
             &dtypes,
