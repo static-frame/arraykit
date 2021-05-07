@@ -155,7 +155,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 }
 
 
-// Given a dtype_specifier, which might be a dtype, assign a fresh dtype object (or NULL) to dtype_returned. Returns 1 on success.
+// Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 1 on success. This will never set dtype_returned to None.
 static inline int
 AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 {
@@ -1534,11 +1534,11 @@ typedef struct AK_CodePointGrid {
     Py_ssize_t lines_count; // accumulated number of lines
     Py_ssize_t lines_capacity; // max number of lines
     AK_CodePointLine **lines; // array of pointers
-    bool *type_parse; // array of bools
+    PyObject *dtypes; // Sequence of bools
 } AK_CodePointGrid;
 
 AK_CodePointGrid*
-AK_CPG_New(bool *type_parse)
+AK_CPG_New(PyObject *dtypes)
 {
     AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
     cpg->lines_count = 0;
@@ -1546,7 +1546,7 @@ AK_CPG_New(bool *type_parse)
     cpg->lines = (AK_CodePointLine**)PyMem_Malloc(
             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
     // NOTE: initialize lines to NULL?
-    cpg->type_parse = type_parse;
+    cpg->dtypes = dtypes;
     return cpg;
 }
 
@@ -1557,6 +1557,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
+    Py_XDECREF(cpg->dtypes);
     PyMem_Free(cpg);
 }
 //------------------------------------------------------------------------------
@@ -1574,11 +1575,22 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     }
     // for now we assume sequential growth, so should only check if equal
     if (line >= cpg->lines_count) {
+        // determine if we need to parse types
+        bool type_parse = false;
+        if (!cpg->dtypes) {
+            type_parse = true;
+        }
+        else {
+            PyObject* dtype_specifier = PyList_GetItem(cpg->dtypes, line);
+            if (!dtype_specifier || dtype_specifier == Py_None) {
+                type_parse = true;
+            }
+        }
         // initialize a CPL in this position
-        // TODO: is type_parse of sufficient size?
-        cpg->lines[line] = AK_CPL_New(cpg->type_parse[line]);
+        cpg->lines[line] = AK_CPL_New(type_parse);
         ++cpg->lines_count;
     }
+
     return 1;
 }
 
@@ -1678,23 +1690,25 @@ PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
     return list;
 }
 
-PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg, PyObject* dtypes)
+PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
     PyObject* list = PyList_New(cpg->lines_count);
     // handle error
 
+    PyObject* dtypes = cpg->dtypes;
+
     for (int i = 0; i < cpg->lines_count; ++i) {
 
-        PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
-        if (!dtype_specifier) {
-            Py_DECREF(list);
-            return NULL;
+        // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
+        PyArray_Descr* dtype = NULL;
+        if (dtypes) {
+            PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
+            // Set dtype; this value can be NULL or a dtype (never Py_None)
+            AK_DTypeFromSpecifier(dtype_specifier, &dtype);
+            // TODO: handle error
         }
 
-        PyArray_Descr* dtype = NULL;
-        AK_DTypeFromSpecifier(dtype_specifier, &dtype);
-        // TODO: handle error
-
+        // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
 
         if (PyList_SetItem(list, i, array)) { // steals reference
@@ -2427,25 +2441,30 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
 
-    PyObject* dtype_iter = PyObject_GetIter(dtypes);
-    if (dtype_iter == NULL) {
-        AK_DR_Free(dr);
-        return NULL;
-    }
-    bool type_parse[PySequence_Length(dtypes)];
-    PyObject* dtype_specifier;
-    Py_ssize_t pos = 0;
-    while ((dtype_specifier = PyIter_Next(dtype_iter))) {
-        type_parse[pos] = dtype_specifier == Py_None;
-        ++pos;
-    }
+    //
+    // bool *type_parse_active = (bool*)PyMem_Malloc(sizeof(bool) * PySequence_Length(dtypes));
 
-    AK_CodePointGrid* cpg = AK_CPG_New(type_parse);
+    // PyObject* dtype_iter = PyObject_GetIter(dtypes);
+    // if (dtype_iter == NULL) {
+    //     AK_DR_Free(dr);
+    //     return NULL;
+    // }
+
+    // PyObject* dtype_specifier;
+    // Py_ssize_t pos = 0;
+    // while ((dtype_specifier = PyIter_Next(dtype_iter))) {
+    //     type_parse_active[pos] = dtype_specifier == Py_None;
+    //     ++pos;
+    // }
+
+    Py_XINCREF(dtypes);
+    AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
+
     while (AK_DR_ProcessLine(dr, cpg)); // check for -1
     AK_DR_Free(dr);
 
-    PyObject* arrays = AK_CPG_ToArrayList(cpg, dtypes);
-    AK_CPG_Free(cpg);
+    PyObject* arrays = AK_CPG_ToArrayList(cpg);
+    AK_CPG_Free(cpg); // will free reference to dtypes
 
     return arrays; // could be NULL
 }
