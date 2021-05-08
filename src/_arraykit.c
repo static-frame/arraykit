@@ -538,6 +538,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
     if (space || digit) {
         return true;
     }
+
     if (tp->last_sign_pos >= 0) { // initialized to -1
         pos_field -= tp->last_sign_pos + 1;
     }
@@ -548,6 +549,10 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
             else if (AK_is_f(c)) {--tp->count_bool;}
             else if (AK_is_n(c)) {++tp->count_nan;}
             else if (AK_is_i(c)) {++tp->count_inf;}
+            else if (!numeric) { // if not decimal, sign, e, j
+                tp->parsed_field = TPS_STRING;
+                return false;
+            }
             break;
         case 1:
             if      (AK_is_r(c)) {++tp->count_bool;} // true
@@ -556,20 +561,41 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
                 ++tp->count_nan;
                 }
             else if (AK_is_n(c)) {++tp->count_inf;}
+            else if (!numeric) {
+                tp->parsed_field = TPS_STRING;
+                return false;
+            }
             break;
         case 2:
             if      (AK_is_u(c)) {++tp->count_bool;}
             else if (AK_is_l(c)) {--tp->count_bool;}
             else if (AK_is_n(c)) {++tp->count_nan;}
             else if (AK_is_f(c)) {++tp->count_inf;}
+            else if (!numeric) {
+                tp->parsed_field = TPS_STRING;
+                return false;
+            }
             break;
         case 3:
             if      (AK_is_e(c)) {++tp->count_bool;} // true
             else if (AK_is_s(c)) {--tp->count_bool;} // false
+            else if (!numeric) {
+                tp->parsed_field = TPS_STRING;
+                return false;
+            }
             break;
         case 4:
             if      (AK_is_e(c)) {--tp->count_bool;} // false
+            else if (!numeric) {
+                tp->parsed_field = TPS_STRING;
+                return false;
+            }
             break;
+        default: // character positions > 4
+            if (!numeric) {
+                tp->parsed_field = TPS_STRING;
+                return false;
+            }
     }
     // continue processing
     return true;
@@ -926,6 +952,7 @@ typedef struct AK_CodePointLine{
 
     char *field;
     AK_TypeParser *type_parser;
+    bool type_parser_active;
 
 } AK_CodePointLine;
 
@@ -954,9 +981,11 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     if (type_parse) {
         // AK_DEBUG("AK_CodePointLin calling AK_TP_New()");
         cpl->type_parser = AK_TP_New();
+        cpl->type_parser_active = true;
     }
     else {
         cpl->type_parser = NULL;
+        cpl->type_parser_active = false;
     }
     return cpl;
 }
@@ -1019,13 +1048,13 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
         Py_UCS4* p = cpl->pos_current;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
-        bool run = true; // TODO: this can be cpl->type_parser_active bool
         for (; p < end; ++p) {
-            run = AK_TP_ProcessChar(cpl->type_parser, (char)*p, pos);
-            if (!run) {break;}
+            cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)*p, pos);
+            if (!cpl->type_parser_active) {break;}
             ++pos;
         }
         AK_TP_ProcessField(cpl->type_parser, element_length);
+        cpl->type_parser_active = true; // turn back on for next field
     }
 
     // read offset_count, then increment
@@ -1045,9 +1074,8 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (!AK_CPL_resize(cpl, 1)) {
         return -1;
     }
-    if (cpl->type_parser) {
-        // TODO: need to store and examine cpl->type_parser_active bool based on output of each call below
-        AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
+    if (cpl->type_parser && cpl->type_parser_active) {
+        cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
     *cpl->pos_current++ = p;
     ++cpl->buffer_count;
@@ -1063,6 +1091,7 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
     }
     if (cpl->type_parser) {
         AK_TP_ProcessField(cpl->type_parser, offset);
+        cpl->type_parser_active = true; // turn back on for next field
     }
     cpl->offsets[cpl->offsets_count++] = offset;
 

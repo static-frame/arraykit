@@ -204,6 +204,17 @@ class TypeField:
         if self.parsed_field != TypeResolved.IS_UNKNOWN:
             return 0
 
+         # 32 to 57; 65 to 85; 97 to 117 inclusive
+        # if ord(c) < 32 or ord(c) > 117: # less than space, greater than u
+        #     self.parsed_field = TypeResolved.IS_STRING
+        #     return 0
+        # if 57 < ord(c) < 65: # greater than 9, less than A
+        #     self.parsed_field = TypeResolved.IS_STRING
+        #     return 0
+        # if 85 < ord(c) < 97: # greater than U, less than a
+        #     self.parsed_field = TypeResolved.IS_STRING
+        #     return 0
+
         # evaluate space -------------------------------------------------------
         space = False
 
@@ -318,6 +329,9 @@ class TypeField:
                 self.count_nan += 1
             elif is_i(c):
                 self.count_inf += 1
+            elif not numeric:
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
 
         elif pos_field == 1:
             if is_r(c):
@@ -327,6 +341,9 @@ class TypeField:
                 self.count_nan += 1
             elif is_n(c):
                 self.count_inf += 1
+            elif not numeric:
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
 
         elif pos_field == 2:
             if is_u(c):
@@ -337,16 +354,29 @@ class TypeField:
                 self.count_nan += 1
             elif is_f(c):
                 self.count_inf += 1
+            elif not numeric:
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
 
         elif pos_field == 3:
             if is_e(c):
                 self.count_bool += 1
             if is_s(c):
                 self.count_bool -= 1
+            elif not numeric:
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
 
         elif pos_field == 4:
             if is_e(c):
                 self.count_bool -= 1
+            elif not numeric:
+                self.parsed_field = TypeResolved.IS_STRING
+                return 0
+
+        elif not numeric:
+            self.parsed_field = TypeResolved.IS_STRING
+            return 0
 
         # print(f'post: {c=} {pos=} {pos_field=} {numeric=} {self.previous_numeric=} {self.contiguous_numeric=} {self.last_sign_pos=} {self.count_nan=} {self.count_inf=} {self.count_notspace=}')
 
