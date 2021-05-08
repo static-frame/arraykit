@@ -1,39 +1,50 @@
 import sys
-import os
-import typing as tp
 
 import invoke
+
+
+
+ARTIFACTS = (
+    '*.egg-info',
+    '.hypothesis',
+    'build',
+    'dist',
+    'src/*.so'
+)
 
 
 @invoke.task
 def clean(context):
     '''Clean doc and build artifacts
     '''
-    context.run(f"{sys.executable} setup.py develop --uninstall", echo=True)
+    cmd = f'{sys.executable} -m pip uninstall --yes arraykit'
+    context.run(cmd, echo=True, pty=True)
 
-    for artifact in ("*.egg-info", "*.so", "build", "dist", ".hypothesis"):
-        context.run(f"rm -rf {artifact}", echo=True)
+    for artifact in sorted(ARTIFACTS):
+        context.run(f'rm -rf {artifact}', echo=True, pty=True)
 
-    # context.run("black .", echo=True)@task(clean)
 
-@invoke.task
+@invoke.task(clean)
 def build(context):
-    context.run(f"pip install -r requirements.txt", echo=True)
-    context.run(f"{sys.executable} setup.py develop", echo=True)
+    context.run('pip install -r requirements.txt', echo=True, pty=True)
+    context.run(f'{sys.executable} -m pip install .', echo=True, pty=True)
 
-@invoke.task(pre=(clean, build))
+
+@invoke.task(build)
 def test(context):
     cmd = 'pytest -s --color no --disable-pytest-warnings --tb=native'
-    context.run(cmd)
+    context.run(cmd, echo=True, pty=True)
 
-@invoke.task(pre=(clean, build))
+
+@invoke.task(build)
 def performance(context):
-    context.run(f"{sys.executable} performance/main.py", echo=True)
+    context.run(f'{sys.executable} -m performance', echo=True, pty=True)
 
-@invoke.task(pre=(clean, build))
+
+@invoke.task
 def lint(context):
     '''Run pylint static analysis.
     '''
-    context.run('pylint -f colorized test performance')
-
+    cmd = 'pylint -f colorized *.py performance src test'
+    context.run(cmd, echo=True, pty=True)
 

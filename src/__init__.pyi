@@ -4,6 +4,8 @@ import numpy as np  # type: ignore
 
 _T = tp.TypeVar('_T')
 
+__version__: str
+
 class ArrayGO:
 
     values: np.array
