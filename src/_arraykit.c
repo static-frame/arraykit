@@ -1030,7 +1030,7 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
 }
 
 // Given a PyUnicode PyObject, load the string content into the CPL
-int
+static inline int
 AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 {
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
@@ -1066,7 +1066,7 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 }
 
 // Add a single point to a line. This does not update offsets. This is valled when updating a character.
-int
+static inline int
 AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         Py_UCS4 p,
         Py_ssize_t pos)
@@ -1083,7 +1083,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
 }
 
 // Append to offsets. This does not update buffer lines. This is called when closing a field.
-int
+static inline int
 AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 {
     if (!AK_CPL_resize(cpl, 1)) {

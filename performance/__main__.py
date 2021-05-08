@@ -38,13 +38,12 @@ class Perf:
     NUMBER = 500_000
 
 
-#-------------------------------------------------------------------------------
-class DelimitedToArraysTypedPandas(Perf):
-    NUMBER = 20
-    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
+class FixtureFileLike:
+
     COUNT_ROW = 1_000
 
-    def pre(self):
+    def __init__(self):
         records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
         self.file_like_int = io.StringIO('\n'.join(records_int))
 
@@ -57,11 +56,29 @@ class DelimitedToArraysTypedPandas(Perf):
         records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
         self.file_like_float = io.StringIO('\n'.join(records_float))
 
+#-------------------------------------------------------------------------------
+class DelimitedToArraysTypedPandas(Perf, FixtureFileLike):
+    NUMBER = 10
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+    # COUNT_ROW = 1_000
+
+    # def pre(self):
+    #     records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_int = io.StringIO('\n'.join(records_int))
+
+    #     records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_bool = io.StringIO('\n'.join(records_bool))
+
+    #     records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_str = io.StringIO('\n'.join(records_str))
+
+    #     records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_float = io.StringIO('\n'.join(records_float))
+
 class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
     entry = staticmethod(delimited_to_arrays_ak)
 
     def pre(self):
-        super().pre()
         self.dtypes_int = [int] * 1000
         self.dtypes_bool = [bool] * 1000
         self.dtypes_str = [str] * 1000
@@ -90,7 +107,6 @@ class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
     entry = staticmethod(pandas.read_csv)
 
     def pre(self):
-        super().pre()
         self.dtypes_int = {i: int for i in range(1000)}
         self.dtypes_bool = {i: bool for i in range(1000)}
         self.dtypes_str = {i: object for i in range(1000)}
@@ -114,29 +130,28 @@ class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
 
 #-------------------------------------------------------------------------------
 
-class DelimitedToArraysParsedPandas(Perf):
-    NUMBER = 20
+class DelimitedToArraysParsedPandas(Perf, FixtureFileLike):
+    NUMBER = 10
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
     COUNT_ROW = 1_000
 
-    def pre(self):
-        records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
-        self.file_like_int = io.StringIO('\n'.join(records_int))
+    # def pre(self):
+    #     records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_int = io.StringIO('\n'.join(records_int))
 
-        records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
-        self.file_like_bool = io.StringIO('\n'.join(records_bool))
+    #     records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
-        records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
-        self.file_like_str = io.StringIO('\n'.join(records_str))
+    #     records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_str = io.StringIO('\n'.join(records_str))
 
-        records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
-        self.file_like_float = io.StringIO('\n'.join(records_float))
+    #     records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_float = io.StringIO('\n'.join(records_float))
 
 class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
     entry = staticmethod(delimited_to_arrays_ak)
 
     def pre(self):
-        super().pre()
         self.axis = 1
 
     def int_uniform(self):
@@ -160,8 +175,6 @@ class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
     import pandas
     entry = staticmethod(pandas.read_csv)
 
-    def pre(self):
-        super().pre()
 
     def int_uniform(self):
         self.file_like_int.seek(0)
@@ -183,29 +196,28 @@ class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
 
 
 #-------------------------------------------------------------------------------
-class DelimitedToArraysTypedGenft(Perf):
-    NUMBER = 20
+class DelimitedToArraysTypedGenft(Perf, FixtureFileLike):
+    NUMBER = 10
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
     COUNT_ROW = 1_000
 
-    def pre(self):
-        records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
-        self.file_like_int = io.StringIO('\n'.join(records_int))
+    # def pre(self):
+    #     records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_int = io.StringIO('\n'.join(records_int))
 
-        records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
-        self.file_like_bool = io.StringIO('\n'.join(records_bool))
+    #     records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
-        records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
-        self.file_like_str = io.StringIO('\n'.join(records_str))
+    #     records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_str = io.StringIO('\n'.join(records_str))
 
-        records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
-        self.file_like_float = io.StringIO('\n'.join(records_float))
+    #     records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_float = io.StringIO('\n'.join(records_float))
 
 class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
     entry = staticmethod(delimited_to_arrays_ak)
 
     def pre(self):
-        super().pre()
         self.dtypes_int = [int] * 1000
         self.dtypes_bool = [bool] * 1000
         self.dtypes_str = [str] * 1000
@@ -229,12 +241,9 @@ class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
         _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
 
 
-
 class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
     entry = staticmethod(np.genfromtxt)
 
-    def pre(self):
-        super().pre()
 
     def int_uniform(self):
         self.file_like_int.seek(0)
@@ -252,6 +261,67 @@ class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
         self.file_like_float.seek(0)
         _ = self.entry(self.file_like_float, delimiter=',', dtype=float)
 
+
+#-------------------------------------------------------------------------------
+class DelimitedToArraysParsedGenft(Perf, FixtureFileLike):
+    NUMBER = 10
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+    COUNT_ROW = 1_000
+
+    # def pre(self):
+    #     records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_int = io.StringIO('\n'.join(records_int))
+
+    #     records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_bool = io.StringIO('\n'.join(records_bool))
+
+    #     records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_str = io.StringIO('\n'.join(records_str))
+
+    #     records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
+    #     self.file_like_float = io.StringIO('\n'.join(records_float))
+
+class DelimitedToArraysParsedGenftAK(DelimitedToArraysParsedGenft):
+    entry = staticmethod(delimited_to_arrays_ak)
+
+    def pre(self):
+        self.axis = 1
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtypes=None, axis=self.axis)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtypes=None, axis=self.axis)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtypes=None, axis=self.axis)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtypes=None, axis=self.axis)
+
+
+class DelimitedToArraysParsedGenftREF(DelimitedToArraysParsedGenft):
+    entry = staticmethod(np.genfromtxt)
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, delimiter=',', dtype=None)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, delimiter=',', dtype=None)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, delimiter=',', dtype=None)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, delimiter=',', dtype=None)
 
 
 #-------------------------------------------------------------------------------
@@ -499,14 +569,15 @@ def main():
             results = {}
             for key, cls_runner in cls_map.items():
                 runner = cls_runner()
-                runner.pre()
+                if hasattr(runner, 'pre'):
+                    runner.pre()
                 f = getattr(runner, func_attr)
                 results[key] = timeit.timeit('f()',
                         globals=locals(),
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
-    width = 24
+    width = 28
     for record in records:
         print(''.join(
             (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
