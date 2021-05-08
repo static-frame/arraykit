@@ -874,12 +874,12 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
     // TODO: handle error
     cpl->buffer_count = 0;
-    cpl->buffer_capacity = 1024;
+    cpl->buffer_capacity = 2048;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
     // TODO: handle error
 
     cpl->offsets_count = 0;
-    cpl->offsets_capacity = 512;
+    cpl->offsets_capacity = 2048;
     cpl->offsets = (Py_ssize_t*)PyMem_Malloc(
             sizeof(Py_ssize_t) * cpl->offsets_capacity);
     // TODO: handle error
