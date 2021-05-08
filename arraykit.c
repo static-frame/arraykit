@@ -211,7 +211,7 @@ typedef enum AK_TypeParserState {
     TPS_BOOL,
     TPS_INT,
     TPS_FLOAT,
-    TPS_COMPLEX,
+    TPS_COMPLEX, // 4
     TPS_STRING,
     TPS_EMPTY
 } AK_TypeParserState;
@@ -515,12 +515,16 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
     return true;
 }
 
-// This private function is used by AK_TP_ProcessField to evalaute the state of the AK_TypeParser and determine the the resolved AK_TypeParserState.
+// This private function is used by AK_TP_ProcessField to evaluate the state of the AK_TypeParser and determine the the resolved AK_TypeParserState.
 AK_TypeParserState
 AK_TP_resolve_field(AK_TypeParser* tp,
         Py_ssize_t count)
 {
+    // AK_DEBUG("calling AK_TP_resolve_field, tp->parsed_field");
+    // AK_DEBUG_OBJ(PyLong_FromLong(tp->parsed_field));
+
     if (count == 0) {return TPS_EMPTY;}
+
 
     // if parsed_field was set in AK_TP_ProcessChar
     if (tp->parsed_field != TPS_UNKNOWN) {return tp->parsed_field;}
@@ -534,6 +538,7 @@ AK_TP_resolve_field(AK_TypeParser* tp,
 
     if (tp->contiguous_numeric) {
         if (tp->count_digit == 0) {return TPS_STRING;}
+        // AK_DEBUG("contiguous numeric");
 
         // int
         if (tp->count_j == 0 &&
@@ -566,6 +571,7 @@ AK_TP_resolve_field(AK_TypeParser* tp,
             if (tp->count_sign > 2 + tp->count_e) {
                 return TPS_STRING;
             }
+            // AK_DEBUG("found j == 1, returning complex");
             return TPS_COMPLEX;
         }
         // complex with parens (no j)
@@ -589,20 +595,47 @@ AK_TP_resolve_field(AK_TypeParser* tp,
         }
     }
     else if (tp->count_j == 1) {
-        if ((tp->count_nan == 3 || tp->count_nan == 6) &&
+        Py_ssize_t count_numeric = (tp->count_sign +
+                tp->count_decimal +
+                tp->count_e +
+                tp->count_j +
+                tp->count_digit);
+
+        // one inf and one nan
+        if (tp->count_nan == 3 && tp->count_inf == 3 &&
+                tp->count_sign + 7 == tp->count_not_space) {
+            return TPS_COMPLEX;
+        }
+        // one nan one number
+        if (tp->count_nan == 3 &&
+                tp->count_nan + count_numeric == tp->count_not_space) {
+            return TPS_COMPLEX;
+        }
+        // two nans
+        if (tp->count_nan == 6 &&
                 tp->count_sign + tp->count_nan + 1 == tp->count_not_space) {
             return TPS_COMPLEX;
         }
-        if ((tp->count_inf == 3 || tp->count_inf == 6) &&
+        // one inf one number
+        if (tp->count_inf == 3 &&
+                tp->count_inf + count_numeric == tp->count_not_space) {
+            return TPS_COMPLEX;
+        }
+        // two infs
+        if (tp->count_inf == 6 &&
                 tp->count_sign + tp->count_inf + 1 == tp->count_not_space) {
             return TPS_COMPLEX;
         }
     }
+    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_j));
+    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_inf));
+    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_sign));
+    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_not_space));
     return TPS_STRING; // default
 }
 
 
-// After field is complete, call AK_TP_ProcessField to evaluate and set the current parsed_line. This will be called for each field, updating the parsed_field values as this advances.
+// After field is complete, call AK_TP_ProcessField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called
 void
 AK_TP_ProcessField(AK_TypeParser* tp,
         Py_ssize_t count)

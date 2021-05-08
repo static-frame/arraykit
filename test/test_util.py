@@ -2,6 +2,10 @@ import unittest
 import datetime
 import numpy as np  # type: ignore
 
+from hypothesis import strategies as st
+from hypothesis import given
+
+
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
 from arraykit import shape_filter
@@ -312,6 +316,11 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(complex))
         self.assertEqual(a1.tolist(), [(-2+1.2j), (1.5+4.2j)])
 
+    def test_iterable_str_to_array_1d_complex_4(self) -> None:
+        a1 = iterable_str_to_array_1d(['(-0+infj)', '0j'], complex)
+        self.assertEqual(a1.dtype, np.dtype(complex))
+        self.assertEqual(a1.tolist(), [complex('-0+infj'), (0j)])
+
     # NOTE: this causes a seg fault
     # def test_iterable_str_to_array_1d_d4(self) -> None:
     #     with self.assertRaises(ValueError):
@@ -501,7 +510,8 @@ class TestUnit(unittest.TestCase):
 
 
 
-    def test_delimited_to_arrays_h(self) -> None:
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_parse_a(self) -> None:
 
         msg = [
             'false, 100,  inf,     red',
@@ -520,7 +530,59 @@ class TestUnit(unittest.TestCase):
                     [np.inf, 6.5, 3.2e-10],
                     ['     red', '     blue', ' green']])
 
+    def test_delimited_to_arrays_parse_b(self) -> None:
+        msg = ['0j', '(-0+infj)']
+        post = delimited_to_arrays(msg, dtypes=None, axis=1)
+        self.assertEqual([a.dtype.kind for a in post], ['c'])
 
+
+
+
+    #---------------------------------------------------------------------------
+
+    @given(st.lists(st.integers(), min_size=1, max_size=10))
+    def test_delimited_to_arrays_property_parse_a(self, v) -> None:
+        msg = [f'{x},{x}' for x in v]
+        post = delimited_to_arrays(msg, dtypes=None, axis=1)
+        self.assertEqual([a.dtype.kind for a in post],
+                ['i', 'i'])
+        # NOTE: there are some areas where this fails as we overflow and return zero:
+        # 9223372036854775808
+        # self.assertEqual(post[0].tolist(), v)
+
+    @given(st.lists(st.booleans(), min_size=1, max_size=10))
+    def test_delimited_to_arrays_property_parse_b(self, v) -> None:
+        msg = [f'{x},{x}' for x in v]
+        post = delimited_to_arrays(msg, dtypes=None, axis=1)
+        self.assertEqual([a.dtype.kind for a in post],
+                ['b', 'b'])
+        self.assertEqual(post[0].tolist(), v)
+
+    @given(st.lists(st.floats(), min_size=1, max_size=10))
+    def test_delimited_to_arrays_property_parse_c(self, v) -> None:
+        msg = [f'{x},{x}' for x in v]
+        post = delimited_to_arrays(msg, dtypes=None, axis=1)
+        self.assertEqual([a.dtype.kind for a in post],
+                ['f', 'f'])
+        # need to compare without NaNs
+
+    @given(st.lists(st.floats(allow_nan=False), min_size=1, max_size=10))
+    def test_delimited_to_arrays_property_parse_d(self, v) -> None:
+        msg = [f'{x},{x}' for x in v]
+        post = delimited_to_arrays(msg, dtypes=None, axis=1)
+        self.assertEqual([a.dtype.kind for a in post],
+                ['f', 'f'])
+        # need to compare without NaNs
+        self.assertEqual(post[0].tolist(), v)
+
+
+    # NOTE: this is not yet passing for all cases
+    @given(st.lists(st.complex_numbers(), min_size=2, max_size=10))
+    def test_delimited_to_arrays_property_parse_e(self, v) -> None:
+        msg = [f'{x},{x}' for x in v]
+        post = delimited_to_arrays(msg, dtypes=None, axis=1)
+        self.assertEqual([a.dtype.kind for a in post],
+                ['c', 'c'])
 
     #---------------------------------------------------------------------------
 

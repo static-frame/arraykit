@@ -616,11 +616,12 @@ class TestUnit(unittest.TestCase):
     def test_complex_i(self) -> None:
         self.assertEqual(TypeField().process_field('(inf+0j)'), TypeResolved.IS_COMPLEX)
 
-    def test_complex_j(self) -> None:
+    def test_complex_j1(self) -> None:
         self.assertEqual(TypeField().process_field('(-0+infj)'), TypeResolved.IS_COMPLEX)
 
-    def test_complex_j(self) -> None:
+    def test_complex_j2(self) -> None:
         self.assertEqual(TypeField().process_field('(-23e-10e)'), TypeResolved.IS_STRING)
+
 
     def test_complex_k(self) -> None:
         self.assertEqual(TypeField().process_field('(-23e-10j-34e-2)'), TypeResolved.IS_COMPLEX)
