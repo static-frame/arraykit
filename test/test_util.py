@@ -576,7 +576,6 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post[0].tolist(), v)
 
 
-    # NOTE: this is not yet passing for all cases
     @given(st.lists(st.complex_numbers(), min_size=2, max_size=10))
     def test_delimited_to_arrays_property_parse_e(self, v) -> None:
         msg = [f'{x},{x}' for x in v]

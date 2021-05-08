@@ -845,9 +845,6 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     return number;
 }
 
-
-
-
 //------------------------------------------------------------------------------
 // CodePointLine: Type, New, Destrctor
 
@@ -962,7 +959,7 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
         Py_UCS4* p = cpl->pos_current;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
-        bool run = true;
+        bool run = true; // TODO: this can be cpl->type_parser_active bool
         for (; p < end; ++p) {
             run = AK_TP_ProcessChar(cpl->type_parser, (char)*p, pos);
             if (!run) {break;}
@@ -989,6 +986,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         return -1;
     }
     if (cpl->type_parser) {
+        // TODO: need to store and examine cpl->type_parser_active bool based on output of each call below
         AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
     *cpl->pos_current++ = p;
