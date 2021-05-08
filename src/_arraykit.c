@@ -644,11 +644,11 @@ static PyMethodDef arraykit_methods[] =  {
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, "arraykit", NULL, -1, arraykit_methods,
+    PyModuleDef_HEAD_INIT, "_arraykit", NULL, -1, arraykit_methods,
 };
 
 PyObject *
-PyInit_arraykit(void)
+PyInit__arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
