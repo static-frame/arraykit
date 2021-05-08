@@ -35,8 +35,10 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
-0.1.3 dev
+0.1.3
 ............
+
+Redesigned package structure for inclusion of ``py.typed`` and ``__init__.pyi``.
 
 ``array_deepcopy`` now accepts kwargs and makes the ``memo`` dict optional.
 
