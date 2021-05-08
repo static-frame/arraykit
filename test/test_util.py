@@ -230,7 +230,8 @@ class TestUnit(unittest.TestCase):
         mutable = [3, 4, 5]
         a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo=memo)
-
+        self.assertIsNot(a1, a2)
+        self.assertTrue(id(mutable) in memo)
 
     def test_array_deepcopy_e(self) -> None:
         a1 = np.array((3, 4, 5))
