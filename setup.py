@@ -3,7 +3,7 @@ from setuptools import setup
 import numpy as np  # type: ignore
 
 
-AK_VERSION = '0.1.2'
+AK_VERSION = '0.1.3'
 
 
 def get_long_description() -> str:
@@ -21,9 +21,9 @@ setup(
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
     python_requires='>3.6.0',
-    install_requires=['numpy>=1.14.2'],
+    install_requires=['numpy>=1.16.5'],
     url='https://github.com/InvestmentSystems/arraykit',
-    author='Christopher Ariza, Brandt Bucher',
+    author='Christopher Ariza, Brandt Bucher, Charles Burkland',
     license='MIT',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[

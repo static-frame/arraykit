@@ -745,7 +745,7 @@ class TestUnit(unittest.TestCase):
         memo = {}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
         self.assertFalse(a2.flags.writeable)
         self.assertEqual(a1.dtype, a2.dtype)
@@ -755,7 +755,7 @@ class TestUnit(unittest.TestCase):
         memo = {}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
         self.assertIn(id(a1), memo)
         self.assertEqual(memo[id(a1)].tolist(), a2.tolist())
@@ -776,9 +776,9 @@ class TestUnit(unittest.TestCase):
         a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
 
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
-        self.assertNotEqual(id(a1[3]), id(a2[3]))
+        self.assertIsNot(a1[3], a2[3])
         self.assertFalse(a2.flags.writeable)
 
     def test_array_deepcopy_c2(self) -> None:
@@ -786,11 +786,31 @@ class TestUnit(unittest.TestCase):
         mutable = [np.nan]
         a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
-        self.assertNotEqual(id(a1[3]), id(a2[3]))
+        self.assertIsNot(a1[3], a2[3])
         self.assertFalse(a2.flags.writeable)
         self.assertIn(id(a1), memo)
+
+
+    def test_array_deepcopy_d(self) -> None:
+        memo = {}
+        mutable = [3, 4, 5]
+        a1 = np.array((None, 'foo', True, mutable))
+        a2 = array_deepcopy(a1, memo=memo)
+        self.assertIsNot(a1, a2)
+        self.assertTrue(id(mutable) in memo)
+
+    def test_array_deepcopy_e(self) -> None:
+        a1 = np.array((3, 4, 5))
+        with self.assertRaises(TypeError):
+            # memo argument must be a dictionary
+            a2 = array_deepcopy(a1, memo=None)
+
+    def test_array_deepcopy_f(self) -> None:
+        a1 = np.array((3, 4, 5))
+        a2 = array_deepcopy(a1)
+        self.assertNotEqual(id(a1), id(a2))
 
 
 if __name__ == '__main__':
