@@ -148,7 +148,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
-// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays. Related Numpy implementation: https://github.com/numpy/numpy/blob/a14c41264855e44ebd6187d7541b5b8d59bb32cb/numpy/core/src/multiarray/methods.c#L1557
+// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays.
 PyObject*
 AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
 {
