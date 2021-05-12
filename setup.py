@@ -3,7 +3,7 @@ from setuptools import setup
 import numpy as np  # type: ignore
 
 
-AK_VERSION = '0.1.3'
+AK_VERSION = '0.1.4'
 
 
 def get_long_description() -> str:
