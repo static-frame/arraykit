@@ -4,7 +4,7 @@ from numpy.distutils.misc_util import get_info
 import numpy as np  # type: ignore
 
 
-AK_VERSION = '0.1.2'
+AK_VERSION = '0.1.4'
 
 
 def get_long_description() -> str:
@@ -22,8 +22,8 @@ additional_info['include_dirs'] = [np.get_include()] + additional_info['include_
 additional_info['define_macros'] = [("AK_VERSION", AK_VERSION)] + additional_info['define_macros']
 
 ak_extension = Extension(
-        name='arraykit',
-        sources=['arraykit.c'],
+        name='arraykit._arraykit', # build into module
+        sources=['src/_arraykit.c'],
         **additional_info,
 )
 
@@ -33,9 +33,9 @@ setup(
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
     python_requires='>3.6.0',
-    install_requires=['numpy>=1.14.2'],
+    install_requires=['numpy>=1.16.5'],
     url='https://github.com/InvestmentSystems/arraykit',
-    author='Christopher Ariza, Brandt Bucher',
+    author='Christopher Ariza, Brandt Bucher, Charles Burkland',
     license='MIT',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -51,8 +51,9 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='numpy array',
-    packages=[''],
-    package_data={'': ['arraykit.pyi', 'py.typed']},
+    packages=['arraykit'],
+    package_dir={'arraykit': 'src'},
+    package_data={'arraykit': ['__init__.pyi', 'py.typed']},
     include_package_data=True,
     ext_modules=[ak_extension],
 )
