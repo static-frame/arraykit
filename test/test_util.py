@@ -1,4 +1,6 @@
+import datetime
 import unittest
+import itertools
 
 import numpy as np  # type: ignore
 
@@ -11,6 +13,7 @@ from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
+from arraykit import isna_element
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -224,7 +227,6 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a2.flags.writeable)
         self.assertIn(id(a1), memo)
 
-
     def test_array_deepcopy_d(self) -> None:
         memo = {}
         mutable = [3, 4, 5]
@@ -244,9 +246,60 @@ class TestUnit(unittest.TestCase):
         a2 = array_deepcopy(a1)
         self.assertNotEqual(id(a1), id(a2))
 
+    def test_isna_element_true(self) -> None:
+        class FloatSubclass(float): pass
+        class ComplexSubclass(complex): pass
+
+        self.assertTrue(isna_element(np.datetime64('NaT')))
+        self.assertTrue(isna_element(np.timedelta64('NaT')))
+
+        nan = np.nan
+        complex_nans = [
+                complex(nan, 0),
+                complex(-nan, 0),
+                complex(0, nan),
+                complex(0, -nan),
+        ]
+
+        float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
+        if hasattr(np, 'float128'):
+            float_classes.append(np.float128)
+
+        cfloat_classes = [complex, np.complex64, np.complex128, ComplexSubclass]
+        if hasattr(np, 'complex256'):
+            cfloat_classes.append(np.complex256)
+
+        for float_class in float_classes:
+            self.assertTrue(isna_element(float_class(nan)))
+            self.assertTrue(isna_element(float_class(-nan)))
+
+        for cfloat_class in cfloat_classes:
+            for complex_nan in complex_nans:
+                self.assertTrue(isna_element(cfloat_class(complex_nan)))
+
+        self.assertTrue(isna_element(float('NaN')))
+        self.assertTrue(isna_element(-float('NaN')))
+        self.assertTrue(isna_element(None))
+
+    def test_isna_element_false(self) -> None:
+        # Test a wide range of float values, with different precision, across types
+        for val in (
+                1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
+            ):
+            for sign in (1, -1):
+                for ctor in (np.float16, np.float32, np.float64, float):
+                    self.assertFalse(isna_element(ctor(sign * val)))
+
+                if hasattr(np, 'float128'):
+                    self.assertFalse(isna_element(np.float128(sign * val)))
+
+        self.assertFalse(isna_element(1))
+        self.assertFalse(isna_element('str'))
+        self.assertFalse(isna_element(np.datetime64('2020-12-31')))
+        self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
+        self.assertFalse(isna_element(False))
+
 
 if __name__ == '__main__':
     unittest.main()
-
-
 
