@@ -472,7 +472,7 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
             return NULL;
         }
         if (len == 0) {
-            return PyTuple_Pack(3, Py_False, Py_False, values);
+            return PyTuple_Pack(3, Py_None, Py_False, values);
         }
     }
 
@@ -591,27 +591,30 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
         goto failure;
     }
 
-    PyObject *is_object_obj = PyBool_FromLong(is_object);
-    if (!is_object_obj) {
-        goto failure;
+    PyObject *resolved = NULL;
+    if (is_object) {
+        resolved = PyArray_DescrFromType(NPY_OBJECT);
+    } else {
+        resolved = Py_None;
     }
+    Py_INCREF(resolved);
 
     PyObject *is_tuple_obj = PyBool_FromLong(has_tuple);
     if (!is_tuple_obj) {
-        Py_DECREF(is_object_obj);
+        Py_DECREF(resolved);
         goto failure;
     }
 
     if (copy_values) {
-        PyObject *ret = PyTuple_Pack(3, is_object_obj, is_tuple_obj, copied_values);
-        Py_DECREF(is_object_obj);
+        PyObject *ret = PyTuple_Pack(3, resolved, is_tuple_obj, copied_values);
+        Py_DECREF(resolved);
         Py_DECREF(is_tuple_obj);
         Py_DECREF(copied_values);
         return ret;
     }
 
-    PyObject *ret = PyTuple_Pack(3, is_object_obj, is_tuple_obj, values);
-    Py_DECREF(is_object_obj);
+    PyObject *ret = PyTuple_Pack(3, resolved, is_tuple_obj, values);
+    Py_DECREF(resolved);
     Py_DECREF(is_tuple_obj);
     return ret;
 

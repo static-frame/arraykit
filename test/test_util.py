@@ -20,8 +20,7 @@ from arraykit import isna_element
 
 from performance.reference.util import mloc as mloc_ref
 
-#from arraykit import prepare_iter_for_array
-from performance.reference.util import prepare_iter_for_array
+from arraykit import prepare_iter_for_array
 
 
 class TestUnit(unittest.TestCase):
