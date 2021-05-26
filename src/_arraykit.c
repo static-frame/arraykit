@@ -6,6 +6,8 @@
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 # include "numpy/arrayobject.h"
+# include "numpy/arrayscalars.h"
+# include "numpy/halffloat.h"
 
 //------------------------------------------------------------------------------
 // Macros
@@ -149,7 +151,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
-// Numpy implementation: https://github.com/numpy/numpy/blob/a14c41264855e44ebd6187d7541b5b8d59bb32cb/numpy/core/src/multiarray/methods.c#L1557
+// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays.
 PyObject*
 AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
 {
@@ -157,14 +159,17 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
     if (!id) {
         return NULL;
     }
-    PyObject *found = PyDict_GetItemWithError(memo, id);
-    if (found) { // found will be NULL if not in dict
-        Py_INCREF(found); // got a borrowed ref, increment first
-        Py_DECREF(id);
-        return found;
-    }
-    else if (PyErr_Occurred()) {
-        goto error;
+
+    if (memo) {
+        PyObject *found = PyDict_GetItemWithError(memo, id);
+        if (found) { // found will be NULL if not in dict
+            Py_INCREF(found); // got a borrowed ref, increment first
+            Py_DECREF(id);
+            return found;
+        }
+        else if (PyErr_Occurred()) {
+            goto error;
+        }
     }
 
     // if dtype is object, call deepcopy with memo
@@ -188,14 +193,17 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
         }
     }
     else {
+        // if not a n object dtype, we will force a copy (even if this is an immutable array) so as to not hold on to any references
         Py_INCREF(dtype); // PyArray_FromArray steals a reference
         array_new = PyArray_FromArray(
                 array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
-        if (!array_new || PyDict_SetItem(memo, id, array_new)) {
-            Py_XDECREF(array_new);
-            goto error;
+        if (memo) {
+            if (!array_new || PyDict_SetItem(memo, id, array_new)) {
+                Py_XDECREF(array_new);
+                goto error;
+            }
         }
     }
     // set immutable
@@ -312,20 +320,25 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 //------------------------------------------------------------------------------
 // array utility
 
-// Specialized array deepcopy that stores immutable arrays in memo dict.
+static char *array_deepcopy_kwarg_names[] = {
+    "array",
+    "memo",
+    NULL
+};
+
+// Specialized array deepcopy that stores immutable arrays in an optional memo dict that can be provided with kwargs.
 static PyObject *
-array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args)
+array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
-    PyObject *array, *memo;
-    if (!PyArg_UnpackTuple(args, "array_deepcopy", 2, 2, &array, &memo)) {
+    PyObject *array;
+    PyObject *memo = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|O!:array_deepcopy", array_deepcopy_kwarg_names,
+            &array,
+            &PyDict_Type, &memo)) {
         return NULL;
     }
     AK_CHECK_NUMPY_ARRAY(array);
-    if (!PyDict_CheckExact(memo)) {
-        PyErr_Format(PyExc_TypeError, "expected a dict (got %s)",
-                Py_TYPE(memo)->tp_name);
-        return NULL;
-    }
     return AK_ArrayDeepCopy((PyArrayObject*)array, memo);
 }
 
@@ -614,6 +627,70 @@ failure:
 }
 
 //------------------------------------------------------------------------------
+// general utility
+
+static PyObject *
+isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    // None
+    if (arg == Py_None) {
+        Py_RETURN_TRUE;
+    }
+
+    // NaN
+    if (PyFloat_Check(arg)) {
+        return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
+    }
+    if (PyArray_IsScalar(arg, Half)) {
+        return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(arg, Half)));
+    }
+    if (PyArray_IsScalar(arg, Float32)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+    }
+    if (PyArray_IsScalar(arg, Float64)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float64)));
+    }
+    # ifdef PyFloat128ArrType_Type
+    if (PyArray_IsScalar(arg, Float128)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float128)));
+    }
+    # endif
+
+    // Complex NaN
+    if (PyComplex_Check(arg)) {
+        Py_complex val = ((PyComplexObject*)arg)->cval;
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    if (PyArray_IsScalar(arg, Complex64)) {
+        npy_cfloat val = PyArrayScalar_VAL(arg, Complex64);
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    if (PyArray_IsScalar(arg, Complex128)) {
+        npy_cdouble val = PyArrayScalar_VAL(arg, Complex128);
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    # ifdef PyComplex256ArrType_Type
+    if (PyArray_IsScalar(arg, Complex256)) {
+        npy_clongdouble val = PyArrayScalar_VAL(arg, Complex256);
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    # endif
+
+    // NaT - Datetime
+    if (PyArray_IsScalar(arg, Datetime)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Datetime) == NPY_DATETIME_NAT);
+    }
+
+    // NaT - Timedelta
+    if (PyArray_IsScalar(arg, Timedelta)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT);
+    }
+
+    Py_RETURN_FALSE;
+}
+
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -887,20 +964,24 @@ static PyMethodDef arraykit_methods[] =  {
     {"column_2d_filter", column_2d_filter, METH_O, NULL},
     {"column_1d_filter", column_1d_filter, METH_O, NULL},
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
-    {"array_deepcopy", array_deepcopy, METH_VARARGS, NULL},
+    {"array_deepcopy",
+            (PyCFunction)array_deepcopy,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"is_gen_copy_values", is_gen_copy_values, METH_O, NULL},
     {"prepare_iter_for_array", (PyCFunction)prepare_iter_for_array, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"isna_element", isna_element, METH_O, NULL},
     {NULL},
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, "arraykit", NULL, -1, arraykit_methods,
+    PyModuleDef_HEAD_INIT, "_arraykit", NULL, -1, arraykit_methods,
 };
 
 PyObject *
-PyInit_arraykit(void)
+PyInit__arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
