@@ -1,8 +1,11 @@
 import typing as tp
+from enum import Enum # type: ignore
+from automap import FrozenAutoMap
 
 import numpy as np  # type: ignore
 
 _T = tp.TypeVar('_T')
+_DtypeSpecifier = tp.Optional[tp.Union[str, np.dtype, type]]
 
 __version__: str
 
@@ -35,4 +38,4 @@ def is_gen_copy_values(__values: tp.Iterable[tp.Any]) -> tp.Tuple[bool, bool]: .
 def prepare_iter_for_array(
         __values: tp.Iterable[tp.Any],
         restrict_copy: bool = ...,
-        ) -> tp.Tuple[DtypeSpecifier, bool, tp.Sequence[tp.Any]]: ...
+        ) -> tp.Tuple[_DtypeSpecifier, bool, tp.Sequence[tp.Any]]: ...
