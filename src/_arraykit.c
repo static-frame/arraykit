@@ -371,16 +371,16 @@ typedef enum IsGenCopyValues {
 } IsGenCopyValues;
 
 static IsGenCopyValues
-AK_is_gen_copy_values(PyObject *arg, PyObject *frozenAutoMap)
+AK_is_gen_copy_values(PyObject *values, PyObject *frozenAutoMap)
 {
-    if(PyObject_HasAttrString(arg, "__len__")) {
-        if (PySet_Check(arg) || PyDict_Check(arg) ||
-            PyDictValues_Check(arg) || PyDictKeys_Check(arg))
+    if(PyObject_HasAttrString(values, "__len__")) {
+        if (PySet_Check(values) || PyDict_Check(values) ||
+            PyDictValues_Check(values) || PyDictKeys_Check(values))
         {
             return NOT_GEN_COPY;
         }
 
-        switch (PyObject_IsInstance(arg, frozenAutoMap))
+        switch (PyObject_IsInstance(values, frozenAutoMap))
         {
         case -1:
             return ERR;
@@ -492,7 +492,6 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     bool is_object = false;
     bool has_tuple = false;
     bool has_str = false;
-    bool has_enum = false;
     bool has_non_str = false;
     bool has_inexact = false;
     bool has_big_int = false;
@@ -525,16 +524,17 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
         }
 
         int enum_success = PyObject_IsInstance(item, enumClass);
-        if (enum_success == -1) {
+        if (-1 == enum_success) {
             goto iteration_failure;
         }
 
         // These three API calls always succeed.
         if (PyList_Check(item) || PyTuple_Check(item) || PyObject_HasAttrString(item, "__slots__")) {
             has_tuple = true;
+            is_object = true;
         }
         else if (enum_success) {
-            has_enum = true;
+            is_object = true;
         }
         // This API call always succeeds
         else if (PyUnicode_Check(item)) {
@@ -563,10 +563,7 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
             }
         }
 
-        if (has_tuple | has_enum | (has_str & has_non_str)) {
-            is_object = true;
-        }
-        else if (has_big_int & has_inexact) {
+        if ((has_str & has_non_str) | (has_big_int & has_inexact)) {
             is_object = true;
         }
 
