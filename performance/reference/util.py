@@ -31,6 +31,7 @@ def mloc(array: np.ndarray) -> int:
     '''
     return tp.cast(int, array.__array_interface__['data'][0])
 
+
 def immutable_filter(src_array: np.ndarray) -> np.ndarray:
     '''Pass an immutable array; otherwise, return an immutable copy of the provided array.
     '''
@@ -39,6 +40,7 @@ def immutable_filter(src_array: np.ndarray) -> np.ndarray:
         dst_array.flags.writeable = False
         return dst_array
     return src_array # keep it as is
+
 
 def name_filter(name):
     '''
@@ -51,7 +53,6 @@ def name_filter(name):
     return name
 
 
-
 def shape_filter(array: np.ndarray) -> tp.Tuple[int, int]:
     '''Represent a 1D array as a 2D array with length as rows of a single-column array.
 
@@ -62,6 +63,7 @@ def shape_filter(array: np.ndarray) -> tp.Tuple[int, int]:
         return array.shape[0], 1
     return array.shape #type: ignore
 
+
 def column_2d_filter(array: np.ndarray) -> np.ndarray:
     '''Reshape a flat ndim 1 array into a 2D array with one columns and rows of length. This is used (a) for getting string representations and (b) for using np.concatenate and np binary operators on 1D arrays.
     '''
@@ -69,6 +71,7 @@ def column_2d_filter(array: np.ndarray) -> np.ndarray:
     if array.ndim == 1:
         return np.reshape(array, (array.shape[0], 1))
     return array
+
 
 def column_1d_filter(array: np.ndarray) -> np.ndarray:
     '''
@@ -78,6 +81,7 @@ def column_1d_filter(array: np.ndarray) -> np.ndarray:
         # could assert that array.shape[1] == 1, but this will raise if does not fit
         return np.reshape(array, array.shape[0])
     return array
+
 
 def row_1d_filter(array: np.ndarray) -> np.ndarray:
     '''
@@ -142,6 +146,7 @@ def resolve_dtype(dt1: np.dtype, dt2: np.dtype) -> np.dtype:
     # if not a string or an object, can use result type
     return np.result_type(dt1, dt2)
 
+
 def resolve_dtype_iter(dtypes: tp.Iterable[np.dtype]) -> np.dtype:
     '''Given an iterable of one or more dtypes, do pairwise comparisons to determine compatible overall type. Once we get to object we can stop checking and return object.
 
@@ -156,7 +161,6 @@ def resolve_dtype_iter(dtypes: tp.Iterable[np.dtype]) -> np.dtype:
         if dt_resolve == DTYPE_OBJECT:
             return dt_resolve
     return dt_resolve
-
 
 
 def array_deepcopy(
@@ -181,3 +185,17 @@ def array_deepcopy(
     if memo is not None:
         memo[ident] = post
     return post
+
+
+def isna_element(value: tp.Any) -> bool:
+    '''Return Boolean if value is an NA. This does not yet handle pd.NA
+    '''
+    try:
+        return np.isnan(value) #type: ignore
+    except TypeError:
+        pass
+
+    if isinstance(value, (np.datetime64, np.timedelta64)):
+        return np.isnat(value) #type: ignore
+
+    return value is None

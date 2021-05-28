@@ -29,11 +29,17 @@ Dependencies
 ArrayKit requires the following:
 
 - Python >= 3.6
-- NumPy >= 1.16.5
+- NumPy >= 1.17.4
 
 
 What is New in ArrayKit
 -------------------------
+
+0.1.5
+............
+
+Added ``isna_element()``.
+
 
 0.1.3
 ............

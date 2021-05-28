@@ -6,6 +6,8 @@
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 # include "numpy/arrayobject.h"
+# include "numpy/arrayscalars.h"
+# include "numpy/halffloat.h"
 
 //------------------------------------------------------------------------------
 // Macros
@@ -153,6 +155,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     Py_DECREF(iterator);
     return resolved;
 }
+
 
 // Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays.
 PyObject*
@@ -2206,6 +2209,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             break;
         /*fallthru*/
 
+
     case IN_FIELD: /* in unquoted field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
@@ -2720,6 +2724,69 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
+// general utility
+
+static PyObject *
+isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    // None
+    if (arg == Py_None) {
+        Py_RETURN_TRUE;
+    }
+
+    // NaN
+    if (PyFloat_Check(arg)) {
+        return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
+    }
+    if (PyArray_IsScalar(arg, Half)) {
+        return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(arg, Half)));
+    }
+    if (PyArray_IsScalar(arg, Float32)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+    }
+    if (PyArray_IsScalar(arg, Float64)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float64)));
+    }
+    # ifdef PyFloat128ArrType_Type
+    if (PyArray_IsScalar(arg, Float128)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float128)));
+    }
+    # endif
+
+    // Complex NaN
+    if (PyComplex_Check(arg)) {
+        Py_complex val = ((PyComplexObject*)arg)->cval;
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    if (PyArray_IsScalar(arg, Complex64)) {
+        npy_cfloat val = PyArrayScalar_VAL(arg, Complex64);
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    if (PyArray_IsScalar(arg, Complex128)) {
+        npy_cdouble val = PyArrayScalar_VAL(arg, Complex128);
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    # ifdef PyComplex256ArrType_Type
+    if (PyArray_IsScalar(arg, Complex256)) {
+        npy_clongdouble val = PyArrayScalar_VAL(arg, Complex256);
+        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+    }
+    # endif
+
+    // NaT - Datetime
+    if (PyArray_IsScalar(arg, Datetime)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Datetime) == NPY_DATETIME_NAT);
+    }
+
+    // NaT - Timedelta
+    if (PyArray_IsScalar(arg, Timedelta)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT);
+    }
+
+    Py_RETURN_FALSE;
+}
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -3005,6 +3072,8 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
     // {"_test", _test, METH_O, NULL},
+    {"isna_element", isna_element, METH_O, NULL},
+
     {NULL},
 };
 
