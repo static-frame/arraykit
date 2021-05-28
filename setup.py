@@ -4,7 +4,7 @@ from numpy.distutils.misc_util import get_info
 import numpy as np  # type: ignore
 
 
-AK_VERSION = '0.1.4'
+AK_VERSION = '0.1.5'
 
 
 def get_long_description() -> str:
@@ -33,7 +33,7 @@ setup(
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
     python_requires='>3.6.0',
-    install_requires=['numpy>=1.16.5'],
+    install_requires=['numpy>=1.17.4'],
     url='https://github.com/InvestmentSystems/arraykit',
     author='Christopher Ariza, Brandt Bucher, Charles Burkland',
     license='MIT',
