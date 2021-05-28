@@ -1,5 +1,6 @@
 from setuptools import Extension  # type: ignore
 from setuptools import setup
+from numpy.distutils.misc_util import get_info
 import numpy as np  # type: ignore
 
 
@@ -14,6 +15,17 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 '''
 
+additional_info = get_info('npymath') # We need this for various numpy C math APIs to work
+
+# Update the dictionary to include configuration we want.
+additional_info['include_dirs'] = [np.get_include()] + additional_info['include_dirs']
+additional_info['define_macros'] = [("AK_VERSION", AK_VERSION)] + additional_info['define_macros']
+
+ak_extension = Extension(
+        name='arraykit._arraykit', # build into module
+        sources=['src/_arraykit.c'],
+        **additional_info,
+)
 
 setup(
     name='arraykit',
@@ -43,12 +55,5 @@ setup(
     package_dir={'arraykit': 'src'},
     package_data={'arraykit': ['__init__.pyi', 'py.typed']},
     include_package_data=True,
-    ext_modules=[
-        Extension(
-            name='arraykit._arraykit', # build into module
-            sources=['src/_arraykit.c'],
-            include_dirs=[np.get_include()],
-            define_macros=[('AK_VERSION', AK_VERSION)],
-        ),
-    ],
+    ext_modules=[ak_extension],
 )
