@@ -1657,7 +1657,7 @@ typedef struct AK_CodePointGrid {
     Py_ssize_t lines_count; // accumulated number of lines
     Py_ssize_t lines_capacity; // max number of lines
     AK_CodePointLine **lines; // array of pointers
-    PyObject *dtypes; // Sequence of bools
+    PyObject *dtypes; // a PyList of dtype objects
 } AK_CodePointGrid;
 
 AK_CodePointGrid*
@@ -1668,7 +1668,6 @@ AK_CPG_New(PyObject *dtypes)
     cpg->lines_capacity = 100;
     cpg->lines = (AK_CodePointLine**)PyMem_Malloc(
             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
-    // NOTE: initialize lines to NULL?
     cpg->dtypes = dtypes;
     return cpg;
 }
