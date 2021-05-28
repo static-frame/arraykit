@@ -580,7 +580,7 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
 
     PyObject *resolved = NULL;
     if (is_object) {
-        resolved = PyArray_DescrFromType(NPY_OBJECT);
+        resolved = (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
     } else {
         resolved = Py_None;
     }
