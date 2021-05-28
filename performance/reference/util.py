@@ -38,10 +38,8 @@ DICTLIKE_TYPES = (abc.Set, dict, FrozenAutoMap)
 # types have already been identified
 INVALID_ITERABLE_FOR_ARRAY = (abc.ValuesView, abc.KeysView)
 
-# integers above this value will occasionally, once coerced to a float (64 or 128)
-# in an NP array, will not match a hash lookup as a key in a dictionary;
-# an NP array of int or object will work
-INT_MAX_COERCIBLE_TO_FLOAT = 1_000_000_000_000_000
+# integers above this value will lose precision when coerced to a float
+INT_MAX_COERCIBLE_TO_FLOAT = 9_007_199_256_349_108
 
 
 def mloc(array: np.ndarray) -> int:

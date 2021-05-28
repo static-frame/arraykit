@@ -64,6 +64,8 @@
         fprintf(stderr, #msg);  \
     _AK_DEBUG_END()
 
+# define AK_INT_MAX_COERCIBLE_TO_FLOAT 9007199256349108l
+
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
 # define AK_UNLIKELY(X) __builtin_expect(!!(X), 0)
@@ -388,7 +390,7 @@ AK_is_gen_copy_values(PyObject *values, PyObject *frozenAutoMap)
         case 0:
             return NOT_GEN_NO_COPY;
 
-        default:
+        default: // 1
             return NOT_GEN_COPY;
         }
     }
@@ -464,7 +466,7 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    ssize_t len;
+    Py_ssize_t len;
 
     if (!is_gen) {
         len = PyObject_Size(values);
@@ -501,16 +503,9 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
         goto failure;
     }
 
-    PyObject *int_max_coercible_to_float = PyLong_FromLongLong(1000000000000000ll);
-    if (!int_max_coercible_to_float) {
-        Py_DECREF(enumClass);
-        goto failure;
-    }
-
     PyObject *iterator = PyObject_GetIter(values);
     if (!iterator) {
         Py_DECREF(enumClass);
-        Py_DECREF(int_max_coercible_to_float);
         goto failure;
     }
     PyObject *item = NULL;
@@ -518,59 +513,55 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     while ((item = PyIter_Next(iterator))) {
         if (copy_values) {
             if (-1 == PyList_Append(copied_values, item)) {
-                goto iteration_failure;
+                goto failure_during_iteration;
             }
             ++len;
         }
 
-        int enum_success = PyObject_IsInstance(item, enumClass);
-        if (-1 == enum_success) {
-            goto iteration_failure;
+        // This API call always succeeds.
+        if (PyUnicode_Check(item)) {
+            has_str = true;
         }
-
-        // These three API calls always succeed.
-        if (PyList_Check(item) || PyTuple_Check(item) || PyObject_HasAttrString(item, "__slots__")) {
+        else if (PyObject_HasAttrString(item, "__len__")) {
             has_tuple = true;
             is_object = true;
         }
-        else if (enum_success) {
-            is_object = true;
-        }
-        // This API call always succeeds
-        else if (PyUnicode_Check(item)) {
-            has_str = true;
-        }
         else {
-            has_non_str = true;
-
-            // These two API calls always succeed. 96% sure this catches np types
-            if (PyFloat_Check(item) || PyComplex_Check(item)) {
-                has_inexact = true;
+            int enum_success = PyObject_IsInstance(item, enumClass);
+            if (-1 == enum_success) {
+                goto failure_during_iteration;
             }
-            else if PyLong_Check(item) {
-                PyObject *abs_v = PyNumber_Absolute(item);
-                if (!abs_v) {
-                    goto iteration_failure;
-                }
+            else if (enum_success) {
+                is_object = true;
+            }
+            else {
+                has_non_str = true;
 
-                int success = PyObject_RichCompareBool(abs_v, int_max_coercible_to_float, Py_GT);
-                Py_DECREF(abs_v);
-                if (success == -1) {
-                    goto iteration_failure;
+                // These two API calls always succeed. 96% sure this catches np types
+                if (!has_inexact && (PyFloat_Check(item) || PyComplex_Check(item))) {
+                    has_inexact = true;
                 }
-
-                has_big_int |= success;
+                else if (!has_big_int && PyLong_Check(item)) {
+                    int overflow;
+                    npy_int64 item_val = PyLong_AsLongLongAndOverflow(item, &overflow);
+                    if (-1 == item_val) {
+                        if (PyErr_Occurred()) {
+                            goto failure_during_iteration;
+                        }
+                    }
+                    else {
+                        has_big_int |= (overflow != 0 || Py_ABS(item_val) > AK_INT_MAX_COERCIBLE_TO_FLOAT);
+                    }
+                }
             }
         }
 
-        if ((has_str & has_non_str) | (has_big_int & has_inexact)) {
-            is_object = true;
-        }
+        is_object |= (has_str && has_non_str) || (has_big_int && has_inexact);
 
         if (is_object) {
             if (copy_values) {
                 if (-1 == PyList_SetSlice(copied_values, len, len, iterator)) {
-                    goto iteration_failure;
+                    goto failure_during_iteration;
                 }
             }
             Py_DECREF(item);
@@ -582,7 +573,6 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
 
     Py_DECREF(iterator);
     Py_DECREF(enumClass);
-    Py_DECREF(int_max_coercible_to_float);
 
     if (PyErr_Occurred()) {
         goto failure;
@@ -615,9 +605,8 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     Py_DECREF(is_tuple_obj);
     return ret;
 
-iteration_failure:
+failure_during_iteration:
     Py_DECREF(enumClass);
-    Py_DECREF(int_max_coercible_to_float);
     Py_DECREF(iterator);
     Py_DECREF(item);
 

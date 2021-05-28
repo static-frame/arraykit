@@ -1,7 +1,6 @@
 import typing as tp
 import datetime
 import unittest
-import itertools
 
 from automap import FrozenAutoMap
 import numpy as np  # type: ignore
@@ -445,6 +444,14 @@ class TestPrepareIterUnit(unittest.TestCase):
         a0 = [0.0, 36_028_797_018_963_969]
         resolved, has_tuple, values = prepare_iter_for_array(a0)
         self.assertIsNotNone(resolved)
+
+        a1 = [0.0, 9_007_199_256_349_109]
+        resolved, has_tuple, values = prepare_iter_for_array(a1)
+        self.assertIsNotNone(resolved)
+
+        a2 = [0.0, 9_007_199_256_349_108]
+        resolved, has_tuple, values = prepare_iter_for_array(a2)
+        self.assertIsNone(resolved)
 
     def test_resolve_type_iter_k(self) -> None:
         resolved, has_tuple, values = prepare_iter_for_array((x for x in ())) #type: ignore

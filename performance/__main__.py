@@ -326,7 +326,7 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 #-------------------------------------------------------------------------------
 class IsGenCopyValues(Perf):
-    NUMBER = 1000
+    NUMBER = 2500
 
     def pre(self):
         self.objects = [
@@ -338,7 +338,7 @@ class IsGenCopyValues(Perf):
         ]
 
     def main(self):
-        for _ in range(100):
+        for _ in range(200):
             for obj in self.objects:
                 self.entry(obj)
 
