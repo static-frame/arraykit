@@ -35,6 +35,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.1.6
+............
+
+Explicit imports in __init__.py for better static analysis.
+
+
 0.1.5
 ............
 
