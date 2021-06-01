@@ -1,7 +1,6 @@
 import typing as tp
 from copy import deepcopy
 from collections import abc
-from enum import Enum
 from automap import FrozenAutoMap  # pylint: disable = E0611
 
 import numpy as np
@@ -288,10 +287,6 @@ def prepare_iter_for_array(
         elif hasattr(v, '__len__'):
             # identify SF types by if they have STATIC attr they also must be assigned after array creation, so we treat them like tuples
             has_tuple = True
-            resolved = object
-            break
-        elif isinstance(v, Enum):
-            # must check isinstance, as Enum types are always derived from Enum
             resolved = object
             break
         else:

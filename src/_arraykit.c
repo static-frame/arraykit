@@ -498,14 +498,8 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     bool has_inexact = false;
     bool has_big_int = false;
 
-    PyObject *enumClass = PyObject_GetAttrString(m, "Enum");
-    if (!enumClass) {
-        goto failure;
-    }
-
     PyObject *iterator = PyObject_GetIter(values);
     if (!iterator) {
-        Py_DECREF(enumClass);
         goto failure;
     }
     PyObject *item = NULL;
@@ -527,31 +521,22 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
             is_object = true;
         }
         else {
-            int enum_success = PyObject_IsInstance(item, enumClass);
-            if (-1 == enum_success) {
-                goto failure_during_iteration;
-            }
-            else if (enum_success) {
-                is_object = true;
-            }
-            else {
-                has_non_str = true;
+            has_non_str = true;
 
-                // These two API calls always succeed. 96% sure this catches np types
-                if (!has_inexact && (PyFloat_Check(item) || PyComplex_Check(item))) {
-                    has_inexact = true;
+            // These two API calls always succeed. 96% sure this catches np types
+            if (!has_inexact && (PyFloat_Check(item) || PyComplex_Check(item))) {
+                has_inexact = true;
+            }
+            else if (!has_big_int && PyLong_Check(item)) {
+                int overflow;
+                npy_int64 item_val = PyLong_AsLongLongAndOverflow(item, &overflow);
+                if (-1 == item_val) {
+                    if (PyErr_Occurred()) {
+                        goto failure_during_iteration;
+                    }
                 }
-                else if (!has_big_int && PyLong_Check(item)) {
-                    int overflow;
-                    npy_int64 item_val = PyLong_AsLongLongAndOverflow(item, &overflow);
-                    if (-1 == item_val) {
-                        if (PyErr_Occurred()) {
-                            goto failure_during_iteration;
-                        }
-                    }
-                    else {
-                        has_big_int |= (overflow != 0 || Py_ABS(item_val) > AK_INT_MAX_COERCIBLE_TO_FLOAT);
-                    }
+                else {
+                    has_big_int |= (overflow != 0 || Py_ABS(item_val) > AK_INT_MAX_COERCIBLE_TO_FLOAT);
                 }
             }
         }
@@ -572,7 +557,6 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     }
 
     Py_DECREF(iterator);
-    Py_DECREF(enumClass);
 
     if (PyErr_Occurred()) {
         goto failure;
@@ -606,7 +590,6 @@ prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
     return ret;
 
 failure_during_iteration:
-    Py_DECREF(enumClass);
     Py_DECREF(iterator);
     Py_DECREF(item);
 
@@ -991,30 +974,12 @@ PyInit__arraykit(void)
         return NULL;
     }
 
-    PyObject *enum_module = PyImport_ImportModule("enum");
-    if (!enum_module) {
-        Py_DECREF(frozenAutoMapClass);
-        Py_DECREF(m);
-        return NULL;
-    }
-
-    PyObject *enumClass = PyObject_GetAttrString(enum_module, "Enum");
-    Py_DECREF(enum_module);
-    if (!enumClass) {
-        Py_DECREF(frozenAutoMapClass);
-        Py_DECREF(enumClass);
-        Py_DECREF(m);
-        return NULL;
-    }
-
     if (PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
-        PyModule_AddObject(m, "FrozenAutoMap", frozenAutoMapClass) ||
-        PyModule_AddObject(m, "Enum", enumClass))
+        PyModule_AddObject(m, "FrozenAutoMap", frozenAutoMapClass))
     {
         Py_DECREF(frozenAutoMapClass);
-        Py_DECREF(enum_module);
         Py_DECREF(m);
         return NULL;
     }

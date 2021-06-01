@@ -1,5 +1,4 @@
 import typing as tp
-from enum import Enum # type: ignore
 from automap import FrozenAutoMap
 
 import numpy as np  # type: ignore

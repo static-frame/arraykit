@@ -3,7 +3,6 @@
 # pylint: disable=C0414
 
 from ._arraykit import __version__
-from ._arraykit import Enum as Enum
 from ._arraykit import FrozenAutoMap as FrozenAutoMap
 from ._arraykit import ArrayGO as ArrayGO
 from ._arraykit import immutable_filter as immutable_filter
