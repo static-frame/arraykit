@@ -407,10 +407,11 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // Bytes
     if (PyBytes_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_STRING);
-        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
-        if (!dtype) {
+        if (descr == NULL) {
             return NULL;
         }
+        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
+        Py_DECREF(descr);
         return dtype;
     }
 
