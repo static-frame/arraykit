@@ -365,7 +365,6 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 //------------------------------------------------------------------------------
 // general utility
 
-
 static PyObject *
 dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
@@ -392,17 +391,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
         return (PyObject*)PyArray_DescrFromType(NPY_BOOL);
     }
 
-    // -------------------------------------------------------------------------
-    // 2. Construct dtype (slightly more complicated)
-
     PyObject* dtype = NULL;
-
-    // Already known
-    dtype = PyObject_GetAttrString(arg, "dtype");
-    if (dtype) {
-        return dtype;
-    }
-    PyErr_Clear();
 
     // String
     if (PyUnicode_CheckExact(arg)) {
@@ -425,18 +414,19 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     }
 
     // -------------------------------------------------------------------------
+    // 2. Construct dtype (slightly more complicated)
+
+    // Already known
+    dtype = PyObject_GetAttrString(arg, "dtype");
+    if (dtype) {
+        return dtype;
+    }
+    PyErr_Clear();
+
+    // -------------------------------------------------------------------------
     // 3. Handles everything else.
-
-    // Is this check necessary? (i.e. can a non-object dtype get here?)
-    // dtype = (PyObject*)PyArray_DescrFromScalar(arg);
-    // if (!dtype) {
-    //     return NULL;
-    // }
-    // return dtype;
     return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
-
 }
-
 
 static PyObject *
 isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
