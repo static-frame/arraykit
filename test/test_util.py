@@ -304,16 +304,28 @@ class TestUnit(unittest.TestCase):
     def test_dtype_from_element(self) -> None:
         NT = collections.namedtuple('NT', tuple('abc'))
 
-        dtype_val_pairs = [
-                (np.longlong, -1),(np.int_, -1),(np.intc, -1),(np.short, -1),
-                (np.byte, -1),(np.ubyte, 1),(np.ushort, 1),(np.uintc, 1),
-                (np.uint, 1),(np.ulonglong, 1),(np.half, 1.0),(np.single, 1.0),
-                (np.float_, 1.0),(np.longfloat, 1.0),(np.csingle, 1.0j),
-                (np.complex_, 1.0j),(np.clongfloat, 1.0j),(np.bool_, 0),
+        dtypes = [
+                np.longlong,
+                np.int_,
+                np.intc,
+                np.short,
+                np.byte,
+                np.ubyte,
+                np.ushort,
+                np.uintc,
+                np.uint,
+                np.ulonglong,
+                np.half,
+                np.single,
+                np.float_,
+                np.longfloat,
+                np.csingle,
+                np.complex_,
+                np.clongfloat,
+                np.bool_,
         ]
-        for dtype, val in dtype_val_pairs:
-            obj = dtype(val)
-            self.assertEqual(dtype, dtype_from_element(obj))
+        for dtype in dtypes:
+            self.assertEqual(dtype, dtype_from_element(dtype()))
 
         dtype_obj_pairs = [
                 (np.dtype('<U1'), np.str_('1')),
@@ -355,4 +367,3 @@ class TestUnit(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
