@@ -396,10 +396,11 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // String
     if (PyUnicode_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_UNICODE);
-        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
-        if (!dtype) {
+        if (descr == NULL) {
             return NULL;
         }
+        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
+        Py_DECREF(descr);
         return dtype;
     }
 
