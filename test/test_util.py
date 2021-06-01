@@ -1,6 +1,7 @@
 import collections
 import datetime
 import unittest
+import itertools
 
 import numpy as np  # type: ignore
 
@@ -13,6 +14,7 @@ from arraykit import row_1d_filter
 from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
+from arraykit import isna_element
 from arraykit import dtype_from_element
 
 from performance.reference.util import mloc as mloc_ref
@@ -180,7 +182,7 @@ class TestUnit(unittest.TestCase):
         memo = {}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
         self.assertFalse(a2.flags.writeable)
         self.assertEqual(a1.dtype, a2.dtype)
@@ -190,7 +192,7 @@ class TestUnit(unittest.TestCase):
         memo = {}
         a2 = array_deepcopy(a1, memo)
 
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
         self.assertIn(id(a1), memo)
         self.assertEqual(memo[id(a1)].tolist(), a2.tolist())
@@ -211,9 +213,9 @@ class TestUnit(unittest.TestCase):
         a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
 
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
-        self.assertNotEqual(id(a1[3]), id(a2[3]))
+        self.assertIsNot(a1[3], a2[3])
         self.assertFalse(a2.flags.writeable)
 
     def test_array_deepcopy_c2(self) -> None:
@@ -221,11 +223,83 @@ class TestUnit(unittest.TestCase):
         mutable = [np.nan]
         a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
-        self.assertNotEqual(id(a1), id(a2))
+        self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
-        self.assertNotEqual(id(a1[3]), id(a2[3]))
+        self.assertIsNot(a1[3], a2[3])
         self.assertFalse(a2.flags.writeable)
         self.assertIn(id(a1), memo)
+
+    def test_array_deepcopy_d(self) -> None:
+        memo = {}
+        mutable = [3, 4, 5]
+        a1 = np.array((None, 'foo', True, mutable))
+        a2 = array_deepcopy(a1, memo=memo)
+        self.assertIsNot(a1, a2)
+        self.assertTrue(id(mutable) in memo)
+
+    def test_array_deepcopy_e(self) -> None:
+        a1 = np.array((3, 4, 5))
+        with self.assertRaises(TypeError):
+            # memo argument must be a dictionary
+            a2 = array_deepcopy(a1, memo=None)
+
+    def test_array_deepcopy_f(self) -> None:
+        a1 = np.array((3, 4, 5))
+        a2 = array_deepcopy(a1)
+        self.assertNotEqual(id(a1), id(a2))
+
+    def test_isna_element_true(self) -> None:
+        class FloatSubclass(float): pass
+        class ComplexSubclass(complex): pass
+
+        self.assertTrue(isna_element(np.datetime64('NaT')))
+        self.assertTrue(isna_element(np.timedelta64('NaT')))
+
+        nan = np.nan
+        complex_nans = [
+                complex(nan, 0),
+                complex(-nan, 0),
+                complex(0, nan),
+                complex(0, -nan),
+        ]
+
+        float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
+        if hasattr(np, 'float128'):
+            float_classes.append(np.float128)
+
+        cfloat_classes = [complex, np.complex64, np.complex128, ComplexSubclass]
+        if hasattr(np, 'complex256'):
+            cfloat_classes.append(np.complex256)
+
+        for float_class in float_classes:
+            self.assertTrue(isna_element(float_class(nan)))
+            self.assertTrue(isna_element(float_class(-nan)))
+
+        for cfloat_class in cfloat_classes:
+            for complex_nan in complex_nans:
+                self.assertTrue(isna_element(cfloat_class(complex_nan)))
+
+        self.assertTrue(isna_element(float('NaN')))
+        self.assertTrue(isna_element(-float('NaN')))
+        self.assertTrue(isna_element(None))
+
+    def test_isna_element_false(self) -> None:
+        # Test a wide range of float values, with different precision, across types
+        for val in (
+                1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
+            ):
+            for sign in (1, -1):
+                for ctor in (np.float16, np.float32, np.float64, float):
+                    self.assertFalse(isna_element(ctor(sign * val)))
+
+                if hasattr(np, 'float128'):
+                    self.assertFalse(isna_element(np.float128(sign * val)))
+
+        self.assertFalse(isna_element(1))
+        self.assertFalse(isna_element('str'))
+        self.assertFalse(isna_element(np.datetime64('2020-12-31')))
+        self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
+        self.assertFalse(isna_element(False))
 
     def test_dtype_from_element(self) -> None:
         NT = collections.namedtuple('NT', tuple('abc'))
@@ -281,3 +355,4 @@ class TestUnit(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

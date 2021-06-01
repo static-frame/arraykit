@@ -187,6 +187,20 @@ def array_deepcopy(
     return post
 
 
+def isna_element(value: tp.Any) -> bool:
+    '''Return Boolean if value is an NA. This does not yet handle pd.NA
+    '''
+    try:
+        return np.isnan(value) #type: ignore
+    except TypeError:
+        pass
+
+    if isinstance(value, (np.datetime64, np.timedelta64)):
+        return np.isnat(value) #type: ignore
+
+    return value is None
+
+
 def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     '''Given an arbitrary hashable to be treated as an element, return the appropriate dtype. This was created to avoid using np.array(value).dtype, which for a Tuple does not return object.
     '''
@@ -201,3 +215,4 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
         return value.dtype #type: ignore
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
+
