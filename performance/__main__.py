@@ -378,7 +378,6 @@ def main():
 
     records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
     for cls_perf in Perf.__subclasses__(): # only get one level
-        print(cls_perf)
         cls_map = {}
         if match and cls_perf.__name__ not in match:
             continue
