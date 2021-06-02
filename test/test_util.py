@@ -1,3 +1,4 @@
+import collections
 import datetime
 import unittest
 import itertools
@@ -14,6 +15,7 @@ from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
+from arraykit import dtype_from_element
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -299,7 +301,73 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
         self.assertFalse(isna_element(False))
 
+    def test_dtype_from_element_core_dtypes(self) -> None:
+        dtypes = [
+                np.longlong,
+                np.int_,
+                np.intc,
+                np.short,
+                np.byte,
+                np.ubyte,
+                np.ushort,
+                np.uintc,
+                np.uint,
+                np.ulonglong,
+                np.half,
+                np.single,
+                np.float_,
+                np.longfloat,
+                np.csingle,
+                np.complex_,
+                np.clongfloat,
+                np.bool_,
+        ]
+        for dtype in dtypes:
+            self.assertEqual(dtype, dtype_from_element(dtype()))
+
+    def test_dtype_from_element_str_and_misc_dtypes(self) -> None:
+        dtype_obj_pairs = [
+                (np.dtype('<U1'), np.str_('1')),
+                (np.dtype('<U1'), np.unicode_('1')),
+                (np.dtype('V1'), np.void(1)),
+                (np.dtype('O'), np.object()),
+                (np.dtype('<M8'), np.datetime64('NaT')),
+                (np.dtype('<m8'), np.timedelta64('NaT')),
+                (np.float_, np.nan),
+        ]
+        for dtype, obj in dtype_obj_pairs:
+            self.assertEqual(dtype, dtype_from_element(obj))
+
+    def test_dtype_from_element_obj_dtypes(self) -> None:
+        NT = collections.namedtuple('NT', tuple('abc'))
+
+        dtype_obj_pairs = [
+                (np.int_, 12),
+                (np.float_, 12.0),
+                (np.bool_, True),
+                (np.dtype('O'), None),
+                (np.float_, float('NaN')),
+                (np.dtype('O'), object()),
+                (np.dtype('O'), (1, 2, 3)),
+                (np.dtype('O'), NT(1, 2, 3)),
+                (np.dtype('O'), datetime.date(2020, 12, 31)),
+                (np.dtype('O'), datetime.timedelta(14)),
+        ]
+        for dtype, obj in dtype_obj_pairs:
+            self.assertEqual(dtype, dtype_from_element(obj))
+
+    def test_dtype_from_element_time_dtypes(self) -> None:
+        # Datetime & Timedelta
+        for precision in ['ns', 'us', 'ms', 's', 'm', 'h', 'D', 'M', 'Y']:
+            for kind, ctor in (('m', np.timedelta64), ('M', np.datetime64)):
+                obj = ctor(12, precision)
+                self.assertEqual(np.dtype(f'<{kind}8[{precision}]'), dtype_from_element(obj))
+
+    def test_dtype_from_element_str_and_bytes_dtypes(self) -> None:
+        for size in (1, 8, 16, 32, 64, 128, 256, 512):
+            self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
+            self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
+
 
 if __name__ == '__main__':
     unittest.main()
-
