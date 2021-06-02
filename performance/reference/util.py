@@ -216,6 +216,22 @@ def isna_element(value: tp.Any) -> bool:
     return value is None
 
 
+def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
+    '''Given an arbitrary hashable to be treated as an element, return the appropriate dtype. This was created to avoid using np.array(value).dtype, which for a Tuple does not return object.
+    '''
+    if value is np.nan:
+        # NOTE: this will not catch all NaN instances, but will catch any default NaNs in function signatures that reference the same NaN object found on the NP root namespace
+        return DTYPE_FLOAT_DEFAULT
+    if value is None:
+        return DTYPE_OBJECT
+    if isinstance(value, tuple):
+        return DTYPE_OBJECT
+    if hasattr(value, 'dtype'):
+        return value.dtype #type: ignore
+    # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
+    return np.array(value).dtype
+
+
 def is_gen_copy_values(values: tp.Iterable[tp.Any]) -> tp.Tuple[bool, bool]:
     '''
     Returns:
