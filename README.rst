@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.1.7
+............
+
+Added `isna_element`.
+Added `dtype_from_element`.
+
 
 0.1.6
 ............
