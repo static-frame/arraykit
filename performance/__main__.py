@@ -43,7 +43,7 @@ class Perf:
 #-------------------------------------------------------------------------------
 class MLoc(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(100)
 
     def main(self):
@@ -58,7 +58,7 @@ class MLocREF(MLoc):
 #-------------------------------------------------------------------------------
 class ImmutableFilter(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(100)
 
     def main(self):
@@ -74,7 +74,7 @@ class ImmutableFilterREF(ImmutableFilter):
 #-------------------------------------------------------------------------------
 class NameFilter(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.name1 = ('foo', None, ['bar'])
         self.name2 = 'foo'
 
@@ -94,7 +94,7 @@ class NameFilterREF(NameFilter):
 #-------------------------------------------------------------------------------
 class ShapeFilter(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(20, 5)
 
@@ -111,7 +111,7 @@ class ShapeFilterREF(ShapeFilter):
 #-------------------------------------------------------------------------------
 class Column2DFilter(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(20, 5)
 
@@ -129,7 +129,7 @@ class Column2DFilterREF(Column2DFilter):
 #-------------------------------------------------------------------------------
 class Column1DFilter(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(100, 1)
 
@@ -146,7 +146,7 @@ class Column1DFilterREF(Column1DFilter):
 #-------------------------------------------------------------------------------
 class Row1DFilter(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(1, 100)
 
@@ -164,7 +164,7 @@ class Row1DFilterREF(Row1DFilter):
 #-------------------------------------------------------------------------------
 class ResolveDType(Perf):
 
-    def pre(self):
+    def __init__(self):
         self.dtype1 = np.arange(100).dtype
         self.dtype2 = np.array(('a', 'b')).dtype
 
@@ -184,7 +184,7 @@ class ResolveDTypeIter(Perf):
     FUNCTIONS = ('iter10', 'iter100000')
     NUMBER = 1000
 
-    def pre(self):
+    def __init__(self):
         self.dtypes10 = [np.dtype(int)] * 9 + [np.dtype(float)]
         self.dtypes100000 = (
                 [np.dtype(int)] * 50000 +
@@ -210,7 +210,7 @@ class ArrayDeepcopy(Perf):
     FUNCTIONS = ('memo_new', 'memo_shared')
     NUMBER = 500
 
-    def pre(self):
+    def __init__(self):
         self.array1 = np.arange(100_000)
         self.array2 = np.full(100_000, None)
         self.array2[0] = [np.nan] # add a mutable
@@ -236,7 +236,7 @@ class ArrayDeepcopyREF(ArrayDeepcopy):
 class ArrayGOPerf(Perf):
     NUMBER = 1000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(100).astype(object)
 
     def main(self):
@@ -257,7 +257,7 @@ class ArrayGOPerfREF(ArrayGOPerf):
 class DtypeFromElementPerf(Perf):
     NUMBER = 1000
 
-    def pre(self):
+    def __init__(self):
         NT = collections.namedtuple('NT', tuple('abc'))
 
         self.values = [
@@ -296,7 +296,7 @@ class DtypeFromElementPerfREF(DtypeFromElementPerf):
 class IsNaElementPerf(Perf):
     NUMBER = 1000
 
-    def pre(self):
+    def __init__(self):
         class FloatSubclass(float): pass
         class ComplexSubclass(complex): pass
 
@@ -391,7 +391,8 @@ def main():
             results = {}
             for key, cls_runner in cls_map.items():
                 runner = cls_runner()
-                runner.pre()
+                if hasattr(runner, 'pre'): #TEMP, for branches
+                    raise RuntimeError('convert your pre() method to __init__()')
                 f = getattr(runner, func_attr)
                 results[key] = timeit.timeit('f()',
                         globals=locals(),
