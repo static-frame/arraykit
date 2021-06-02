@@ -38,13 +38,13 @@ What is New in ArrayKit
 0.1.7
 ............
 
-Added `dtype_from_element()`.
+Added ``dtype_from_element()``.
 
 
 0.1.6
 ............
 
-Explicit imports in __init__.py for better static analysis.
+Explicit imports in ``__init__.py`` for better static analysis.
 
 
 0.1.5
