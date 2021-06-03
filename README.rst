@@ -32,6 +32,7 @@ ArrayKit requires the following:
 - NumPy >= 1.17.4
 
 
+
 What is New in ArrayKit
 -------------------------
 
