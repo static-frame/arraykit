@@ -32,35 +32,56 @@ def new(
 
     is_dupe = np.full(size, False)
 
-    if exclude_first and not exclude_last:
+    if exclude_first ^ exclude_last:
         # Optimize for route requiring least amount of data structure
 
         found = set()
 
-        for idx, v in enumerate(value_source):
-            if v not in found:
-                found.add(v)
-            else:
-                is_dupe[idx] = True
+        if exclude_first:
+            for idx, v in enumerate(value_source):
+                if v not in found:
+                    found.add(v)
+                else:
+                    is_dupe[idx] = True
+        else:
+            for idx, v in reversed(list(enumerate(value_source))):
+                if v not in found:
+                    found.add(v)
+                else:
+                    is_dupe[idx] = True
 
         return is_dupe
 
-    first_unique_locations = {}
-    last_duplicate_locations = {}
+    elif not exclude_first and not exclude_last:
+        first_unique_locations = {}
+        duplicates = set()
 
-    for idx, v in enumerate(value_source):
-        if v not in first_unique_locations:
-            first_unique_locations[v] = idx
-        else:
-            is_dupe[idx] = True
+        for idx, v in enumerate(value_source):
+            if v not in first_unique_locations:
+                first_unique_locations[v] = idx
+            else:
+                is_dupe[idx] = True
 
-            if v not in last_duplicate_locations and not exclude_first:
-                is_dupe[first_unique_locations[v]] = True
+                # Second time seeing a duplicate
+                if v not in duplicates:
+                    is_dupe[first_unique_locations[v]] = True
 
-            # always update last
-            last_duplicate_locations[v] = idx
+                # always update last
+                duplicates.add(v)
 
-    if exclude_last: # overwrite with False
+    else:
+        seen = set()
+        last_duplicate_locations = {}
+
+        for idx, v in enumerate(value_source):
+            if v not in seen:
+                seen.add(v)
+            else:
+                is_dupe[idx] = True
+
+                # always update last
+                last_duplicate_locations[v] = idx
+
         is_dupe[list(last_duplicate_locations.values())] = False
 
     return is_dupe
@@ -76,7 +97,9 @@ arr = np.array([1, PO(1), 2, 3, 1, PO(1), 2, 3, 2, -1, -233, 'aslkj', 'df', 'df'
 #array_to_duplicated_hashable(np.arange(5), 1, True)
 #array_to_duplicated_hashable(np.arange(5), 1, 123)
 #array_to_duplicated_hashable(np.arange(5), 1, True)
+
 test(arr, 0, True, False)
 test(arr, 0, False, False)
 test(arr, 0, False, True)
 test(arr, 0, True, True)
+print('Done')
