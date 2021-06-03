@@ -491,6 +491,25 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
+// duplication
+
+static PyObject *
+array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    return NULL;
+    // PyObject *array;
+    // PyObject *memo = NULL;
+    // if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+    //         "O|O!:array_to_duplicated_hashable", array_deepcopy_kwarg_names,
+    //         &array,
+    //         &PyDict_Type, &memo)) {
+    //     return NULL;
+    // }
+    // AK_CHECK_NUMPY_ARRAY(array);
+    // return AK_ArrayDeepCopy((PyArrayObject*)array, memo);
+}
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -772,6 +791,10 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"array_to_duplicated_hashable",
+            (PyCFunction)array_to_duplicated_hashable,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 

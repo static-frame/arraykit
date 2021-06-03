@@ -19,7 +19,7 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
-from performance.reference.util import _array_to_duplicated_hashable as array_to_duplicated_hashable_ref
+from performance.reference.util import array_to_duplicated_hashable as array_to_duplicated_hashable_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -35,7 +35,7 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
-from performance.reference.util import _array_to_duplicated_hashable as array_to_duplicated_hashable_ak
+from performance.reference.util import array_to_duplicated_hashable as array_to_duplicated_hashable_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 

@@ -220,7 +220,7 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
 #-------------------------------------------------------------------------------
 # tools for handling duplicates
 
-def _array_to_duplicated_hashable(
+def array_to_duplicated_hashable(
         array: np.ndarray,
         axis: int = 0,
         exclude_first: bool = False,
