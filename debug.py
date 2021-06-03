@@ -65,12 +65,18 @@ def new(
 
     return is_dupe
 
-arr = np.array([1, PO(1), 2, 3, 1, PO(1), 2, 3])
+def test(*args, **kwargs):
+    assert (new(*args, **kwargs) == array_to_duplicated_hashable(*args, **kwargs)).all(), (args, kwargs)
+
+
+arr = np.array([1, PO(1), 2, 3, 1, PO(1), 2, 3, 2, -1, -233, 'aslkj', 'df', 'df', True, True, None, 1])
 #array_to_duplicated_hashable(np.arange(5))
 #array_to_duplicated_hashable(np.arange(5), 213)
 #array_to_duplicated_hashable(np.arange(5), 1)
 #array_to_duplicated_hashable(np.arange(5), 1, True)
 #array_to_duplicated_hashable(np.arange(5), 1, 123)
 #array_to_duplicated_hashable(np.arange(5), 1, True)
-x = array_to_duplicated_hashable(arr, 1, True, False)
-print(x)
+test(arr, 0, True, False)
+test(arr, 0, False, False)
+test(arr, 0, False, True)
+test(arr, 0, True, True)

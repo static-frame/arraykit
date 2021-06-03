@@ -548,13 +548,12 @@ AK_array_to_duplicated_hashable_no_constraints(PyArrayObject *array, PyArrayObje
 
         int i = 0;
         while (count--) {
-            AK_DEBUG_OBJ(found);
             // Object arrays contains pointers to PyObjects, so we will only temporarily
             // look at the reference here.
             memcpy(&obj_ref, data, sizeof(obj_ref));
 
             // 5. Assign into result whether or not the element exists in the set
-            int in_set = PySequence_Contains(found, obj_ref);
+            int in_set = PySet_Contains(found, obj_ref);
             if (in_set == -1) {
                 Py_DECREF(is_dup);
                 Py_DECREF(found);
@@ -589,18 +588,28 @@ AK_array_to_duplicated_hashable_no_constraints(PyArrayObject *array, PyArrayObje
 }
 
 static PyObject *
-AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayObject *is_dup)
+AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayObject *is_dup,
+                                                 int exclude_first, int exclude_last)
 {
     /*
         Rougly equivalent Python code
 
-        found = set()
+        first_unique_locations = {}
+        last_duplicate_locations = {}
 
         for idx, v in enumerate(array):
-            if v not in found:
-                found.add(v)
+            if v not in first_unique_locations:
+                first_unique_locations[v] = idx
             else:
                 is_dupe[idx] = True
+
+                if v not in last_duplicate_locations and not exclude_first:
+                    is_dupe[first_unique_locations[v]] = True
+
+                last_duplicate_locations[v] = idx
+
+        if exclude_last: # overwrite with False
+            is_dupe[list(last_duplicate_locations.values())] = False
 
         return is_dupe
     */
@@ -617,22 +626,23 @@ AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayOb
         return NULL;
     }
 
-
     NpyIter *iter = NpyIter_New(array,
                                 NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
                                 NPY_KEEPORDER,
                                 NPY_NO_CASTING,
                                 NULL);
     if (!iter) {
+        Py_DECREF(first_unique_locations);
+        Py_DECREF(last_duplicate_locations);
         Py_DECREF(is_dup);
-        Py_DECREF(found);
         return NULL;
     }
 
     NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
     if (!iternext) {
         Py_DECREF(is_dup);
-        Py_DECREF(found);
+        Py_DECREF(first_unique_locations);
+        Py_DECREF(last_duplicate_locations);
         NpyIter_Deallocate(iter);
         return NULL;
     }
@@ -646,36 +656,97 @@ AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayOb
         npy_intp stride = *strideptr;
         npy_intp count = *sizeptr;
 
-        PyObject* obj_ref = NULL;
+        PyObject* val = NULL;
 
         int i = 0;
         while (count--) {
-            AK_DEBUG_OBJ(found);
             // Object arrays contains pointers to PyObjects, so we will only temporarily
             // look at the reference here.
-            memcpy(&obj_ref, data, sizeof(obj_ref));
+            memcpy(&val, data, sizeof(val));
+
+            // AK_DEBUG_OBJ(val);
+            // AK_DEBUG_OBJ(first_unique_locations);
+            // AK_DEBUG_OBJ(last_duplicate_locations);
 
             // 5. Assign into result whether or not the element exists in the set
-            int in_set = PySequence_Contains(found, obj_ref);
-            if (in_set == -1) {
+            int in_dict = PyDict_Contains(first_unique_locations, val);
+            if (in_dict == -1) {
                 Py_DECREF(is_dup);
-                Py_DECREF(found);
+                Py_DECREF(first_unique_locations);
+                Py_DECREF(last_duplicate_locations);
                 NpyIter_Deallocate(iter);
                 return NULL;
             }
-            else if (in_set == 0) {
-                Py_INCREF(obj_ref);
-                int add_success = PySet_Add(found, obj_ref);
-                Py_DECREF(obj_ref);
-                if (add_success == -1) {
+            else if (in_dict == 0) {
+                PyObject *idx = PyLong_FromLong(i);
+                if (!idx) {
                     Py_DECREF(is_dup);
-                    Py_DECREF(found);
+                    Py_DECREF(first_unique_locations);
+                    Py_DECREF(last_duplicate_locations);
+                    NpyIter_Deallocate(iter);
+                }
+
+                Py_INCREF(val);
+                int set_success = PyDict_SetItem(first_unique_locations, val, idx);
+                Py_DECREF(val);
+                Py_DECREF(idx);
+                if (set_success == -1) {
+                    Py_DECREF(is_dup);
+                    Py_DECREF(first_unique_locations);
+                    Py_DECREF(last_duplicate_locations);
                     NpyIter_Deallocate(iter);
                     return NULL;
                 }
             }
             else {
                 *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+
+                in_dict = PyDict_Contains(last_duplicate_locations, val);
+                if (in_dict == -1) {
+                    Py_DECREF(is_dup);
+                    Py_DECREF(first_unique_locations);
+                    Py_DECREF(last_duplicate_locations);
+                    NpyIter_Deallocate(iter);
+                }
+                else if (in_dict == 0 && !exclude_first) {
+                    PyObject *first_unique_location = PyDict_GetItem(first_unique_locations, val);
+                    if (!first_unique_location) {
+                        Py_DECREF(is_dup);
+                        Py_DECREF(first_unique_locations);
+                        Py_DECREF(last_duplicate_locations);
+                        NpyIter_Deallocate(iter);
+                    }
+
+                    int idx = PyLong_AsLong(first_unique_location);
+                    if (idx == -1) {
+                        Py_DECREF(is_dup);
+                        Py_DECREF(first_unique_locations);
+                        Py_DECREF(last_duplicate_locations);
+                        NpyIter_Deallocate(iter);
+                    }
+
+                    *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_TRUE;
+                }
+
+                PyObject *idx = PyLong_FromLong(i);
+                if (!idx) {
+                    Py_DECREF(is_dup);
+                    Py_DECREF(first_unique_locations);
+                    Py_DECREF(last_duplicate_locations);
+                    NpyIter_Deallocate(iter);
+                }
+
+                Py_INCREF(val);
+                int set_success = PyDict_SetItem(last_duplicate_locations, val, idx);
+                Py_DECREF(val);
+                Py_DECREF(idx);
+                if (set_success == -1) {
+                    Py_DECREF(is_dup);
+                    Py_DECREF(first_unique_locations);
+                    Py_DECREF(last_duplicate_locations);
+                    NpyIter_Deallocate(iter);
+                    return NULL;
+                }
             }
 
             data += stride;
@@ -684,7 +755,23 @@ AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayOb
 
     } while (iternext(iter));
 
-    Py_DECREF(found);
+    if (exclude_last) {
+        PyObject *value = NULL;
+        Py_ssize_t pos = 0;
+        while (PyDict_Next(last_duplicate_locations, &pos, NULL, &value)) {
+            long idx = PyLong_AsLong(value);
+            if (idx == -1) {
+                Py_DECREF(first_unique_locations);
+                Py_DECREF(last_duplicate_locations);
+                NpyIter_Deallocate(iter);
+            }
+
+            *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_FALSE;
+        }
+    }
+
+    Py_DECREF(first_unique_locations);
+    Py_DECREF(last_duplicate_locations);
     NpyIter_Deallocate(iter);
 
     return (PyObject*)is_dup;
@@ -735,7 +822,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         return AK_array_to_duplicated_hashable_no_constraints(array, is_dup);
     }
 
-    return AK_array_to_duplicated_hashable_with_constraints(array, is_dup);
+    return AK_array_to_duplicated_hashable_with_constraints(array, is_dup, exclude_first, exclude_last);
 }
 
 //------------------------------------------------------------------------------
