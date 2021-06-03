@@ -1,7 +1,9 @@
+import argparse
 import collections
 import datetime
+import functools
+import itertools
 import timeit
-import argparse
 
 import numpy as np
 
@@ -17,6 +19,7 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
+from performance.reference.util import _array_to_duplicated_hashable as array_to_duplicated_hashable_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -32,6 +35,7 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
+from performance.reference.util import _array_to_duplicated_hashable as array_to_duplicated_hashable_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -357,6 +361,63 @@ class IsNaElementPerfAK(IsNaElementPerf):
 
 class IsNaElementPerfREF(IsNaElementPerf):
     entry = staticmethod(isna_element_ref)
+
+
+#-------------------------------------------------------------------------------
+class ArrayToDuplicatedHashablePerf(Perf):
+    NUMBER = 1
+    FUNCTIONS = ('array_1d', 'array_2d')
+
+    def __init__(self):
+        self.arrays_1d_small = [
+            np.array([0,0,1,0,None,None,0,1,None], dtype=object),
+            np.array([0,0,1,0,'q','q',0,1,'q'], dtype=object),
+            np.array(['q','q','q', 'a', 'w', 'w'], dtype=object),
+            np.array([0,1,2,2,1,4,5,3,4,5,5,6], dtype=object),
+        ]
+        self.arrays_1d_large = [
+            np.arange(100_000).astype(object),
+            np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).astype(object),
+        ]
+
+        self.arrays_2d_small = [
+            np.array([[None, None, None, 32, 17, 17], [2,2,2,False,'q','q'], [2,2,2,False,'q','q'], ], dtype=object),
+            np.array([[None, None, None, 32, 17, 17], [2,2,2,False,'q','q'], [2,2,2,False,'q','q'], ], dtype=object),
+            np.array([[50, 50, 32, 17, 17], [2,2,1,3,3]], dtype=object),
+        ]
+        self.arrays_2d_large = [
+            np.arange(100_000).reshape(10_000, 10).astype(object),
+            np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).reshape(10_000, 10).astype(object),
+        ]
+
+    def array_1d(self):
+        prd = functools.partial(itertools.product, (True, False), (True, False))
+
+        for _ in range(1000):
+            for exclude_first, exclude_last, arr in prd(self.arrays_1d_small):
+                self.entry(arr, exclude_first=exclude_first, exclude_last=exclude_last)
+
+        for _ in range(5):
+            for exclude_first, exclude_last, arr in prd(self.arrays_1d_large):
+                self.entry(arr, exclude_first=exclude_first, exclude_last=exclude_last)
+
+    def array_2d(self):
+        prd = functools.partial(itertools.product, (0, 1), (True, False), (True, False))
+
+        for _ in range(1000):
+            for axis, exclude_first, exclude_last, arr in prd(self.arrays_2d_small):
+                self.entry(arr, axis, exclude_first, exclude_last)
+
+        for _ in range(5):
+            for axis, exclude_first, exclude_last, arr in prd(self.arrays_2d_large):
+                self.entry(arr, axis, exclude_first, exclude_last)
+
+
+class ArrayToDuplicatedHashablePerfAK(ArrayToDuplicatedHashablePerf):
+    entry = staticmethod(array_to_duplicated_hashable_ak)
+
+class ArrayToDuplicatedHashablePerfREF(ArrayToDuplicatedHashablePerf):
+    entry = staticmethod(array_to_duplicated_hashable_ref)
 
 
 #-------------------------------------------------------------------------------
