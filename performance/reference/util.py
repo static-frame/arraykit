@@ -224,7 +224,8 @@ def array_to_duplicated_hashable(
         array: np.ndarray,
         axis: int = 0,
         exclude_first: bool = False,
-        exclude_last: bool = False) -> np.ndarray:
+        exclude_last: bool = False,
+    ) -> np.ndarray:
     '''
     Algorithm for finding duplicates in unsortable arrays for hashables. This will always be an object array.
     '''

@@ -494,19 +494,248 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 // duplication
 
 static PyObject *
+AK_array_to_duplicated_hashable_no_constraints(PyArrayObject *array, PyArrayObject *is_dup)
+{
+    /*
+        Rougly equivalent Python code
+
+        found = set()
+
+        for idx, v in enumerate(array):
+            if v not in found:
+                found.add(v)
+            else:
+                is_dupe[idx] = True
+
+        return is_dupe
+    */
+    // This path is optimized to only construct a single set
+    PyObject *found = PySet_New(NULL);
+    if (!found) {
+        Py_DECREF(is_dup);
+        return NULL;
+    }
+
+    NpyIter *iter = NpyIter_New(array,
+                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                                NPY_KEEPORDER,
+                                NPY_NO_CASTING,
+                                NULL);
+    if (!iter) {
+        Py_DECREF(is_dup);
+        Py_DECREF(found);
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        Py_DECREF(is_dup);
+        Py_DECREF(found);
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    do {
+        char *data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp count = *sizeptr;
+
+        PyObject* obj_ref = NULL;
+
+        int i = 0;
+        while (count--) {
+            AK_DEBUG_OBJ(found);
+            // Object arrays contains pointers to PyObjects, so we will only temporarily
+            // look at the reference here.
+            memcpy(&obj_ref, data, sizeof(obj_ref));
+
+            // 5. Assign into result whether or not the element exists in the set
+            int in_set = PySequence_Contains(found, obj_ref);
+            if (in_set == -1) {
+                Py_DECREF(is_dup);
+                Py_DECREF(found);
+                NpyIter_Deallocate(iter);
+                return NULL;
+            }
+            else if (in_set == 0) {
+                Py_INCREF(obj_ref);
+                int add_success = PySet_Add(found, obj_ref);
+                Py_DECREF(obj_ref);
+                if (add_success == -1) {
+                    Py_DECREF(is_dup);
+                    Py_DECREF(found);
+                    NpyIter_Deallocate(iter);
+                    return NULL;
+                }
+            }
+            else {
+                *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+            }
+
+            data += stride;
+            i += 1;
+        }
+
+    } while (iternext(iter));
+
+    Py_DECREF(found);
+    NpyIter_Deallocate(iter);
+
+    return (PyObject*)is_dup;
+}
+
+static PyObject *
+AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayObject *is_dup)
+{
+    /*
+        Rougly equivalent Python code
+
+        found = set()
+
+        for idx, v in enumerate(array):
+            if v not in found:
+                found.add(v)
+            else:
+                is_dupe[idx] = True
+
+        return is_dupe
+    */
+    PyObject *first_unique_locations = PyDict_New();
+    if (!first_unique_locations) {
+        Py_DECREF(is_dup);
+        return NULL;
+    }
+
+    PyObject *last_duplicate_locations = PyDict_New();
+    if (!last_duplicate_locations) {
+        Py_DECREF(first_unique_locations);
+        Py_DECREF(is_dup);
+        return NULL;
+    }
+
+
+    NpyIter *iter = NpyIter_New(array,
+                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                                NPY_KEEPORDER,
+                                NPY_NO_CASTING,
+                                NULL);
+    if (!iter) {
+        Py_DECREF(is_dup);
+        Py_DECREF(found);
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        Py_DECREF(is_dup);
+        Py_DECREF(found);
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    do {
+        char *data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp count = *sizeptr;
+
+        PyObject* obj_ref = NULL;
+
+        int i = 0;
+        while (count--) {
+            AK_DEBUG_OBJ(found);
+            // Object arrays contains pointers to PyObjects, so we will only temporarily
+            // look at the reference here.
+            memcpy(&obj_ref, data, sizeof(obj_ref));
+
+            // 5. Assign into result whether or not the element exists in the set
+            int in_set = PySequence_Contains(found, obj_ref);
+            if (in_set == -1) {
+                Py_DECREF(is_dup);
+                Py_DECREF(found);
+                NpyIter_Deallocate(iter);
+                return NULL;
+            }
+            else if (in_set == 0) {
+                Py_INCREF(obj_ref);
+                int add_success = PySet_Add(found, obj_ref);
+                Py_DECREF(obj_ref);
+                if (add_success == -1) {
+                    Py_DECREF(is_dup);
+                    Py_DECREF(found);
+                    NpyIter_Deallocate(iter);
+                    return NULL;
+                }
+            }
+            else {
+                *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+            }
+
+            data += stride;
+            i += 1;
+        }
+
+    } while (iternext(iter));
+
+    Py_DECREF(found);
+    NpyIter_Deallocate(iter);
+
+    return (PyObject*)is_dup;
+}
+
+static PyObject *
 array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
-    return NULL;
-    // PyObject *array;
-    // PyObject *memo = NULL;
-    // if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-    //         "O|O!:array_to_duplicated_hashable", array_deepcopy_kwarg_names,
-    //         &array,
-    //         &PyDict_Type, &memo)) {
-    //     return NULL;
-    // }
-    // AK_CHECK_NUMPY_ARRAY(array);
-    // return AK_ArrayDeepCopy((PyArrayObject*)array, memo);
+    PyArrayObject *array = NULL;
+    int axis = 0;
+    int exclude_first = 0;
+    int exclude_last = 0;
+
+    static char *kwarg_list[] = {"array", "axis", "exclude_first", "exclude_last", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "O!|iii:array_to_duplicated_hashable", kwarg_list,
+                                     &PyArray_Type, &array,
+                                     &axis,
+                                     &exclude_first,
+                                     &exclude_last))
+    {
+        return NULL;
+    }
+
+    if (PyArray_DESCR(array)->kind != 'O') {
+        PyErr_SetString(PyExc_ValueError, "Array must have object dtype");
+        return NULL;
+    }
+
+    int size;
+    int ndim = PyArray_NDIM(array);
+
+    if (ndim == 1) {
+        size = PyArray_DIM(array, 0);
+    }
+    else {
+        if (axis > 1) {
+            return NULL;
+        }
+        size = PyArray_DIM(array, size);
+    }
+
+    npy_intp dims = {size};
+    PyArrayObject *is_dup = PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
+
+    if (exclude_first && !exclude_last) {
+        return AK_array_to_duplicated_hashable_no_constraints(array, is_dup);
+    }
+
+    return AK_array_to_duplicated_hashable_with_constraints(array, is_dup);
 }
 
 //------------------------------------------------------------------------------
