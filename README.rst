@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.1.8
+............
+
+Revised cross compile releases.
+
+
 0.1.7
 ............
 

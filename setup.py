@@ -4,7 +4,7 @@ from numpy.distutils.misc_util import get_info
 import numpy as np  # type: ignore
 
 
-AK_VERSION = '0.1.7'
+AK_VERSION = '0.1.8'
 
 
 def get_long_description() -> str:
