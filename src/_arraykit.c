@@ -494,18 +494,18 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 // duplication
 
 // Defines how to process a hashable value.
-typedef int (*AK_handle_value_func)(int,            // i
-                                    PyObject*,      // value
-                                    PyArrayObject*, // is_dup
-                                    PyObject*,      // set_obj
-                                    PyObject*       // dict_obj
+typedef int (*AK_handle_value_func)(int,       // i
+                                    PyObject*, // value
+                                    npy_bool*, // is_dup
+                                    PyObject*, // set_obj
+                                    PyObject*  // dict_obj
 );
 
 // Defines how to iterate over an arbitrary numpy (object) array
 typedef int (*AK_iterate_np_func)(PyArrayObject*,       // array
                                   int,                  // axis
                                   int,                  // reverse
-                                  PyArrayObject*,       // is_dup
+                                  npy_bool*,            // is_dup
                                   AK_handle_value_func, // handle_value_func
                                   PyObject*,            // set_obj
                                   PyObject*             // dict_obj
@@ -514,7 +514,7 @@ typedef int (*AK_iterate_np_func)(PyArrayObject*,       // array
 // Value processing funcs
 
 static int
-AK_handle_value_one_boundary(int i, PyObject *value, PyArrayObject *is_dup,
+AK_handle_value_one_boundary(int i, PyObject *value, npy_bool *is_dup,
                              PyObject *set_obj, PyObject *dict_obj)
 {
     /*
@@ -542,12 +542,12 @@ AK_handle_value_one_boundary(int i, PyObject *value, PyArrayObject *is_dup,
         return PySet_Add(seen, value); // -1 on failure, 0 on success
     }
 
-    *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+    is_dup[i] = NPY_TRUE;
     return 0;
 }
 
 static int
-AK_handle_value_include_boundaries(int i, PyObject *value, PyArrayObject *is_dup,
+AK_handle_value_include_boundaries(int i, PyObject *value, npy_bool *is_dup,
                                    PyObject *set_obj, PyObject *dict_obj)
 {
     /*
@@ -575,7 +575,7 @@ AK_handle_value_include_boundaries(int i, PyObject *value, PyArrayObject *is_dup
         return PySet_Add(seen, value); // -1 on failure, 0 on success
     }
 
-    *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+    is_dup[i] = NPY_TRUE;
 
     PyObject *idx = PyLong_FromLong(i);
     if (!idx) { return -1; }
@@ -586,7 +586,7 @@ AK_handle_value_include_boundaries(int i, PyObject *value, PyArrayObject *is_dup
 }
 
 static int
-AK_handle_value_exclude_boundaries(int i, PyObject *value, PyArrayObject *is_dup,
+AK_handle_value_exclude_boundaries(int i, PyObject *value, npy_bool *is_dup,
                                    PyObject *set_obj, PyObject *dict_obj)
 {
     /*
@@ -628,7 +628,7 @@ AK_handle_value_exclude_boundaries(int i, PyObject *value, PyArrayObject *is_dup
         return set_success; // -1 on failure, 0 on success
     }
 
-    *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+    is_dup[i] = NPY_TRUE;
 
     // Second time seeing a duplicate
     found = PySet_Contains(duplicates, value);
@@ -647,7 +647,7 @@ AK_handle_value_exclude_boundaries(int i, PyObject *value, PyArrayObject *is_dup
         }
         Py_DECREF(first_unique_location);
 
-        *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_TRUE;
+        is_dup[idx] = NPY_TRUE;
     }
 
     return PySet_Add(duplicates, value);
@@ -656,7 +656,7 @@ AK_handle_value_exclude_boundaries(int i, PyObject *value, PyArrayObject *is_dup
 // Iteration funcs
 
 static int
-AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_dup,
+AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
                  AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
     /*
@@ -802,7 +802,7 @@ AK_build_2d_array_iter(PyArrayObject *array, int axis, int reverse)
 }
 
 static int
-AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_dup,
+AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
                  AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
     int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
@@ -836,6 +836,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
         // When the axis doesn't align with the ordering, it means the npy iterator goes one-element at a time.
         // Otherwise, it does a strided loop through the non-contiguous axis
         if (is_c_order != axis) {
+            // AK_DEBUG("ONE PASS");
             // Do-while is one loop through all elements.
 
             int tup_idx = 0;
@@ -872,6 +873,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
         }
 
         else {
+            //AK_DEBUG("MULTI PASS");
             PyObject *tup = PyTuple_New(tuple_size);
             if (!tup) { goto failure; }
 
@@ -976,6 +978,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
 
     npy_intp dims = {size};
     PyArrayObject *is_dup = PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
+    npy_bool *is_dup_array = (npy_bool*)PyArray_DATA(is_dup);
 
     PyObject *set_obj = PySet_New(NULL);
     if (!set_obj) {
@@ -1005,7 +1008,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
     }
 
     // 3. Execute
-    if (-1 == iterate_array_func(array, axis, reverse, is_dup, handle_value_func, set_obj, dict_obj)) {
+    if (-1 == iterate_array_func(array, axis, reverse, is_dup_array, handle_value_func, set_obj, dict_obj)) {
         goto failure;
     }
 
@@ -1025,7 +1028,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
             }
             Py_DECREF(value);
 
-            *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_FALSE;
+            is_dup_array[idx] = NPY_FALSE;
         }
     }
 

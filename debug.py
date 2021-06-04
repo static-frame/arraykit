@@ -196,6 +196,17 @@ def test_misc(debug=True):
     run_test(arr.T, debug=debug)
 
 
+# arr = np.array([
+#     [1, 2, 2, 1, 3, 2, 6],
+#     [2, 3, 3, 2, 4, 3, 6],
+#     [2, 3, 3, 2, 4, 3, 6],
+#     [1, 2, 2, 1, 3, 2, 6],
+#     [3, 4, 4, 3, 5, 4, 6],
+#     [2, 3, 3, 2, 4, 3, 6],
+# ], dtype=object)
+# array_to_duplicated_hashable(arr, 1)
+
+
 test_arr1d(debug=False)
 test_arr2d(debug=False)
 test_misc(debug=False)
