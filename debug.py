@@ -130,21 +130,34 @@ def dprint(*args, debug):
         print(*args)
 
 
-def test(*args, debug=True):
-    dprint(args[1:], debug=debug)
-    o = new(*args); dprint('python:', o, debug=debug)
-    n = array_to_duplicated_hashable(*args); dprint('c     :', n, debug=debug)
-    assert (n == o).all()
+def run_test(array, debug=True):
+    def _test(*args):
+        dprint(args[1:], debug=debug)
+
+        python_result = new(*args)
+        dprint('python:', python_result, debug=debug)
+
+        c_result = array_to_duplicated_hashable(*args);
+        dprint('c     :', c_result, debug=debug)
+        assert (python_result == c_result).all()
+
+    _test(array, 0, True, False) # include_boundaries
+    _test(array, 0, False, False) # one_boundary (normal)
+    _test(array, 0, False, True) # one_boundary (reverse)
+    _test(array, 0, True, True) # exclude_boundaries
+
+    if len(array.shape) == 2:
+        _test(array, 1, True, False)
+        _test(array, 1, False, False)
+        _test(array, 1, False, True)
+        _test(array, 1, True, True)
 
 
-def test_1d(debug=True):
+def test_arr1d(debug=True):
     arr = np.array([1, 2, 2, 1, 3, 2, 6], dtype=object)
 
     # Test with normally constructed array
-    test(arr, 0, True, True, debug=debug) # include_boundaries
-    test(arr, 0, True, False, debug=debug) # one_boundary (normal)
-    test(arr, 0, False, True, debug=debug) # one_boundary (reverse)
-    test(arr, 0, False, False, debug=debug) # exclude_boundaries
+    run_test(arr, debug=debug)
 
     arr2d = np.array([[2, 1, 2],
                       [3, 2, 3],
@@ -155,18 +168,11 @@ def test_1d(debug=True):
                       [6, 6, 6]], dtype=object)
 
     # Test with array slices
-    test(arr2d[:, 1], 0, True, True, debug=debug)
-    test(arr2d[:, 1], 0, True, False, debug=debug)
-    test(arr2d[:, 1], 0, False, True, debug=debug)
-    test(arr2d[:, 1], 0, False, False, debug=debug)
-
-    test(arr2d.T[1], 0, True, True, debug=debug)
-    test(arr2d.T[1], 0, True, False, debug=debug)
-    test(arr2d.T[1], 0, False, True, debug=debug)
-    test(arr2d.T[1], 0, False, False, debug=debug)
+    run_test(arr2d[:, 1], debug=debug)
+    run_test(arr2d.T[1], debug=debug)
 
 
-def test_2d(debug=True):
+def test_arr2d(debug=True):
     arr2d = np.array([
         [1, 2, 2, 1, 3, 2, 6],
         [2, 3, 3, 2, 4, 3, 6],
@@ -176,64 +182,20 @@ def test_2d(debug=True):
         [2, 3, 3, 2, 4, 3, 6],
     ], dtype=object)
 
-    test(arr2d, 0, True, True, debug=debug)
-    test(arr2d, 0, True, False, debug=debug)
-    test(arr2d, 0, False, True, debug=debug)
-    test(arr2d, 0, False, False, debug=debug)
-
-    test(arr2d, 1, True, True, debug=debug)
-    test(arr2d, 1, True, False, debug=debug)
-    #test(arr2d, 1, False, True, debug=debug)
-    test(arr2d, 1, False, False, debug=debug)
-
-    test(arr2d.T, 0, True, True, debug=debug)
-    test(arr2d.T, 0, True, False, debug=debug)
-    #test(arr2d.T, 0, False, True, debug=debug)
-    test(arr2d.T, 0, False, False, debug=debug)
-
-    test(arr2d.T, 1, True, True, debug=debug)
-    test(arr2d.T, 1, True, False, debug=debug)
-    test(arr2d.T, 1, False, True, debug=debug)
-    test(arr2d.T, 1, False, False, debug=debug)
+    run_test(arr2d, debug=debug)
+    run_test(arr2d.T, debug=debug)
 
 
-test_1d(debug=False)
-test_2d(debug=False)
+def test_misc(debug=True):
+    arr = np.array([1, PO(1), 2, 3, 1, PO(1), 2, 3, 2, -1, -233, 'aslkj', 'df', 'df', True, True, None, 1])
+    run_test(arr, debug=debug)
 
-exit(0)
-
-
-
-def test(*args, **kwargs):
-    assert (new(*args, **kwargs) == array_to_duplicated_hashable(*args, **kwargs)).all(), (args, kwargs)
+    arr = np.arange(20).reshape(4, 5).astype(object)
+    run_test(arr, debug=debug)
+    run_test(arr.T, debug=debug)
 
 
-arr = np.array([1, PO(1), 2, 3, 1, PO(1), 2, 3, 2, -1, -233, 'aslkj', 'df', 'df', True, True, None, 1])
-#array_to_duplicated_hashable(np.arange(5))
-#array_to_duplicated_hashable(np.arange(5), 213)
-#array_to_duplicated_hashable(np.arange(5), 1)
-#array_to_duplicated_hashable(np.arange(5), 1, True)
-#array_to_duplicated_hashable(np.arange(5), 1, 123)
-#array_to_duplicated_hashable(np.arange(5), 1, True)
-
-if False:
-    test(arr, 0, True, False)
-    test(arr, 0, False, False)
-    test(arr, 0, False, True)
-    test(arr, 0, True, True)
-
-
-array_to_duplicated_hashable(np.arange(20).reshape(4, 5).astype(object), 0)
-print()
-array_to_duplicated_hashable(np.arange(20).reshape(4, 5).astype(object), 1)
-print()
-print()
-
-
-array_to_duplicated_hashable(np.arange(20).reshape(4, 5).astype(object).T, 0)
-print()
-array_to_duplicated_hashable(np.arange(20).reshape(4, 5).astype(object).T, 1)
-print()
-
-
+test_arr1d(debug=False)
+test_arr2d(debug=False)
+test_misc(debug=False)
 print('Done')

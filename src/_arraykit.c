@@ -493,229 +493,6 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 //------------------------------------------------------------------------------
 // duplication
 
-// These two methods are defunct.
-
-static PyObject *
-AK_array_to_duplicated_hashable_no_constraints(PyArrayObject *array, PyArrayObject *is_dup)
-{
-    /*
-        Rougly equivalent Python code
-
-        seen = set()
-
-        for idx, v in enumerate(array):
-            if v not in seen:
-                seen.add(v)
-            else:
-                is_dup[idx] = True
-
-        return is_dup
-    */
-    // This path is optimized to only construct a single set
-    PyObject *seen = PySet_New(NULL);
-    if (!seen) {
-        Py_DECREF(is_dup);
-        return NULL;
-    }
-
-    NpyIter *iter = NpyIter_New(array,
-                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
-                                NPY_KEEPORDER,
-                                NPY_NO_CASTING,
-                                NULL);
-    if (!iter) { goto failure; }
-
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-    if (!iternext) { goto failure; }
-
-    char** dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-
-    do {
-        char *data = *dataptr;
-        npy_intp stride = *strideptr;
-        npy_intp count = *sizeptr;
-
-        PyObject* value = NULL;
-
-        int i = 0;
-        while (count--) {
-            // Object arrays contains pointers to PyObjects, so we will only temporarily
-            // look at the reference here.
-            memcpy(&value, data, sizeof(value));
-
-            // 5. Assign into result whether or not the element exists in the set
-            int found = PySet_Contains(seen, value);
-            if (found == -1) { goto failure; }
-
-            else if (found == 0) {
-                int add_success = PySet_Add(seen, value);
-                if (add_success == -1) { goto failure; }
-            }
-            else {
-                *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
-            }
-
-            data += stride;
-            i += 1;
-        }
-
-    } while (iternext(iter));
-
-    NpyIter_Deallocate(iter);
-    Py_DECREF(seen);
-
-    return (PyObject*)is_dup;
-
-failure:
-    if (iter != NULL) {
-        NpyIter_Deallocate(iter);
-    }
-    Py_DECREF(seen);
-    Py_DECREF(is_dup);
-    return NULL;
-}
-
-static PyObject *
-AK_array_to_duplicated_hashable_with_constraints(PyArrayObject *array, PyArrayObject *is_dup,
-                                                 int exclude_first, int exclude_last)
-{
-    /*
-        Rougly equivalent Python code
-
-        first_unique_locations = {}
-        last_duplicate_locations = {}
-
-        for idx, v in enumerate(array):
-            if v not in first_unique_locations:
-                first_unique_locations[v] = idx
-            else:
-                is_dupe[idx] = True
-
-                if v not in last_duplicate_locations and not exclude_first:
-                    is_dupe[first_unique_locations[v]] = True
-
-                last_duplicate_locations[v] = idx
-
-        if exclude_last: # overwrite with False
-            is_dupe[list(last_duplicate_locations.values())] = False
-
-        return is_dupe
-    */
-    // Contains first location for all unique values. len(first_unique_locations) == len(set(array))
-    PyObject *first_unique_locations = PyDict_New();
-    if (!first_unique_locations) {
-        Py_DECREF(is_dup);
-        return NULL;
-    }
-
-    PyObject *last_duplicate_locations = PyDict_New();
-    if (!last_duplicate_locations) {
-        Py_DECREF(first_unique_locations);
-        Py_DECREF(is_dup);
-        return NULL;
-    }
-
-    NpyIter *iter = NpyIter_New(array,
-                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
-                                NPY_KEEPORDER,
-                                NPY_NO_CASTING,
-                                NULL);
-    if (!iter) { goto failure; }
-
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-    if (!iternext) { goto failure; }
-
-    char** dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-
-    do {
-        char *data = *dataptr;
-        npy_intp stride = *strideptr;
-        npy_intp count = *sizeptr;
-
-        PyObject* val = NULL;
-
-        int i = 0;
-        while (count--) {
-            // Object arrays contains pointers to PyObjects, so we will only temporarily
-            // look at the reference here.
-            memcpy(&val, data, sizeof(val));
-
-            // 5. Assign into result whether or not the element exists in the set
-            int in_dict = PyDict_Contains(first_unique_locations, val);
-
-            if (in_dict == -1) { goto failure; }
-
-            else if (in_dict == 0) {
-                PyObject *idx = PyLong_FromLong(i);
-                if (!idx) { goto failure; }
-
-                int set_success = PyDict_SetItem(first_unique_locations, val, idx);
-                Py_DECREF(idx);
-                if (set_success == -1) { goto failure; }
-
-            }
-            else {
-                *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
-
-                in_dict = PyDict_Contains(last_duplicate_locations, val);
-                if (in_dict == -1) { goto failure; }
-
-                else if (in_dict == 0 && !exclude_first) {
-                    PyObject *first_unique_location = PyDict_GetItem(first_unique_locations, val);
-                    if (!first_unique_location) { goto failure; }
-
-                    int idx = PyLong_AsLong(first_unique_location);
-                    if (idx == -1) { goto failure; }
-
-                    *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_TRUE;
-                }
-
-                PyObject *idx = PyLong_FromLong(i);
-                if (!idx) { goto failure; }
-
-                int set_success = PyDict_SetItem(last_duplicate_locations, val, idx);
-                Py_DECREF(idx);
-                if (set_success == -1) { goto failure; }
-            }
-
-            data += stride;
-            i += 1;
-        }
-
-    } while (iternext(iter));
-
-    if (exclude_last) {
-        PyObject *value = NULL; // Borrowed
-        Py_ssize_t pos = 0;
-
-        while (PyDict_Next(last_duplicate_locations, &pos, NULL, &value)) {
-            long idx = PyLong_AsLong(value);
-            if (idx == -1) { goto failure; } // -1 always means failure since no locations are negative
-
-            *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_FALSE;
-        }
-    }
-
-    NpyIter_Deallocate(iter);
-    Py_DECREF(last_duplicate_locations);
-    Py_DECREF(first_unique_locations);
-
-    return (PyObject*)is_dup;
-
-failure:
-    if (iter != NULL) {
-        NpyIter_Deallocate(iter);
-    }
-    Py_DECREF(last_duplicate_locations);
-    Py_DECREF(first_unique_locations);
-    Py_DECREF(is_dup);
-    return NULL;
-}
-
 // Defines how to process a hashable value.
 typedef int (*AK_handle_value_func)(int,            // i
                                     PyObject*,      // value
@@ -960,18 +737,77 @@ failure:
     return -1;
 }
 
+static NpyIter*
+AK_build_2d_array_iter(PyArrayObject *array, int axis, int reverse)
+{
+    int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
+    int iter_flags = NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+    int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
+
+    if (!((is_c_order == axis) && reverse)) {
+        return NpyIter_New(array, iter_flags, order_flags, NPY_NO_CASTING, NULL);
+    }
+
+    // The dreaded case of reverse iterating through non-continguous sequences of memory (i.e. columns on arr or rows on arr.T)
+
+    PyObject *negative_one = PyLong_FromLong(-1);
+    if (!negative_one) {
+        return NULL;
+    }
+
+    PyObject *reverse_slice = PySlice_New(NULL, NULL, negative_one);
+    Py_DECREF(negative_one);
+    if (!reverse_slice) {
+        return NULL;
+    }
+
+    PyObject *reversed_array;
+
+    if (axis == 0) {
+        reversed_array = PyObject_GetItem((PyObject*)array, reverse_slice); // array[::-1]
+        Py_DECREF(reverse_slice);
+        if (!reversed_array) {
+            return NULL;
+        }
+    }
+    else {
+        PyObject *empty_row_slice = PySlice_New(NULL, NULL, NULL);
+        if (!empty_row_slice) {
+            Py_DECREF(reverse_slice);
+            return NULL;
+        }
+
+        PyObject *slice_tuple = PyTuple_Pack(2, empty_row_slice, reverse_slice);
+        Py_DECREF(empty_row_slice);
+        Py_DECREF(reverse_slice);
+        if (!slice_tuple) {
+            return NULL;
+        }
+
+        reversed_array = PyObject_GetItem((PyObject*)array, slice_tuple); // array[:,::-1]
+        Py_DECREF(slice_tuple);
+        if (!reversed_array) {
+            return NULL;
+        }
+    }
+
+    NpyIter *iter = NpyIter_New((PyArrayObject*)reversed_array,
+                        NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                        order_flags,
+                        NPY_NO_CASTING,
+                        NULL);
+
+    Py_DECREF(reversed_array);
+    return iter; // Can be NULL
+}
+
 static int
 AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_dup,
                  AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
     int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
-    int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
 
-    NpyIter *iter = NpyIter_New(array,
-                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
-                                order_flags,
-                                NPY_NO_CASTING,
-                                NULL);
+    NpyIter *iter = AK_build_2d_array_iter(array, axis, reverse);
     if (!iter) { goto failure; }
 
     NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
@@ -985,6 +821,11 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
 
     int idx = 0;
     int step = 1;
+
+    if (reverse) {
+        idx = num_tuples - 1;
+        step = -1;
+    }
 
     do {
         char *data = *dataptr;
