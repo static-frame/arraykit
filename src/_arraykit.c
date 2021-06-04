@@ -714,6 +714,130 @@ failure:
     return NULL;
 }
 
+static void
+AK_func_1(PyObject *value)
+{
+    AK_DEBUG_OBJ(value);
+}
+
+static void
+AK_func_2(PyObject *value)
+{
+    AK_DEBUG_OBJ(value);
+}
+
+static void
+AK_iter_1d_array(PyArrayObject *array)
+{
+    NpyIter *iter = NpyIter_New(array,
+                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                                NPY_KEEPORDER,
+                                NPY_NO_CASTING,
+                                NULL);
+    if (!iter) { goto failure; }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) { goto failure; }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    do {
+        char *data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp count = *sizeptr;
+
+        PyObject* value = NULL;
+
+        while (count--) {
+            memcpy(&value, data, sizeof(value));
+            AK_DEBUG_OBJ(value);
+            data += stride;
+        }
+    } while (iternext(iter));
+
+    NpyIter_Deallocate(iter);
+    return;
+
+failure:
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+}
+
+static void
+AK_iter_2d_array(PyArrayObject *array, int axis, void (*value_func)(PyObject*))
+{
+    int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
+    int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
+
+    NpyIter *iter = NpyIter_New(array,
+                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                                order_flags,
+                                NPY_NO_CASTING,
+                                NULL);
+    if (!iter) { goto failure; }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) { goto failure; }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+
+    npy_intp tuple_size = PyArray_DIM(array, !axis);
+    npy_intp num_tuples = PyArray_DIM(array, axis);
+
+    do {
+        char *data = *dataptr;
+        npy_intp stride = *strideptr;
+
+        PyObject* value = NULL;
+
+        // When the axis doesn't align with the ordering, it means the npy iterator goes one-element at a time.
+        // Otherwise, it does a strided loop through the non-contiguous axis
+        if (is_c_order != axis) {
+            // Do-while is one loop through all elements.
+            for (int i = 0; i < num_tuples; ++i) {
+                PyObject *tup = PyTuple_New(tuple_size);
+                if (!tup) { goto failure; }
+
+                for (int j = 0; j < tuple_size; ++j) {
+                    memcpy(&value, data, sizeof(value));
+                    Py_INCREF(value);
+                    PyTuple_SET_ITEM(tup, j, value);
+                    data += stride;
+                }
+                value_func(tup);
+                Py_DECREF(tup);
+            }
+        }
+        else {
+            PyObject *tup = PyTuple_New(tuple_size);
+            if (!tup) { goto failure; }
+
+            // Each do-while loop strides over another column
+            for (int i = 0; i < tuple_size; ++i) {
+                memcpy(&value, data, sizeof(value));
+                Py_INCREF(value);
+                PyTuple_SET_ITEM(tup, i, value);
+                data += stride;
+            }
+            value_func(tup);
+            Py_DECREF(tup);
+        }
+
+    } while (iternext(iter));
+
+    NpyIter_Deallocate(iter);
+    return;
+
+failure:
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+}
+
 static PyObject *
 array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
@@ -739,21 +863,37 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         return NULL;
     }
 
+    void (*func1_ptr)(PyObject*) = AK_func_1;
+    void (*func2_ptr)(PyObject*) = AK_func_2;
+
+    // AK_iter_1d_array(array);
+    AK_iter_2d_array(array, axis, AK_func_1);
+    AK_iter_2d_array(array, axis, AK_func_2);
+    Py_RETURN_NONE;
+
     int size;
     int ndim = PyArray_NDIM(array);
 
+    void (*iterate_array_func)(PyArrayObject*, PyArrayObject*) = NULL;
+
     if (ndim == 1) {
+        iterate_array_func = AK_iter_1d_array;
         size = PyArray_DIM(array, 0);
     }
     else {
         if (axis > 1) {
             return NULL;
         }
+        iterate_array_func = AK_iter_2d_array;
         size = PyArray_DIM(array, size);
     }
 
     npy_intp dims = {size};
     PyArrayObject *is_dup = PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
+
+    void (*process_hashable_func)(PyArrayObject*, PyArrayObject*) = NULL;
+
+
 
     if (exclude_first && !exclude_last) {
         return AK_array_to_duplicated_hashable_no_constraints(array, is_dup);
