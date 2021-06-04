@@ -365,8 +365,13 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 #-------------------------------------------------------------------------------
 class ArrayToDuplicatedHashablePerf(Perf):
-    NUMBER = 1
-    FUNCTIONS = ('array_1d', 'array_2d')
+    NUMBER = 3
+    FUNCTIONS = (
+            'array_1d_small',
+            'array_1d_large',
+            'array_2d_small',
+            'array_2d_large',
+    )
 
     def __init__(self):
         self.arrays_1d_small = [
@@ -390,26 +395,27 @@ class ArrayToDuplicatedHashablePerf(Perf):
             np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).reshape(10_000, 10).astype(object),
         ]
 
-    def array_1d(self):
-        prd = functools.partial(itertools.product, (True, False), (True, False))
+        self.prd_1d = functools.partial(itertools.product, (True, False), (True, False))
+        self.prd_2d = functools.partial(itertools.product, (0, 1), (True, False), (True, False))
 
-        for _ in range(1000):
-            for exclude_first, exclude_last, arr in prd(self.arrays_1d_small):
+    def array_1d_small(self):
+        for _ in range(10000):
+            for exclude_first, exclude_last, arr in self.prd_1d(self.arrays_1d_small):
                 self.entry(arr, exclude_first=exclude_first, exclude_last=exclude_last)
 
-        for _ in range(5):
-            for exclude_first, exclude_last, arr in prd(self.arrays_1d_large):
+    def array_1d_large(self):
+        for _ in range(12):
+            for exclude_first, exclude_last, arr in self.prd_1d(self.arrays_1d_large):
                 self.entry(arr, exclude_first=exclude_first, exclude_last=exclude_last)
 
-    def array_2d(self):
-        prd = functools.partial(itertools.product, (0, 1), (True, False), (True, False))
-
-        for _ in range(1000):
-            for axis, exclude_first, exclude_last, arr in prd(self.arrays_2d_small):
+    def array_2d_small(self):
+        for _ in range(5000):
+            for axis, exclude_first, exclude_last, arr in self.prd_2d(self.arrays_2d_small):
                 self.entry(arr, axis, exclude_first, exclude_last)
 
-        for _ in range(5):
-            for axis, exclude_first, exclude_last, arr in prd(self.arrays_2d_large):
+    def array_2d_large(self):
+        for _ in range(12):
+            for axis, exclude_first, exclude_last, arr in self.prd_2d(self.arrays_2d_large):
                 self.entry(arr, axis, exclude_first, exclude_last)
 
 

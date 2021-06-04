@@ -701,7 +701,7 @@ AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
 
         PyObject* value = NULL;
 
-        int i = 0;
+        Py_ssize_t i = 0;
         int step = 1;
         int stride_step = (int)stride; // We might walk in reverse!
 

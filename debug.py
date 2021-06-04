@@ -7,38 +7,6 @@ class PO:
     def __repr__(self) -> str:
         return f'PO<{self.v}>'
 
-def iterate_1d(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj):
-    if reverse:
-        iterator = reversed(array)
-    else:
-        iterator = array
-
-    size = len(array)
-
-    for i, value in enumerate(iterator):
-        if reverse:
-            i = size - i - 1
-
-        process_value_func(i, value, is_dup, set_obj, dict_obj)
-
-
-def iterate_2d(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj):
-    size = array.shape[axis]
-
-    if axis == 0:
-        iterator = array
-    else:
-        iterator = array.T
-
-    if reverse:
-        iterator = reversed(iterator)
-
-    for i, value in enumerate(map(tuple, iterator)):
-        if reverse:
-            i = size - i - 1
-
-        process_value_func(i, value, is_dup, set_obj, dict_obj)
-
 
 def handle_value_one_boundary(i, value, is_dup, set_obj, dict_obj):
     seen = set_obj
@@ -80,7 +48,40 @@ def handle_value_include_boundaries(i, value, is_dup, set_obj, dict_obj):
         last_duplicate_locations[value] = i
 
 
-def new(
+def iterate_1d(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj):
+    if reverse:
+        iterator = reversed(array)
+    else:
+        iterator = array
+
+    size = len(array)
+
+    for i, value in enumerate(iterator):
+        if reverse:
+            i = size - i - 1
+
+        process_value_func(i, value, is_dup, set_obj, dict_obj)
+
+
+def iterate_2d(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj):
+    size = array.shape[axis]
+
+    if axis == 0:
+        iterator = array
+    else:
+        iterator = array.T
+
+    if reverse:
+        iterator = reversed(iterator)
+
+    for i, value in enumerate(map(tuple, iterator)):
+        if reverse:
+            i = size - i - 1
+
+        process_value_func(i, value, is_dup, set_obj, dict_obj)
+
+
+def python_impl(
         array: np.ndarray,
         axis: int = 0,
         exclude_first: bool = False,
@@ -134,7 +135,7 @@ def run_test(array, debug=True):
     def _test(*args):
         dprint(args[1:], debug=debug)
 
-        python_result = new(*args)
+        python_result = python_impl(*args)
         dprint('python:', python_result, debug=debug)
 
         c_result = array_to_duplicated_hashable(*args);
