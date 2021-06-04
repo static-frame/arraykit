@@ -493,6 +493,8 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 //------------------------------------------------------------------------------
 // duplication
 
+// These two methods are defunct.
+
 static PyObject *
 AK_array_to_duplicated_hashable_no_constraints(PyArrayObject *array, PyArrayObject *is_dup)
 {
@@ -714,12 +716,15 @@ failure:
     return NULL;
 }
 
+// Defines how to process a hashable value.
 typedef int (*AK_handle_value_func)(int,            // i
                                     PyObject*,      // value
                                     PyArrayObject*, // is_dup
                                     PyObject*,      // set_obj
                                     PyObject*       // dict_obj
 );
+
+// Defines how to iterate over an arbitrary numpy (object) array
 typedef int (*AK_iterate_np_func)(PyArrayObject*,       // array
                                   int,                  // axis
                                   int,                  // reverse
@@ -729,31 +734,173 @@ typedef int (*AK_iterate_np_func)(PyArrayObject*,       // array
                                   PyObject*             // dict_obj
 );
 
+// Value processing funcs
+
 static int
 AK_handle_value_one_boundary(int i, PyObject *value, PyArrayObject *is_dup,
                              PyObject *set_obj, PyObject *dict_obj)
 {
+    /*
+    Used when the first duplicated element is considered unique.
+
+    If exclude_first && !exclude_last, we walk from left to right
+    If !exclude_first && exclude_last, we walk from right to left
+
+    Rougly equivalent Python:
+
+        if value not in seen:
+            seen.add(value)
+        else:
+            is_dup[i] = True
+    */
     PyObject *seen = set_obj; // Meaningful name alias
     assert(dict_obj == NULL);
 
     int found = PySet_Contains(seen, value);
-    if (found == -1) { return -1; }
-
-    else if (found == 0) {
-        int add_success = PySet_Add(seen, value);
-        if (add_success == -1) { return -1; }
-    }
-    else {
-        *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+    if (found == -1) {
+        return -1;
     }
 
+    if (found == 0) {
+        return PySet_Add(seen, value); // -1 on failure, 0 on success
+    }
+
+    *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
     return 0;
 }
+
+static int
+AK_handle_value_include_boundaries(int i, PyObject *value, PyArrayObject *is_dup,
+                                   PyObject *set_obj, PyObject *dict_obj)
+{
+    /*
+    Used when the first & last instances of duplicated values are considered unique
+
+    Rougly equivalent Python:
+
+        if value not in seen:
+            seen.add(value)
+        else:
+            is_dup[i] = True
+
+            # Keep track of last observed location, so we can mark it False (i.e. unique) at the end
+            last_duplicate_locations[value] = i
+    */
+    PyObject *seen = set_obj; // Meaningful name alias
+    PyObject *last_duplicate_locations = dict_obj; // Meaningful name alias
+
+    int found = PySet_Contains(seen, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        return PySet_Add(seen, value); // -1 on failure, 0 on success
+    }
+
+    *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+
+    PyObject *idx = PyLong_FromLong(i);
+    if (!idx) { return -1; }
+
+    int set_success = PyDict_SetItem(last_duplicate_locations, value, idx);
+    Py_DECREF(idx);
+    return set_success; // -1 on failure, 0 on success
+}
+
+static int
+AK_handle_value_exclude_boundaries(int i, PyObject *value, PyArrayObject *is_dup,
+                                   PyObject *set_obj, PyObject *dict_obj)
+{
+    /*
+    Used when the first & last instances of duplicated values are considered duplicated
+
+    Rougly equivalent Python:
+
+        if value not in first_unique_locations:
+            // Keep track of the first time we see each unique value, so we can mark the first location
+            // of each duplicated value as duplicated
+            first_unique_locations[value] = i
+        else:
+            is_dup[i] = True
+
+            # The second time we see a duplicate, we mark the first observed location as True (i.e. duplicated)
+            if value not in duplicates:
+                is_dup[first_unique_locations[value]] = True
+
+            # This value is duplicated!
+            duplicates.add(value)
+    */
+
+    PyObject *duplicates = set_obj; // Meaningful name alias
+    PyObject *first_unique_locations = dict_obj; // Meaningful name alias
+
+    int found = PyDict_Contains(first_unique_locations, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        PyObject *idx = PyLong_FromLong(i);
+        if (!idx) {
+            return -1;
+        }
+
+        int set_success = PyDict_SetItem(first_unique_locations, value, idx);
+        Py_DECREF(idx);
+        return set_success; // -1 on failure, 0 on success
+    }
+
+    *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+
+    // Second time seeing a duplicate
+    found = PySet_Contains(duplicates, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        PyObject *first_unique_location = PyDict_GetItem(first_unique_locations, value);
+        if (!first_unique_location) {
+            return -1;
+        }
+        long idx = PyLong_AsLong(first_unique_location);
+        if (idx == -1) {
+            return -1; // -1 always means failure since no locations are negative
+        }
+        Py_DECREF(first_unique_location);
+
+        *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_TRUE;
+    }
+
+    return PySet_Add(duplicates, value);
+}
+
+// Iteration funcs
 
 static int
 AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_dup,
                  AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
+    /*
+    Iterates over a 1D numpy array.
+
+    Roughly equivalent Python code:
+
+        if reverse:
+            iterator = reversed(array)
+        else:
+            iterator = array
+
+        size = len(array)
+
+        for i, value in enumerate(iterator):
+            if reverse:
+                i = size - i - 1
+
+            process_value_func(i, value, is_dup, set_obj, dict_obj)
+    */
+
     assert(axis == 0);
     NpyIter *iter = NpyIter_New(array,
                                 NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
@@ -769,6 +916,7 @@ AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
     npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
     npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
 
+    // Do-while numpy iteration loops only happen once for 1D arrays!
     do {
         char *data = *dataptr;
         npy_intp stride = *strideptr;
@@ -778,24 +926,27 @@ AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
 
         int i = 0;
         int step = 1;
+        int stride_step = (int)stride; // We might walk in reverse!
 
         if (reverse) {
-            data += (stride * count);
-            stride = -stride;
-            i = count;
+            data += (stride * (count - 1));
+            i = count - 1;
             step = -1;
+            stride_step = -stride_step;
         }
 
         while (count--) {
+            // Object arrays contains pointers to PyObjects, so we will only temporarily
+            // look at the reference here.
             memcpy(&value, data, sizeof(value));
 
             // Process the value!
-            if (!value_func(i, value, is_dup, set_obj, dict_obj)) {
+            if (value_func(i, value, is_dup, set_obj, dict_obj) == -1) {
                 goto failure;
             }
 
-            data += stride;
             i += step;
+            data += stride_step;
         }
     } while (iternext(iter));
 
@@ -858,7 +1009,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
 
                 int success = value_func(idx, value, is_dup, set_obj, dict_obj);
                 Py_DECREF(tup);
-                if (!success) { goto failure; }
+                if (success == -1) { goto failure; }
                 idx += step;
             }
         }
@@ -876,7 +1027,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
 
             int success = value_func(idx, value, is_dup, set_obj, dict_obj);
             Py_DECREF(tup);
-            if (!success) { goto failure; }
+            if (success == -1) { goto failure; }
             idx += step;
         }
 
@@ -956,14 +1107,14 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         }
 
         if (!exclude_first && !exclude_last) {
-            handle_value_func = AK_handle_value_one_boundary; // AK_handle_value_exclude_boundaries
+            handle_value_func = AK_handle_value_exclude_boundaries;
         }
         else {
-            handle_value_func = AK_handle_value_one_boundary; // AK_handle_value_include_boundaries
+            handle_value_func = AK_handle_value_include_boundaries;
         }
     }
 
-    if (iterate_array_func(array, axis, reverse, is_dup, handle_value_func, set_obj, dict_obj)) {
+    if (-1 == iterate_array_func(array, axis, reverse, is_dup, handle_value_func, set_obj, dict_obj)) {
         goto failure;
     }
 

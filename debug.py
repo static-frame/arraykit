@@ -124,6 +124,75 @@ def new(
     return is_dup
 
 
+def dprint(*args, debug):
+    '''Debug print'''
+    if debug:
+        print(*args)
+
+
+def test(*args, debug=True):
+    dprint(args[1:], debug=debug)
+    o = new(*args); dprint('python:', o, debug=debug)
+    n = array_to_duplicated_hashable(*args); dprint('c     :', n, debug=debug)
+    assert (n == o).all()
+
+
+def test_1d(debug=True):
+    arr = np.array([1, 2, 2, 1, 3, 2, 6], dtype=object)
+
+    # Test with normally constructed array
+    test(arr, 0, True, True, debug=debug) # include_boundaries
+    test(arr, 0, True, False, debug=debug) # one_boundary (normal)
+    test(arr, 0, False, True, debug=debug) # one_boundary (reverse)
+    test(arr, 0, False, False, debug=debug) # exclude_boundaries
+
+    arr2d = np.array([[2, 1, 2],
+                      [3, 2, 3],
+                      [3, 2, 3],
+                      [2, 1, 2],
+                      [4, 3, 4],
+                      [3, 2, 3],
+                      [6, 6, 6]], dtype=object)
+
+    # Test with array slices
+    test(arr2d[:, 1], 0, True, True, debug=debug)
+    test(arr2d[:, 1], 0, True, False, debug=debug)
+    test(arr2d[:, 1], 0, False, True, debug=debug)
+    test(arr2d[:, 1], 0, False, False, debug=debug)
+
+    test(arr2d.T[1], 0, True, True, debug=debug)
+    test(arr2d.T[1], 0, True, False, debug=debug)
+    test(arr2d.T[1], 0, False, True, debug=debug)
+    test(arr2d.T[1], 0, False, False, debug=debug)
+
+
+def test_2d(debug=True):
+    arr2d = np.array([
+        [1, 2, 2, 1, 3, 2, 6],
+        [2, 3, 3, 2, 4, 3, 6],
+        [2, 3, 3, 2, 4, 3, 6],
+        [1, 2, 2, 1, 3, 2, 6],
+        [3, 4, 4, 3, 5, 4, 6],
+        [2, 3, 3, 2, 4, 3, 6],
+    ], dtype=object)
+
+    test(arr2d, 0, True, True)
+    test(arr2d, 0, False, True)
+    test(arr2d, 0, True, False)
+    test(arr2d, 0, False, False)
+
+    test(arr2d, 1, True, True)
+    test(arr2d, 1, False, True)
+    test(arr2d, 1, True, False)
+    test(arr2d, 1, False, False)
+
+
+test_1d(debug=False)
+
+exit(0)
+
+
+
 def test(*args, **kwargs):
     assert (new(*args, **kwargs) == array_to_duplicated_hashable(*args, **kwargs)).all(), (args, kwargs)
 
