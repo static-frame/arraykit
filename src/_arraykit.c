@@ -1046,6 +1046,34 @@ failure:
 static PyObject *
 array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
+    /*
+    Main driver method. Determines how to iterate, and process the value of each iteration
+    based on the array itself and the parameters.
+
+    Numpy 2D iteration is very different than Numpy 1D iteration, and so those two iteration
+    approaches are generalized.
+
+    Depending on the parameters, there are 4 different ways we can interpret uniqueness.
+
+    1. exclude_first=True and exclude_last=True
+        - This means the first & last observations of duplicated values are considered unique.
+        - We consider them `included` in what is reported as unique
+
+    2. exclude_first=False and exclude_last=False
+        - This means the first & last observations of duplicated values are considered duplicated.
+        - We consider them `excluded` in what is reported as unique (by reporting them as duplicates)
+
+    3. exclude_first ^ exclude_last
+        - This means either the first OR the last observation will be considered unique, while the other is not
+        - This allows for more efficient iteration, by requiring only that we keep track of what we've seen before,
+          only changing the direction we iterate through the array.
+
+        - If exclude_first is True, the we iterate left-to-right, ensuring the first observation of each unique
+          is reported as such, with every subsequent duplicate observation being marked as a duplicate
+
+        - If exclude_last is True, the we iterate right-to-left, ensuring the last observation of each unique
+          is reported as such, with every subsequent duplicate observation being marked as a duplicate
+    */
     PyArrayObject *array = NULL;
     int axis = 0;
     int exclude_first = 0;
@@ -1080,6 +1108,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
     AK_handle_value_func handle_value_func = NULL;
     AK_iterate_np_func iterate_array_func = NULL;
 
+    // 1. Determine how to iterate
     if (ndim == 1) {
         iterate_array_func = AK_iter_1d_array;
     }
@@ -1097,10 +1126,13 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
 
     PyObject *dict_obj = NULL;
 
+    // 2. Determine how to process each value
     if (exclude_first ^ exclude_last) {
+        // 2.a This approach only needs a set!
         handle_value_func = AK_handle_value_one_boundary;
     }
     else {
+        // 2.b Both of these approaches require an additional dictionary structure to keep track of some observed indices
         dict_obj = PyDict_New();
         if (!dict_obj) {
             goto failure;
@@ -1114,17 +1146,21 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         }
     }
 
+    // 3. Execute
     if (-1 == iterate_array_func(array, axis, reverse, is_dup, handle_value_func, set_obj, dict_obj)) {
         goto failure;
     }
 
+    // 4. Post-process
     if (exclude_first && exclude_last) {
-        // is_dup[list(dict_obj.values())] = False
+        // Mark the last observed location of each duplicate value as False
+
+        PyObject *last_duplicate_locations = dict_obj; // Meaningful name alias
 
         PyObject *value = NULL; // Borrowed
         Py_ssize_t pos = 0;
 
-        while (PyDict_Next(dict_obj, &pos, NULL, &value)) {
+        while (PyDict_Next(last_duplicate_locations, &pos, NULL, &value)) {
             long idx = PyLong_AsLong(value);
             if (idx == -1) {
                 goto failure; // -1 always means failure since no locations are negative
