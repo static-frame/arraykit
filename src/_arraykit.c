@@ -996,7 +996,22 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
         // Otherwise, it does a strided loop through the non-contiguous axis
         if (is_c_order != axis) {
             // Do-while is one loop through all elements.
-            for (int i = 0; i < num_tuples; ++i) {
+
+            int tup_idx = 0;
+            int step = 1;
+            int tup_stride_step = 0; // For normal iterations, each time we build a tuple, we are right where we
+                                     // we need to be to start building the next tuple. For reverse, we have to
+                                     // backtrack two tuples worth of strides to get where we need to be
+
+            if (reverse) {
+                data += (stride * (num_tuples - 1) * tuple_size);
+                tup_idx = num_tuples - 1;
+                step = -1;
+                tup_stride_step = -(tuple_size * 2) * stride;
+            }
+
+            while (num_tuples--) {
+
                 PyObject *tup = PyTuple_New(tuple_size);
                 if (!tup) { goto failure; }
 
@@ -1007,12 +1022,14 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
                     data += stride;
                 }
 
-                int success = value_func(idx, value, is_dup, set_obj, dict_obj);
+                int success = value_func(tup_idx, tup, is_dup, set_obj, dict_obj);
                 Py_DECREF(tup);
                 if (success == -1) { goto failure; }
-                idx += step;
+                tup_idx += step;
+                data += tup_stride_step;
             }
         }
+
         else {
             PyObject *tup = PyTuple_New(tuple_size);
             if (!tup) { goto failure; }
@@ -1025,7 +1042,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_
                 data += stride;
             }
 
-            int success = value_func(idx, value, is_dup, set_obj, dict_obj);
+            int success = value_func(idx, tup, is_dup, set_obj, dict_obj);
             Py_DECREF(tup);
             if (success == -1) { goto failure; }
             idx += step;

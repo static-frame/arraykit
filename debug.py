@@ -176,18 +176,29 @@ def test_2d(debug=True):
         [2, 3, 3, 2, 4, 3, 6],
     ], dtype=object)
 
-    test(arr2d, 0, True, True)
-    test(arr2d, 0, False, True)
-    test(arr2d, 0, True, False)
-    test(arr2d, 0, False, False)
+    test(arr2d, 0, True, True, debug=debug)
+    test(arr2d, 0, True, False, debug=debug)
+    test(arr2d, 0, False, True, debug=debug)
+    test(arr2d, 0, False, False, debug=debug)
 
-    test(arr2d, 1, True, True)
-    test(arr2d, 1, False, True)
-    test(arr2d, 1, True, False)
-    test(arr2d, 1, False, False)
+    test(arr2d, 1, True, True, debug=debug)
+    test(arr2d, 1, True, False, debug=debug)
+    #test(arr2d, 1, False, True, debug=debug)
+    test(arr2d, 1, False, False, debug=debug)
+
+    test(arr2d.T, 0, True, True, debug=debug)
+    test(arr2d.T, 0, True, False, debug=debug)
+    #test(arr2d.T, 0, False, True, debug=debug)
+    test(arr2d.T, 0, False, False, debug=debug)
+
+    test(arr2d.T, 1, True, True, debug=debug)
+    test(arr2d.T, 1, True, False, debug=debug)
+    test(arr2d.T, 1, False, True, debug=debug)
+    test(arr2d.T, 1, False, False, debug=debug)
 
 
 test_1d(debug=False)
+test_2d(debug=False)
 
 exit(0)
 
