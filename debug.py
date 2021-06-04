@@ -7,7 +7,7 @@ class PO:
     def __repr__(self) -> str:
         return f'PO<{self.v}>'
 
-def iterate_1d(array, axis, reverse, is_dupe, process_value_func, set_obj, dict_obj):
+def iterate_1d(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj):
     if reverse:
         iterator = reversed(array)
     else:
@@ -19,10 +19,10 @@ def iterate_1d(array, axis, reverse, is_dupe, process_value_func, set_obj, dict_
         if reverse:
             i = size - i - 1
 
-        process_value_func(i, value, is_dupe, set_obj, dict_obj)
+        process_value_func(i, value, is_dup, set_obj, dict_obj)
 
 
-def iterate_2d(array, axis, reverse, is_dupe, process_value_func, set_obj, dict_obj):
+def iterate_2d(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj):
     size = array.shape[axis]
 
     if axis == 0:
@@ -37,44 +37,44 @@ def iterate_2d(array, axis, reverse, is_dupe, process_value_func, set_obj, dict_
         if reverse:
             i = size - i - 1
 
-        process_value_func(i, value, is_dupe, set_obj, dict_obj)
+        process_value_func(i, value, is_dup, set_obj, dict_obj)
 
 
-def handle_value_one_boundary(i, value, is_dupe, set_obj, dict_obj):
+def handle_value_one_boundary(i, value, is_dup, set_obj, dict_obj):
     seen = set_obj
     assert dict_obj == None
 
     if value not in seen:
         seen.add(value)
     else:
-        is_dupe[i] = True
+        is_dup[i] = True
 
 
-def handle_value_exclude_boundaries(i, value, is_dupe, set_obj, dict_obj):
+def handle_value_exclude_boundaries(i, value, is_dup, set_obj, dict_obj):
     duplicates = set_obj
     first_unique_locations = dict_obj
 
     if value not in first_unique_locations:
         first_unique_locations[value] = i
     else:
-        is_dupe[i] = True
+        is_dup[i] = True
 
         # Second time seeing a duplicate
         if value not in duplicates:
-            is_dupe[first_unique_locations[value]] = True
+            is_dup[first_unique_locations[value]] = True
 
         # always update last
         duplicates.add(value)
 
 
-def handle_value_include_boundaries(i, value, is_dupe, set_obj, dict_obj):
+def handle_value_include_boundaries(i, value, is_dup, set_obj, dict_obj):
     seen = set_obj
     last_duplicate_locations = dict_obj
 
     if value not in seen:
         seen.add(value)
     else:
-        is_dupe[i] = True
+        is_dup[i] = True
 
         # always update last
         last_duplicate_locations[value] = i
@@ -101,7 +101,7 @@ def new(
     else:
         iterate_func = iterate_2d
 
-    is_dupe = np.full(size, False)
+    is_dup = np.full(size, False)
 
     set_obj = set()
     if exclude_first ^ exclude_last:
@@ -116,12 +116,12 @@ def new(
         dict_obj = dict()
         process_value_func = handle_value_include_boundaries
 
-    iterate_func(array, axis, reverse, is_dupe, process_value_func, set_obj, dict_obj)
+    iterate_func(array, axis, reverse, is_dup, process_value_func, set_obj, dict_obj)
 
     if exclude_first and exclude_last:
-        is_dupe[list(dict_obj.values())] = False
+        is_dup[list(dict_obj.values())] = False
 
-    return is_dupe
+    return is_dup
 
 
 def test(*args, **kwargs):

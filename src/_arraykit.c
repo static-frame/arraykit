@@ -714,21 +714,47 @@ failure:
     return NULL;
 }
 
-static void
-AK_func_1(PyObject *value)
+typedef int (*AK_handle_value_func)(int,            // i
+                                    PyObject*,      // value
+                                    PyArrayObject*, // is_dup
+                                    PyObject*,      // set_obj
+                                    PyObject*       // dict_obj
+);
+typedef int (*AK_iterate_np_func)(PyArrayObject*,       // array
+                                  int,                  // axis
+                                  int,                  // reverse
+                                  PyArrayObject*,       // is_dup
+                                  AK_handle_value_func, // handle_value_func
+                                  PyObject*,            // set_obj
+                                  PyObject*             // dict_obj
+);
+
+static int
+AK_handle_value_one_boundary(int i, PyObject *value, PyArrayObject *is_dup,
+                             PyObject *set_obj, PyObject *dict_obj)
 {
-    AK_DEBUG_OBJ(value);
+    PyObject *seen = set_obj; // Meaningful name alias
+    assert(dict_obj == NULL);
+
+    int found = PySet_Contains(seen, value);
+    if (found == -1) { return -1; }
+
+    else if (found == 0) {
+        int add_success = PySet_Add(seen, value);
+        if (add_success == -1) { return -1; }
+    }
+    else {
+        *(npy_bool *) PyArray_GETPTR1(is_dup, i) = NPY_TRUE;
+    }
+
+    return 0;
 }
 
-static void
-AK_func_2(PyObject *value)
+static int
+AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_dup,
+                 AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
-    AK_DEBUG_OBJ(value);
-}
-
-static void
-AK_iter_1d_array(PyArrayObject *array)
-{
+    assert(axis == 0);
     NpyIter *iter = NpyIter_New(array,
                                 NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
                                 NPY_KEEPORDER,
@@ -750,24 +776,42 @@ AK_iter_1d_array(PyArrayObject *array)
 
         PyObject* value = NULL;
 
+        int i = 0;
+        int step = 1;
+
+        if (reverse) {
+            data += (stride * count);
+            stride = -stride;
+            i = count;
+            step = -1;
+        }
+
         while (count--) {
             memcpy(&value, data, sizeof(value));
-            AK_DEBUG_OBJ(value);
+
+            // Process the value!
+            if (!value_func(i, value, is_dup, set_obj, dict_obj)) {
+                goto failure;
+            }
+
             data += stride;
+            i += step;
         }
     } while (iternext(iter));
 
     NpyIter_Deallocate(iter);
-    return;
+    return 0;
 
 failure:
     if (iter != NULL) {
         NpyIter_Deallocate(iter);
     }
+    return -1;
 }
 
-static void
-AK_iter_2d_array(PyArrayObject *array, int axis, void (*value_func)(PyObject*))
+static int
+AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, PyArrayObject *is_dup,
+                 AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
     int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
     int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
@@ -787,6 +831,9 @@ AK_iter_2d_array(PyArrayObject *array, int axis, void (*value_func)(PyObject*))
 
     npy_intp tuple_size = PyArray_DIM(array, !axis);
     npy_intp num_tuples = PyArray_DIM(array, axis);
+
+    int idx = 0;
+    int step = 1;
 
     do {
         char *data = *dataptr;
@@ -808,8 +855,11 @@ AK_iter_2d_array(PyArrayObject *array, int axis, void (*value_func)(PyObject*))
                     PyTuple_SET_ITEM(tup, j, value);
                     data += stride;
                 }
-                value_func(tup);
+
+                int success = value_func(idx, value, is_dup, set_obj, dict_obj);
                 Py_DECREF(tup);
+                if (!success) { goto failure; }
+                idx += step;
             }
         }
         else {
@@ -823,19 +873,23 @@ AK_iter_2d_array(PyArrayObject *array, int axis, void (*value_func)(PyObject*))
                 PyTuple_SET_ITEM(tup, i, value);
                 data += stride;
             }
-            value_func(tup);
+
+            int success = value_func(idx, value, is_dup, set_obj, dict_obj);
             Py_DECREF(tup);
+            if (!success) { goto failure; }
+            idx += step;
         }
 
     } while (iternext(iter));
 
     NpyIter_Deallocate(iter);
-    return;
+    return 0;
 
 failure:
     if (iter != NULL) {
         NpyIter_Deallocate(iter);
     }
+    return -1;
 }
 
 static PyObject *
@@ -863,43 +917,81 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         return NULL;
     }
 
-    void (*func1_ptr)(PyObject*) = AK_func_1;
-    void (*func2_ptr)(PyObject*) = AK_func_2;
-
-    // AK_iter_1d_array(array);
-    AK_iter_2d_array(array, axis, AK_func_1);
-    AK_iter_2d_array(array, axis, AK_func_2);
-    Py_RETURN_NONE;
-
-    int size;
     int ndim = PyArray_NDIM(array);
+    if (axis > 1 || (ndim == 1 && axis == 1)) {
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1 for 2d, and 0 for 1d");
+        return NULL;
+    }
 
-    void (*iterate_array_func)(PyArrayObject*, PyArrayObject*) = NULL;
+    int size = PyArray_DIM(array, axis);
+    int reverse = !exclude_first && exclude_last;
+
+    AK_handle_value_func handle_value_func = NULL;
+    AK_iterate_np_func iterate_array_func = NULL;
 
     if (ndim == 1) {
         iterate_array_func = AK_iter_1d_array;
-        size = PyArray_DIM(array, 0);
     }
     else {
-        if (axis > 1) {
-            return NULL;
-        }
         iterate_array_func = AK_iter_2d_array;
-        size = PyArray_DIM(array, size);
     }
 
     npy_intp dims = {size};
     PyArrayObject *is_dup = PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
 
-    void (*process_hashable_func)(PyArrayObject*, PyArrayObject*) = NULL;
-
-
-
-    if (exclude_first && !exclude_last) {
-        return AK_array_to_duplicated_hashable_no_constraints(array, is_dup);
+    PyObject *set_obj = PySet_New(NULL);
+    if (!set_obj) {
+        return NULL;
     }
 
-    return AK_array_to_duplicated_hashable_with_constraints(array, is_dup, exclude_first, exclude_last);
+    PyObject *dict_obj = NULL;
+
+    if (exclude_first ^ exclude_last) {
+        handle_value_func = AK_handle_value_one_boundary;
+    }
+    else {
+        dict_obj = PyDict_New();
+        if (!dict_obj) {
+            goto failure;
+        }
+
+        if (!exclude_first && !exclude_last) {
+            handle_value_func = AK_handle_value_one_boundary; // AK_handle_value_exclude_boundaries
+        }
+        else {
+            handle_value_func = AK_handle_value_one_boundary; // AK_handle_value_include_boundaries
+        }
+    }
+
+    if (iterate_array_func(array, axis, reverse, is_dup, handle_value_func, set_obj, dict_obj)) {
+        goto failure;
+    }
+
+    if (exclude_first && exclude_last) {
+        // is_dup[list(dict_obj.values())] = False
+
+        PyObject *value = NULL; // Borrowed
+        Py_ssize_t pos = 0;
+
+        while (PyDict_Next(dict_obj, &pos, NULL, &value)) {
+            long idx = PyLong_AsLong(value);
+            if (idx == -1) {
+                goto failure; // -1 always means failure since no locations are negative
+            }
+            Py_DECREF(value);
+
+            *(npy_bool *) PyArray_GETPTR1(is_dup, idx) = NPY_FALSE;
+        }
+    }
+
+    Py_XDECREF(dict_obj);
+    Py_DECREF(set_obj);
+    return (PyObject *)is_dup;
+
+failure:
+    Py_XDECREF(dict_obj);
+    Py_DECREF(set_obj);
+    return NULL;
 }
 
 //------------------------------------------------------------------------------
