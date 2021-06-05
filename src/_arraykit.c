@@ -63,6 +63,11 @@
         fprintf(stderr, #msg);  \
     _AK_DEBUG_END()
 
+# define AK_DEBUG_INT(msg)           \
+    _AK_DEBUG_BEGIN();               \
+        fprintf(stderr, #msg"=%x", (int)(msg)); \
+    _AK_DEBUG_END()
+
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
 # define AK_UNLIKELY(X) __builtin_expect(!!(X), 0)
@@ -737,77 +742,33 @@ failure:
     return -1;
 }
 
-static NpyIter*
-AK_build_2d_array_iter(PyArrayObject *array, int axis, int reverse)
-{
-    int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
-    int iter_flags = NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
-    int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
-
-    if (!((is_c_order == axis) && reverse)) {
-        return NpyIter_New(array, iter_flags, order_flags, NPY_NO_CASTING, NULL);
-    }
-
-    // The dreaded case of reverse iterating through non-continguous sequences of memory (i.e. columns on arr or rows on arr.T)
-
-    PyObject *negative_one = PyLong_FromLong(-1);
-    if (!negative_one) {
-        return NULL;
-    }
-
-    PyObject *reverse_slice = PySlice_New(NULL, NULL, negative_one);
-    Py_DECREF(negative_one);
-    if (!reverse_slice) {
-        return NULL;
-    }
-
-    PyObject *reversed_array;
-
-    if (axis == 0) {
-        reversed_array = PyObject_GetItem((PyObject*)array, reverse_slice); // array[::-1]
-        Py_DECREF(reverse_slice);
-        if (!reversed_array) {
-            return NULL;
-        }
-    }
-    else {
-        PyObject *empty_row_slice = PySlice_New(NULL, NULL, NULL);
-        if (!empty_row_slice) {
-            Py_DECREF(reverse_slice);
-            return NULL;
-        }
-
-        PyObject *slice_tuple = PyTuple_Pack(2, empty_row_slice, reverse_slice);
-        Py_DECREF(empty_row_slice);
-        Py_DECREF(reverse_slice);
-        if (!slice_tuple) {
-            return NULL;
-        }
-
-        reversed_array = PyObject_GetItem((PyObject*)array, slice_tuple); // array[:,::-1]
-        Py_DECREF(slice_tuple);
-        if (!reversed_array) {
-            return NULL;
-        }
-    }
-
-    NpyIter *iter = NpyIter_New((PyArrayObject*)reversed_array,
-                        NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
-                        order_flags,
-                        NPY_NO_CASTING,
-                        NULL);
-
-    Py_DECREF(reversed_array);
-    return iter; // Can be NULL
-}
-
 static int
 AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
                  AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
 {
     int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
 
-    NpyIter *iter = AK_build_2d_array_iter(array, axis, reverse);
+    // When the axis aligns with the ordering (i.e. row-wise for C, col-wise for Fortran), it means the npy iterator goes one-element at a time.
+    // Otherwise, it does a strided loop through the non-contiguous axis (which adds a lot of complexity).
+    // To prevent this, we will make a copy of the array with the data laid out in the way we want
+    if (is_c_order == axis) {
+        int new_flags = NPY_ARRAY_ALIGNED;
+        if (is_c_order) {
+            new_flags |= NPY_ARRAY_F_CONTIGUOUS;
+        }
+        else {
+            new_flags |= NPY_ARRAY_C_CONTIGUOUS;
+        }
+
+        array = PyArray_FromArray(array, PyArray_DescrFromType(NPY_OBJECT), new_flags);
+        if (!array) {
+            return -1;
+        }
+    }
+
+    int iter_flags = NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+    int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
+    NpyIter *iter = NpyIter_New(array, iter_flags, order_flags, NPY_NO_CASTING, NULL);
     if (!iter) { goto failure; }
 
     NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
@@ -819,76 +780,42 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
     npy_intp tuple_size = PyArray_DIM(array, !axis);
     npy_intp num_tuples = PyArray_DIM(array, axis);
 
-    int idx = 0;
-    int step = 1;
-
-    if (reverse) {
-        idx = num_tuples - 1;
-        step = -1;
-    }
-
     do {
         char *data = *dataptr;
         npy_intp stride = *strideptr;
 
         PyObject* value = NULL;
 
-        // When the axis doesn't align with the ordering, it means the npy iterator goes one-element at a time.
-        // Otherwise, it does a strided loop through the non-contiguous axis
-        if (is_c_order != axis) {
-            // AK_DEBUG("ONE PASS");
-            // Do-while is one loop through all elements.
+        int tup_idx = 0;
+        int step = 1;
+        int tup_stride_step = 0; // For normal iterations, each time we build a tuple, we are right where we
+                                    // we need to be to start building the next tuple. For reverse, we have to
+                                    // backtrack two tuples worth of strides to get where we need to be
 
-            int tup_idx = 0;
-            int step = 1;
-            int tup_stride_step = 0; // For normal iterations, each time we build a tuple, we are right where we
-                                     // we need to be to start building the next tuple. For reverse, we have to
-                                     // backtrack two tuples worth of strides to get where we need to be
-
-            if (reverse) {
-                data += (stride * (num_tuples - 1) * tuple_size);
-                tup_idx = num_tuples - 1;
-                step = -1;
-                tup_stride_step = -(tuple_size * 2) * stride;
-            }
-
-            while (num_tuples--) {
-
-                PyObject *tup = PyTuple_New(tuple_size);
-                if (!tup) { goto failure; }
-
-                for (int j = 0; j < tuple_size; ++j) {
-                    memcpy(&value, data, sizeof(value));
-                    Py_INCREF(value);
-                    PyTuple_SET_ITEM(tup, j, value);
-                    data += stride;
-                }
-
-                int success = value_func(tup_idx, tup, is_dup, set_obj, dict_obj);
-                Py_DECREF(tup);
-                if (success == -1) { goto failure; }
-                tup_idx += step;
-                data += tup_stride_step;
-            }
+        if (reverse) {
+            data += (stride * (num_tuples - 1) * tuple_size);
+            tup_idx = num_tuples - 1;
+            step = -1;
+            tup_stride_step = -(tuple_size * 2) * stride;
         }
 
-        else {
-            //AK_DEBUG("MULTI PASS");
+        while (num_tuples--) {
+
             PyObject *tup = PyTuple_New(tuple_size);
             if (!tup) { goto failure; }
 
-            // Each do-while loop strides over another column
-            for (int i = 0; i < tuple_size; ++i) {
+            for (int j = 0; j < tuple_size; ++j) {
                 memcpy(&value, data, sizeof(value));
                 Py_INCREF(value);
-                PyTuple_SET_ITEM(tup, i, value);
+                PyTuple_SET_ITEM(tup, j, value);
                 data += stride;
             }
 
-            int success = value_func(idx, tup, is_dup, set_obj, dict_obj);
+            int success = value_func(tup_idx, tup, is_dup, set_obj, dict_obj);
             Py_DECREF(tup);
             if (success == -1) { goto failure; }
-            idx += step;
+            tup_idx += step;
+            data += tup_stride_step;
         }
 
     } while (iternext(iter));
