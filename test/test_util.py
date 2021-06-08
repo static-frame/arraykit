@@ -376,6 +376,19 @@ class TestUnit(unittest.TestCase):
             (-(2**63)  , np.int_),
             (-(2**63)+1, np.int_),
             ((2**63)-1 , np.int_),
+
+            # Unknown
+            (-(2**32)-1, np.int_),
+            (-(2**32)  , np.int_),
+            (-(2**32)+1, np.int_),
+            ((2**31)-1, np.int_),
+            ((2**31)  , np.int_),
+            ((2**31)+1, np.int_),
+            ((2**32)-1, np.int_),
+            ((2**32)  , np.int_),
+            ((2**32)+1, np.int_),
+            # Unknown
+
             # Too big for np.int64, still valid np.uint64s
             ((2**63)   , np.uint),
             ((2**63)+1 , np.uint),
