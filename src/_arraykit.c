@@ -404,7 +404,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
             PyErr_Clear();
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT); // [2**64, ∞]
         }
-        return (PyObject*)PyArray_DescrFromType(NPY_ULONGLONG); // [2**63, 2**64)
+        return (PyObject*)PyArray_DescrFromType(NPY_ULONG); // [2**63, 2**64)
     }
 
     // Bool

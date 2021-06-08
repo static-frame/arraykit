@@ -386,7 +386,7 @@ class TestUnit(unittest.TestCase):
         )
 
         for val, val_type in vals_to_type:
-            self.assertEqual(val_type, dtype_from_element(val))
+            self.assertEqual(val_type, dtype_from_element(val), val)
 
 
 if __name__ == '__main__':
