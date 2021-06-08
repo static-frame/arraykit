@@ -383,7 +383,28 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 
     // Integers
     if (PyLong_CheckExact(arg)) {
-        return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+        int overflow;
+        npy_int64 v = PyLong_AsLongLongAndOverflow(arg, &overflow);
+        if (v != -1 && overflow == 0) {
+            // Prioritize fastest case first
+            return (PyObject*)PyArray_DescrFromType(NPY_LONG); // (-2**63, 2**63)
+        }
+        if (v == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+        if (overflow == -1) {
+            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT); // [-∞, -2**63]
+        }
+
+        npy_uint64 uv = PyLong_AsUnsignedLongLong(arg);
+        if (uv == -1 && PyErr_Occurred()) {
+            if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
+                return NULL;
+            }
+            PyErr_Clear();
+            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT); // [2**64, ∞]
+        }
+        return (PyObject*)PyArray_DescrFromType(NPY_ULONGLONG); // [2**63, 2**64)
     }
 
     // Bool

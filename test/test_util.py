@@ -368,6 +368,26 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
+    def test_dtype_from_element_overflow(self) -> None:
+        vals_to_type = (
+            # Too small for anything
+            (-(2**63)-1, np.object),
+            # Valid np.int64
+            (-(2**63)  , np.int64),
+            (-(2**63)+1, np.int64),
+            ((2**63)-1 , np.int64),
+            # Too big for np.int64, still valid np.uint64s
+            ((2**63)   , np.uint64),
+            ((2**63)+1 , np.uint64),
+            ((2**64)-1 , np.uint64),
+            # Too big for anything
+            ((2**64)   , np.object),
+            ((2**64)+1 , np.object),
+        )
+
+        for val, val_type in vals_to_type:
+            self.assertEqual(val_type, dtype_from_element(val))
+
 
 if __name__ == '__main__':
     unittest.main()
