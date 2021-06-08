@@ -377,7 +377,7 @@ class TestUnit(unittest.TestCase):
             (-(2**63)+1, np.int_),
             ((2**63)-1 , np.int_),
 
-            # Unknown
+            # Mid-range boundary values for 32-bit machines
             (-(2**32)-1, np.int_),
             (-(2**32)  , np.int_),
             (-(2**32)+1, np.int_),
@@ -387,7 +387,7 @@ class TestUnit(unittest.TestCase):
             ((2**32)-1, np.int_),
             ((2**32)  , np.int_),
             ((2**32)+1, np.int_),
-            # Unknown
+            # Mid-range boundary values for 32-bit machines
 
             # Too big for np.int64, still valid np.uint64s
             ((2**63)   , np.uint),
