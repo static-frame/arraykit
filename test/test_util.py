@@ -369,33 +369,39 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
     def test_dtype_from_element_overflow(self) -> None:
+        imin = np.iinfo("int").min
+        imax = np.iinfo("int").max
+        i32min = np.iinfo("int32").min
+        umax = np.iinfo("uint").max
+        u32max = np.iinfo("uint32").max
+        
         vals_to_type = (
             # Too small for anything
-            (-(2**63)-1, np.object),
-            # Valid np.int64
-            (-(2**63)  , np.int_),
-            (-(2**63)+1, np.int_),
-            ((2**63)-1 , np.int_),
+            (imin - 1, np.object),
+            # Valid np.int_
+            (imin, np.int_),
+            (imin + 1, np.int_),
+            (imax, np.int_),
 
             # Mid-range boundary values for 32-bit machines
-            (-(2**32)-1, np.int_),
-            (-(2**32)  , np.int_),
-            (-(2**32)+1, np.int_),
-            ((2**31)-1, np.int_),
-            ((2**31)  , np.int_),
-            ((2**31)+1, np.int_),
-            ((2**32)-1, np.int_),
-            ((2**32)  , np.int_),
-            ((2**32)+1, np.int_),
+            (-u32max, np.int_),
+            (-u32max + 1, np.int_),
+            (-u32max + 2, np.int_),
+            (i32min - 1, np.int_),
+            (i32min, np.int_),
+            (i32min+1, np.int_),
+            (u32max, np.int_),
+            (u32max + 1, np.int_),
+            (u32max + 2, np.int_),
             # Mid-range boundary values for 32-bit machines
 
             # Too big for np.int64, still valid np.uint64s
-            ((2**63)   , np.uint),
-            ((2**63)+1 , np.uint),
-            ((2**64)-1 , np.uint),
+            (imax + 1, np.uint),
+            (imax + 2, np.uint),
+            (umax, np.uint),
             # Too big for anything
-            ((2**64)   , np.object),
-            ((2**64)+1 , np.object),
+            (umax + 1, np.object),
+            ((umax + 2 , np.object),
         )
 
         for val, val_type in vals_to_type:
