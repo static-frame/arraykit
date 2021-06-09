@@ -397,7 +397,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
         }
 
         unsigned long long uv = PyLong_AsUnsignedLongLong(arg);
-        if (uv == (npy_uint64)-1 && PyErr_Occurred()) {
+        if (uv == -1ULL && PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
                 return NULL;
             }
