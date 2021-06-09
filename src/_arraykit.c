@@ -396,7 +396,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT); // [-∞, -2**63]
         }
 
-        npy_uint64 uv = PyLong_AsUnsignedLongLong(arg);
+        unsigned long long uv = PyLong_AsUnsignedLongLong(arg);
         if (uv == (npy_uint64)-1 && PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
                 return NULL;
