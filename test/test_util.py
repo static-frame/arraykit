@@ -374,7 +374,7 @@ class TestUnit(unittest.TestCase):
         i32min = np.iinfo("int32").min
         umax = np.iinfo("uint").max
         u32max = np.iinfo("uint32").max
-        
+
         vals_to_type = (
             # Too small for anything
             (imin - 1, np.object),
@@ -401,7 +401,7 @@ class TestUnit(unittest.TestCase):
             (umax, np.uint),
             # Too big for anything
             (umax + 1, np.object),
-            ((umax + 2 , np.object),
+            (umax + 2 , np.object),
         )
 
         for val, val_type in vals_to_type:
