@@ -373,7 +373,8 @@ class TestUnit(unittest.TestCase):
 
         bits = sysinfo.platform_bits
         if bits == 32:
-            self.skipTest()
+            self.skipTest('32')
+            return
 
         imin = -(2**(bits-1))
         imax = 2**(bits-1) - 1
