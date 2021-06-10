@@ -367,7 +367,7 @@ class TestUnit(unittest.TestCase):
 
     def test_dtype_from_element_int_boundaries(self) -> None:
         failed = False
-        for offset, power in itertools.product((-1, 0, 1), range(65)):
+        for offset, power in itertools.product((-1, 0, 1), range(-65, 66)):
             val = 2**power + offset
 
             actual = dtype_from_element(val)
