@@ -372,31 +372,34 @@ class TestUnit(unittest.TestCase):
         import numpy.distutils.system_info as sysinfo
 
         bits = sysinfo.platform_bits
+        if bits == 32:
+            self.skipTest()
+
         imin = -(2**(bits-1))
         imax = 2**(bits-1) - 1
         uimax = 2**bits - 1
 
         vals_to_type = (
             # Too small for anything
-            (imin-1  , np.object),
+            (imin-1  , np.object), # 1
 
             # Valid np.int64
-            (imin    , np.int_),
-            (imin+1  , np.int_),
-            (imax-1  , np.int_),
-            (imax    , np.int_),
+            (imin    , np.int_),   # 2
+            (imin+1  , np.int_),   # 3
+            (imax-1  , np.int_),   # 4
+            (imax    , np.int_),   # 5
 
             # Too big for np.int64, still valid np.uint64s
-            (imax+1  , np.uint),
-            (uimax-1 , np.uint),
-            (uimax   , np.uint),
+            (imax+1  , np.uint),   # 6
+            (uimax-1 , np.uint),   # 7
+            (uimax   , np.uint),   # 8
 
             # Too big for anything
-            (uimax+1 , np.object),
+            (uimax+1 , np.object), # 9
         )
 
-        for val, val_type in vals_to_type:
-            self.assertEqual(val_type, dtype_from_element(val), (val, bits))
+        for i, (val, val_type) in enumerate(vals_to_type):
+            self.assertEqual(val_type, dtype_from_element(val), (i+1, val, bits))
 
 
 if __name__ == '__main__':
