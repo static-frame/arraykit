@@ -369,34 +369,30 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
     def test_dtype_from_element_overflow(self) -> None:
+        import numpy.distutils.system_info as sysinfo
+
+        bits = sysinfo.platform_bits
+        imin = -(2**(bits-1))
+        imax = 2**(bits-1) - 1
+        uimax = 2**bits - 1
 
         vals_to_type = (
             # Too small for anything
-            (-(2**63)-1, np.object),
+            (imin-1  , np.object),
+
             # Valid np.int64
-            (-(2**63)  , np.int_),
-            (-(2**63)+1, np.int_),
+            (imin    , np.int_),
+            (imin+1  , np.int_),
+            (imax-1  , np.int_),
+            (imax    , np.int_),
 
-            # Mid-range boundary values for 32-bit machines
-            # (i32min-1, np.int_),
-            # (i32min  , np.int_),
-            # (i32min+1, np.int_),
-            # (i32max-1, np.int_),
-            # (i32max  , np.int_),
-            # (i32max+1, np.int_),
-            # (u32max-1, np.int_),
-            # (u32max  , np.int_),
-            # (u32max+1, np.int_),
-            # Mid-range boundary values for 32-bit machines
-
-            ((2**63)-2 , np.int_),
-            ((2**63)-1 , np.int_),
             # Too big for np.int64, still valid np.uint64s
-            ((2**63)   , np.uint),
-            ((2**64)-2 , np.uint),
-            ((2**64)-1 , np.uint),
+            (imax+1  , np.uint),
+            (uimax-1 , np.uint),
+            (uimax   , np.uint),
+
             # Too big for anything
-            ((2**64)   , np.object),
+            (uimax+1 , np.object),
         )
 
         for val, val_type in vals_to_type:
