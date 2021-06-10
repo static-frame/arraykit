@@ -384,7 +384,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // Integers
     if (PyLong_CheckExact(arg)) {
         // This move cuts our speed gain from ~2.5 to ~2.0 :(
-        PyArrayObject *scalar = PyArray_FromAny(arg, NULL, 0, 0, 0, NULL);
+        PyArrayObject *scalar = (PyArrayObject*)PyArray_FromAny(arg, NULL, 0, 0, 0, NULL);
         if (!scalar) {
             return NULL;
         }
