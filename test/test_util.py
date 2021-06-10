@@ -366,6 +366,11 @@ class TestUnit(unittest.TestCase):
                 obj = ctor(12, precision)
                 self.assertEqual(np.dtype(f'<{kind}8[{precision}]'), dtype_from_element(obj))
 
+    def test_dtype_from_element_why(self) -> None:
+        for offset, power in itertools.product((-1, 0, 1), range(31)):
+            v = 2**power + offset
+            self.assertEqual(np.array(v).dtype, dtype_from_element(v), v)
+
     def test_dtype_from_element_str_and_bytes_dtypes(self) -> None:
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
