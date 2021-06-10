@@ -396,7 +396,7 @@ class TestUnit(unittest.TestCase):
         )
 
         for val, val_type in vals_to_type:
-            self.assertEqual(val_type, dtype_from_element(val), val)
+            self.assertEqual(val_type, dtype_from_element(val), (val, bits))
 
 
 if __name__ == '__main__':
