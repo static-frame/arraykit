@@ -384,7 +384,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // Integers
     if (PyLong_CheckExact(arg)) {
         int overflow;
-        long long v = PyLong_AsLongLongAndOverflow(arg, &overflow);
+        npy_longlong v = PyLong_AsLongLongAndOverflow(arg, &overflow);
         if (v == -1 && PyErr_Occurred()) {
             return NULL;
         }
@@ -395,7 +395,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);  // (-inf, -2**63)
         }
 
-        unsigned long long uv = PyLong_AsUnsignedLongLong(arg);
+        npy_ulonglong uv = PyLong_AsUnsignedLongLong(arg);
         if (uv == -1ULL && PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
                 return NULL;

@@ -376,24 +376,40 @@ class TestUnit(unittest.TestCase):
         imax = 2**(bits-1) - 1
         uimax = 2**bits - 1
 
+        print(np.iinfo('int'))
+        print(np.iinfo('uint'))
+
         if bits == 32:
-            print(np.iinfo('int'))
-            print(np.iinfo('uint'))
+            vals_to_type = (
+                # Too small for anything
+                (imin-1  , np.int_), # 1
 
-            for v in (
-                imin-1,
-                imin,
-                imin+1,
-                imax-1,
-                imax,
-                imax+1,
-                uimax-1,
-                uimax,
-                uimax+1,
-            ):
-                print(v, dtype_from_element(v))
+                # Valid np.int64
+                (imin    , np.int_),   # 2
+                (imin+1  , np.int_),   # 3
+                (imax-1  , np.int_),   # 4
+                (imax    , np.int_),   # 5
 
-            assert False
+                # Too big for np.int64, still valid np.uint64s
+                (imax+1  , np.int_),   # 6
+                (uimax-1 , np.int_),   # 7
+                (uimax   , np.int_),   # 8
+
+                # Too big for anything
+                (uimax+1 , np.int_), # 9
+            )
+
+            failed = False
+
+            for i, (val, val_type) in enumerate(vals_to_type):
+                actual = dtype_from_element(val)
+
+                if actual != val_type:
+                    print(i, val, actual, val_type)
+                    failed = True
+
+            self.assertTrue(not failed)
+            return
 
         vals_to_type = (
             # Too small for anything
@@ -414,8 +430,16 @@ class TestUnit(unittest.TestCase):
             (uimax+1 , np.object), # 9
         )
 
+        failed = False
+
         for i, (val, val_type) in enumerate(vals_to_type):
-            self.assertEqual(val_type, dtype_from_element(val), (i+1, val, bits))
+            actual = dtype_from_element(val)
+
+            if actual != val_type:
+                print(i, val, actual, val_type)
+                failed = True
+
+        self.assertTrue(not failed)
 
 
 if __name__ == '__main__':
