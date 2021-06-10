@@ -385,8 +385,10 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     if (PyLong_CheckExact(arg)) {
         int overflow;
         long long v = PyLong_AsLongLongAndOverflow(arg, &overflow);
-        if (v != -1 && overflow == 0) {
-            // Prioritize fastest case first
+        if (v == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+        if (overflow == 0) {
             return (PyObject*)PyArray_DescrFromType(NPY_LONG); // (-2**63, 2**63)
         }
         if (v == -1 && PyErr_Occurred()) {
