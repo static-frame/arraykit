@@ -391,7 +391,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
         // return (PyObject*)PyArray_DESCR((PyArrayObject*)scalar);
 
         int overflow;
-        long long v = PyLong_AsLongLongAndOverflow(arg, &overflow);
+        long long v = PyLong_AsLongAndOverflow(arg, &overflow);
         if (v == -1 && PyErr_Occurred()) {
             return NULL;
         }
@@ -400,24 +400,18 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
         }
         if (overflow == 0) {
-            // Unsure how exactly how numpy determines when to use int64 & int32....
-            if (v <= NPY_MAX_INT64 && v >= NPY_MIN_INT64) {
-                return (PyObject*)PyArray_DescrFromType(NPY_LONG);
-            }
+            return (PyObject*)PyArray_DescrFromType(NPY_LONG);
         }
 
-        unsigned long long uv = PyLong_AsUnsignedLongLong(arg);
+        unsigned long long uv = PyLong_AsUnsignedLong(arg);
         if (uv == -1ULL && PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
                 return NULL;
             }
             PyErr_Clear();
+            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
         }
-        else if (v <= NPY_MAX_UINT64) {
-            return (PyObject*)PyArray_DescrFromType(NPY_ULONG);
-        }
-
-        return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+        return (PyObject*)PyArray_DescrFromType(NPY_ULONG);
     }
 
     // Bool
