@@ -389,7 +389,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
             return NULL;
         }
         if (overflow == 0) {
-            return (PyObject*)PyArray_DescrFromType(NPY_LONG);  // [-2**63, 2**63)
+            return (PyObject*)PyArray_DescrFromType(NPY_LONGLONG);  // [-2**63, 2**63)
         }
         if (overflow == -1) {
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);  // (-inf, -2**63)
@@ -403,7 +403,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
             PyErr_Clear();
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);  // [2**64, inf)
         }
-        return (PyObject*)PyArray_DescrFromType(NPY_ULONG);  // [2**63, 2**64)
+        return (PyObject*)PyArray_DescrFromType(NPY_ULONGLONG);  // [2**63, 2**64)
     }
 
     // Bool

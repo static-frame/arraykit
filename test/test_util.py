@@ -405,12 +405,15 @@ class TestUnit(unittest.TestCase):
                 actual = dtype_from_element(val)
 
                 if actual != val_type:
-                    print(i, val, actual, val_type)
+                    print(i+1, val, actual, val_type)
                     failed = True
 
                 if actual != np.array(val).dtype:
-                    print(i, val, actual, val_type)
+                    print(i+1, val, actual, np.array(val).dtype, 'np.array')
                     failed = True
+
+            if val_type != np.object:
+                val_type(val)
 
             self.assertTrue(not failed)
             return
@@ -440,12 +443,15 @@ class TestUnit(unittest.TestCase):
             actual = dtype_from_element(val)
 
             if actual != val_type:
-                print(i, val, actual, val_type)
+                print(i+1, val, actual, val_type)
                 failed = True
 
             if actual != np.array(val).dtype:
-                print(i, val, actual, val_type)
+                print(i+1, val, actual, np.array(val).dtype, 'np.array')
                 failed = True
+
+            if val_type != np.object:
+                val_type(val)
 
         self.assertTrue(not failed)
 
