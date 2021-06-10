@@ -384,33 +384,34 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // Integers
     if (PyLong_CheckExact(arg)) {
         // This move cuts our speed gain from ~2.5 to ~2.0 :(
-        // PyObject *scalar = PyArray_FromAny(arg, NULL, 0, 0, 0, NULL);
-        // if (!scalar) {
-        //     return NULL;
-        // }
-        // return (PyObject*)PyArray_DESCR((PyArrayObject*)scalar);
-
-        int overflow;
-        long v = PyLong_AsLongAndOverflow(arg, &overflow);
-        if (v == -1 && PyErr_Occurred()) {
+        PyObject *scalar = PyArray_FromAny(arg, NULL, 0, 0, 0, NULL);
+        if (!scalar) {
             return NULL;
         }
+        return (PyObject*)PyArray_DESCR((PyArrayObject*)scalar);
 
-        if (overflow == -1) {
-            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
-        }
-        if (overflow == 0) {
-            return (PyObject*)PyArray_DescrFromType(NPY_LONG);
-        }
-        unsigned long uv = PyLong_AsUnsignedLong(arg);
-        if (uv == -1UL && PyErr_Occurred()) {
-            if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
-                return NULL;
-            }
-            PyErr_Clear();
-            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
-        }
-        return (PyObject*)PyArray_DescrFromType(NPY_ULONG);
+        // This doesn't work because numpy is inscrutable as it relates to determining integer dtypes
+        // int overflow;
+        // long v = PyLong_AsLongAndOverflow(arg, &overflow);
+        // if (v == -1 && PyErr_Occurred()) {
+        //     return NULL;
+        // }
+
+        // if (overflow == -1) {
+        //     return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+        // }
+        // if (overflow == 0) {
+        //     return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+        // }
+        // unsigned long uv = PyLong_AsUnsignedLong(arg);
+        // if (uv == -1UL && PyErr_Occurred()) {
+        //     if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
+        //         return NULL;
+        //     }
+        //     PyErr_Clear();
+        //     return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+        // }
+        // return (PyObject*)PyArray_DescrFromType(NPY_ULONG);
     }
 
     // Bool
