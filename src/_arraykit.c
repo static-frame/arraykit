@@ -392,8 +392,13 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
         if (overflow == -1) {
             return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
         }
-        if (overflow == 0 && v <= NPY_MAX_INT64 && v >= NPY_MIN_INT64) {
-            return (PyObject*)PyArray_DescrFromType(NPY_INT64);
+        if (overflow == 0) {
+            if (v <= NPY_MAX_INT64 && v >= NPY_MIN_INT64) {
+                if (v > NPY_MAX_INT32 && v < NPY_MIN_INT32) {
+                    return (PyObject*)PyArray_DescrFromType(NPY_INT64);
+                }
+                return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+            }
         }
 
         unsigned long long uv = PyLong_AsUnsignedLongLong(arg);

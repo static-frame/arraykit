@@ -368,14 +368,14 @@ class TestUnit(unittest.TestCase):
 
     def test_dtype_from_element_why(self) -> None:
         failed = False
-        for offset, power in itertools.product((-1, 0, 1), range(31)):
+        for offset, power in itertools.product((-1, 0, 1), range(65)):
             val = 2**power + offset
 
             actual = dtype_from_element(val)
             expected = np.array(val).dtype
 
             if actual != expected:
-                print(val, actual, expected)
+                print(f'{val}. {actual=}, {expected=}')
                 failed = True
 
         self.assertTrue(not failed)
@@ -385,7 +385,7 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
-    def test_dtype_from_element_overflow(self) -> None:
+    def test_dtype_from_element_overflow64(self) -> None:
 
         imin = np.iinfo('int64').min
         imax = np.iinfo('int64').max
@@ -398,7 +398,7 @@ class TestUnit(unittest.TestCase):
             expected = np.array(val).dtype
 
             if actual != expected:
-                print(val, actual, expected)
+                print(f'{val}. {actual=}, {expected=}')
                 failed = True
 
             if expected != np.object:
@@ -407,6 +407,30 @@ class TestUnit(unittest.TestCase):
                 self.assertEqual(np.array(val, dtype=expected).item(), val)
 
         self.assertTrue(not failed)
+
+    def test_dtype_from_element_overflow32(self) -> None:
+
+        imin = np.iinfo('int32').min
+        imax = np.iinfo('int32').max
+        uimax = np.iinfo('uint32').max
+
+        failed = False
+        for offset, val in itertools.product((-1, 0, 1), (imin, imax, uimax)):
+            val = val + offset
+            actual = dtype_from_element(val)
+            expected = np.array(val).dtype
+
+            if actual != expected:
+                print(f'{val}. {actual=}, {expected=}')
+                failed = True
+
+            if expected != np.object:
+                # Check doesn't raise Overflow error
+                self.assertEqual(np.array(val, dtype=actual).item(), val)
+                self.assertEqual(np.array(val, dtype=expected).item(), val)
+
+        self.assertTrue(not failed)
+
 
 
 if __name__ == '__main__':
