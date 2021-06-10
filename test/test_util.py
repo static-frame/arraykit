@@ -412,8 +412,6 @@ class TestUnit(unittest.TestCase):
                     print(i, val, actual, val_type)
                     failed = True
 
-                val_type(val)
-
             self.assertTrue(not failed)
             return
 
@@ -448,8 +446,6 @@ class TestUnit(unittest.TestCase):
             if actual != np.array(val).dtype:
                 print(i, val, actual, val_type)
                 failed = True
-
-            val_type(val)
 
         self.assertTrue(not failed)
 
