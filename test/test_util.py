@@ -367,9 +367,18 @@ class TestUnit(unittest.TestCase):
                 self.assertEqual(np.dtype(f'<{kind}8[{precision}]'), dtype_from_element(obj))
 
     def test_dtype_from_element_why(self) -> None:
+        failed = False
         for offset, power in itertools.product((-1, 0, 1), range(31)):
-            v = 2**power + offset
-            self.assertEqual(np.array(v).dtype, dtype_from_element(v), v)
+            val = 2**power + offset
+
+            actual = dtype_from_element(val)
+            expected = np.array(val).dtype
+
+            if actual != expected:
+                print(val, actual, expected)
+                failed = True
+
+        self.assertTrue(not failed)
 
     def test_dtype_from_element_str_and_bytes_dtypes(self) -> None:
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
@@ -383,13 +392,13 @@ class TestUnit(unittest.TestCase):
         uimax = np.iinfo('uint64').max
 
         failed = False
-        for i, val in itertools.product((-1, 0, 1), (imin, imax, uimax)):
-            val = val + i
+        for offset, val in itertools.product((-1, 0, 1), (imin, imax, uimax)):
+            val = val + offset
             actual = dtype_from_element(val)
             expected = np.array(val).dtype
 
             if actual != expected:
-                print(i+1, val, actual, expected)
+                print(val, actual, expected)
                 failed = True
 
             if expected != np.object:
