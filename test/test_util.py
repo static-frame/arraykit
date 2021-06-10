@@ -339,7 +339,6 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.array(obj).dtype, dtype_from_element(obj), obj)
 
     def test_dtype_from_element_obj_dtypes(self) -> None:
-        self.skipTest('ugh')
         NT = collections.namedtuple('NT', tuple('abc'))
 
         dtype_obj_pairs = [
@@ -366,7 +365,7 @@ class TestUnit(unittest.TestCase):
                 obj = ctor(12, precision)
                 self.assertEqual(np.dtype(f'<{kind}8[{precision}]'), dtype_from_element(obj))
 
-    def test_dtype_from_element_why(self) -> None:
+    def test_dtype_from_element_int_boundaries(self) -> None:
         failed = False
         for offset, power in itertools.product((-1, 0, 1), range(65)):
             val = 2**power + offset
@@ -388,51 +387,6 @@ class TestUnit(unittest.TestCase):
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
-
-    def test_dtype_from_element_overflow64(self) -> None:
-
-        imin = np.iinfo('int64').min
-        imax = np.iinfo('int64').max
-        uimax = np.iinfo('uint64').max
-
-        failed = False
-        for offset, val in itertools.product((-1, 0, 1), (imin, imax, uimax)):
-            val = val + offset
-            actual = dtype_from_element(val)
-            expected = np.array(val).dtype
-
-            if actual != expected:
-                print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
-                failed = True
-            else:
-                # Check doesn't raise Overflow error
-                self.assertEqual(np.array(val, dtype=actual).item(), val)
-                self.assertEqual(np.array(val, dtype=expected).item(), val)
-
-        self.assertTrue(not failed)
-
-    def test_dtype_from_element_overflow32(self) -> None:
-
-        imin = np.iinfo('int32').min
-        imax = np.iinfo('int32').max
-        uimax = np.iinfo('uint32').max
-
-        failed = False
-        for offset, val in itertools.product((-1, 0, 1), (imin, imax, uimax)):
-            val = val + offset
-            actual = dtype_from_element(val)
-            expected = np.array(val).dtype
-
-            if actual != expected:
-                print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
-                failed = True
-            else:
-                # Check doesn't raise Overflow error
-                self.assertEqual(np.array(val, dtype=actual).item(), val)
-                self.assertEqual(np.array(val, dtype=expected).item(), val)
-
-        self.assertTrue(not failed)
-
 
 
 if __name__ == '__main__':
