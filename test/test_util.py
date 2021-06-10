@@ -369,39 +369,40 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
     def test_dtype_from_element_overflow(self) -> None:
-        imin = np.iinfo("int").min
-        imax = np.iinfo("int").max
-        i32min = np.iinfo("int32").min
-        umax = np.iinfo("uint").max
-        u32max = np.iinfo("uint32").max
+        imin = int(np.iinfo("int").min)
+        imax = int(np.iinfo("int").max)
+        #i32min = int(np.iinfo("int32").min)
+        #i32max = int(np.iinfo("int32").max)
+        umax = int(np.iinfo("uint").max)
+        #u32max = int(np.iinfo("uint32").max)
 
         vals_to_type = (
             # Too small for anything
-            (imin - 1, np.object),
-            # Valid np.int_
-            (imin, np.int_),
-            (imin + 1, np.int_),
-            (imax, np.int_),
+            (imin-1, np.object),
+            # Valid np.int64
+            (imin  , np.int_),
+            (imin+1, np.int_),
 
             # Mid-range boundary values for 32-bit machines
-            (-u32max - 1, np.int_),
-            (-u32max, np.int_),
-            (-u32max + 1, np.int_),
-            (i32min - 1, np.int_),
-            (i32min, np.int_),
-            (i32min + 1, np.int_),
-            (u32max - 1, np.int_),
-            (u32max, np.int_),
-            (u32max + 1, np.int_),
+            # (i32min-1, np.int_),
+            # (i32min  , np.int_),
+            # (i32min+1, np.int_),
+            # (i32max-1, np.int_),
+            # (i32max  , np.int_),
+            # (i32max+1, np.int_),
+            # (u32max-1, np.int_),
+            # (u32max  , np.int_),
+            # (u32max+1, np.int_),
             # Mid-range boundary values for 32-bit machines
 
+            (imax-1 , np.int_),
+            (imax   , np.int_),
             # Too big for np.int64, still valid np.uint64s
-            (imax + 1, np.uint),
-            (imax + 2, np.uint),
-            (umax, np.uint),
+            (imax+1 , np.uint),
+            (umax-1 , np.uint),
+            (umax   , np.uint),
             # Too big for anything
-            (umax + 1, np.object),
-            (umax + 2 , np.object),
+            (umax+1 , np.object),
         )
 
         for val, val_type in vals_to_type:
