@@ -396,7 +396,7 @@ class TestUnit(unittest.TestCase):
                 (uimax   , np.int_),   # 8
 
                 # Too big for anything
-                (uimax+1 , np.int_), # 9
+                (uimax+1 , np.int_), # 9 (2**32 + 1)
             )
 
             failed = False
@@ -407,6 +407,12 @@ class TestUnit(unittest.TestCase):
                 if actual != val_type:
                     print(i, val, actual, val_type)
                     failed = True
+
+                if actual != np.array(val).dtype:
+                    print(i, val, actual, val_type)
+                    failed = True
+
+                val_type(val)
 
             self.assertTrue(not failed)
             return
@@ -438,6 +444,12 @@ class TestUnit(unittest.TestCase):
             if actual != val_type:
                 print(i, val, actual, val_type)
                 failed = True
+
+            if actual != np.array(val).dtype:
+                print(i, val, actual, val_type)
+                failed = True
+
+            val_type(val)
 
         self.assertTrue(not failed)
 
