@@ -384,31 +384,30 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // Integers
     if (PyLong_CheckExact(arg)) {
         int overflow;
-        long v = PyLong_AsLongAndOverflow(arg, &overflow);
+        long long v = PyLong_AsLongLongAndOverflow(arg, &overflow);
         if (v == -1 && PyErr_Occurred()) {
             return NULL;
         }
-        if (overflow == 0) {
-            if (v <= NPY_MAX_INTP && v >= NPY_MIN_INTP) {
-                return (PyObject*)PyArray_DescrFromType(NPY_INTP);  // [-2**63, 2**63)
-            }
+
+        if (overflow == -1) {
+            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
         }
-        else if (overflow == -1) {
-            return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);  // (-inf, -2**63)
+        if (overflow == 0 && v <= NPY_MAX_INT64 && v >= NPY_MIN_INT64) {
+            return (PyObject*)PyArray_DescrFromType(NPY_INT64);
         }
 
-        unsigned long uv = PyLong_AsUnsignedLong(arg);
+        unsigned long long uv = PyLong_AsUnsignedLongLong(arg);
         if (uv == -1ULL && PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_OverflowError)) {
                 return NULL;
             }
             PyErr_Clear();
         }
-        else if (v <= NPY_MAX_UINTP) {
-            return (PyObject*)PyArray_DescrFromType(NPY_UINTP);  // [2**63, 2**64)
+        else if (v <= NPY_MAX_UINT64) {
+            return (PyObject*)PyArray_DescrFromType(NPY_UINT64);
         }
 
-        return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);  // [2**64, inf)
+        return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
     }
 
     // Bool

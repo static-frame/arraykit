@@ -376,27 +376,35 @@ class TestUnit(unittest.TestCase):
         imax = 2**(bits-1) - 1
         uimax = 2**bits - 1
 
+        imin = np.iinfo('int64').min
+        imax = np.iinfo('int64').max
+        uimax = np.iinfo('uint64').max
+
+        print(np.iinfo('int32'))
+        print(np.iinfo('uint32'))
         print(np.iinfo('int'))
         print(np.iinfo('uint'))
+        print(np.iinfo('int64'))
+        print(np.iinfo('uint64'))
 
-        if bits == 32:
+        if False and bits == 32:
             vals_to_type = (
                 # Too small for anything
-                (imin-1  , np.int_), # 1
+                (imin-1  , np.int64), # 1
 
                 # Valid np.int64
-                (imin    , np.int_),   # 2
-                (imin+1  , np.int_),   # 3
-                (imax-1  , np.int_),   # 4
-                (imax    , np.int_),   # 5
+                (imin    , np.int64),   # 2
+                (imin+1  , np.int64),   # 3
+                (imax-1  , np.int64),   # 4
+                (imax    , np.int64),   # 5
 
                 # Too big for np.int64, still valid np.uint64s
-                (imax+1  , np.int_),   # 6
-                (uimax-1 , np.int_),   # 7
-                (uimax   , np.int_),   # 8
+                (imax+1  , np.int64),   # 6
+                (uimax-1 , np.int64),   # 7
+                (uimax   , np.int64),   # 8
 
                 # Too big for anything
-                (uimax+1 , np.int_), # 9 (2**32 + 1)
+                (uimax+1 , np.int64), # 9 (2**32 + 1)
             )
 
             failed = False
@@ -418,20 +426,22 @@ class TestUnit(unittest.TestCase):
             self.assertTrue(not failed)
             return
 
+        # 64bit land
+
         vals_to_type = (
             # Too small for anything
             (imin-1  , np.object), # 1
 
             # Valid np.int64
-            (imin    , np.int_),   # 2
-            (imin+1  , np.int_),   # 3
-            (imax-1  , np.int_),   # 4
-            (imax    , np.int_),   # 5
+            (imin    , np.int64),   # 2
+            (imin+1  , np.int64),   # 3
+            (imax-1  , np.int64),   # 4
+            (imax    , np.int64),   # 5
 
             # Too big for np.int64, still valid np.uint64s
-            (imax+1  , np.uint),   # 6
-            (uimax-1 , np.uint),   # 7
-            (uimax   , np.uint),   # 8
+            (imax+1  , np.uint64),   # 6
+            (uimax-1 , np.uint64),   # 7
+            (uimax   , np.uint64),   # 8
 
             # Too big for anything
             (uimax+1 , np.object), # 9
