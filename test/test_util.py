@@ -375,7 +375,7 @@ class TestUnit(unittest.TestCase):
             expected = np.array(val).dtype
 
             if actual != expected:
-                print(f'{val}. {actual=}, {expected=}')
+                print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
                 failed = True
 
         self.assertTrue(not failed)
@@ -398,7 +398,7 @@ class TestUnit(unittest.TestCase):
             expected = np.array(val).dtype
 
             if actual != expected:
-                print(f'{val}. {actual=}, {expected=}')
+                print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
                 failed = True
 
             if expected != np.object:
@@ -421,7 +421,7 @@ class TestUnit(unittest.TestCase):
             expected = np.array(val).dtype
 
             if actual != expected:
-                print(f'{val}. {actual=}, {expected=}')
+                print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
                 failed = True
 
             if expected != np.object:
