@@ -372,99 +372,25 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
     def test_dtype_from_element_overflow(self) -> None:
-        import numpy.distutils.system_info as sysinfo
-
-        bits = sysinfo.platform_bits
-        imin = -(2**(bits-1))
-        imax = 2**(bits-1) - 1
-        uimax = 2**bits - 1
 
         imin = np.iinfo('int64').min
         imax = np.iinfo('int64').max
         uimax = np.iinfo('uint64').max
 
-        print(np.iinfo('int32'))
-        print(np.iinfo('uint32'))
-        print(np.iinfo('int'))
-        print(np.iinfo('uint'))
-        print(np.iinfo('int64'))
-        print(np.iinfo('uint64'))
-
-        if False and bits == 32:
-            vals_to_type = (
-                # Too small for anything
-                (imin-1  , np.int64), # 1
-
-                # Valid np.int64
-                (imin    , np.int64),   # 2
-                (imin+1  , np.int64),   # 3
-                (imax-1  , np.int64),   # 4
-                (imax    , np.int64),   # 5
-
-                # Too big for np.int64, still valid np.uint64s
-                (imax+1  , np.int64),   # 6
-                (uimax-1 , np.int64),   # 7
-                (uimax   , np.int64),   # 8
-
-                # Too big for anything
-                (uimax+1 , np.int64), # 9 (2**32 + 1)
-            )
-
-            failed = False
-
-            for i, (val, val_type) in enumerate(vals_to_type):
-                actual = dtype_from_element(val)
-
-                if actual != val_type:
-                    print(i+1, val, actual, val_type)
-                    failed = True
-
-                if actual != np.array(val).dtype:
-                    print(i+1, val, actual, np.array(val).dtype, 'np.array')
-                    failed = True
-
-            if val_type != np.object:
-                val_type(val)
-
-            self.assertTrue(not failed)
-            return
-
-        # 64bit land
-
-        vals_to_type = (
-            # Too small for anything
-            (imin-1  , np.object), # 1
-
-            # Valid np.int64
-            (imin    , np.int64),   # 2
-            (imin+1  , np.int64),   # 3
-            (imax-1  , np.int64),   # 4
-            (imax    , np.int64),   # 5
-
-            # Too big for np.int64, still valid np.uint64s
-            (imax+1  , np.uint64),   # 6
-            (uimax-1 , np.uint64),   # 7
-            (uimax   , np.uint64),   # 8
-
-            # Too big for anything
-            (uimax+1 , np.object), # 9
-        )
-
         failed = False
-
-        for i, (val, val_type) in enumerate(vals_to_type):
+        for i, val in itertools.product((-1, 0, 1), (imin, imax, uimax)):
+            val = val + i
             actual = dtype_from_element(val)
+            expected = np.array(val).dtype
 
-            if actual != val_type:
-                print(i+1, val, actual, val_type)
+            if actual != expected:
+                print(i+1, val, actual, expected)
                 failed = True
 
-            if actual != np.array(val).dtype:
-                print(i+1, val, actual, np.array(val).dtype, 'np.array')
-                failed = True
-
-            if val_type != np.object:
-                val_type(val)
+            if expected != np.object:
+                # Check doesn't raise Overflow error
+                self.assertEqual(np.array(val, dtype=actual).item(), val)
+                self.assertEqual(np.array(val, dtype=expected).item(), val)
 
         self.assertTrue(not failed)
 
