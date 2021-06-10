@@ -384,15 +384,15 @@ class TestUnit(unittest.TestCase):
             (imax, np.int_),
 
             # Mid-range boundary values for 32-bit machines
+            (-u32max - 1, np.int_),
             (-u32max, np.int_),
             (-u32max + 1, np.int_),
-            (-u32max + 2, np.int_),
             (i32min - 1, np.int_),
             (i32min, np.int_),
-            (i32min+1, np.int_),
+            (i32min + 1, np.int_),
+            (u32max - 1, np.int_),
             (u32max, np.int_),
             (u32max + 1, np.int_),
-            (u32max + 2, np.int_),
             # Mid-range boundary values for 32-bit machines
 
             # Too big for np.int64, still valid np.uint64s
