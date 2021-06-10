@@ -372,13 +372,28 @@ class TestUnit(unittest.TestCase):
         import numpy.distutils.system_info as sysinfo
 
         bits = sysinfo.platform_bits
-        if bits == 32:
-            self.skipTest('32')
-            return
-
         imin = -(2**(bits-1))
         imax = 2**(bits-1) - 1
         uimax = 2**bits - 1
+
+        if bits == 32:
+            print(np.iinfo('int'))
+            print(np.iinfo('uint'))
+
+            for v in (
+                imin-1,
+                imin,
+                imin+1,
+                imax-1,
+                imax,
+                imax+1,
+                uimax-1,
+                uimax,
+                uimax+1,
+            ):
+                print(v, dtype_from_element(v))
+
+            assert False
 
         vals_to_type = (
             # Too small for anything
