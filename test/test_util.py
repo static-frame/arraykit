@@ -377,6 +377,10 @@ class TestUnit(unittest.TestCase):
             if actual != expected:
                 print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
                 failed = True
+            else:
+                # Check doesn't raise Overflow error
+                self.assertEqual(np.array(val, dtype=actual).item(), val)
+                self.assertEqual(np.array(val, dtype=expected).item(), val)
 
         self.assertTrue(not failed)
 
@@ -400,8 +404,7 @@ class TestUnit(unittest.TestCase):
             if actual != expected:
                 print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
                 failed = True
-
-            if expected != np.object:
+            else:
                 # Check doesn't raise Overflow error
                 self.assertEqual(np.array(val, dtype=actual).item(), val)
                 self.assertEqual(np.array(val, dtype=expected).item(), val)
@@ -423,8 +426,7 @@ class TestUnit(unittest.TestCase):
             if actual != expected:
                 print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
                 failed = True
-
-            if expected != np.object:
+            else:
                 # Check doesn't raise Overflow error
                 self.assertEqual(np.array(val, dtype=actual).item(), val)
                 self.assertEqual(np.array(val, dtype=expected).item(), val)
