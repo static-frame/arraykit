@@ -24,6 +24,9 @@ additional_info['define_macros'] = [("AK_VERSION", AK_VERSION)] + additional_inf
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=['src/_arraykit.c'],
+        #extra_compile_args=['-pg'],
+        #extra_link_args=['-pg'],
+        extra_link_args=['-Wl,--no-as-needed,-lprofiler,--as-needed'],
         **additional_info,
 )
 

@@ -7,6 +7,7 @@
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
+// # include "gperftools/profiler.h"
 
 //------------------------------------------------------------------------------
 // Macros
@@ -499,28 +500,28 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 // duplication
 
 // Defines how to process a hashable value.
-typedef int (*AK_handle_value_func)(int,       // i
-                                    PyObject*, // value
-                                    npy_bool*, // is_dup
-                                    PyObject*, // set_obj
-                                    PyObject*  // dict_obj
+typedef int (*AK_handle_value_func)(Py_ssize_t i,
+                                    PyObject* value,
+                                    npy_bool* is_dup,
+                                    PyObject* set_obj,
+                                    PyObject* dict_obj
 );
 
 // Defines how to iterate over an arbitrary numpy (object) array
-typedef int (*AK_iterate_np_func)(PyArrayObject*,       // array
-                                  int,                  // axis
-                                  int,                  // reverse
-                                  npy_bool*,            // is_dup
-                                  AK_handle_value_func, // handle_value_func
-                                  PyObject*,            // set_obj
-                                  PyObject*             // dict_obj
+typedef int (*AK_iterate_np_func)(PyArrayObject* array,
+                                  int axis,
+                                  int reverse,
+                                  npy_bool* is_dup,
+                                  AK_handle_value_func handle_value_func,
+                                  PyObject* set_obj,
+                                  PyObject* dict_obj
 );
 
 // Value processing funcs
 
 static int
-AK_handle_value_one_boundary(int i, PyObject *value, npy_bool *is_dup,
-                             PyObject *set_obj, PyObject *dict_obj)
+AK_handle_value_one_boundary(Py_ssize_t i, PyObject *value, npy_bool *is_dup,
+                             PyObject *seen, PyObject * Py_UNUSED(dict_obj))
 {
     /*
     Used when the first duplicated element is considered unique.
@@ -535,9 +536,6 @@ AK_handle_value_one_boundary(int i, PyObject *value, npy_bool *is_dup,
         else:
             is_dup[i] = True
     */
-    PyObject *seen = set_obj; // Meaningful name alias
-    assert(dict_obj == NULL);
-
     int found = PySet_Contains(seen, value);
     if (found == -1) {
         return -1;
@@ -552,8 +550,9 @@ AK_handle_value_one_boundary(int i, PyObject *value, npy_bool *is_dup,
 }
 
 static int
-AK_handle_value_include_boundaries(int i, PyObject *value, npy_bool *is_dup,
-                                   PyObject *set_obj, PyObject *dict_obj)
+AK_handle_value_include_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_dup,
+                                   PyObject *seen,
+                                   PyObject *last_duplicate_locations)
 {
     /*
     Used when the first & last instances of duplicated values are considered unique
@@ -568,9 +567,6 @@ AK_handle_value_include_boundaries(int i, PyObject *value, npy_bool *is_dup,
             # Keep track of last observed location, so we can mark it False (i.e. unique) at the end
             last_duplicate_locations[value] = i
     */
-    PyObject *seen = set_obj; // Meaningful name alias
-    PyObject *last_duplicate_locations = dict_obj; // Meaningful name alias
-
     int found = PySet_Contains(seen, value);
     if (found == -1) {
         return -1;
@@ -591,8 +587,9 @@ AK_handle_value_include_boundaries(int i, PyObject *value, npy_bool *is_dup,
 }
 
 static int
-AK_handle_value_exclude_boundaries(int i, PyObject *value, npy_bool *is_dup,
-                                   PyObject *set_obj, PyObject *dict_obj)
+AK_handle_value_exclude_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_dup,
+                                   PyObject *duplicates,
+                                   PyObject *first_unique_locations)
 {
     /*
     Used when the first & last instances of duplicated values are considered duplicated
@@ -600,8 +597,8 @@ AK_handle_value_exclude_boundaries(int i, PyObject *value, npy_bool *is_dup,
     Rougly equivalent Python:
 
         if value not in first_unique_locations:
-            // Keep track of the first time we see each unique value, so we can mark the first location
-            // of each duplicated value as duplicated
+            # Keep track of the first time we see each unique value, so we can mark the first location
+            # of each duplicated value as duplicated
             first_unique_locations[value] = i
         else:
             is_dup[i] = True
@@ -613,10 +610,6 @@ AK_handle_value_exclude_boundaries(int i, PyObject *value, npy_bool *is_dup,
             # This value is duplicated!
             duplicates.add(value)
     */
-
-    PyObject *duplicates = set_obj; // Meaningful name alias
-    PyObject *first_unique_locations = dict_obj; // Meaningful name alias
-
     int found = PyDict_Contains(first_unique_locations, value);
     if (found == -1) {
         return -1;
@@ -682,7 +675,6 @@ AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
 
             process_value_func(i, value, is_dup, set_obj, dict_obj)
     */
-
     assert(axis == 0);
     NpyIter *iter = NpyIter_New(array,
                                 NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
@@ -760,7 +752,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
             new_flags |= NPY_ARRAY_C_CONTIGUOUS;
         }
 
-        array = PyArray_FromArray(array, PyArray_DescrFromType(NPY_OBJECT), new_flags);
+        array = (PyArrayObject*)PyArray_FromArray(array, PyArray_DescrFromType(NPY_OBJECT), new_flags);
         if (!array) {
             return -1;
         }
@@ -768,6 +760,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
 
     int iter_flags = NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
     int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
+
     NpyIter *iter = NpyIter_New(array, iter_flags, order_flags, NPY_NO_CASTING, NULL);
     if (!iter) { goto failure; }
 
@@ -786,7 +779,7 @@ AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
 
         PyObject* value = NULL;
 
-        int tup_idx = 0;
+        Py_ssize_t tup_idx = 0;
         int step = 1;
         int tup_stride_step = 0; // For normal iterations, each time we build a tuple, we are right where we
                                     // we need to be to start building the next tuple. For reverse, we have to
@@ -861,6 +854,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         - If exclude_last is True, the we iterate right-to-left, ensuring the last observation of each unique
           is reported as such, with every subsequent duplicate observation being marked as a duplicate
     */
+    // ProfilerStart("/home/burkland/github/arraykit/arraykit.prof");
     PyArrayObject *array = NULL;
     int axis = 0;
     int exclude_first = 0;
@@ -904,7 +898,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
     }
 
     npy_intp dims = {size};
-    PyArrayObject *is_dup = PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
+    PyArrayObject *is_dup = (PyArrayObject*)PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
     npy_bool *is_dup_array = (npy_bool*)PyArray_DATA(is_dup);
 
     PyObject *set_obj = PySet_New(NULL);
@@ -942,7 +936,7 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
     // 4. Post-process
     if (exclude_first && exclude_last) {
         // Mark the last observed location of each duplicate value as False
-
+        assert(dict_obj != NULL);
         PyObject *last_duplicate_locations = dict_obj; // Meaningful name alias
 
         PyObject *value = NULL; // Borrowed
@@ -961,11 +955,13 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
 
     Py_XDECREF(dict_obj);
     Py_DECREF(set_obj);
+    // ProfilerStop();
     return (PyObject *)is_dup;
 
 failure:
     Py_XDECREF(dict_obj);
     Py_DECREF(set_obj);
+    // ProfilerStop();
     return NULL;
 }
 
