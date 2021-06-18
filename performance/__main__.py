@@ -1,7 +1,6 @@
 import argparse
 import collections
 import datetime
-import functools
 import itertools
 import timeit
 
@@ -380,9 +379,16 @@ class ArrayToDuplicatedHashablePerf(Perf):
             np.array(['q','q','q', 'a', 'w', 'w'], dtype=object),
             np.array([0,1,2,2,1,4,5,3,4,5,5,6], dtype=object),
         ]
+
+        # 0.99920089 0.94194469
+        rs = np.random.RandomState(0)
         self.arrays_1d_large = [
-            np.arange(100_000).astype(object),
-            np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).astype(object),
+            np.arange(100_000).astype(object), # All unique                                                        0.73636183 0.73142613
+            np.full(100_000, fill_value='abc').astype(object), # All duplicated                                    0.99341718 1.07130567
+            rs.randint(0, 100, 100_000).astype(object), # Many repeated elements from small subset                 0.96812477 0.97921523
+            rs.randint(0, 10_000, 100_000).astype(object), # Many repeated elements from medium subset             1.05508269 0.9765244
+            rs.randint(0, 75_000, 100_000).astype(object), # Some repeated elements from a large subset            0.81474696 0.89746359
+            np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).astype(object), # Custom 0.84165586 0.86117453
         ]
 
         self.arrays_2d_small = [
@@ -395,28 +401,33 @@ class ArrayToDuplicatedHashablePerf(Perf):
             np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).reshape(10_000, 10).astype(object),
         ]
 
-        self.prd_1d = functools.partial(itertools.product, (True, False), (True, False))
-        self.prd_2d = functools.partial(itertools.product, (0, 1), (True, False), (True, False))
-
     def array_1d_small(self):
         for _ in range(10000):
-            for exclude_first, exclude_last, arr in self.prd_1d(self.arrays_1d_small):
-                self.entry(arr, exclude_first=exclude_first, exclude_last=exclude_last)
+            for arr in self.arrays_1d_small:
+                self.entry(arr, 0, False, False)
+                self.entry(arr, 0, True, False)
+                self.entry(arr, 0, False, True)
 
     def array_1d_large(self):
-        for _ in range(12):
-            for exclude_first, exclude_last, arr in self.prd_1d(self.arrays_1d_large):
-                self.entry(arr, exclude_first=exclude_first, exclude_last=exclude_last)
+        for _ in range(5):
+            for arr in self.arrays_1d_large:
+                self.entry(arr, 0, False, False)
+                self.entry(arr, 0, True, False)
+                self.entry(arr, 0, False, True)
 
     def array_2d_small(self):
         for _ in range(5000):
-            for axis, exclude_first, exclude_last, arr in self.prd_2d(self.arrays_2d_small):
-                self.entry(arr, axis, exclude_first, exclude_last)
+            for axis, arr in itertools.product((0, 1), self.arrays_2d_small):
+                self.entry(arr, axis, False, False)
+                self.entry(arr, axis, True, False)
+                self.entry(arr, axis, False, True)
 
     def array_2d_large(self):
         for _ in range(12):
-            for axis, exclude_first, exclude_last, arr in self.prd_2d(self.arrays_2d_large):
-                self.entry(arr, axis, exclude_first, exclude_last)
+            for axis, arr in itertools.product((0, 1), self.arrays_2d_large):
+                self.entry(arr, axis, False, False)
+                self.entry(arr, axis, True, False)
+                self.entry(arr, axis, False, True)
 
 
 class ArrayToDuplicatedHashablePerfAK(ArrayToDuplicatedHashablePerf):
@@ -466,7 +477,7 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
-    width = 24
+    width = 36
     for record in records:
         print(''.join(
             (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record

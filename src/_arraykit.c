@@ -581,9 +581,11 @@ AK_handle_value_include_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_d
     PyObject *idx = PyLong_FromLong(i);
     if (!idx) { return -1; }
 
-    int set_success = PyDict_SetItem(last_duplicate_locations, value, idx);
-    Py_DECREF(idx);
-    return set_success; // -1 on failure, 0 on success
+    int success = PyDict_SetItem(last_duplicate_locations, value, idx);
+    if (success == -1) {
+        Py_DECREF(idx);
+    }
+    return success; // -1 on failure, 0 on success
 }
 
 static int
@@ -621,9 +623,11 @@ AK_handle_value_exclude_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_d
             return -1;
         }
 
-        int set_success = PyDict_SetItem(first_unique_locations, value, idx);
-        Py_DECREF(idx);
-        return set_success; // -1 on failure, 0 on success
+        int success = PyDict_SetItem(first_unique_locations, value, idx);
+        if (success == -1) {
+            Py_DECREF(idx);
+        }
+        return success; // -1 on failure, 0 on success
     }
 
     is_dup[i] = NPY_TRUE;
@@ -635,7 +639,7 @@ AK_handle_value_exclude_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_d
     }
 
     if (found == 0) {
-        PyObject *first_unique_location = PyDict_GetItem(first_unique_locations, value);
+        PyObject *first_unique_location = PyDict_GetItem(first_unique_locations, value); // Borrowed!
         if (!first_unique_location) {
             return -1;
         }
@@ -643,8 +647,6 @@ AK_handle_value_exclude_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_d
         if (idx == -1) {
             return -1; // -1 always means failure since no locations are negative
         }
-        Py_DECREF(first_unique_location);
-
         is_dup[idx] = NPY_TRUE;
     }
 
@@ -947,8 +949,6 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
             if (idx == -1) {
                 goto failure; // -1 always means failure since no locations are negative
             }
-            Py_DECREF(value);
-
             is_dup_array[idx] = NPY_FALSE;
         }
     }
