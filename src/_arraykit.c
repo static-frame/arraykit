@@ -7,7 +7,6 @@
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
-// # include "gperftools/profiler.h"
 
 //------------------------------------------------------------------------------
 // Macros
@@ -856,7 +855,6 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
         - If exclude_last is True, the we iterate right-to-left, ensuring the last observation of each unique
           is reported as such, with every subsequent duplicate observation being marked as a duplicate
     */
-    // ProfilerStart("/home/burkland/github/arraykit/arraykit.prof");
     PyArrayObject *array = NULL;
     int axis = 0;
     int exclude_first = 0;
@@ -955,13 +953,11 @@ array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *k
 
     Py_XDECREF(dict_obj);
     Py_DECREF(set_obj);
-    // ProfilerStop();
     return (PyObject *)is_dup;
 
 failure:
     Py_XDECREF(dict_obj);
     Py_DECREF(set_obj);
-    // ProfilerStop();
     return NULL;
 }
 
