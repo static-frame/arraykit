@@ -29,14 +29,41 @@ Dependencies
 ArrayKit requires the following:
 
 - Python >= 3.6
-- NumPy >= 1.16.5
+- NumPy >= 1.17.4
+
 
 
 What is New in ArrayKit
 -------------------------
 
-0.1.3 dev
+0.1.8
 ............
+
+Revised cross compile releases.
+
+
+0.1.7
+............
+
+Added ``dtype_from_element()``.
+
+
+0.1.6
+............
+
+Explicit imports in ``__init__.py`` for better static analysis.
+
+
+0.1.5
+............
+
+Added ``isna_element()``.
+
+
+0.1.3
+............
+
+Redesigned package structure for inclusion of ``py.typed`` and ``__init__.pyi``.
 
 ``array_deepcopy`` now accepts kwargs and makes the ``memo`` dict optional.
 

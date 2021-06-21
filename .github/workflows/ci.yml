@@ -26,6 +26,7 @@ jobs:
   whl:
     name: Build / ${{ matrix.os }} / Python ${{ matrix.major }}.${{ matrix.minor }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macOS, Ubuntu, Windows]
         major: [3]
@@ -34,10 +35,10 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
-      - uses: docker/setup-qemu-action@v1
-        if: matrix.os == 'Ubuntu' && github.event_name == 'release' && github.event.action == 'published'
-        with:
-          platforms: all
+#       - uses: docker/setup-qemu-action@v1
+#         if: matrix.os == 'Ubuntu' && github.event_name == 'release' && github.event.action == 'published'
+#         with:
+#           platforms: all
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
         if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
@@ -46,12 +47,12 @@ jobs:
         with:
           output-dir: dist
         env:
-          CIBW_ARCHS: "${{ github.event_name == 'release' && github.event.action == 'published' && 'all' || 'auto' }}"
+#           CIBW_ARCHS: "${{ github.event_name == 'release' && github.event.action == 'published' && 'all' || 'auto' }}"
           CIBW_BEFORE_BUILD: pip install -r {project}/requirements.txt
           CIBW_BUILD: cp${{ matrix.major }}${{ matrix.minor }}-*
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-test.txt
-          CIBW_TEST_COMMAND: pytest {project}
+          CIBW_TEST_COMMAND: pytest {project}/test
       - uses: actions/upload-artifact@master
         with:
           name: dist

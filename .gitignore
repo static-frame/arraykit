@@ -8,3 +8,5 @@
 .vscode
 __pycache__
 build
+*.diff
+*.orig
