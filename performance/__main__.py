@@ -374,7 +374,7 @@ class Roll1d20kInt(Perf):
     NUMBER = 10
     SIZE = 20_000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(self.SIZE)
 
     def main(self):
@@ -385,7 +385,7 @@ class Roll1d20kFloat(Perf):
     NUMBER = 10
     SIZE = 20_000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(self.SIZE).astype(float)
 
     def main(self):
@@ -396,7 +396,7 @@ class Roll1d20kObject(Perf):
     NUMBER = 2
     SIZE = 20_000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(self.SIZE).astype(object)
 
     def main(self):
@@ -407,7 +407,7 @@ class Roll1d1kInt(Perf):
     NUMBER = 10
     SIZE = 1_000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(self.SIZE)
 
     def main(self):
@@ -418,7 +418,7 @@ class Roll1d1kFloat(Perf):
     NUMBER = 10
     SIZE = 1_000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(self.SIZE).astype(float)
 
     def main(self):
@@ -429,7 +429,7 @@ class Roll1d1kObject(Perf):
     NUMBER = 10
     SIZE = 1_000
 
-    def pre(self):
+    def __init__(self):
         self.array = np.arange(self.SIZE).astype(object)
 
     def main(self):
