@@ -121,6 +121,8 @@ class TestUnit(unittest.TestCase):
         with pytest.raises(TypeError):
             self.assertEqual(resolve_dtype_iter((a3.dtype, int)).kind, 'U')
 
+        self.assertEqual(resolve_dtype_iter((a1.dtype,)), a1.dtype)
+
     #---------------------------------------------------------------------------
 
     def test_shape_filter_a(self) -> None:
