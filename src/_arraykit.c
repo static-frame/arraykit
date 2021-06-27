@@ -120,6 +120,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
     if (iterator == NULL) {
+        // No need to set exception here. GetIter already sets TypeError
         return NULL;
     }
     PyArray_Descr *resolved = NULL;
@@ -147,6 +148,11 @@ AK_ResolveDTypeIter(PyObject *dtypes)
         }
     }
     Py_DECREF(iterator);
+    if (!resolved) {
+        // this could happen if this function gets an empty tuple
+        PyErr_Format(PyExc_ValueError, "Iterator passed to resolve dtypes is empty.");
+        return NULL;
+    }
     return resolved;
 }
 
