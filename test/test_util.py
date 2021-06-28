@@ -134,6 +134,16 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             shape_filter(a1.reshape(1,2,5))
 
+        with self.assertRaises(NotImplementedError):
+            # zero dimension
+            shape_filter(np.array(1))
+
+        a2 = np.arange(4)
+        self.assertEqual(shape_filter(a2), (4, 1))
+        self.assertEqual(shape_filter(a2.reshape(2, 2)), (2, 2))
+
+        
+        
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:
