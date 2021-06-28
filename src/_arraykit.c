@@ -199,7 +199,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
         if (!array_new) { // we unnecessarily incref'ed the dtype
-            Py_DECREF(dtype);
+            goto error;
         }
         else if (memo && PyDict_SetItem(memo, id, array_new)) {
             Py_XDECREF(array_new);
