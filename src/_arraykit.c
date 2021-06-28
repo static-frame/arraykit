@@ -150,7 +150,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     Py_DECREF(iterator);
     if (!resolved) {
         // this could happen if this function gets an empty tuple
-        PyErr_SetString(PyExc_ValueError, "iterator passed to resolve dtypes is empty");
+        PyErr_SetString(PyExc_ValueError, "iterable passed to resolve dtypes is empty");
     }
     return resolved;
 }
