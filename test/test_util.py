@@ -119,12 +119,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).itemsize, 40)
 
         with pytest.raises(TypeError):
-            self.assertEqual(resolve_dtype_iter((a3.dtype, int)).kind, 'U')
+            resolve_dtype_iter((a3.dtype, int))
 
         self.assertEqual(resolve_dtype_iter((a1.dtype,)), a1.dtype)
 
         with pytest.raises(ValueError):
-            self.assertEqual(resolve_dtype_iter(()), a1.dtype)
+            resolve_dtype_iter(())
 
     #---------------------------------------------------------------------------
 
