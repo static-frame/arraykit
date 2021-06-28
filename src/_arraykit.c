@@ -201,8 +201,8 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
         if (!array_new) { // we unnecessarily incref'ed the dtype
             goto error;
         }
-        else if (memo && PyDict_SetItem(memo, id, array_new)) {
-            Py_XDECREF(array_new);
+        if (memo && PyDict_SetItem(memo, id, array_new)) {
+            Py_DECREF(array_new);
             goto error;
         }
     }
