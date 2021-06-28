@@ -138,11 +138,6 @@ class TestUnit(unittest.TestCase):
             # zero dimension
             shape_filter(np.array(1))
 
-        a2 = np.arange(4)
-        self.assertEqual(shape_filter(a2), (4, 1))
-        self.assertEqual(shape_filter(a2.reshape(2, 2)), (2, 2))
-
-        
         
     #---------------------------------------------------------------------------
 
