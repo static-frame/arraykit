@@ -198,11 +198,12 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
                 array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
-        if (memo) {
-            if (!array_new || PyDict_SetItem(memo, id, array_new)) {
-                Py_XDECREF(array_new);
-                goto error;
-            }
+        if (!array_new) {
+            goto error;
+        }
+        if (memo && PyDict_SetItem(memo, id, array_new)) {
+            Py_DECREF(array_new);
+            goto error;
         }
     }
     // set immutable
