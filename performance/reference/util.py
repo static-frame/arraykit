@@ -1,7 +1,11 @@
 import typing as tp
 from copy import deepcopy
+from collections import abc
+from automap import FrozenAutoMap  # pylint: disable = E0611
 
 import numpy as np
+
+DtypeSpecifier = tp.Optional[tp.Union[str, np.dtype, type]]
 
 DTYPE_DATETIME_KIND = 'M'
 DTYPE_TIMEDELTA_KIND = 'm'
@@ -24,6 +28,17 @@ DTYPE_COMPLEX_DEFAULT = np.dtype(np.complex128)
 
 DTYPES_BOOL = (DTYPE_BOOL,)
 DTYPES_INEXACT = (DTYPE_FLOAT_DEFAULT, DTYPE_COMPLEX_DEFAULT)
+
+INEXACT_TYPES = (float, complex, np.inexact) # inexact matches floating, complexfloating
+
+DICTLIKE_TYPES = (abc.Set, dict, FrozenAutoMap)
+
+# iterables that cannot be used in NP array constructors; asumes that dictlike
+# types have already been identified
+INVALID_ITERABLE_FOR_ARRAY = (abc.ValuesView, abc.KeysView)
+
+# integers above this value will lose precision when coerced to a float
+INT_MAX_COERCIBLE_TO_FLOAT = 9_007_199_256_349_108
 
 
 def mloc(array: np.ndarray) -> int:
@@ -216,3 +231,94 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
 
+
+def is_gen_copy_values(values: tp.Iterable[tp.Any]) -> tp.Tuple[bool, bool]:
+    '''
+    Returns:
+        copy_values: True if values cannot be used in an np.array constructor.`
+    '''
+    if hasattr(values, '__len__'):
+        if isinstance(values, DICTLIKE_TYPES + INVALID_ITERABLE_FOR_ARRAY):
+            # Dict-like iterables need copies
+            return False, True
+
+        return False, False
+
+    # We are a generator and all generators need copies
+    return True, True
+
+
+def prepare_iter_for_array(
+        values: tp.Iterable[tp.Any],
+        restrict_copy: bool = False
+        ) -> tp.Tuple[DtypeSpecifier, bool, tp.Sequence[tp.Any]]:
+    '''
+    Determine an appropriate DtypeSpecifier for values in an iterable.
+    This does not try to determine the actual dtype, but instead, if the DtypeSpecifier needs to be
+    object rather than None (which lets NumPy auto detect).
+    This is expected to only operate on 1D data.
+
+    Args:
+        values: can be a generator that will be exhausted in processing;
+                if a generator, a copy will be made and returned as values.
+        restrict_copy: if True, reject making a copy, even if a generator is given
+
+    Returns:
+        resolved_dtype, has_tuple, values
+    '''
+    is_gen, copy_values = is_gen_copy_values(values)
+
+    if not is_gen and len(values) == 0: #type: ignore
+        return None, False, values #type: ignore
+
+    if restrict_copy:
+        copy_values = False
+
+    v_iter = values if is_gen else iter(values)
+
+    if copy_values:
+        values_post = []
+
+    resolved = None # None is valid specifier if the type is not ambiguous
+
+    has_tuple = False
+    has_str = False
+    has_non_str = False
+    has_inexact = False
+    has_big_int = False
+
+    for v in v_iter:
+        if copy_values:
+            # if a generator, have to make a copy while iterating
+            values_post.append(v)
+
+        value_type = type(v)
+
+        if (value_type is str
+                or value_type is np.str_
+                or value_type is bytes
+                or value_type is np.bytes_):
+            # must compare to both string types
+            has_str = True
+        elif hasattr(v, '__len__'):
+            # identify SF types by if they have STATIC attr they also must be assigned after array creation, so we treat them like tuples
+            has_tuple = True
+            resolved = object
+            break
+        else:
+            has_non_str = True
+            if value_type in INEXACT_TYPES:
+                has_inexact = True
+            elif value_type is int and abs(v) > INT_MAX_COERCIBLE_TO_FLOAT:
+                has_big_int = True
+
+        if (has_str and has_non_str) or (has_big_int and has_inexact):
+            resolved = object
+            break
+
+    if copy_values:
+        # v_iter is an iter, we need to finish it
+        values_post.extend(v_iter)
+        return resolved, has_tuple, values_post
+
+    return resolved, has_tuple, values #type: ignore

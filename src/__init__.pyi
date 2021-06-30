@@ -1,8 +1,10 @@
 import typing as tp
+from automap import FrozenAutoMap
 
 import numpy as np  # type: ignore
 
 _T = tp.TypeVar('_T')
+_DtypeSpecifier = tp.Optional[tp.Union[str, np.dtype, type]]
 
 __version__: str
 
@@ -32,4 +34,9 @@ def resolve_dtype(__d1: np.dtype, __d2: np.dtype) -> np.dtype: ...
 def resolve_dtype_iter(__dtypes: tp.Iterable[np.dtype]) -> np.dtype: ...
 def isna_element(__value: tp.Any) -> bool: ...
 def dtype_from_element(__value: tp.Optional[tp.Hashable]) -> np.dtype: ...
+def is_gen_copy_values(__values: tp.Iterable[tp.Any]) -> tp.Tuple[bool, bool]: ...
+def prepare_iter_for_array(
+        __values: tp.Iterable[tp.Any],
+        restrict_copy: bool = ...,
+        ) -> tp.Tuple[_DtypeSpecifier, bool, tp.Sequence[tp.Any]]: ...
 

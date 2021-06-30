@@ -1,5 +1,6 @@
 # include "Python.h"
 # include "structmember.h"
+# include <stdbool.h>
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -62,6 +63,8 @@
     _AK_DEBUG_BEGIN();          \
         fprintf(stderr, #msg);  \
     _AK_DEBUG_END()
+
+# define AK_INT_MAX_COERCIBLE_TO_FLOAT 9007199256349108l
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
@@ -368,6 +371,239 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
+typedef enum IsGenCopyValues {
+    ERR,
+    IS_GEN,
+    NOT_GEN_COPY,
+    NOT_GEN_NO_COPY
+} IsGenCopyValues;
+
+static IsGenCopyValues
+AK_is_gen_copy_values(PyObject *values, PyObject *frozenAutoMap)
+{
+    if(PyObject_HasAttrString(values, "__len__")) {
+        if (PySet_Check(values) || PyDict_Check(values) ||
+            PyDictValues_Check(values) || PyDictKeys_Check(values))
+        {
+            return NOT_GEN_COPY;
+        }
+
+        switch (PyObject_IsInstance(values, frozenAutoMap))
+        {
+        case -1:
+            return ERR;
+
+        case 0:
+            return NOT_GEN_NO_COPY;
+
+        default: // 1
+            return NOT_GEN_COPY;
+        }
+    }
+
+    return IS_GEN;
+}
+
+static PyObject*
+is_gen_copy_values(PyObject *m, PyObject *arg)
+{
+    // This only exists to allow `AK_is_gen_copy_values` to be tested
+
+    PyObject *frozenAutoMap = PyObject_GetAttrString(m, "FrozenAutoMap");
+    if (!frozenAutoMap) {
+        return NULL;
+    }
+
+    PyObject *is_gen = Py_False;
+    PyObject *copy_values = Py_False;
+
+    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(arg, frozenAutoMap);
+    Py_DECREF(frozenAutoMap);
+
+    if (is_gen_ret == IS_GEN) {
+        is_gen = Py_True;
+        copy_values = Py_True;
+    }
+    else if (is_gen_ret == NOT_GEN_COPY) {
+        copy_values = Py_True;
+    }
+    else if (is_gen_ret == ERR) {
+        return NULL;
+    }
+
+    return PyTuple_Pack(2, is_gen, copy_values);
+}
+
+static PyObject*
+prepare_iter_for_array(PyObject *m, PyObject *args, PyObject *kwargs)
+{
+    PyObject *values;
+    int restrict_copy = 0; // False by default
+
+    static char *kwlist[] = {"values", "restrict_copy", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p:prepare_iter_for_array",
+                                     kwlist,
+                                     &values,
+                                     &restrict_copy))
+    {
+        return NULL;
+    }
+
+    PyObject *frozenAutoMap = PyObject_GetAttrString(m, "FrozenAutoMap");
+    if (!frozenAutoMap) {
+        return NULL;
+    }
+
+    bool is_gen = false;
+    bool copy_values = false;
+
+    IsGenCopyValues is_gen_ret = AK_is_gen_copy_values(values, frozenAutoMap);
+    Py_DECREF(frozenAutoMap);
+
+    if (is_gen_ret == IS_GEN) {
+        is_gen = true;
+        copy_values = true;
+    }
+    else if (is_gen_ret == NOT_GEN_COPY) {
+        copy_values = true;
+    }
+    else if (is_gen_ret == ERR) {
+        return NULL;
+    }
+
+    Py_ssize_t len;
+
+    if (!is_gen) {
+        len = PyObject_Size(values);
+        if (len == -1) {
+            return NULL;
+        }
+        if (len == 0) {
+            return PyTuple_Pack(3, Py_None, Py_False, values);
+        }
+    }
+
+    PyObject *copied_values = NULL;
+
+    if (restrict_copy) {
+        copy_values = false;
+    }
+    else if (copy_values) {
+        copied_values = PyList_New(0);
+        if (!copied_values) {
+            return NULL;
+        }
+    }
+
+    len = 0;
+    bool is_object = false;
+    bool has_tuple = false;
+    bool has_str = false;
+    bool has_non_str = false;
+    bool has_inexact = false;
+    bool has_big_int = false;
+
+    PyObject *iterator = PyObject_GetIter(values);
+    if (!iterator) {
+        goto failure;
+    }
+    PyObject *item = NULL;
+
+    while ((item = PyIter_Next(iterator))) {
+        if (copy_values) {
+            if (-1 == PyList_Append(copied_values, item)) {
+                goto failure_during_iteration;
+            }
+            ++len;
+        }
+
+        // This API call always succeeds.
+        if (PyUnicode_Check(item)) {
+            has_str = true;
+        }
+        else if (PyObject_HasAttrString(item, "__len__")) {
+            has_tuple = true;
+            is_object = true;
+        }
+        else {
+            has_non_str = true;
+
+            // These two API calls always succeed. 96% sure this catches np types
+            if (!has_inexact && (PyFloat_Check(item) || PyComplex_Check(item))) {
+                has_inexact = true;
+            }
+            else if (!has_big_int && PyLong_Check(item)) {
+                int overflow;
+                npy_int64 item_val = PyLong_AsLongLongAndOverflow(item, &overflow);
+                if (-1 == item_val) {
+                    if (PyErr_Occurred()) {
+                        goto failure_during_iteration;
+                    }
+                }
+                else {
+                    has_big_int |= (overflow != 0 || Py_ABS(item_val) > AK_INT_MAX_COERCIBLE_TO_FLOAT);
+                }
+            }
+        }
+
+        is_object |= (has_str && has_non_str) || (has_big_int && has_inexact);
+
+        if (is_object) {
+            if (copy_values) {
+                if (-1 == PyList_SetSlice(copied_values, len, len, iterator)) {
+                    goto failure_during_iteration;
+                }
+            }
+            Py_DECREF(item);
+            break;
+        }
+
+        Py_DECREF(item);
+    }
+
+    Py_DECREF(iterator);
+
+    if (PyErr_Occurred()) {
+        goto failure;
+    }
+
+    PyObject *resolved = NULL;
+    if (is_object) {
+        resolved = (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+    } else {
+        resolved = Py_None;
+    }
+    Py_INCREF(resolved);
+
+    PyObject *is_tuple_obj = PyBool_FromLong(has_tuple);
+    if (!is_tuple_obj) {
+        Py_DECREF(resolved);
+        goto failure;
+    }
+
+    if (copy_values) {
+        PyObject *ret = PyTuple_Pack(3, resolved, is_tuple_obj, copied_values);
+        Py_DECREF(resolved);
+        Py_DECREF(is_tuple_obj);
+        Py_DECREF(copied_values);
+        return ret;
+    }
+
+    PyObject *ret = PyTuple_Pack(3, resolved, is_tuple_obj, values);
+    Py_DECREF(resolved);
+    Py_DECREF(is_tuple_obj);
+    return ret;
+
+failure_during_iteration:
+    Py_DECREF(iterator);
+    Py_DECREF(item);
+
+failure:
+    Py_XDECREF(copied_values);
+    return NULL;
+}
+
 //------------------------------------------------------------------------------
 // general utility
 
@@ -495,6 +731,7 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 
     Py_RETURN_FALSE;
 }
+
 
 //------------------------------------------------------------------------------
 // ArrayGO
@@ -776,6 +1013,8 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"is_gen_copy_values", is_gen_copy_values, METH_O, NULL},
+    {"prepare_iter_for_array", (PyCFunction)prepare_iter_for_array, METH_VARARGS | METH_KEYWORDS, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {NULL},
@@ -794,12 +1033,30 @@ PyInit__arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
-    if (!m ||
-        PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
+    if (!m) {
+        return NULL;
+    }
+
+    PyObject *automap_module = PyImport_ImportModule("automap");
+    if (!automap_module) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    PyObject *frozenAutoMapClass = PyObject_GetAttrString(automap_module, "FrozenAutoMap");
+    Py_DECREF(automap_module);
+    if (!frozenAutoMapClass) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    if (PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
-        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType))
+        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
+        PyModule_AddObject(m, "FrozenAutoMap", frozenAutoMapClass))
     {
-        Py_XDECREF(m);
+        Py_DECREF(frozenAutoMapClass);
+        Py_DECREF(m);
         return NULL;
     }
     return m;
