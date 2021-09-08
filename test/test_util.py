@@ -1,3 +1,4 @@
+import pytest
 import collections
 import datetime
 import unittest
@@ -117,6 +118,14 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).kind, 'U')
         self.assertEqual(resolve_dtype_iter((a3.dtype, a5.dtype)).itemsize, 40)
 
+        with pytest.raises(TypeError):
+            resolve_dtype_iter((a3.dtype, int))
+
+        self.assertEqual(resolve_dtype_iter((a1.dtype,)), a1.dtype)
+
+        with pytest.raises(ValueError):
+            resolve_dtype_iter(())
+
     #---------------------------------------------------------------------------
 
     def test_shape_filter_a(self) -> None:
@@ -134,6 +143,11 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             shape_filter(a1.reshape(1,2,5))
 
+        with self.assertRaises(NotImplementedError):
+            # zero dimension
+            shape_filter(np.array(1))
+
+        
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:

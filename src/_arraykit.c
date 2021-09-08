@@ -120,6 +120,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
     if (iterator == NULL) {
+        // No need to set exception here. GetIter already sets TypeError
         return NULL;
     }
     PyArray_Descr *resolved = NULL;
@@ -147,6 +148,10 @@ AK_ResolveDTypeIter(PyObject *dtypes)
         }
     }
     Py_DECREF(iterator);
+    if (!resolved) {
+        // this could happen if this function gets an empty tuple
+        PyErr_SetString(PyExc_ValueError, "iterable passed to resolve dtypes is empty");
+    }
     return resolved;
 }
 
@@ -193,11 +198,12 @@ AK_ArrayDeepCopy(PyObject* m, PyArrayObject *array, PyObject *memo)
                 array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
-        if (memo) {
-            if (!array_new || PyDict_SetItem(memo, id, array_new)) {
-                Py_XDECREF(array_new);
-                goto error;
-            }
+        if (!array_new) {
+            goto error;
+        }
+        if (memo && PyDict_SetItem(memo, id, array_new)) {
+            Py_DECREF(array_new);
+            goto error;
         }
     }
     // set immutable
@@ -771,7 +777,11 @@ static PyMethodDef arraykit_methods[] =  {
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, "_arraykit", NULL, -1, arraykit_methods,
+    PyModuleDef_HEAD_INIT, 
+    .m_name = "_arraykit", 
+    .m_doc = NULL, 
+    .m_size = -1, 
+    .m_methods = arraykit_methods,
 };
 
 PyObject *
