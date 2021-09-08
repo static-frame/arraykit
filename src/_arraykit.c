@@ -777,10 +777,10 @@ static PyMethodDef arraykit_methods[] =  {
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, 
-    .m_name = "_arraykit", 
-    .m_doc = NULL, 
-    .m_size = -1, 
+    PyModuleDef_HEAD_INIT,
+    .m_name = "_arraykit",
+    .m_doc = NULL,
+    .m_size = -1,
     .m_methods = arraykit_methods,
 };
 
@@ -792,13 +792,13 @@ PyInit__arraykit(void)
 
     PyObject *copy = PyImport_ImportModule("copy");
     if (!copy) {
-        Py_DECREF(m);
+        Py_XDECREF(m);
         return NULL;
     }
     PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
     Py_DECREF(copy);
     if (!deepcopy) {
-        Py_DECREF(m);
+        Py_XDECREF(m);
         return NULL;
     }
 
