@@ -36,6 +36,14 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.1.9
+............
+
+Improvements to performance of ``array_deepcopy``.
+
+Added ``dtype_from_element``.
+
+
 0.1.8
 ............
 
