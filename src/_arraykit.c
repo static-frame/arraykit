@@ -155,9 +155,9 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
-// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays.
+// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays. This depends on the module object to get the deepcopy method.
 PyObject*
-AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
+AK_ArrayDeepCopy(PyObject* m, PyArrayObject *array, PyObject *memo)
 {
     PyObject *id = PyLong_FromVoidPtr((PyObject*)array);
     if (!id) {
@@ -181,12 +181,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
     PyArray_Descr *dtype = PyArray_DESCR(array); // borrowed ref
 
     if (PyDataType_ISOBJECT(dtype)) {
-        PyObject *copy = PyImport_ImportModule("copy");
-        if (!copy) {
-            goto error;
-        }
-        PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
-        Py_DECREF(copy);
+        PyObject *deepcopy = PyObject_GetAttrString(m, "deepcopy");
         if (!deepcopy) {
             goto error;
         }
@@ -333,7 +328,7 @@ static char *array_deepcopy_kwarg_names[] = {
 
 // Specialized array deepcopy that stores immutable arrays in an optional memo dict that can be provided with kwargs.
 static PyObject *
-array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 {
     PyObject *array;
     PyObject *memo = NULL;
@@ -344,7 +339,7 @@ array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
     AK_CHECK_NUMPY_ARRAY(array);
-    return AK_ArrayDeepCopy((PyArrayObject*)array, memo);
+    return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
 //------------------------------------------------------------------------------
@@ -782,10 +777,10 @@ static PyMethodDef arraykit_methods[] =  {
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, 
-    .m_name = "_arraykit", 
-    .m_doc = NULL, 
-    .m_size = -1, 
+    PyModuleDef_HEAD_INIT,
+    .m_name = "_arraykit",
+    .m_doc = NULL,
+    .m_size = -1,
     .m_methods = arraykit_methods,
 };
 
@@ -794,11 +789,26 @@ PyInit__arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
+
+    PyObject *copy = PyImport_ImportModule("copy");
+    if (!copy) {
+        Py_XDECREF(m);
+        return NULL;
+    }
+    PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
+    Py_DECREF(copy);
+    if (!deepcopy) {
+        Py_XDECREF(m);
+        return NULL;
+    }
+
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
-        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType))
+        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
+        PyModule_AddObject(m, "deepcopy", deepcopy))
     {
+        Py_DECREF(deepcopy);
         Py_XDECREF(m);
         return NULL;
     }
