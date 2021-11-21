@@ -3,6 +3,12 @@ import collections
 import datetime
 import unittest
 import itertools
+import typing as tp
+from contextlib import contextmanager
+import os
+from os import PathLike
+from pathlib import Path
+import tempfile
 
 import numpy as np  # type: ignore
 
@@ -20,6 +26,27 @@ from arraykit import dtype_from_element
 from arraykit import array_bytes_to_file
 
 from performance.reference.util import mloc as mloc_ref
+
+PathSpecifier = tp.Union[str, PathLike]
+
+@contextmanager
+def temp_file(suffix: tp.Optional[str] = None,
+        path: bool = False
+        ) -> tp.Iterator[PathSpecifier]:
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            tmp_name = f.name
+        if path:
+            yield Path(tmp_name)
+        else:
+            yield tmp_name
+    finally:
+        if os.path.exists(tmp_name):
+            try:
+                os.unlink(tmp_name)
+            except PermissionError: # happens on Windows sometimes
+                pass
+
 
 
 class TestUnit(unittest.TestCase):
@@ -387,10 +414,11 @@ class TestUnit(unittest.TestCase):
     def test_array_bytes_to_file_a(self) -> None:
 
         a1 = np.array([3, 4, 5])
-        with open('/tmp/tmp.txt', 'w') as f:
-            post = array_bytes_to_file(a1, f)
-            self.assertTrue(post > 0)
-            # import ipdb; ipdb.set_trace()
+        with temp_file('.npy') as fp:
+            with open(fp, 'wb') as f:
+                post = array_bytes_to_file(a1, f)
+                self.assertTrue(post > 0)
+                # import ipdb; ipdb.set_trace()
 
 if __name__ == '__main__':
     unittest.main()
