@@ -17,6 +17,7 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from arraykit import array_bytes_to_file
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -147,7 +148,7 @@ class TestUnit(unittest.TestCase):
             # zero dimension
             shape_filter(np.array(1))
 
-        
+
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:
@@ -382,6 +383,14 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
+    #---------------------------------------------------------------------------
+    def test_array_bytes_to_file_a(self) -> None:
+
+        a1 = np.array([3, 4, 5])
+        with open('/tmp/tmp.txt', 'w') as f:
+            post = array_bytes_to_file(a1, f)
+            self.assertTrue(post > 0)
+            # import ipdb; ipdb.set_trace()
 
 if __name__ == '__main__':
     unittest.main()

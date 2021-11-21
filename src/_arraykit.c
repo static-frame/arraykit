@@ -342,6 +342,28 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
     return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
+
+
+// Wites array bytes to an open, writeable file. Possibly return number of bytes written.
+static PyObject *
+array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    PyObject *array;
+    PyObject *file;
+    if (!PyArg_ParseTuple(args, "OO:array_bytes_to_file",
+            &array, &file)) // how to validate file type?
+    {
+        return NULL;
+    }
+    AK_CHECK_NUMPY_ARRAY(array);
+
+    PyObject *post = PyLong_FromLong(3); // temp
+    if (!post) {
+        return NULL;
+    }
+    return post;
+}
+
 //------------------------------------------------------------------------------
 // type resolution
 
@@ -769,6 +791,7 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"array_bytes_to_file", array_bytes_to_file, METH_VARARGS, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
