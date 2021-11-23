@@ -387,6 +387,9 @@ array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
     // PyObject *PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char order)
 
     PyArrayIterObject *it = (PyArrayIterObject *) PyArray_IterNew(array);
+    if (it == NULL) {
+        return NULL;
+    }
     while (it->index < it->size) {
         // fwrite((const void *)it->dataptr,
         //             (size_t) PyArray_DESCR(self)->elsize,
@@ -407,6 +410,25 @@ error:
     return NULL;
 
 }
+
+// from PyArray_ToString: create an empty bytes object and write to it
+
+        // ret = PyBytes_FromStringAndSize(NULL, (Py_ssize_t) numbytes);
+        // if (ret == NULL) {
+        //     Py_DECREF(it);
+        //     return NULL;
+        // }
+        // dptr = PyBytes_AS_STRING(ret);
+        // i = it->size;
+        // elsize = PyArray_DESCR(self)->elsize;
+        // while (i--) {
+        //     memcpy(dptr, it->dataptr, elsize);
+        //     dptr += elsize;
+        //     PyArray_ITER_NEXT(it);
+        // }
+        // Py_DECREF(it);
+
+
 
 //------------------------------------------------------------------------------
 // type resolution
