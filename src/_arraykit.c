@@ -344,12 +344,14 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 
 
 
-// Wites array bytes to an open, writeable file. Possibly return number of bytes written.
+// Wites array bytes to an open, writeable file. Possibly return number of bytes written. This is similar to what tofile() does but tofile() cannot be used on a _ZipWriteFile when writing into a zip (raises io.UnsupportedOperation: fileno)
 static PyObject *
 array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
 {
+
     PyObject *array;
     PyObject *file;
+
     if (!PyArg_ParseTuple(args, "OO:array_bytes_to_file",
             &array, &file)) // how to validate file type?
     {
@@ -357,11 +359,53 @@ array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
     }
     AK_CHECK_NUMPY_ARRAY(array);
 
-    PyObject *post = PyLong_FromLong(3); // temp
+    PyObject *write_func = PyObject_GetAttrString(file, "write");
+    if (!write_func) {
+        goto error;
+    }
+    // PyObject *_ = PyObject_CallFunctionObjArgs(fileno, NULL);
+
+    // this is what PyArray_ToFile to does
+    // if (PyArray_ISCONTIGUOUS(array)) {
+    //     size = PyArray_SIZE(array);
+    //     NPY_BEGIN_ALLOW_THREADS;
+    //     n = fwrite((const void *)PyArray_DATA(array),
+    //             (size_t) PyArray_DESCR(array)->elsize,
+    //             (size_t) size,
+    //             file);
+    //     NPY_END_ALLOW_THREADS;
+    //     if (n < size) {
+    //         PyErr_Format(PyExc_OSError,
+    //                 "%ld requested and %ld written",
+    //                 (long) size, (long) n);
+    //         return NULL;
+    //     }
+    // }
+
+    // can create memory view object and pass this to the write method
+    // PyObject *PyMemoryView_FromMemory(char *mem, Py_ssize_t size, int flags)
+    // PyObject *PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char order)
+
+    PyArrayIterObject *it = (PyArrayIterObject *) PyArray_IterNew(array);
+    while (it->index < it->size) {
+        // fwrite((const void *)it->dataptr,
+        //             (size_t) PyArray_DESCR(self)->elsize,
+        //             1, fp)
+        PyArray_ITER_NEXT(it);
+    }
+    Py_DECREF(it);
+    Py_DECREF(write_func);
+
+    // dummy return
+    PyObject *post = PyLong_FromLong(3);
     if (!post) {
         return NULL;
     }
     return post;
+
+error:
+    return NULL;
+
 }
 
 //------------------------------------------------------------------------------
