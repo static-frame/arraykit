@@ -390,11 +390,19 @@ array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
     if (it == NULL) {
         return NULL;
     }
+
+    PyObject *mv;
+    PyObject *ret;
+
+    size_t elsize = PyArray_DESCR(array)->elsize;
+
     while (it->index < it->size) {
-        // fwrite((const void *)it->dataptr,
-        //             (size_t) PyArray_DESCR(self)->elsize,
-        //             1, fp)
+        mv = PyMemoryView_FromMemory(it->dataptr, elsize, 0);
+        ret = PyObject_CallFunctionObjArgs(write_func, mv, NULL);
+
         PyArray_ITER_NEXT(it);
+        Py_DECREF(mv);
+        Py_DECREF(ret);
     }
     Py_DECREF(it);
     Py_DECREF(write_func);
@@ -412,6 +420,11 @@ error:
 }
 
 // from PyArray_ToString: create an empty bytes object and write to it
+
+        // fwrite((const void *)it->dataptr,
+        //             (size_t) PyArray_DESCR(self)->elsize,
+        //             1, fp)
+
 
         // ret = PyBytes_FromStringAndSize(NULL, (Py_ssize_t) numbytes);
         // if (ret == NULL) {

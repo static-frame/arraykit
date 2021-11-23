@@ -416,11 +416,16 @@ class TestUnit(unittest.TestCase):
         a1 = np.array([3, 4, 5])
         with temp_file('.npy') as fp:
             with open(fp, 'wb') as f:
-                post = array_bytes_to_file(a1, f)
-                self.assertTrue(post > 0)
+                count = array_bytes_to_file(a1, f)
+                self.assertTrue(count > 0)
                 # import ipdb; ipdb.set_trace()
 
-        # import ipdb; ipdb.set_trace()
+            with open(fp, 'r') as f:
+                a2 = np.fromfile(f, dtype=a1.dtype)
+                self.assertTrue((a1 == a2).all())
+                # print(a2)
+                # import ipdb; ipdb.set_trace()
+                pass
 
 if __name__ == '__main__':
     unittest.main()
