@@ -216,3 +216,30 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
 
+
+NDITER_FLAGS = ('external_loop', 'buffered', 'zerosize_ok')
+BUFFERSIZE_NUMERATOR = 16 * 1024 ** 2
+# for 8 bytes this would give 2,097,152 bytes
+
+def array_bytes_to_file(
+        array: np.ndarray,
+        file: tp.BinaryIO,
+        ):
+    buffersize = max(BUFFERSIZE_NUMERATOR // array.itemsize, 1)
+    flags = array.flags
+    if flags.f_contiguous and not flags.c_contiguous:
+        for chunk in np.nditer(
+                array,
+                flags=NDITER_FLAGS,
+                buffersize=buffersize,
+                order='F',
+                ):
+            file.write(chunk.tobytes('C'))
+    else:
+        for chunk in np.nditer(
+                array,
+                flags=NDITER_FLAGS,
+                buffersize=buffersize,
+                order='C',
+                ):
+            file.write(chunk.tobytes('C'))

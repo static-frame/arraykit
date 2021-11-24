@@ -363,48 +363,33 @@ array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
     if (!write_func) {
         goto error;
     }
-    // PyObject *_ = PyObject_CallFunctionObjArgs(fileno, NULL);
-
-    // this is what PyArray_ToFile to does
-    // if (PyArray_ISCONTIGUOUS(array)) {
-    //     size = PyArray_SIZE(array);
-    //     NPY_BEGIN_ALLOW_THREADS;
-    //     n = fwrite((const void *)PyArray_DATA(array),
-    //             (size_t) PyArray_DESCR(array)->elsize,
-    //             (size_t) size,
-    //             file);
-    //     NPY_END_ALLOW_THREADS;
-    //     if (n < size) {
-    //         PyErr_Format(PyExc_OSError,
-    //                 "%ld requested and %ld written",
-    //                 (long) size, (long) n);
-    //         return NULL;
-    //     }
-    // }
-
-    // can create memory view object and pass this to the write method
-    // PyObject *PyMemoryView_FromMemory(char *mem, Py_ssize_t size, int flags)
-    // PyObject *PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char order)
-
-    PyArrayIterObject *it = (PyArrayIterObject *) PyArray_IterNew(array);
-    if (it == NULL) {
-        return NULL;
-    }
-
     PyObject *mv;
     PyObject *ret;
+    size_t elsize = PyArray_DESCR((PyArrayObject*)array)->elsize;
 
-    size_t elsize = PyArray_DESCR(array)->elsize;
-
-    while (it->index < it->size) {
-        mv = PyMemoryView_FromMemory(it->dataptr, elsize, 0);
+    // this is what PyArray_ToFile to does
+    if (PyArray_ISCONTIGUOUS((PyArrayObject*)array)) {
+        npy_intp size = PyArray_SIZE((PyArrayObject*)array);
+        // might use PyMemoryView_GetContiguous
+        mv = PyMemoryView_FromMemory(PyArray_DATA((PyArrayObject*)array), size * elsize, 0);
         ret = PyObject_CallFunctionObjArgs(write_func, mv, NULL);
-
-        PyArray_ITER_NEXT(it);
         Py_DECREF(mv);
-        Py_DECREF(ret);
+        Py_DECREF(ret);    }
+    else {
+        PyArrayIterObject *it = (PyArrayIterObject *) PyArray_IterNew(array);
+        if (it == NULL) {
+            return NULL;
+        }
+        while (it->index < it->size) {
+            mv = PyMemoryView_FromMemory(it->dataptr, elsize, 0);
+            ret = PyObject_CallFunctionObjArgs(write_func, mv, NULL);
+
+            PyArray_ITER_NEXT(it);
+            Py_DECREF(mv);
+            Py_DECREF(ret);
+        }
+        Py_DECREF(it);
     }
-    Py_DECREF(it);
     Py_DECREF(write_func);
 
     // dummy return
@@ -418,6 +403,10 @@ error:
     return NULL;
 
 }
+
+    // can create memory view object and pass this to the write method
+    // PyObject *PyMemoryView_FromMemory(char *mem, Py_ssize_t size, int flags)
+    // PyObject *PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char order)
 
 // from PyArray_ToString: create an empty bytes object and write to it
 
