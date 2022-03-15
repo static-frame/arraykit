@@ -258,9 +258,9 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
-    int size0 = PyArray_DIM(array, 0);
+    int size0 = (int)PyArray_DIM(array, 0);
     // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
-    int size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    int size1 = (int)(PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1));
     return Py_BuildValue("ii", size0, size1);
 }
 
@@ -490,6 +490,126 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 
     Py_RETURN_FALSE;
 }
+
+//------------------------------------------------------------------------------
+// rolling
+
+static PyObject *
+_roll_1d(PyArrayObject *array, int shift)
+{
+    // Tell the constructor to automatically allocate the output.
+    // The data type of the output will match that of the input.
+    PyArrayObject *arrays[2];
+    npy_uint32 arrays_flags[2];
+    arrays[0] = array;
+    arrays[1] = NULL;
+    arrays_flags[0] = NPY_ITER_READONLY;
+    arrays_flags[1] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE;
+
+    // No inner iteration - inner loop is handled by CopyArray code
+    // Reference objects are OK.
+    int iter_flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+
+    // Construct the iterator
+    NpyIter *iter = NpyIter_MultiNew(
+            2,              // number of arrays
+            arrays,
+            iter_flags,
+            NPY_KEEPORDER,  // Maintain existing order for `array`
+            NPY_NO_CASTING, // Both arrays will have the same dtype so casting isn't needed or allowed
+            arrays_flags,
+            NULL);          // We don't have to specify dtypes since it will use array's
+
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    npy_intp itemsize = NpyIter_GetDescrArray(iter)[0]->elsize;
+
+    // If we don't need the GIL, iteration can be multi-threaded!
+    NPY_BEGIN_THREADS_DEF;
+    if (!NpyIter_IterationNeedsAPI(iter)) {
+        NPY_BEGIN_THREADS;
+    }
+
+    do {
+        char* src_data = dataptr[0];
+        char* dst_data = dataptr[1];
+        npy_intp size = *sizeptr;
+
+        npy_intp offset = ((size - shift) % size) * itemsize;
+        npy_intp first_chunk = (size * itemsize) - offset;
+
+        memcpy(dst_data, src_data + offset, first_chunk);
+        memcpy(dst_data + first_chunk, src_data, offset);
+
+        // Increment ref counts of objects.
+        if (PyDataType_ISOBJECT(PyArray_DESCR(array))) {
+            dst_data = dataptr[1];
+            while (size--) {
+                Py_INCREF(*(PyObject**)dst_data);
+                dst_data += itemsize;
+            }
+        }
+    } while (iternext(iter));
+
+    NPY_END_THREADS;
+
+    // Get the result from the iterator object array
+    PyArrayObject *ret = NpyIter_GetOperandArray(iter)[1];
+    if (!ret) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+    Py_INCREF(ret);
+
+    if (NpyIter_Deallocate(iter) != NPY_SUCCEED) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+
+    return (PyObject*)ret;
+}
+
+static PyObject *
+roll_1d(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    PyArrayObject *array;
+    int shift;
+
+    if (!PyArg_ParseTuple(args, "O!i:roll_1d", &PyArray_Type, &array, &shift))
+    {
+        return NULL;
+    }
+
+    // Must be signed in order for modulo to work properly for negative shift values
+    int size = (int)PyArray_SIZE(array);
+
+    uint8_t is_empty = (size == 0);
+
+    if (!is_empty) {
+        shift = shift % size;
+    }
+
+    if (is_empty || (shift == 0)) {
+        PyObject* copy = PyArray_Copy(array);
+        if (!copy) {
+            return NULL;
+        }
+        return copy;
+    }
+
+    return _roll_1d(array, shift);
+}
+
 
 //------------------------------------------------------------------------------
 // ArrayGO
@@ -773,6 +893,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"roll_1d", roll_1d, METH_VARARGS, NULL},
     {NULL},
 };
 

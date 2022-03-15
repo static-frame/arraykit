@@ -17,6 +17,7 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from arraykit import roll_1d
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -381,6 +382,25 @@ class TestUnit(unittest.TestCase):
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
+
+    def test_roll_1d_a(self) -> None:
+        a1 = np.arange(12, dtype=float)
+
+        for i in range(len(a1) + 1):
+            post = roll_1d(a1, i)
+            self.assertEqual(post.tolist(), np.roll(a1, i).tolist())
+
+            post = roll_1d(a1, -i)
+            self.assertEqual(post.tolist(), np.roll(a1, -i).tolist())
+
+    def test_roll_1d_b(self) -> None:
+        post = roll_1d(np.array([]), -4)
+        self.assertEqual([], post.tolist())
+
+    def test_roll_1d_c(self) -> None:
+        a1 = np.array([3, 4, 5, 6])
+        self.assertEqual(roll_1d(a1, 1).tolist(), [6, 3, 4, 5])
+        self.assertEqual(roll_1d(a1, -1).tolist(), [4, 5, 6, 3])
 
 
 if __name__ == '__main__':

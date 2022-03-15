@@ -17,6 +17,7 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
+from performance.reference.util import roll_1d as roll_1d_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -32,6 +33,7 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
+from arraykit import roll_1d as roll_1d_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -358,6 +360,89 @@ class IsNaElementPerfAK(IsNaElementPerf):
 class IsNaElementPerfREF(IsNaElementPerf):
     entry = staticmethod(isna_element_ref)
 
+
+#-------------------------------------------------------------------------------
+
+storage = []
+def build_subclassses(klass, ak_meth, ref_meth):
+    storage.append(type(f'{klass.__name__}AK', (klass,), dict(entry=staticmethod(ak_meth))))
+    storage.append(type(f'{klass.__name__}REF', (klass,), dict(entry=staticmethod(ref_meth))))
+
+
+#-------------------------------------------------------------------------------
+class Roll1d20kInt(Perf):
+    NUMBER = 10
+    SIZE = 20_000
+
+    def __init__(self):
+        self.array = np.arange(self.SIZE)
+
+    def main(self):
+        for i in range(-20_001, 20_001):
+            self.entry(self.array, i)
+
+class Roll1d20kFloat(Perf):
+    NUMBER = 10
+    SIZE = 20_000
+
+    def __init__(self):
+        self.array = np.arange(self.SIZE).astype(float)
+
+    def main(self):
+        for i in range(-20_001, 20_001):
+            self.entry(self.array, i)
+
+class Roll1d20kObject(Perf):
+    NUMBER = 2
+    SIZE = 20_000
+
+    def __init__(self):
+        self.array = np.arange(self.SIZE).astype(object)
+
+    def main(self):
+        for i in range(-20_001, 20_001):
+            self.entry(self.array, i)
+
+class Roll1d1kInt(Perf):
+    NUMBER = 10
+    SIZE = 1_000
+
+    def __init__(self):
+        self.array = np.arange(self.SIZE)
+
+    def main(self):
+        for i in range(-20_000, 20_000):
+            self.entry(self.array, i)
+
+class Roll1d1kFloat(Perf):
+    NUMBER = 10
+    SIZE = 1_000
+
+    def __init__(self):
+        self.array = np.arange(self.SIZE).astype(float)
+
+    def main(self):
+        for i in range(-20_000, 20_000):
+            self.entry(self.array, i)
+
+class Roll1d1kObject(Perf):
+    NUMBER = 10
+    SIZE = 1_000
+
+    def __init__(self):
+        self.array = np.arange(self.SIZE).astype(object)
+
+    def main(self):
+        for i in range(-20_000, 20_000):
+            self.entry(self.array, i)
+
+
+build_subclassses(Roll1d20kInt, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d20kFloat, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d20kObject, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d1kInt, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d1kFloat, roll_1d_ak, roll_1d_ref)
+build_subclassses(Roll1d1kObject, roll_1d_ak, roll_1d_ref)
 
 #-------------------------------------------------------------------------------
 

@@ -216,3 +216,23 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
 
+
+def roll_1d(array: np.ndarray, shift: int) -> np.ndarray:
+    '''
+    Specialized form of np.roll that, by focusing on the 1D solution, is at least four times faster.
+    '''
+    size = len(array)
+    if size <= 1:
+        return array.copy()
+
+    # result will be positive
+    shift = shift % size
+    if shift == 0:
+        return array.copy()
+
+    post = np.empty(size, dtype=array.dtype)
+
+    post[0:shift] = array[-shift:]
+    post[shift:] = array[0:-shift]
+    return post
+
