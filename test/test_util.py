@@ -17,6 +17,7 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from performance.reference.util import array_to_duplicated_hashable
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -381,6 +382,80 @@ class TestUnit(unittest.TestCase):
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
+
+    def testarray_to_duplicated_hashable_a(self) -> None:
+        a = array_to_duplicated_hashable(np.array([0,1,2,2,1,4,5,3,4,5,5,6], dtype=object),
+                exclude_first=False, exclude_last=False)
+        assert a.tolist() == [False, True, True, True, True, True, True, False, True, True, True, False]
+
+        a = array_to_duplicated_hashable(np.array([0,1,2,2,1,4,5,3,4,5,5,6], dtype=object),
+                exclude_first=True, exclude_last=False)
+        assert a.tolist() == [False, False, False, True, True, False, False, False, True, True, True, False]
+
+    def testarray_to_duplicated_hashable_b(self) -> None:
+        a = np.array([[50, 50, 32, 17, 17], [2,2,1,3,3]], dtype=object)
+        # find duplicate rows
+        post = array_to_duplicated_hashable(a, axis=0)
+        assert post.tolist() == [False, False]
+
+        post = array_to_duplicated_hashable(a, axis=1)
+        assert post.tolist() == [True, True, False, True, True]
+
+        post = array_to_duplicated_hashable(a, axis=1, exclude_first=True)
+        assert post.tolist() == [False, True, False, False, True]
+
+    def testarray_to_duplicated_hashable_c(self) -> None:
+        c = array_to_duplicated_hashable(np.array(['q','q','q', 'a', 'w', 'w'], dtype=object),
+                exclude_first=False, exclude_last=False)
+        assert c.tolist() == [True, True, True, False, True, True]
+
+    def testarray_to_duplicated_hashable_d(self) -> None:
+        # NOTE: these cases fail with hetergenous types as we cannot sort
+        a1 = np.array([0,0,1,0,None,None,0,1,None], dtype=object)
+        a2 = np.array([0,0,1,0,'q','q',0,1,'q'], dtype=object)
+
+        for array in (a1, a2):
+            post1 = array_to_duplicated_hashable(array, exclude_first=False, exclude_last=False)
+            assert post1.tolist() == [True, True, True, True, True, True, True, True, True]
+
+            post2 = array_to_duplicated_hashable(array, exclude_first=True, exclude_last=False)
+            assert post2.tolist() == [False, True, False, True, False, True, True, True, True]
+
+            post3 = array_to_duplicated_hashable(array, exclude_first=False, exclude_last=True)
+            assert post3.tolist() == [True, True, True, True, True, True, False, False, False]
+
+            post4 = array_to_duplicated_hashable(array, exclude_first=True, exclude_last=True)
+            assert post4.tolist() == [False, True, False, True, False, True, False, False, False]
+
+    def testarray_to_duplicated_hashable_e(self) -> None:
+        array = np.array([[None, None, None, 32, 17, 17], [2,2,2,False,'q','q'], [2,2,2,False,'q','q'], ], dtype=object)
+
+        post1 = array_to_duplicated_hashable(array, exclude_first=False, exclude_last=False)
+        assert post1.tolist() == [False, True, True]
+
+        post2 = array_to_duplicated_hashable(array, exclude_first=True, exclude_last=False)
+        assert post2.tolist() == [False, False, True]
+
+        post3 = array_to_duplicated_hashable(array, exclude_first=False, exclude_last=True)
+        assert post3.tolist() == [False, True, False]
+
+        post4 = array_to_duplicated_hashable( array, exclude_first=True, exclude_last=True)
+        assert post4.tolist() == [False, False, False]
+
+    def testarray_to_duplicated_hashable_f(self) -> None:
+        array = np.array([[None, None, None, 32, 17, 17], [2,2,2,False,'q','q'], [2,2,2,False,'q','q'], ], dtype=object)
+
+        post1 = array_to_duplicated_hashable(array, axis=1, exclude_first=False, exclude_last=False)
+        assert post1.tolist() == [True, True, True, False, True, True]
+
+        post2 = array_to_duplicated_hashable(array, axis=1, exclude_first=True, exclude_last=False)
+        assert post2.tolist() == [False, True, True, False, False, True]
+
+        post3 = array_to_duplicated_hashable(array, axis=1, exclude_first=False, exclude_last=True)
+        assert post3.tolist() == [True, True, False, False, True, False]
+
+        post4 = array_to_duplicated_hashable(array, axis=1, exclude_first=True, exclude_last=True)
+        assert post4.tolist() == [False, True, False, False, False, False]
 
 
 if __name__ == '__main__':

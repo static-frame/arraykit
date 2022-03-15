@@ -216,3 +216,63 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
 
+
+#-------------------------------------------------------------------------------
+# tools for handling duplicates
+
+def array_to_duplicated_hashable(
+        array: np.ndarray,
+        axis: int = 0,
+        exclude_first: bool = False,
+        exclude_last: bool = False,
+    ) -> np.ndarray:
+    '''
+    Algorithm for finding duplicates in unsortable arrays for hashables. This will always be an object array.
+    '''
+    # np.unique fails under the same conditions that sorting fails, so there is no need to try np.unique: must go to set drectly.
+    len_axis = array.shape[axis]
+
+    if array.ndim == 1:
+        value_source = array
+        to_hashable = None
+    else:
+        if axis == 0:
+            value_source = array # will iterate rows
+        else:
+            value_source = (array[:, i] for i in range(len_axis))
+        # values will be arrays; must convert to tuples to make hashable
+        to_hashable = tuple
+
+    is_dupe = np.full(len_axis, False)
+
+    # could exit early with a set, but would have to hash all array twice to go to set and dictionary
+    # creating a list for each entry and tracking indices would be very expensive
+
+    unique_to_first: tp.Dict[tp.Hashable, int] = {} # value to first occurence
+    dupe_to_first: tp.Dict[tp.Hashable, int] = {}
+    dupe_to_last: tp.Dict[tp.Hashable, int] = {}
+
+    for idx, v in enumerate(value_source):
+
+        if to_hashable:
+            v = to_hashable(v)
+
+        if v not in unique_to_first:
+            unique_to_first[v] = idx
+        else:
+            # v has been seen before; upate Boolean array
+            is_dupe[idx] = True
+
+            # if no entry in dupe to first, no update with value in unique to first, which is the index this values was first seen
+            if v not in dupe_to_first:
+                dupe_to_first[v] = unique_to_first[v]
+            # always update last
+            dupe_to_last[v] = idx
+
+    if exclude_last: # overwrite with False
+        is_dupe[list(dupe_to_last.values())] = False
+
+    if not exclude_first: # add in first values
+        is_dupe[list(dupe_to_first.values())] = True
+
+    return is_dupe

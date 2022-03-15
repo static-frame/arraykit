@@ -1,7 +1,8 @@
+import argparse
 import collections
 import datetime
+import itertools
 import timeit
-import argparse
 
 import numpy as np
 
@@ -17,6 +18,7 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
+from performance.reference.util import array_to_duplicated_hashable as array_to_duplicated_hashable_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -32,6 +34,7 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
+from performance.reference.util import array_to_duplicated_hashable as array_to_duplicated_hashable_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -360,6 +363,81 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 
 #-------------------------------------------------------------------------------
+class ArrayToDuplicatedHashablePerf(Perf):
+    NUMBER = 3
+    FUNCTIONS = (
+            'array_1d_small',
+            'array_1d_large',
+            'array_2d_small',
+            'array_2d_large',
+    )
+
+    def __init__(self):
+        self.arrays_1d_small = [
+            np.array([0,0,1,0,None,None,0,1,None], dtype=object),
+            np.array([0,0,1,0,'q','q',0,1,'q'], dtype=object),
+            np.array(['q','q','q', 'a', 'w', 'w'], dtype=object),
+            np.array([0,1,2,2,1,4,5,3,4,5,5,6], dtype=object),
+        ]
+
+        # 0.99920089 0.94194469
+        rs = np.random.RandomState(0)
+        self.arrays_1d_large = [
+            np.arange(100_000).astype(object), # All unique                                                        0.73636183 0.73142613
+            np.full(100_000, fill_value='abc').astype(object), # All duplicated                                    0.99341718 1.07130567
+            rs.randint(0, 100, 100_000).astype(object), # Many repeated elements from small subset                 0.96812477 0.97921523
+            rs.randint(0, 10_000, 100_000).astype(object), # Many repeated elements from medium subset             1.05508269 0.9765244
+            rs.randint(0, 75_000, 100_000).astype(object), # Some repeated elements from a large subset            0.81474696 0.89746359
+            np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).astype(object), # Custom 0.84165586 0.86117453
+        ]
+
+        self.arrays_2d_small = [
+            np.array([[None, None, None, 32, 17, 17], [2,2,2,False,'q','q'], [2,2,2,False,'q','q'], ], dtype=object),
+            np.array([[None, None, None, 32, 17, 17], [2,2,2,False,'q','q'], [2,2,2,False,'q','q'], ], dtype=object),
+            np.array([[50, 50, 32, 17, 17], [2,2,1,3,3]], dtype=object),
+        ]
+        self.arrays_2d_large = [
+            np.arange(100_000).reshape(10_000, 10).astype(object),
+            np.hstack([np.arange(15), np.arange(90_000), np.arange(15), np.arange(9970)]).reshape(10_000, 10).astype(object),
+        ]
+
+    def array_1d_small(self):
+        for _ in range(10000):
+            for arr in self.arrays_1d_small:
+                self.entry(arr, 0, False, False)
+                self.entry(arr, 0, True, False)
+                self.entry(arr, 0, False, True)
+
+    def array_1d_large(self):
+        for _ in range(5):
+            for arr in self.arrays_1d_large:
+                self.entry(arr, 0, False, False)
+                self.entry(arr, 0, True, False)
+                self.entry(arr, 0, False, True)
+
+    def array_2d_small(self):
+        for _ in range(5000):
+            for axis, arr in itertools.product((0, 1), self.arrays_2d_small):
+                self.entry(arr, axis, False, False)
+                self.entry(arr, axis, True, False)
+                self.entry(arr, axis, False, True)
+
+    def array_2d_large(self):
+        for _ in range(12):
+            for axis, arr in itertools.product((0, 1), self.arrays_2d_large):
+                self.entry(arr, axis, False, False)
+                self.entry(arr, axis, True, False)
+                self.entry(arr, axis, False, True)
+
+
+class ArrayToDuplicatedHashablePerfAK(ArrayToDuplicatedHashablePerf):
+    entry = staticmethod(array_to_duplicated_hashable_ak)
+
+class ArrayToDuplicatedHashablePerfREF(ArrayToDuplicatedHashablePerf):
+    entry = staticmethod(array_to_duplicated_hashable_ref)
+
+
+#-------------------------------------------------------------------------------
 
 def get_arg_parser():
 
@@ -399,7 +477,7 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
-    width = 24
+    width = 36
     for record in records:
         print(''.join(
             (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record

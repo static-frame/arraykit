@@ -63,6 +63,11 @@
         fprintf(stderr, #msg);  \
     _AK_DEBUG_END()
 
+# define AK_DEBUG_INT(msg)           \
+    _AK_DEBUG_BEGIN();               \
+        fprintf(stderr, #msg"=%x", (int)(msg)); \
+    _AK_DEBUG_END()
+
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)
 # define AK_UNLIKELY(X) __builtin_expect(!!(X), 0)
@@ -492,6 +497,472 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
+// duplication
+
+// Defines how to process a hashable value.
+typedef int (*AK_handle_value_func)(Py_ssize_t i,
+                                    PyObject* value,
+                                    npy_bool* is_dup,
+                                    PyObject* set_obj,
+                                    PyObject* dict_obj
+);
+
+// Defines how to iterate over an arbitrary numpy (object) array
+typedef int (*AK_iterate_np_func)(PyArrayObject* array,
+                                  int axis,
+                                  int reverse,
+                                  npy_bool* is_dup,
+                                  AK_handle_value_func handle_value_func,
+                                  PyObject* set_obj,
+                                  PyObject* dict_obj
+);
+
+// Value processing funcs
+
+static int
+AK_handle_value_one_boundary(Py_ssize_t i, PyObject *value, npy_bool *is_dup,
+                             PyObject *seen, PyObject * Py_UNUSED(dict_obj))
+{
+    /*
+    Used when the first duplicated element is considered unique.
+
+    If exclude_first && !exclude_last, we walk from left to right
+    If !exclude_first && exclude_last, we walk from right to left
+
+    Rougly equivalent Python:
+
+        if value not in seen:
+            seen.add(value)
+        else:
+            is_dup[i] = True
+    */
+    int found = PySet_Contains(seen, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        return PySet_Add(seen, value); // -1 on failure, 0 on success
+    }
+
+    is_dup[i] = NPY_TRUE;
+    return 0;
+}
+
+static int
+AK_handle_value_include_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_dup,
+                                   PyObject *seen,
+                                   PyObject *last_duplicate_locations)
+{
+    /*
+    Used when the first & last instances of duplicated values are considered unique
+
+    Rougly equivalent Python:
+
+        if value not in seen:
+            seen.add(value)
+        else:
+            is_dup[i] = True
+
+            # Keep track of last observed location, so we can mark it False (i.e. unique) at the end
+            last_duplicate_locations[value] = i
+    */
+    int found = PySet_Contains(seen, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        return PySet_Add(seen, value); // -1 on failure, 0 on success
+    }
+
+    is_dup[i] = NPY_TRUE;
+
+    PyObject *idx = PyLong_FromLong(i);
+    if (!idx) { return -1; }
+
+    int success = PyDict_SetItem(last_duplicate_locations, value, idx);
+    if (success == -1) {
+        Py_DECREF(idx);
+    }
+    return success; // -1 on failure, 0 on success
+}
+
+static int
+AK_handle_value_exclude_boundaries(Py_ssize_t i, PyObject *value, npy_bool *is_dup,
+                                   PyObject *duplicates,
+                                   PyObject *first_unique_locations)
+{
+    /*
+    Used when the first & last instances of duplicated values are considered duplicated
+
+    Rougly equivalent Python:
+
+        if value not in first_unique_locations:
+            # Keep track of the first time we see each unique value, so we can mark the first location
+            # of each duplicated value as duplicated
+            first_unique_locations[value] = i
+        else:
+            is_dup[i] = True
+
+            # The second time we see a duplicate, we mark the first observed location as True (i.e. duplicated)
+            if value not in duplicates:
+                is_dup[first_unique_locations[value]] = True
+
+            # This value is duplicated!
+            duplicates.add(value)
+    */
+    int found = PyDict_Contains(first_unique_locations, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        PyObject *idx = PyLong_FromLong(i);
+        if (!idx) {
+            return -1;
+        }
+
+        int success = PyDict_SetItem(first_unique_locations, value, idx);
+        if (success == -1) {
+            Py_DECREF(idx);
+        }
+        return success; // -1 on failure, 0 on success
+    }
+
+    is_dup[i] = NPY_TRUE;
+
+    // Second time seeing a duplicate
+    found = PySet_Contains(duplicates, value);
+    if (found == -1) {
+        return -1;
+    }
+
+    if (found == 0) {
+        PyObject *first_unique_location = PyDict_GetItem(first_unique_locations, value); // Borrowed!
+        if (!first_unique_location) {
+            return -1;
+        }
+        long idx = PyLong_AsLong(first_unique_location);
+        if (idx == -1) {
+            return -1; // -1 always means failure since no locations are negative
+        }
+        is_dup[idx] = NPY_TRUE;
+    }
+
+    return PySet_Add(duplicates, value);
+}
+
+// Iteration funcs
+
+static int
+AK_iter_1d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
+                 AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
+{
+    /*
+    Iterates over a 1D numpy array.
+
+    Roughly equivalent Python code:
+
+        if reverse:
+            iterator = reversed(array)
+        else:
+            iterator = array
+
+        size = len(array)
+
+        for i, value in enumerate(iterator):
+            if reverse:
+                i = size - i - 1
+
+            process_value_func(i, value, is_dup, set_obj, dict_obj)
+    */
+    assert(axis == 0);
+    NpyIter *iter = NpyIter_New(array,
+                                NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                                NPY_KEEPORDER,
+                                NPY_NO_CASTING,
+                                NULL);
+    if (!iter) { goto failure; }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) { goto failure; }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    // Do-while numpy iteration loops only happen once for 1D arrays!
+    do {
+        char *data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp count = *sizeptr;
+
+        PyObject* value = NULL;
+
+        Py_ssize_t i = 0;
+        int step = 1;
+        int stride_step = (int)stride; // We might walk in reverse!
+
+        if (reverse) {
+            data += (stride * (count - 1));
+            i = count - 1;
+            step = -1;
+            stride_step = -stride_step;
+        }
+
+        while (count--) {
+            // Object arrays contains pointers to PyObjects, so we will only temporarily
+            // look at the reference here.
+            memcpy(&value, data, sizeof(value));
+
+            // Process the value!
+            if (value_func(i, value, is_dup, set_obj, dict_obj) == -1) {
+                goto failure;
+            }
+
+            i += step;
+            data += stride_step;
+        }
+    } while (iternext(iter));
+
+    NpyIter_Deallocate(iter);
+    return 0;
+
+failure:
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+    return -1;
+}
+
+static int
+AK_iter_2d_array(PyArrayObject *array, int axis, int reverse, npy_bool *is_dup,
+                 AK_handle_value_func value_func, PyObject *set_obj, PyObject *dict_obj)
+{
+    int is_c_order = PyArray_FLAGS(array) & NPY_ARRAY_C_CONTIGUOUS;
+
+    // When the axis aligns with the ordering (i.e. row-wise for C, col-wise for Fortran), it means the npy iterator goes one-element at a time.
+    // Otherwise, it does a strided loop through the non-contiguous axis (which adds a lot of complexity).
+    // To prevent this, we will make a copy of the array with the data laid out in the way we want
+    if (is_c_order == axis) {
+        int new_flags = NPY_ARRAY_ALIGNED;
+        if (is_c_order) {
+            new_flags |= NPY_ARRAY_F_CONTIGUOUS;
+        }
+        else {
+            new_flags |= NPY_ARRAY_C_CONTIGUOUS;
+        }
+
+        array = (PyArrayObject*)PyArray_FromArray(array, PyArray_DescrFromType(NPY_OBJECT), new_flags);
+        if (!array) {
+            return -1;
+        }
+    }
+
+    int iter_flags = NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK;
+    int order_flags = NPY_FORTRANORDER ? axis : NPY_CORDER;
+
+    NpyIter *iter = NpyIter_New(array, iter_flags, order_flags, NPY_NO_CASTING, NULL);
+    if (!iter) { goto failure; }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (!iternext) { goto failure; }
+
+    char** dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+
+    npy_intp tuple_size = PyArray_DIM(array, !axis);
+    npy_intp num_tuples = PyArray_DIM(array, axis);
+
+    do {
+        char *data = *dataptr;
+        npy_intp stride = *strideptr;
+
+        PyObject* value = NULL;
+
+        Py_ssize_t tup_idx = 0;
+        int step = 1;
+        int tup_stride_step = 0; // For normal iterations, each time we build a tuple, we are right where we
+                                    // we need to be to start building the next tuple. For reverse, we have to
+                                    // backtrack two tuples worth of strides to get where we need to be
+
+        if (reverse) {
+            data += (stride * (num_tuples - 1) * tuple_size);
+            tup_idx = num_tuples - 1;
+            step = -1;
+            tup_stride_step = -(tuple_size * 2) * stride;
+        }
+
+        while (num_tuples--) {
+
+            PyObject *tup = PyTuple_New(tuple_size);
+            if (!tup) { goto failure; }
+
+            for (int j = 0; j < tuple_size; ++j) {
+                memcpy(&value, data, sizeof(value));
+                Py_INCREF(value);
+                PyTuple_SET_ITEM(tup, j, value);
+                data += stride;
+            }
+
+            int success = value_func(tup_idx, tup, is_dup, set_obj, dict_obj);
+            Py_DECREF(tup);
+            if (success == -1) { goto failure; }
+            tup_idx += step;
+            data += tup_stride_step;
+        }
+
+    } while (iternext(iter));
+
+    NpyIter_Deallocate(iter);
+    return 0;
+
+failure:
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+    return -1;
+}
+
+static PyObject *
+array_to_duplicated_hashable(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    /*
+    Main driver method. Determines how to iterate, and process the value of each iteration
+    based on the array itself and the parameters.
+
+    Numpy 2D iteration is very different than Numpy 1D iteration, and so those two iteration
+    approaches are generalized.
+
+    Depending on the parameters, there are 4 different ways we can interpret uniqueness.
+
+    1. exclude_first=True and exclude_last=True
+        - This means the first & last observations of duplicated values are considered unique.
+        - We consider them `included` in what is reported as unique
+
+    2. exclude_first=False and exclude_last=False
+        - This means the first & last observations of duplicated values are considered duplicated.
+        - We consider them `excluded` in what is reported as unique (by reporting them as duplicates)
+
+    3. exclude_first ^ exclude_last
+        - This means either the first OR the last observation will be considered unique, while the other is not
+        - This allows for more efficient iteration, by requiring only that we keep track of what we've seen before,
+          only changing the direction we iterate through the array.
+
+        - If exclude_first is True, the we iterate left-to-right, ensuring the first observation of each unique
+          is reported as such, with every subsequent duplicate observation being marked as a duplicate
+
+        - If exclude_last is True, the we iterate right-to-left, ensuring the last observation of each unique
+          is reported as such, with every subsequent duplicate observation being marked as a duplicate
+    */
+    PyArrayObject *array = NULL;
+    int axis = 0;
+    int exclude_first = 0;
+    int exclude_last = 0;
+
+    static char *kwarg_list[] = {"array", "axis", "exclude_first", "exclude_last", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "O!|iii:array_to_duplicated_hashable", kwarg_list,
+                                     &PyArray_Type, &array,
+                                     &axis,
+                                     &exclude_first,
+                                     &exclude_last))
+    {
+        return NULL;
+    }
+
+    if (PyArray_DESCR(array)->kind != 'O') {
+        PyErr_SetString(PyExc_ValueError, "Array must have object dtype");
+        return NULL;
+    }
+
+    int ndim = PyArray_NDIM(array);
+    if (axis > 1 || (ndim == 1 && axis == 1)) {
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1 for 2d, and 0 for 1d");
+        return NULL;
+    }
+
+    int size = PyArray_DIM(array, axis);
+    int reverse = !exclude_first && exclude_last;
+
+    AK_handle_value_func handle_value_func = NULL;
+    AK_iterate_np_func iterate_array_func = NULL;
+
+    // 1. Determine how to iterate
+    if (ndim == 1) {
+        iterate_array_func = AK_iter_1d_array;
+    }
+    else {
+        iterate_array_func = AK_iter_2d_array;
+    }
+
+    npy_intp dims = {size};
+    PyArrayObject *is_dup = (PyArrayObject*)PyArray_Zeros(1, &dims, PyArray_DescrFromType(NPY_BOOL), 0);
+    npy_bool *is_dup_array = (npy_bool*)PyArray_DATA(is_dup);
+
+    PyObject *set_obj = PySet_New(NULL);
+    if (!set_obj) {
+        return NULL;
+    }
+
+    PyObject *dict_obj = NULL;
+
+    // 2. Determine how to process each value
+    if (exclude_first ^ exclude_last) {
+        // 2.a This approach only needs a set!
+        handle_value_func = AK_handle_value_one_boundary;
+    }
+    else {
+        // 2.b Both of these approaches require an additional dictionary structure to keep track of some observed indices
+        dict_obj = PyDict_New();
+        if (!dict_obj) {
+            goto failure;
+        }
+
+        if (!exclude_first && !exclude_last) {
+            handle_value_func = AK_handle_value_exclude_boundaries;
+        }
+        else {
+            handle_value_func = AK_handle_value_include_boundaries;
+        }
+    }
+
+    // 3. Execute
+    if (-1 == iterate_array_func(array, axis, reverse, is_dup_array, handle_value_func, set_obj, dict_obj)) {
+        goto failure;
+    }
+
+    // 4. Post-process
+    if (exclude_first && exclude_last) {
+        // Mark the last observed location of each duplicate value as False
+        assert(dict_obj != NULL);
+        PyObject *last_duplicate_locations = dict_obj; // Meaningful name alias
+
+        PyObject *value = NULL; // Borrowed
+        Py_ssize_t pos = 0;
+
+        while (PyDict_Next(last_duplicate_locations, &pos, NULL, &value)) {
+            long idx = PyLong_AsLong(value);
+            if (idx == -1) {
+                goto failure; // -1 always means failure since no locations are negative
+            }
+            is_dup_array[idx] = NPY_FALSE;
+        }
+    }
+
+    Py_XDECREF(dict_obj);
+    Py_DECREF(set_obj);
+    return (PyObject *)is_dup;
+
+failure:
+    Py_XDECREF(dict_obj);
+    Py_DECREF(set_obj);
+    return NULL;
+}
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -773,6 +1244,10 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"array_to_duplicated_hashable",
+            (PyCFunction)array_to_duplicated_hashable,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 
