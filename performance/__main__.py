@@ -363,7 +363,7 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 #-------------------------------------------------------------------------------
 class NewIndexersFromIndexerSubsetPerf(Perf):
-    NUMBER = 10
+    NUMBER = 100
 
     def __init__(self):
         good_case = list(range(25)) * 10_000
