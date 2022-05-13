@@ -492,6 +492,108 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
+// array utility
+
+static PyObject *
+ufunc_unique1d_positions(PyArrayObject *array)
+{
+    PyArrayObject* array_argsorted = (PyArrayObject*)PyArray_ArgSort(array, 0, NPY_QUICKSORT);
+
+    array = PyObject_GetItem((PyObject*)array, (PyObject*)array_argsorted);
+    npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(array);
+
+    PyArrayObject *mask = (PyArrayObject*)PyArray_Empty(1, PyArray_DIMS(array), PyArray_DescrFromType(NPY_BOOL), 0);
+    npy_bool *mask_values = (npy_bool*)PyArray_DATA(mask);
+
+    mask_values[0] = 1;
+    for (size_t i = 1; i < PyArray_SIZE(array); ++i) {
+        mask_values[i] = order_found_values[i] != order_found_values[i-1];
+    }
+
+    array = PyObject_GetItem((PyObject*)array_argsorted, (PyObject*)mask);
+
+    return array;
+}
+
+
+static PyObject *
+new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    /*
+        num_unique = len(positions)
+        order_found: np.ndarray = np.full(num_unique, num_unique, dtype=np.int64)
+        new_indexers: np.ndarray = np.empty(len(array), dtype=np.int64)
+
+        num_found: int = 0
+
+        for i, element in enumerate(array):
+            if order_found[element] == num_unique:
+                order_found[element] = num_found
+                num_found += 1
+
+                if num_found == num_unique:
+                    return positions, array
+
+            new_indexers[i] = order_found[element]
+
+        _, order_found = np.unique(order_found, return_index=True)
+
+        return order_found[:num_found], new_indexers
+    */
+    PyArrayObject *array;
+    PyArrayObject *positions;
+
+    static char *kwlist[] = {"array", "positions", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!:new_indexers_from_indexer_subset", kwlist,
+                &PyArray_Type, &array,
+                &PyArray_Type, &positions
+        ))
+    {
+        return NULL;
+    }
+
+    size_t num_unique = PyArray_SIZE(positions);
+
+    npy_intp dims = {num_unique};
+    PyArrayObject *order_found = (PyArrayObject*)PyArray_Empty(1, &dims, PyArray_DescrFromType(NPY_INT64), 0);
+    PyArrayObject *new_indexers = (PyArrayObject*)PyArray_Empty(1, PyArray_DIMS(array), PyArray_DescrFromType(NPY_INT64), 0);
+
+    npy_int64 *array_values = (npy_int64*)PyArray_DATA(array);
+    npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(order_found);
+    npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
+
+    PyArray_FillWithScalar(order_found,PyLong_FromLong(num_unique));
+
+    size_t num_found = 0;
+
+    // Print each element from array_values
+    for (size_t i = 0; i < PyArray_SIZE(array); ++i) {
+
+        npy_int64 element = array_values[i];
+
+        if (order_found_values[element] == num_unique) {
+            order_found_values[element] = num_found;
+            ++num_found;
+
+            if (num_found == num_unique) {
+                Py_DECREF(order_found);
+                Py_DECREF(new_indexers);
+                return PyTuple_Pack(2, positions, array);
+            }
+        }
+
+        new_indexers_values[i] = order_found_values[element];
+    }
+
+    order_found = ufunc_unique1d_positions(order_found);
+    order_found = PyObject_GetItem((PyObject*)order_found, _PySlice_FromIndices(0, num_found));
+
+    return PyTuple_Pack(2, order_found, new_indexers);
+}
+
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -773,6 +875,10 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"new_indexers_from_indexer_subset",
+            (PyCFunction)new_indexers_from_indexer_subset,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 

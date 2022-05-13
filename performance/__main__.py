@@ -17,6 +17,7 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
+from performance.reference.util import new_indexers_from_indexer_subset as new_indexers_from_indexer_subset_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -32,6 +33,7 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
+from arraykit import new_indexers_from_indexer_subset as new_indexers_from_indexer_subset_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -357,6 +359,40 @@ class IsNaElementPerfAK(IsNaElementPerf):
 
 class IsNaElementPerfREF(IsNaElementPerf):
     entry = staticmethod(isna_element_ref)
+
+
+#-------------------------------------------------------------------------------
+class NewIndexersFromIndexerSubsetPerf(Perf):
+    NUMBER = 10
+
+    def __init__(self):
+        good_case = list(range(25)) * 10_000
+        medium_case = list(range(2_500)) * 100
+        bad_case = good_case + [25]
+        unique_ordered = list(range(len(good_case)))
+        unique_unordered = list(range(len(good_case)))
+        np.random.seed(0)
+        np.random.shuffle(unique_unordered)
+
+        self.cases = [
+            (np.array(good_case), np.arange(25)),
+            (np.array(medium_case), np.arange(2_500)),
+            (np.array(bad_case), np.arange(26)),
+            (np.array(unique_ordered), np.arange(250_000)),
+            (np.array(unique_unordered), np.arange(250_000)),
+        ]
+
+    def main(self):
+        for case, positions in self.cases:
+            self.entry(array=case, positions=positions)
+
+
+class NewIndexersFromIndexerSubsetPerfAK(NewIndexersFromIndexerSubsetPerf):
+    entry = staticmethod(new_indexers_from_indexer_subset_ak)
+
+
+class NewIndexersFromIndexerSubsetPerfREF(NewIndexersFromIndexerSubsetPerf):
+    entry = staticmethod(new_indexers_from_indexer_subset_ref)
 
 
 #-------------------------------------------------------------------------------

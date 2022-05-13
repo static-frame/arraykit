@@ -216,3 +216,23 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
 
+
+def new_indexers_from_indexer_subset(
+        array: np.ndarray,
+        positions: np.ndarray,
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
+
+    positions = array.argsort()
+
+    # get the sorted array
+    array = array[positions]
+
+    mask = np.empty(array.shape, dtype=DTYPE_BOOL)
+    mask[0] = True
+    mask[1:] = array[1:] != array[:-1]
+
+    indexer = np.empty(mask.shape, dtype=DTYPE_INT_DEFAULT)
+    indexer[positions] = np.cumsum(mask) - 1
+    indexer.flags.writeable = False
+
+    return array[mask], indexer
