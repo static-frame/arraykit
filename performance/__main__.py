@@ -369,17 +369,21 @@ class NewIndexersFromIndexerSubsetPerf(Perf):
         good_case = list(range(25)) * 10_000
         medium_case = list(range(2_500)) * 100
         bad_case = good_case + [25]
+        worst_case_A = good_case
+        worst_case_B = np.arange(3)
         unique_ordered = list(range(len(good_case)))
         unique_unordered = list(range(len(good_case)))
         np.random.seed(0)
         np.random.shuffle(unique_unordered)
 
         self.cases = [
-            (np.array(good_case), np.arange(25)),             # 11157.92534498 faster!!!!!
-            (np.array(medium_case), np.arange(2_500)),        # 907.75589628 faster!!!!
-            (np.array(bad_case), np.arange(26)),              # 11.46481243 faster
-            (np.array(unique_ordered), np.arange(250_000)),   # 1.92516696 faster
-            (np.array(unique_unordered), np.arange(250_000)), # 9.2561254 faster
+            (np.array(good_case), np.arange(25)),             # 11157.92534498 faster
+            (np.array(medium_case), np.arange(2_500)),        #   907.75589628 faster
+            (np.array(bad_case), np.arange(26)),              #    11.46481243 faster
+            (np.array(worst_case_A), np.arange(30)),          #     3.13188606 faster
+            (np.array(worst_case_B), np.arange(100_000)),     #    10.21857114 slower
+            (np.array(unique_ordered), np.arange(250_000)),   #     1.92516696 faster
+            (np.array(unique_unordered), np.arange(250_000)), #     9.25612540 faster
         ]
 
     def main(self):

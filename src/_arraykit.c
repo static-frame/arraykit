@@ -567,9 +567,10 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
 
        11.   new_indexers[i] = order_found[element]
 
-       12. _, positions = np.unique(order_found, return_index=True)
+       12.   order_found = order_found[order_found != num_unique]
+       13. _, positions = np.unique(order_found, return_index=True)
 
-       13. return positions[:num_found], new_indexers
+       14. return positions[:num_found], new_indexers
     */
     PyArrayObject *array;
     PyArrayObject *positions;
@@ -608,6 +609,7 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
     if (PyArray_FillWithScalar(order_found, num_unique_scalar))
     {
         Py_DECREF(order_found);
+        Py_DECREF(num_unique_scalar);
         return NULL;
     }
 
@@ -620,6 +622,7 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
             );
     if (new_indexers == NULL) {
         Py_DECREF(order_found);
+        Py_DECREF(num_unique_scalar);
         return NULL;
     }
 
@@ -648,6 +651,7 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
             if (num_found == num_unique) {
                 Py_DECREF(order_found);
                 Py_DECREF(new_indexers);
+                Py_DECREF(num_unique_scalar);
                 // 10. return positions, array
                 return PyTuple_Pack(2, positions, array);
             }
@@ -657,9 +661,33 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
         new_indexers_values[i] = order_found_values[element];
     }
 
-    // 12. _, positions = np.unique(order_found, return_index=True)
-    positions = ufunc_unique1d_positions(order_found);
+    // 12.   order_found = order_found[order_found != num_unique]
+    PyObject *order_not_found_mask = PyObject_RichCompare(
+            (PyObject*)order_found,
+            num_unique_scalar,
+            Py_NE
+            );
+    Py_DECREF(num_unique_scalar);
+    if (order_not_found_mask == NULL) {
+        Py_DECREF(order_found);
+        Py_DECREF(new_indexers);
+        return NULL;
+    }
+
+    PyArrayObject *order_found_filtered = PyObject_GetItem(
+            (PyObject*)order_found,
+            order_not_found_mask
+            );
     Py_DECREF(order_found);
+    Py_DECREF(order_not_found_mask);
+    if (order_found_filtered == NULL) {
+        Py_DECREF(new_indexers);
+        return NULL;
+    }
+
+    // 13. _, positions = np.unique(order_found, return_index=True)
+    positions = ufunc_unique1d_positions(order_found_filtered);
+    Py_DECREF(order_found_filtered);
 
     if (positions == NULL) {
         Py_DECREF(new_indexers);
@@ -681,7 +709,7 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
         return NULL;
     }
 
-    // 13. return positions[:num_found], new_indexers
+    // 14. return positions[:num_found], new_indexers
     return PyTuple_Pack(2, relevant_positions, new_indexers);
 }
 
