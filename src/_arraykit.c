@@ -495,52 +495,66 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 // array utility
 
 static PyObject *
-ufunc_unique1d_positions(PyArrayObject *array)
+AK_get_unique_array_positions(PyArrayObject *array)
 {
     /*
-        1. positions = argsort_array(array)
+        # Equivalent Python code:
 
-        2. array = array[positions]
+        _, positions = np.unique(array, return_index=True)
+        return positions
 
-        3. mask = np.empty(array.shape, dtype=DTYPE_BOOL)
-        4. mask[0] = True
-        5. mask[1:] = array[1:] != array[:-1]
+        # OR
 
-        6. return positions[mask]
+        positions = argsort_array(array)                 # 1
+
+        array = array[positions]                         # 2
+
+        mask = np.empty(array.shape, dtype=bool)         # 3
+        mask[0] = True                                   # 4
+        mask[1:] = array[1:] != array[:-1]               # 5
+
+        return positions[mask]                           # 6
     */
 
-    // 1. positions = argsort_array(array)
+    // Quicksort is safe since array just contains integers
     PyArrayObject* positions = (PyArrayObject*)PyArray_ArgSort(array, 0, NPY_QUICKSORT);
     if (positions == NULL) {
         return NULL;
     }
 
-    // 2. array = array[positions]
-    array = PyObject_GetItem((PyObject*)array, (PyObject*)positions);
-    if (array == NULL) {
+    PyArrayObject *sorted_array = PyObject_GetItem((PyObject*)array, (PyObject*)positions);
+    array = NULL; // We don't need this anymore.
+    if (sorted_array == NULL) {
         Py_DECREF(positions);
         return NULL;
     }
 
-    // 3. mask = np.empty(array.shape, dtype=DTYPE_BOOL)
-    PyArrayObject *mask = (PyArrayObject*)PyArray_Empty(1, PyArray_DIMS(array), PyArray_DescrFromType(NPY_BOOL), 0);
+    // Build up the mask by comparing each element in the sorted array to the
+    // previous element.
+    PyArrayObject *mask = (PyArrayObject*)PyArray_Empty(
+            1,                                // ndim
+            PyArray_DIMS(sorted_array),       // shape
+            PyArray_DescrFromType(NPY_BOOL),  // dtype
+            0                                 // fortran
+            );
     if (mask == NULL) {
+        Py_DECREF(sorted_array);
         Py_DECREF(positions);
         return NULL;
     }
-    npy_bool *mask_values = (npy_bool*)PyArray_DATA(mask);
 
-    // 4. mask[0] = True
+    npy_bool *mask_values = (npy_bool*)PyArray_DATA(mask);
+    npy_int64 *sorted_array_values = (npy_int64*)PyArray_DATA(sorted_array);
+
     mask_values[0] = 1;
 
-    // 5. mask[1:] = array[1:] != array[:-1]
-    npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(array);
-    for (size_t i = 1; i < PyArray_SIZE(array); ++i) {
-        mask_values[i] = order_found_values[i] != order_found_values[i-1];
+    for (size_t i = 1; i < PyArray_SIZE(sorted_array); ++i) {
+        mask_values[i] = sorted_array_values[i] != sorted_array_values[i-1];
     }
 
-    // 6. return positions[mask]
-    PyObject * result = PyObject_GetItem((PyObject*)positions, (PyObject*)mask);\
+    // Apply the mask to indexers to provide the unique positions
+    PyObject * result = PyObject_GetItem((PyObject*)positions, (PyObject*)mask);
+    Py_DECREF(sorted_array);
     Py_DECREF(positions);
     Py_DECREF(mask);
     return result;
@@ -551,26 +565,28 @@ static PyObject *
 new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     /*
-        1. num_unique = len(positions)
-        2. order_found = np.full(num_unique, num_unique, dtype=np.int64)
-        3. new_indexers = np.empty(len(array), dtype=np.int64)
+        # Equivalent Python code:
 
-        4. num_found: int = 0
+        num_unique = len(positions)                                    # 1
+        order_found = np.full(num_unique, num_unique, dtype=np.int64)  # 2
+        new_indexers = np.empty(len(array), dtype=np.int64)            # 3
 
-        5. for i, element in enumerate(array):
-        6.     if order_found[element] == num_unique:
-        7.         order_found[element] = num_found
-        8.         num_found += 1
+        num_found = 0                                                  # 4
 
-        9.        if num_found == num_unique:
-       10.            return positions, array
+        for i, element in enumerate(array):                            # 5
+            if order_found[element] == num_unique:                     # 6
+                order_found[element] = num_found                       # 7
+                num_found += 1                                         # 8
 
-       11.   new_indexers[i] = order_found[element]
+            if num_found == num_unique:                                # 9
+                return positions, array                                # 10
 
-       12.   order_found = order_found[order_found != num_unique]
-       13. _, positions = np.unique(order_found, return_index=True)
+            new_indexers[i] = order_found[element]                     # 11
 
-       14. return positions[:num_found], new_indexers
+       order_found = order_found[order_found != num_unique]            # 12
+       _, positions = np.unique(order_found, return_index=True)        # 13
+
+       return positions[:num_found], new_indexers                      # 14
     */
     PyArrayObject *array;
     PyArrayObject *positions;
@@ -585,10 +601,8 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
         return NULL;
     }
 
-    // 1. num_unique = len(positions)
     size_t num_unique = PyArray_SIZE(positions);
 
-    // 2. order_found = np.full(num_unique, num_unique, dtype=np.int64)
     npy_intp dims = {num_unique};
     PyArrayObject *order_found = (PyArrayObject*)PyArray_Empty(
             1,                                // ndim
@@ -606,6 +620,8 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
         return NULL;
     }
 
+    // We use ``num_unique`` to signal that we haven't found the element yet
+    // This works, because each element must be 0 < num_unique.
     if (PyArray_FillWithScalar(order_found, num_unique_scalar))
     {
         Py_DECREF(order_found);
@@ -613,7 +629,6 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
         return NULL;
     }
 
-    // 3. new_indexers = np.empty(len(array), dtype=np.int64)
     PyArrayObject *new_indexers = (PyArrayObject*)PyArray_Empty(
             1,                                // ndim
             PyArray_DIMS(array),              // shape
@@ -626,38 +641,35 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
         return NULL;
     }
 
+    // We know that our incoming dtypes are all int64! This is a safe cast.
+    // Plus, it's easier (and less error prone) to work with native C-arrays
+    // over using numpy's iteration APIs.
     npy_int64 *array_values = (npy_int64*)PyArray_DATA(array);
     npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(order_found);
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
 
-
-    // 4. num_found: int = 0
     size_t num_found = 0;
 
-
-    // 5. for i, element in enumerate(array):
     for (size_t i = 0; i < PyArray_SIZE(array); ++i) {
 
         npy_int64 element = array_values[i];
 
-        // 6. if order_found[element] == num_unique:
         if (order_found_values[element] == num_unique) {
-            // 7. order_found[element] = num_found
             order_found_values[element] = num_found;
-            // 8. num_found += 1
             ++num_found;
 
-            // 9. if num_found == num_unique:
             if (num_found == num_unique) {
+                // This insight is core to the performance of the algorithm.
+                // If we have found every possible indexer, we can simply return
+                // back the inputs! Essentially, we can observe on <= single pass
+                // that we have the opportunity for re-use
                 Py_DECREF(order_found);
                 Py_DECREF(new_indexers);
                 Py_DECREF(num_unique_scalar);
-                // 10. return positions, array
                 return PyTuple_Pack(2, positions, array);
             }
         }
 
-        // 11. new_indexers[i] = order_found[element]
         new_indexers_values[i] = order_found_values[element];
     }
 
@@ -686,7 +698,7 @@ new_indexers_from_indexer_subset(PyObject *Py_UNUSED(m), PyObject *args, PyObjec
     }
 
     // 13. _, positions = np.unique(order_found, return_index=True)
-    positions = ufunc_unique1d_positions(order_found_filtered);
+    positions = AK_get_unique_array_positions(order_found_filtered);
     Py_DECREF(order_found_filtered);
 
     if (positions == NULL) {
