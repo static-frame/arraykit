@@ -2,7 +2,6 @@ import pytest
 import collections
 import datetime
 import unittest
-import itertools
 
 import numpy as np  # type: ignore
 
@@ -407,17 +406,16 @@ class TestUnit(unittest.TestCase):
 
     def test_get_new_indexers_and_screen_b(self) -> None:
         array1 = np.array([5])
-        post1 = get_new_indexers_and_screen(array1, np.arange(6))
-        assert tuple(map(list, post1)) == ([5], [0])
 
-        array2 = np.array([5])
-        post2 = get_new_indexers_and_screen(array2, np.arange(106))
-        assert tuple(map(list, post2)) == ([5], [0])
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(array1, np.arange(6))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(array1, np.arange(106))
 
         array3 = np.arange(25)
         post3 = get_new_indexers_and_screen(array3, array3)
         assert tuple(map(list, post3)) == (list(array3), list(array3))
-
 
 
 if __name__ == '__main__':

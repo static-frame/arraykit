@@ -2,6 +2,7 @@ import collections
 import datetime
 import timeit
 import argparse
+from turtle import position
 
 import numpy as np
 
@@ -366,52 +367,33 @@ class GetNewIndexersAndScreenPerf(Perf):
     NUMBER = 5_000
 
     def __init__(self):
-        ten_elements = np.arange(10)
-        thousand_elements = np.arange(1_000)
-        hundred_thousand_elements = np.arange(100_000)
-        ten_elements_tiled = np.tile(ten_elements, 10)
-        ten_elements_repeated = np.repeat(ten_elements, 10)
-        thousand_elements_tiled = np.tile(thousand_elements, 10)
-        thousand_elements_repeated = np.repeat(thousand_elements, 10)
+        NUMBERS = np.arange(500_000)
+        POSITIONS = np.arange(500_000)
 
         np.random.seed(0)
-        fifty_thousand_random = np.arange(50_000)
-        np.random.shuffle(fifty_thousand_random)
 
-        fifteen_random = np.random.randint(0, 250_000, size=15)
+        self.cases = []
 
-        positions = np.arange(250_000)
+        for scale in (5, 50, 500, 5_000, 50_000):
+            tiled_ordered = np.tile(NUMBERS[:scale], len(NUMBERS) // scale)
+            repeated_ordered = np.repeat(NUMBERS[:scale], len(NUMBERS) // scale)
+            tiled_unordered = tiled_ordered.copy()
+            repeated_unordered = repeated_ordered.copy()
+            np.random.shuffle(tiled_unordered)
+            np.random.shuffle(repeated_unordered)
 
-        self.cases = [
-            # (np.repeat(5, 50_000),         positions[:7]),    # 2.64688876 faster
-            (fifty_thousand_random,        positions[:60_000]),    # 2.64688876 faster
-            # (ten_elements,               positions[:10]),
-            # (ten_elements,               positions[:1000]),
-            # (ten_elements,               positions),
-
-            # (thousand_elements,          positions[:1000]),
-            # (thousand_elements,          positions),
-
-            # (hundred_thousand_elements,  positions[:100_000]),
-            # (hundred_thousand_elements,  positions),
-
-            # (ten_elements_tiled,         positions[:10]),
-            # (ten_elements_tiled,         positions[:1000]),
-            # (ten_elements_tiled,         positions),
-
-            # (ten_elements_repeated,      positions[:10]),
-            # (ten_elements_repeated,      positions[:1000]),
-            # (ten_elements_repeated,      positions),
-
-            # (thousand_elements_tiled,    positions[:1000]),
-            # (thousand_elements_tiled,    positions),
-
-            # (thousand_elements_repeated, positions[:1000]),
-            # (thousand_elements_repeated, positions),
-
-            # (fifteen_random,             positions),
-            # (fifteen_random,             positions[:max(fifteen_random)]),
-        ]
+            increment = scale
+            while increment < len(NUMBERS):
+                self.cases.extend(
+                    [
+                        (f"tiled_ordered,      {scale}, {increment}", tiled_ordered,      POSITIONS[:increment]),
+                        (f"tiled_ordered,      {scale}, {increment}", tiled_ordered,      POSITIONS[:increment]),
+                        (f"repeated_ordered,   {scale}, {increment}", repeated_ordered,   POSITIONS[:increment]),
+                        (f"tiled_unordered,    {scale}, {increment}", tiled_unordered,    POSITIONS[:increment]),
+                        (f"repeated_unordered, {scale}, {increment}", repeated_unordered, POSITIONS[:increment]),
+                    ]
+                )
+                increment *= 10
 
     def main(self):
         for case, positions in self.cases:
