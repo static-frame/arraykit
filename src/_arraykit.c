@@ -748,9 +748,9 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
     npy_int64 *array_values = (npy_int64*)PyArray_DATA(array);
 
-    size_t num_found = 0;
+    npy_int64 num_found = 0;
 
-    for (size_t i = 0; i < PyArray_SIZE(array); ++i)
+    for (size_t i = 0; i < (size_t)PyArray_SIZE(array); ++i)
     {
         npy_int64 element = array_values[i];
 
