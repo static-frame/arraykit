@@ -677,11 +677,6 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     */
     PyArrayObject *array;
     PyArrayObject *positions;
-    PyArrayObject *element_locations;
-    PyObject *num_unique_pyint;
-    PyArrayObject *new_indexers;
-    PyObject *index_screen;
-    PyObject *result;
 
     static char *kwlist[] = {"array", "positions", NULL};
 
@@ -709,26 +704,42 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     }
 
     npy_intp dims = {num_unique};
-    element_locations = (PyArrayObject*)PyArray_Empty(
+    PyArrayObject *element_locations = (PyArrayObject*)PyArray_Empty(
             1,                                // ndim
             &dims,                            // shape
             PyArray_DescrFromType(NPY_INT64), // dtype
             0                                 // fortran
             );
+    if (element_locations == NULL) {
+        return NULL;
+    }
 
-    num_unique_pyint = PyLong_FromLong(num_unique);
+    PyObject *num_unique_pyint = PyLong_FromLong(num_unique);
+    if (num_unique_pyint == NULL) {
+        Py_DECREF(element_locations);
+        return NULL;
+    }
 
     // We use ``num_unique`` to signal that we haven't found the element yet
     // This works, because each element must be 0 < num_unique.
-    PyArray_FillWithScalar(element_locations, num_unique_pyint);
+    if (PyArray_FillWithScalar(element_locations, num_unique_pyint)) {
+        Py_DECREF(element_locations);
+        Py_DECREF(num_unique_pyint);
+        return NULL;
+    }
 
 
-    new_indexers = (PyArrayObject*)PyArray_Empty(
+    PyArrayObject *new_indexers = (PyArrayObject*)PyArray_Empty(
             1,                                // ndim
             PyArray_DIMS(array),              // shape
             PyArray_DescrFromType(NPY_INT64), // dtype
             0                                 // fortran
             );
+    if (new_indexers == NULL) {
+        Py_DECREF(element_locations);
+        Py_DECREF(num_unique_pyint);
+        return NULL;
+    }
 
     // We know that our incoming dtypes are all int64! This is a safe cast.
     // Plus, it's easier (and less error prone) to work with native C-arrays
@@ -764,18 +775,22 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         new_indexers_values[i] = element_location_values[element];
     }
 
-    index_screen = AK_get_index_screen(
+    PyObject *index_screen = AK_get_index_screen(
             (PyObject*)element_locations,
             (PyObject*)positions,
             num_unique_pyint
             );
     Py_DECREF(element_locations);
     Py_DECREF(num_unique_pyint);
+    if (index_screen == NULL) {
+        Py_DECREF(new_indexers);
+        return NULL;
+    }
 
-    result = PyTuple_Pack(2, index_screen, new_indexers);
+    PyObject *result = PyTuple_Pack(2, index_screen, new_indexers);
     Py_DECREF(index_screen);
     Py_DECREF(new_indexers);
-    return result;
+    return result; // This could be NULL
 }
 
 

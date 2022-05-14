@@ -375,14 +375,18 @@ class GetNewIndexersAndScreenPerf(Perf):
         "small",
         "large",
     )
-    NUMBER = 1
+    NUMBER = 5
 
     TILED = "tiled"
     REPEATED = "repeated"
     ORDERED = "ordered"
     UNORDERED = "unordered"
 
-    Key = namedtuple("Key", ("type1", "type2", "increment", "scale"))
+    class Key(tp.NamedTuple):
+        type1: str
+        type2: str
+        increment: int
+        scale: int
 
     def __init__(self):
         NUMBERS = np.arange(500_000)
