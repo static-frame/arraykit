@@ -375,7 +375,7 @@ class GetNewIndexersAndScreenPerf(Perf):
         "small",
         "large",
     )
-    NUMBER = 5
+    NUMBER = 1
 
     TILED = "tiled"
     REPEATED = "repeated"

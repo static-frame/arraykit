@@ -501,7 +501,30 @@ AK_get_index_screen(PyObject *element_locations,
                     )
 {
     /*
-        # Equivalent Python code:
+    Returns the index screen built up from an array of element locations and a
+    positions array. The index screen will be applied to the original index to
+    determine the labels of what the new indexers map to
+
+    num_unique == len(positions), and is used as the flag to determine which
+    elements were not found.
+
+    Also, len(element_locations) == len(positions).
+
+    Example:
+        input:
+            element_locations = [6, 3, 1, 6, 0, 2]
+            positions         = [0, 1, 2, 3, 4, 5]
+            num_unique        = 6
+
+        algorithm:
+            found_mask        = [F, T, T, F, T, T] (element_locations != num_unique)
+            found_locations   = [3, 1, 0, 2]       (element_locations[found_mask])
+            found_positions   = [1, 2, 4, 5]       (positions[found_mask])
+
+        output:
+                                [4, 2, 5, 1]       (found_positions[argsort(found_locations)])
+
+    Equivalent Python code:
 
         found_mask = element_locations != num_unique             # 1
 
@@ -512,36 +535,44 @@ AK_get_index_screen(PyObject *element_locations,
         return found_positions[order_found]                      # 5
     */
     // 1. Build mask
-    PyObject *found_mask = PyObject_RichCompare(
-            element_locations,
-            num_unique,
-            Py_NE
-            );
+    PyObject *found_mask = PyObject_RichCompare(element_locations, num_unique, Py_NE);
+    if (found_mask == NULL) {
+        return NULL;
+    }
 
     // 2. Apply mask to ``element_locations``
-    PyArrayObject *found_element_locations = (PyArrayObject*)PyObject_GetItem(
-            element_locations,
-            found_mask
-            );
+    PyObject *found_element_locations = PyObject_GetItem(element_locations, found_mask);
+    if (found_element_locations == NULL) {
+        Py_DECREF(found_mask);
+        return NULL;
+    }
 
     // 3. Argsort ``found_element_locations``
     // Quicksort is safe since array just contains integers
     PyObject* order_found = PyArray_ArgSort(
-            found_element_locations,  // array
-            0,                        // axis
-            NPY_QUICKSORT             // kind
+            (PyArrayObject*)found_element_locations, // array
+            0,                                       // axis
+            NPY_QUICKSORT                            // kind
             );
     Py_DECREF(found_element_locations);
+    if (order_found == NULL) {
+        Py_DECREF(found_mask);
+        return NULL;
+    }
 
     // 4. Apply mask to ``positions``
     PyObject *found_positions = PyObject_GetItem(positions, found_mask);
     Py_DECREF(found_mask);
+    if (found_positions == NULL) {
+        Py_DECREF(order_found);
+        return NULL;
+    }
 
     // 5. Apply ``order_found`` to ``found_positions``
     PyObject *result = PyObject_GetItem(found_positions, order_found);
     Py_DECREF(order_found);
     Py_DECREF(found_positions);
-    return result;
+    return result; // This can be NULL
 }
 
 static PyObject *
