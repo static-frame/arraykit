@@ -17,6 +17,7 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from arraykit import get_new_indexers_and_screen
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -147,7 +148,7 @@ class TestUnit(unittest.TestCase):
             # zero dimension
             shape_filter(np.array(1))
 
-        
+
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:
@@ -381,6 +382,42 @@ class TestUnit(unittest.TestCase):
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
+
+    def test_get_new_indexers_and_screen_a(self) -> None:
+        array1 = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1])
+        post1 = get_new_indexers_and_screen(array1, np.arange(10))
+        assert tuple(map(list, post1)) == (
+            [9, 0, 1, 4, 5],
+            [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2]
+        )
+
+        array2 = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        post2 = get_new_indexers_and_screen(array2, np.arange(15))
+        assert tuple(map(list, post2)) == (
+            [9, 0, 1, 4, 5, 2, 3, 6, 7, 8, 10],
+            [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2, 5, 6, 3, 4,7, 8, 9, 0, 10]
+        )
+
+        array3 = np.array([2, 1, 0, 2, 0, 1, 1, 2, 0])
+        post3 = get_new_indexers_and_screen(array3, np.arange(3))
+        assert tuple(map(list, post3)) == (
+            [0, 1, 2],
+            [2, 1, 0, 2, 0, 1, 1, 2, 0]
+        )
+
+    def test_get_new_indexers_and_screen_b(self) -> None:
+        array1 = np.array([5])
+        post1 = get_new_indexers_and_screen(array1, np.arange(6))
+        assert tuple(map(list, post1)) == ([5], [0])
+
+        array2 = np.array([5])
+        post2 = get_new_indexers_and_screen(array2, np.arange(106))
+        assert tuple(map(list, post2)) == ([5], [0])
+
+        array3 = np.arange(25)
+        post3 = get_new_indexers_and_screen(array3, array3)
+        assert tuple(map(list, post3)) == (list(array3), list(array3))
+
 
 
 if __name__ == '__main__':

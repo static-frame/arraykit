@@ -17,7 +17,7 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
-from performance.reference.util import new_indexers_from_indexer_subset as new_indexers_from_indexer_subset_ref
+from performance.reference.util import get_new_indexers_and_screen as get_new_indexers_and_screen_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -33,7 +33,7 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
-from arraykit import new_indexers_from_indexer_subset as new_indexers_from_indexer_subset_ak
+from arraykit import get_new_indexers_and_screen as get_new_indexers_and_screen_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -362,28 +362,55 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 
 #-------------------------------------------------------------------------------
-class NewIndexersFromIndexerSubsetPerf(Perf):
-    NUMBER = 100
+class GetNewIndexersAndScreenPerf(Perf):
+    NUMBER = 5_000
 
     def __init__(self):
-        good_case = list(range(25)) * 10_000
-        medium_case = list(range(2_500)) * 100
-        bad_case = good_case + [25]
-        worst_case_A = good_case
-        worst_case_B = np.arange(3)
-        unique_ordered = list(range(len(good_case)))
-        unique_unordered = list(range(len(good_case)))
+        ten_elements = np.arange(10)
+        thousand_elements = np.arange(1_000)
+        hundred_thousand_elements = np.arange(100_000)
+        ten_elements_tiled = np.tile(ten_elements, 10)
+        ten_elements_repeated = np.repeat(ten_elements, 10)
+        thousand_elements_tiled = np.tile(thousand_elements, 10)
+        thousand_elements_repeated = np.repeat(thousand_elements, 10)
+
         np.random.seed(0)
-        np.random.shuffle(unique_unordered)
+        fifty_thousand_random = np.arange(50_000)
+        np.random.shuffle(fifty_thousand_random)
+
+        fifteen_random = np.random.randint(0, 250_000, size=15)
+
+        positions = np.arange(250_000)
 
         self.cases = [
-            (np.array(good_case), np.arange(25)),             # 11157.92534498 faster
-            (np.array(medium_case), np.arange(2_500)),        #   907.75589628 faster
-            (np.array(bad_case), np.arange(26)),              #    11.46481243 faster
-            (np.array(worst_case_A), np.arange(30)),          #     3.13188606 faster
-            (np.array(worst_case_B), np.arange(100_000)),     #    10.21857114 slower
-            (np.array(unique_ordered), np.arange(250_000)),   #     1.92516696 faster
-            (np.array(unique_unordered), np.arange(250_000)), #     9.25612540 faster
+            # (np.repeat(5, 50_000),         positions[:7]),    # 2.64688876 faster
+            (fifty_thousand_random,        positions[:60_000]),    # 2.64688876 faster
+            # (ten_elements,               positions[:10]),
+            # (ten_elements,               positions[:1000]),
+            # (ten_elements,               positions),
+
+            # (thousand_elements,          positions[:1000]),
+            # (thousand_elements,          positions),
+
+            # (hundred_thousand_elements,  positions[:100_000]),
+            # (hundred_thousand_elements,  positions),
+
+            # (ten_elements_tiled,         positions[:10]),
+            # (ten_elements_tiled,         positions[:1000]),
+            # (ten_elements_tiled,         positions),
+
+            # (ten_elements_repeated,      positions[:10]),
+            # (ten_elements_repeated,      positions[:1000]),
+            # (ten_elements_repeated,      positions),
+
+            # (thousand_elements_tiled,    positions[:1000]),
+            # (thousand_elements_tiled,    positions),
+
+            # (thousand_elements_repeated, positions[:1000]),
+            # (thousand_elements_repeated, positions),
+
+            # (fifteen_random,             positions),
+            # (fifteen_random,             positions[:max(fifteen_random)]),
         ]
 
     def main(self):
@@ -391,12 +418,12 @@ class NewIndexersFromIndexerSubsetPerf(Perf):
             self.entry(array=case, positions=positions)
 
 
-class NewIndexersFromIndexerSubsetPerfAK(NewIndexersFromIndexerSubsetPerf):
-    entry = staticmethod(new_indexers_from_indexer_subset_ak)
+class GetNewIndexersAndScreenPerfAK(GetNewIndexersAndScreenPerf):
+    entry = staticmethod(get_new_indexers_and_screen_ak)
 
 
-class NewIndexersFromIndexerSubsetPerfREF(NewIndexersFromIndexerSubsetPerf):
-    entry = staticmethod(new_indexers_from_indexer_subset_ref)
+class GetNewIndexersAndScreenPerfREF(GetNewIndexersAndScreenPerf):
+    entry = staticmethod(get_new_indexers_and_screen_ref)
 
 
 #-------------------------------------------------------------------------------

@@ -217,7 +217,7 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     return np.array(value).dtype
 
 
-def new_indexers_from_indexer_subset(
+def get_new_indexers_and_screen(
         array: np.ndarray,
         positions: np.ndarray,
     ) -> tp.Tuple[np.ndarray, np.ndarray]:
