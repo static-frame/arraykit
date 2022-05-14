@@ -579,7 +579,82 @@ static PyObject *
 get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     /*
-        # Equivalent Python code:
+    Used to determine the new indexers and index screen in an index hierarchy selection.
+
+    Example:
+
+        Context:
+            We are an index hierarchy, constructing a new index hierarchy from a
+            selection of ourself. We need to build this up for each depth. For
+            example:
+
+            index_at_depth: ["a", "b", "c", "d"]
+            indexer_at_depth: [1, 0, 0, 2, 3, 0, 3, 3, 2]
+            (i.e. our index_hierarchy has these labels at depth = ["b", "a", "a", "c", "d", "a", "d", "d", "c"])
+
+            Imagine we are choosing this selection:
+                index_hierarchy.iloc[1:4]
+                At our depth, this would result in these labels: ["a", "a", "c", "d"]
+
+            We need to output:
+                index_screen: [0, 2, 3]
+                    - New index is created by: index_at_depth[[0, 2, 3]] (i.e. ["a", "c", "d"])
+                new_indexer:  [0, 0, 1, 2]
+                    - When applied to our new_index, results in ["a", "a", "c", "d"]
+
+        Function:
+            input:
+                array:     [0, 0, 2, 3] (i.e. indexer_at_depth[1:4])
+                positions: [0, 1, 2, 3] (i.e. which ilocs from index that ``array`` maps to)
+
+            algorithm:
+                Loop through ``array``. Since we know that ``array`` only contains
+                integers from 0 -> ``num_unique`` - 1, we can use a new array called
+                ``element_locations`` to keep track of which elements have been found, and when.
+                (Use ``num_unique`` as the flag for which elements have not been
+                found since it's not possible for one of our inputs to equal that)
+
+                Using the above example, this would look like:
+
+                    element_locations =
+                    [4, 4, 4, 4] (starting)
+                    [0, 4, 4, 4] (first loop)  array[0] = 0, so mark it as the 0th element found
+                    [0, 4, 4, 4] (second loop) array[1] = 0, already marked, move on
+                    [0, 4, 1, 4] (third loop)  array[2] = 2, so mark it as the 1th element found
+                    [0, 4, 1, 2] (fourth loop) array[3] = 3, so mark it as the 2th element found
+
+                Now, if during this loop, we discover every single element, it means
+                we can exit early, and just return back the original inputs, since
+                those arrays contain all the information the caller needs! This is the
+                core optimization of this function.
+                Example:
+                    array     = [0, 3, 1, 2, 3, 1, 0, 0]
+                    positions = [0, 1, 2, 3]
+
+                    There is no remapping needed! Simple re-use everything!
+
+                Now, if we don't find all the elements, then we need to construct
+                ``new_indexers`` and ``index_screen``.
+
+                We can construct ``new_indexers`` during the loop, by using the
+                information we have placed into ``element_locations``.
+
+                Using the above example, this would look like:
+                    [x, x, x, x] (starting)
+                    [0, x, x, x] (first loop)  element_locations[array[0]] = 0
+                    [0, 0, x, x] (second loop) element_locations[array[1]] = 0
+                    [0, 0, 1, x] (third loop)  element_locations[array[2]] = 1
+                    [0, 0, 1, 2] (fourth loop) element_locations[array[3]] = 2
+
+                Finally, all that's left is to construct ``index_screen``, which
+                is essentially a way to condense and remap ``element_locations``.
+                See ``AK_get_index_screen`` for more details.
+
+            output:
+                index_screen: [0, 2, 3]
+                new_indexer:  [0, 0, 1, 2]
+
+    Equivalent Python code:
 
         num_unique = len(positions)                                          # 1
         element_locations = np.full(num_unique, num_unique, dtype=np.int64)  # 2
