@@ -1,8 +1,9 @@
-import collections
+from collections import namedtuple
 import datetime
 import timeit
 import argparse
-from turtle import position
+import typing as tp
+from enum import Enum
 
 import numpy as np
 
@@ -261,7 +262,7 @@ class DtypeFromElementPerf(Perf):
     NUMBER = 1000
 
     def __init__(self):
-        NT = collections.namedtuple('NT', tuple('abc'))
+        NT = namedtuple('NT', tuple('abc'))
 
         self.values = [
                 np.longlong(-1), np.int_(-1), np.intc(-1), np.short(-1), np.byte(-1),
@@ -364,7 +365,24 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 #-------------------------------------------------------------------------------
 class GetNewIndexersAndScreenPerf(Perf):
-    NUMBER = 5_000
+    FUNCTIONS = (
+        "ordered",
+        "unordered",
+        "tiled",
+        "repeat",
+        "quick_exit",
+        "late_exit",
+        "small",
+        "large",
+    )
+    NUMBER = 5
+
+    TILED = "tiled"
+    REPEATED = "repeated"
+    ORDERED = "ordered"
+    UNORDERED = "unordered"
+
+    Key = namedtuple("Key", ("type1", "type2", "increment", "scale"))
 
     def __init__(self):
         NUMBERS = np.arange(500_000)
@@ -372,7 +390,7 @@ class GetNewIndexersAndScreenPerf(Perf):
 
         np.random.seed(0)
 
-        self.cases = []
+        self.cases: tp.Dict[self.Key, tp.Tuple[np.ndarray, np.ndarray]] = {}
 
         for scale in (5, 50, 500, 5_000, 50_000):
             tiled_ordered = np.tile(NUMBERS[:scale], len(NUMBERS) // scale)
@@ -383,21 +401,51 @@ class GetNewIndexersAndScreenPerf(Perf):
             np.random.shuffle(repeated_unordered)
 
             increment = scale
-            while increment < len(NUMBERS):
-                self.cases.extend(
-                    [
-                        (f"tiled_ordered,      {scale}, {increment}", tiled_ordered,      POSITIONS[:increment]),
-                        (f"tiled_ordered,      {scale}, {increment}", tiled_ordered,      POSITIONS[:increment]),
-                        (f"repeated_ordered,   {scale}, {increment}", repeated_ordered,   POSITIONS[:increment]),
-                        (f"tiled_unordered,    {scale}, {increment}", tiled_unordered,    POSITIONS[:increment]),
-                        (f"repeated_unordered, {scale}, {increment}", repeated_unordered, POSITIONS[:increment]),
-                    ]
-                )
+            while increment <= len(NUMBERS):
+                positions = POSITIONS[:increment]
+                key_kwargs = dict(increment=increment, scale=scale)
+                self.cases[
+                    self.Key(type1=self.TILED, type2=self.ORDERED, **key_kwargs)
+                ] = (tiled_ordered, positions)
+                self.cases[
+                    self.Key(type1=self.REPEATED, type2=self.ORDERED, **key_kwargs)
+                ] = (repeated_ordered, positions)
+                self.cases[
+                    self.Key(type1=self.TILED, type2=self.UNORDERED, **key_kwargs)
+                ] = (tiled_unordered, positions)
+                self.cases[
+                    self.Key(type1=self.REPEATED, type2=self.UNORDERED, **key_kwargs)
+                ] = (repeated_unordered, positions)
                 increment *= 10
 
-    def main(self):
-        for case, positions in self.cases:
-            self.entry(array=case, positions=positions)
+    def evaluate_cases_by_condition(self, condition):
+        for key, (array, positions) in self.cases.items():
+            if condition(key):
+                self.entry(array=array, positions=positions)
+
+    def ordered(self):
+        self.evaluate_cases_by_condition(lambda key: key.type2 == self.ORDERED)
+
+    def unordered(self):
+        self.evaluate_cases_by_condition(lambda key: key.type2 == self.UNORDERED)
+
+    def tiled(self):
+        self.evaluate_cases_by_condition(lambda key: key.type1 == self.TILED)
+
+    def repeat(self):
+        self.evaluate_cases_by_condition(lambda key: key.type1 == self.REPEATED)
+
+    def quick_exit(self):
+        self.evaluate_cases_by_condition(lambda key: key.increment == key.scale)
+
+    def late_exit(self):
+        self.evaluate_cases_by_condition(lambda key: key.increment > key.scale)
+
+    def small(self):
+        self.evaluate_cases_by_condition(lambda key: key.scale <= 500)
+
+    def large(self):
+        self.evaluate_cases_by_condition(lambda key: key.scale > 500)
 
 
 class GetNewIndexersAndScreenPerfAK(GetNewIndexersAndScreenPerf):
@@ -448,7 +496,7 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
-    width = 24
+    width = 32
     for record in records:
         print(''.join(
             (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record

@@ -511,52 +511,34 @@ AK_get_index_screen(PyObject *element_locations,
         found_positions = positions[found_mask]                  # 4
         return found_positions[order_found]                      # 5
     */
-   PyObject *found_mask;
-   PyObject *found_element_locations;
-   PyObject* order_found;
-   PyObject *found_positions;
-   PyObject *result;
-
     // 1. Build mask
-    found_mask = PyObject_RichCompare(element_locations, num_unique, Py_NE);
-    if (found_mask == NULL)
-    {
-        return NULL;
-    }
+    PyObject *found_mask = PyObject_RichCompare(
+            element_locations,
+            num_unique,
+            Py_NE
+            );
 
     // 2. Apply mask to ``element_locations``
-    found_element_locations = PyObject_GetItem(element_locations, found_mask);
-    if (found_element_locations == NULL)
-    {
-        Py_DECREF(found_mask);
-        return NULL;
-    }
+    PyArrayObject *found_element_locations = (PyArrayObject*)PyObject_GetItem(
+            element_locations,
+            found_mask
+            );
 
     // 3. Argsort ``found_element_locations``
     // Quicksort is safe since array just contains integers
-    order_found = PyArray_ArgSort(
-            (PyArrayObject*)found_element_locations,  // array
-            0,                                        // axis
-            NPY_QUICKSORT                             // kind
+    PyObject* order_found = PyArray_ArgSort(
+            found_element_locations,  // array
+            0,                        // axis
+            NPY_QUICKSORT             // kind
             );
     Py_DECREF(found_element_locations);
-    if (order_found == NULL)
-    {
-        Py_DECREF(found_mask);
-        return NULL;
-    }
 
     // 4. Apply mask to ``positions``
-    found_positions = PyObject_GetItem(positions, found_mask);
+    PyObject *found_positions = PyObject_GetItem(positions, found_mask);
     Py_DECREF(found_mask);
-    if (found_positions == NULL)
-    {
-        Py_DECREF(order_found);
-        return NULL;
-    }
 
     // 5. Apply ``order_found`` to ``found_positions``
-    result = PyObject_GetItem(found_positions, order_found);
+    PyObject *result = PyObject_GetItem(found_positions, order_found);
     Py_DECREF(order_found);
     Py_DECREF(found_positions);
     return result;
@@ -627,26 +609,13 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             PyArray_DescrFromType(NPY_INT64), // dtype
             0                                 // fortran
             );
-    if (element_locations == NULL)
-    {
-        return NULL;
-    }
 
     num_unique_pyint = PyLong_FromLong(num_unique);
-    if (num_unique_pyint == NULL)
-    {
-        Py_DECREF(element_locations);
-        return NULL;
-    }
 
     // We use ``num_unique`` to signal that we haven't found the element yet
     // This works, because each element must be 0 < num_unique.
-    if (PyArray_FillWithScalar(element_locations, num_unique_pyint))
-    {
-        Py_DECREF(element_locations);
-        Py_DECREF(num_unique_pyint);
-        return NULL;
-    }
+    PyArray_FillWithScalar(element_locations, num_unique_pyint);
+
 
     new_indexers = (PyArrayObject*)PyArray_Empty(
             1,                                // ndim
@@ -654,46 +623,23 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             PyArray_DescrFromType(NPY_INT64), // dtype
             0                                 // fortran
             );
-    if (new_indexers == NULL)
-    {
-        Py_DECREF(element_locations);
-        Py_DECREF(num_unique_pyint);
-        return NULL;
-    }
 
     // We know that our incoming dtypes are all int64! This is a safe cast.
     // Plus, it's easier (and less error prone) to work with native C-arrays
     // over using numpy's iteration APIs.
     npy_int64 *element_location_values = (npy_int64*)PyArray_DATA(element_locations);
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
+    npy_int64 *array_values = (npy_int64*)PyArray_DATA(array);
 
     size_t num_found = 0;
 
-    PyObject *element;
-
     for (size_t i = 0; i < PyArray_SIZE(array); ++i)
     {
-        element = PySequence_ITEM(array, i);
-        if (element == NULL)
-        {
-            Py_DECREF(element_locations);
-            Py_DECREF(num_unique_pyint);
-            Py_DECREF(new_indexers);
-            return NULL;
-        }
-        npy_int64 c_element = PyLong_AsLong(element);
-        Py_DECREF(element);
-        if (c_element == -1)
-        {
-            Py_DECREF(element_locations);
-            Py_DECREF(num_unique_pyint);
-            Py_DECREF(new_indexers);
-            return NULL;
-        }
+        npy_int64 element = array_values[i];
 
-        if (element_location_values[c_element] == num_unique)
+        if (element_location_values[element] == num_unique)
         {
-            element_location_values[c_element] = num_found;
+            element_location_values[element] = num_found;
             ++num_found;
 
             if (num_found == num_unique)
@@ -709,7 +655,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             }
         }
 
-        new_indexers_values[i] = element_location_values[c_element];
+        new_indexers_values[i] = element_location_values[element];
     }
 
     index_screen = AK_get_index_screen(
@@ -719,19 +665,10 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             );
     Py_DECREF(element_locations);
     Py_DECREF(num_unique_pyint);
-    if (index_screen == NULL)
-    {
-        Py_DECREF(new_indexers);
-        return NULL;
-    }
 
     result = PyTuple_Pack(2, index_screen, new_indexers);
     Py_DECREF(index_screen);
-    if (result == NULL)
-    {
-        Py_DECREF(new_indexers);
-        return NULL;
-    }
+    Py_DECREF(new_indexers);
     return result;
 }
 
