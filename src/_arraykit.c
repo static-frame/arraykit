@@ -664,19 +664,36 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     // We know that our incoming dtypes are all int64! This is a safe cast.
     // Plus, it's easier (and less error prone) to work with native C-arrays
     // over using numpy's iteration APIs.
-    npy_int64 *array_values = (npy_int64*)PyArray_DATA(array);
-    npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(element_locations);
+    npy_int64 *element_location_values = (npy_int64*)PyArray_DATA(element_locations);
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
 
     size_t num_found = 0;
 
+    PyObject *element;
+
     for (size_t i = 0; i < PyArray_SIZE(array); ++i)
     {
-        npy_int64 element = array_values[i];
-
-        if (order_found_values[element] == num_unique)
+        element = PySequence_ITEM(array, i);
+        if (element == NULL)
         {
-            order_found_values[element] = num_found;
+            Py_DECREF(element_locations);
+            Py_DECREF(num_unique_pyint);
+            Py_DECREF(new_indexers);
+            return NULL;
+        }
+        npy_int64 c_element = PyLong_AsLong(element);
+        Py_DECREF(element);
+        if (c_element == -1)
+        {
+            Py_DECREF(element_locations);
+            Py_DECREF(num_unique_pyint);
+            Py_DECREF(new_indexers);
+            return NULL;
+        }
+
+        if (element_location_values[c_element] == num_unique)
+        {
+            element_location_values[c_element] = num_found;
             ++num_found;
 
             if (num_found == num_unique)
@@ -692,9 +709,8 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             }
         }
 
-        new_indexers_values[i] = order_found_values[element];
+        new_indexers_values[i] = element_location_values[c_element];
     }
-
 
     index_screen = AK_get_index_screen(
             (PyObject*)element_locations,
