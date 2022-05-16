@@ -389,8 +389,8 @@ class GetNewIndexersAndScreenPerf(Perf):
         scale: int
 
     def __init__(self):
-        NUMBERS = np.arange(500_000)
-        POSITIONS = np.arange(500_000)
+        NUMBERS = np.arange(500_000, dtype=np.int64)
+        POSITIONS = np.arange(500_000, dtype=np.int64)
 
         np.random.seed(0)
 

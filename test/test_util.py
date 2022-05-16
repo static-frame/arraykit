@@ -383,39 +383,42 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
     def test_get_new_indexers_and_screen_a(self) -> None:
-        array1 = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1])
-        post1 = get_new_indexers_and_screen(array1, np.arange(10))
+        array1 = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1], dtype=np.int64)
+        post1 = get_new_indexers_and_screen(array1, np.arange(10, dtype=np.int64))
         assert tuple(map(list, post1)) == (
             [9, 0, 1, 4, 5],
             [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2]
         )
 
-        array2 = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        post2 = get_new_indexers_and_screen(array2, np.arange(15))
+        array2 = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.int64)
+        post2 = get_new_indexers_and_screen(array2, np.arange(15, dtype=np.int64))
         assert tuple(map(list, post2)) == (
             [9, 0, 1, 4, 5, 2, 3, 6, 7, 8, 10],
             [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2, 5, 6, 3, 4,7, 8, 9, 0, 10]
         )
 
-        array3 = np.array([2, 1, 0, 2, 0, 1, 1, 2, 0])
-        post3 = get_new_indexers_and_screen(array3, np.arange(3))
+        array3 = np.array([2, 1, 0, 2, 0, 1, 1, 2, 0], dtype=np.int64)
+        post3 = get_new_indexers_and_screen(array3, np.arange(3, dtype=np.int64))
         assert tuple(map(list, post3)) == (
             [0, 1, 2],
             [2, 1, 0, 2, 0, 1, 1, 2, 0]
         )
 
     def test_get_new_indexers_and_screen_b(self) -> None:
-        array1 = np.array([5])
+        array1 = np.array([5], dtype=np.int64)
 
         with self.assertRaises(ValueError):
-            get_new_indexers_and_screen(array1, np.arange(6))
+            get_new_indexers_and_screen(array1, np.arange(6, dtype=np.int64))
 
         with self.assertRaises(ValueError):
-            get_new_indexers_and_screen(array1, np.arange(106))
+            get_new_indexers_and_screen(array1, np.arange(106, dtype=np.int64))
 
-        array3 = np.arange(25)
+        array3 = np.arange(25, dtype=np.int64)
         post3 = get_new_indexers_and_screen(array3, array3)
         assert tuple(map(list, post3)) == (list(array3), list(array3))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(array1.astype(np.int32), np.arange(5))
 
 
 if __name__ == '__main__':

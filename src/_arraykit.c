@@ -703,6 +703,15 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
     }
 
+    if (PyArray_TYPE(array) != NPY_INT64)
+    {
+        PyErr_SetString(
+                PyExc_ValueError,
+                "Array must be of type np.int64"
+                );
+        return NULL;
+    }
+
     npy_intp dims = {num_unique};
     PyArrayObject *element_locations = (PyArrayObject*)PyArray_Empty(
             1,                                // ndim
