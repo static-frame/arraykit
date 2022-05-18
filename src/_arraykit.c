@@ -796,10 +796,15 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
     }
 
-    PyObject *result = PyTuple_Pack(2, index_screen, new_indexers);
-    Py_DECREF(index_screen);
-    Py_DECREF(new_indexers);
-    return result; // This could be NULL
+    PyObject *result = PyTuple_New(2);
+    if (result == NULL) {
+        Py_DECREF(index_screen);
+        Py_DECREF(new_indexers);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(result, 0, index_screen);
+    PyTuple_SET_ITEM(result, 1, new_indexers);
+    return result;
 }
 
 
