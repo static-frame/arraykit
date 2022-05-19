@@ -1,6 +1,7 @@
 astroid==2.5.3
+pytest==6.2.3
 numpy==1.18.5
-pytest==4.6.11
 pylint==2.7.4
 invoke==1.4.0
-
+pandas==1.1.5
+hypothesis==6.10.1
