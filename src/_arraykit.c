@@ -692,39 +692,47 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     npy_int64 num_found = 0;
 
-    NpyIter* iter;
-    NpyIter_IterNextFunc *iternext;
-    char** dataptr;
-    npy_intp* strideptr,* innersizeptr;
-    npy_int64 element;
+    // Now, implement the core algorithm by looping over the ``indexers``.
+    // We need to use numpy's iteration API, as the ``indexers`` could be
+    // C-contiguous, F-contiguous, both, or neither.
+    // See https://numpy.org/doc/stable/reference/c-api/iterator.html#simple-iteration-example
 
-    iter = NpyIter_New(
+    NpyIter *indexer_iter = NpyIter_New(
             indexers,
-            NPY_ITER_READONLY| NPY_ITER_EXTERNAL_LOOP| NPY_ITER_REFS_OK,
+            NPY_ITER_READONLY| NPY_ITER_EXTERNAL_LOOP,
             NPY_KEEPORDER,
             NPY_NO_CASTING,
             NULL
             );
-    if (iter == NULL) {
-        return -1;
+    if (indexer_iter == NULL) {
+        Py_DECREF(element_locations);
+        Py_DECREF(new_indexers);
+        return NULL;
     }
 
-    iternext = NpyIter_GetIterNext(iter, NULL);
-    if (iternext == NULL) {
-        NpyIter_Deallocate(iter);
-        return -1;
+    // The iternext function gets stored in a local variable so it can be called repeatedly in an efficient manner.
+    NpyIter_IterNextFunc *indexer_iternext = NpyIter_GetIterNext(indexer_iter, NULL);
+    if (indexer_iternext == NULL) {
+        NpyIter_Deallocate(indexer_iter);
+        Py_DECREF(element_locations);
+        Py_DECREF(new_indexers);
+        return NULL;
     }
-    dataptr = NpyIter_GetDataPtrArray(iter);
-    strideptr = NpyIter_GetInnerStrideArray(iter);
-    innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    // All of these will be updated by the iterator
+    char **dataptr = NpyIter_GetDataPtrArray(indexer_iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(indexer_iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(indexer_iter);
 
     size_t i = 0;
     do {
+        // Get the inner loop data/stride/inner_size values
         char* data = *dataptr;
         npy_intp stride = *strideptr;
-        npy_intp count = *innersizeptr;
+        npy_intp inner_size = *innersizeptr;
+        npy_int64 element;
 
-        while (count--) {
+        while (inner_size--) {
             memcpy (&element, data, sizeof (long));
 
             if (element_location_values[element] == num_unique)
@@ -738,7 +746,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
                     // If we have found every possible indexer, we can simply return
                     // back the inputs! Essentially, we can observe on <= single pass
                     // that we have the opportunity for re-use
-                    NpyIter_Deallocate(iter);
+                    NpyIter_Deallocate(indexer_iter);
                     Py_DECREF(element_locations);
                     Py_DECREF(new_indexers);
                     return PyTuple_Pack(2, indexers, positions);
@@ -751,9 +759,10 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             ++i;
         }
 
-    } while(iternext(iter));
+    // Increment the iterator to the next inner loop
+    } while(indexer_iternext(indexer_iter));
 
-    NpyIter_Deallocate(iter);
+    NpyIter_Deallocate(indexer_iter);
 
     PyObject *result = PyTuple_Pack(2, new_indexers, element_locations);
     Py_DECREF(element_locations);
