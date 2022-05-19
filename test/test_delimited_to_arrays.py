@@ -41,7 +41,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), [True, True, True, False])
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
-        # same as genfroomtxt
+        # same as genfromtxt
         self.assertEqual(a1.tolist(), np.genfromtxt(src, dtype=bool).tolist())
 
 
