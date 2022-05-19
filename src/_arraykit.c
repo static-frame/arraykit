@@ -2573,7 +2573,6 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
 
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
