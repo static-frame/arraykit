@@ -615,26 +615,23 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
                 &PyArray_Type, &indexers,
                 &PyArray_Type, &positions
         ))
-    {
+{
         return NULL;
     }
 
-    if (PyArray_NDIM(indexers) != 1)
-    {
+    if (PyArray_NDIM(indexers) != 1) {
         PyErr_SetString(PyExc_ValueError, "indexers must be 1-dimensional");
         return NULL;
     }
 
-    if (PyArray_TYPE(indexers) != NPY_INT64)
-    {
+    if (PyArray_TYPE(indexers) != NPY_INT64) {
         PyErr_SetString(PyExc_ValueError, "Array must be of type np.int64");
         return NULL;
     }
 
     npy_intp num_unique = PyArray_SIZE(positions);
 
-    if (num_unique > PyArray_SIZE(indexers))
-    {
+    if (num_unique > PyArray_SIZE(indexers)) {
         // This algorithm is only optimal if the number of unique elements is
         // less than the number of elements in the indexers.
         // Otherwise, the most optimal code is ``np.unique(indexers, return_index=True)[1]``
@@ -648,10 +645,10 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     npy_intp dims = {num_unique};
     PyArrayObject *element_locations = (PyArrayObject*)PyArray_Empty(
-            1,                                // ndim
-            &dims,                            // shape
-            PyArray_DescrFromType(NPY_INT64), // dtype
-            0                                 // fortran
+            1,                                 // ndim
+            &dims,                             // shape
+            PyArray_DescrFromType(NPY_INT64),  // dtype
+            0                                  // fortran
             );
     if (element_locations == NULL) {
         return NULL;
@@ -688,15 +685,11 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     // over using numpy's iteration APIs.
     npy_int64 *element_location_values = (npy_int64*)PyArray_DATA(element_locations);
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
-    npy_int64 *array_values = (npy_int64*)PyArray_DATA(indexers);
-
-    npy_int64 num_found = 0;
 
     // Now, implement the core algorithm by looping over the ``indexers``.
     // We need to use numpy's iteration API, as the ``indexers`` could be
     // C-contiguous, F-contiguous, both, or neither.
     // See https://numpy.org/doc/stable/reference/c-api/iterator.html#simple-iteration-example
-
     NpyIter *indexer_iter = NpyIter_New(
             indexers,
             NPY_ITER_READONLY| NPY_ITER_EXTERNAL_LOOP,
@@ -725,6 +718,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(indexer_iter);
 
     size_t i = 0;
+    npy_int64 num_found = 0;
     do {
         // Get the inner loop data/stride/inner_size values
         char* data = *dataptr;
@@ -733,15 +727,13 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         npy_int64 element;
 
         while (inner_size--) {
-            memcpy (&element, data, sizeof (long));
+            memcpy (&element, data, sizeof (npy_int64));
 
-            if (element_location_values[element] == num_unique)
-            {
+            if (element_location_values[element] == num_unique) {
                 element_location_values[element] = num_found;
                 ++num_found;
 
-                if (num_found == num_unique)
-                {
+                if (num_found == num_unique) {
                     // This insight is core to the performance of the algorithm.
                     // If we have found every possible indexer, we can simply return
                     // back the inputs! Essentially, we can observe on <= single pass
@@ -769,7 +761,6 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     Py_DECREF(new_indexers);
     return result;
 }
-
 
 //------------------------------------------------------------------------------
 // ArrayGO
