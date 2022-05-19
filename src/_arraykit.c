@@ -1715,18 +1715,18 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     return 1;
 }
 
-static inline int
-AK_CPG_AppendObjectAtLine(
-        AK_CodePointGrid* cpg,
-        Py_ssize_t line,
-        PyObject* element)
-{
-    AK_CPG_resize(cpg, line);
-    // handle failure
-    AK_CPL_AppendObject(cpg->lines[line], element);
-    // handle failure
-    return 1;
-}
+// static inline int
+// AK_CPG_AppendObjectAtLine(
+//         AK_CodePointGrid* cpg,
+//         Py_ssize_t line,
+//         PyObject* element)
+// {
+//     AK_CPG_resize(cpg, line);
+//     // handle failure
+//     AK_CPL_AppendObject(cpg->lines[line], element);
+//     // handle failure
+//     return 1;
+// }
 
 static inline int
 AK_CPG_AppendPointAtLine(
