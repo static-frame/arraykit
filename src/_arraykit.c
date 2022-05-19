@@ -619,6 +619,18 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
     }
 
+    if (PyArray_NDIM(indexers) != 1)
+    {
+        PyErr_SetString(PyExc_ValueError, "indexers must be 1-dimensional");
+        return NULL;
+    }
+
+    if (PyArray_TYPE(indexers) != NPY_INT64)
+    {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type np.int64");
+        return NULL;
+    }
+
     npy_intp num_unique = PyArray_SIZE(positions);
 
     if (num_unique > PyArray_SIZE(indexers))
@@ -630,15 +642,6 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         PyErr_SetString(
                 PyExc_ValueError,
                 "Number of unique elements must be less than or equal to the length of ``indexers``"
-                );
-        return NULL;
-    }
-
-    if (PyArray_TYPE(indexers) != NPY_INT64)
-    {
-        PyErr_SetString(
-                PyExc_ValueError,
-                "Array must be of type np.int64"
                 );
         return NULL;
     }
@@ -689,29 +692,68 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     npy_int64 num_found = 0;
 
-    for (size_t i = 0; i < (size_t)PyArray_SIZE(indexers); ++i)
-    {
-        npy_int64 element = array_values[i];
+    NpyIter* iter;
+    NpyIter_IterNextFunc *iternext;
+    char** dataptr;
+    npy_intp* strideptr,* innersizeptr;
+    npy_int64 element;
 
-        if (element_location_values[element] == num_unique)
-        {
-            element_location_values[element] = num_found;
-            ++num_found;
+    iter = NpyIter_New(
+            indexers,
+            NPY_ITER_READONLY| NPY_ITER_EXTERNAL_LOOP| NPY_ITER_REFS_OK,
+            NPY_KEEPORDER,
+            NPY_NO_CASTING,
+            NULL
+            );
+    if (iter == NULL) {
+        return -1;
+    }
 
-            if (num_found == num_unique)
+    iternext = NpyIter_GetIterNext(iter, NULL);
+    if (iternext == NULL) {
+        NpyIter_Deallocate(iter);
+        return -1;
+    }
+    dataptr = NpyIter_GetDataPtrArray(iter);
+    strideptr = NpyIter_GetInnerStrideArray(iter);
+    innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+    size_t i = 0;
+    do {
+        char* data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp count = *innersizeptr;
+
+        while (count--) {
+            memcpy (&element, data, sizeof (long));
+
+            if (element_location_values[element] == num_unique)
             {
-                // This insight is core to the performance of the algorithm.
-                // If we have found every possible indexer, we can simply return
-                // back the inputs! Essentially, we can observe on <= single pass
-                // that we have the opportunity for re-use
-                Py_DECREF(element_locations);
-                Py_DECREF(new_indexers);
-                return PyTuple_Pack(2, indexers, positions);
+                element_location_values[element] = num_found;
+                ++num_found;
+
+                if (num_found == num_unique)
+                {
+                    // This insight is core to the performance of the algorithm.
+                    // If we have found every possible indexer, we can simply return
+                    // back the inputs! Essentially, we can observe on <= single pass
+                    // that we have the opportunity for re-use
+                    NpyIter_Deallocate(iter);
+                    Py_DECREF(element_locations);
+                    Py_DECREF(new_indexers);
+                    return PyTuple_Pack(2, indexers, positions);
+                }
             }
+
+            new_indexers_values[i] = element_location_values[element];
+
+            data += stride;
+            ++i;
         }
 
-        new_indexers_values[i] = element_location_values[element];
-    }
+    } while(iternext(iter));
+
+    NpyIter_Deallocate(iter);
 
     PyObject *result = PyTuple_Pack(2, new_indexers, element_locations);
     Py_DECREF(element_locations);
