@@ -37,8 +37,8 @@ def test(context):
 
 
 @invoke.task(build)
-def performance(context):
-    context.run(f'{sys.executable} -m performance', echo=True, pty=True)
+def performance(context, names=''):
+    context.run(f'{sys.executable} -m performance {"--names" if names else ""} {names}', echo=True, pty=True)
 
 
 @invoke.task

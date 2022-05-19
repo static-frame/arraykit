@@ -126,6 +126,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
 {
     PyObject *iterator = PyObject_GetIter(dtypes);
     if (iterator == NULL) {
+        // No need to set exception here. GetIter already sets TypeError
         return NULL;
     }
     PyArray_Descr *resolved = NULL;
@@ -153,13 +154,16 @@ AK_ResolveDTypeIter(PyObject *dtypes)
         }
     }
     Py_DECREF(iterator);
+    if (!resolved) {
+        // this could happen if this function gets an empty tuple
+        PyErr_SetString(PyExc_ValueError, "iterable passed to resolve dtypes is empty");
+    }
     return resolved;
 }
 
-
-// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays.
+// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays. This depends on the module object to get the deepcopy method.
 PyObject*
-AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
+AK_ArrayDeepCopy(PyObject* m, PyArrayObject *array, PyObject *memo)
 {
     PyObject *id = PyLong_FromVoidPtr((PyObject*)array);
     if (!id) {
@@ -183,12 +187,7 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
     PyArray_Descr *dtype = PyArray_DESCR(array); // borrowed ref
 
     if (PyDataType_ISOBJECT(dtype)) {
-        PyObject *copy = PyImport_ImportModule("copy");
-        if (!copy) {
-            goto error;
-        }
-        PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
-        Py_DECREF(copy);
+        PyObject *deepcopy = PyObject_GetAttrString(m, "deepcopy");
         if (!deepcopy) {
             goto error;
         }
@@ -205,11 +204,12 @@ AK_ArrayDeepCopy(PyArrayObject *array, PyObject *memo)
                 array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
-        if (memo) {
-            if (!array_new || PyDict_SetItem(memo, id, array_new)) {
-                Py_XDECREF(array_new);
-                goto error;
-            }
+        if (!array_new) {
+            goto error;
+        }
+        if (memo && PyDict_SetItem(memo, id, array_new)) {
+            Py_DECREF(array_new);
+            goto error;
         }
     }
     // set immutable
@@ -220,8 +220,6 @@ error:
     Py_DECREF(id);
     return NULL;
 }
-
-
 
 // Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 1 on success. This will never set dtype_returned to None.
 static inline int
@@ -242,8 +240,6 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
     *dtype_returned = dtype;
     return 1;
 }
-
-
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -2470,7 +2466,6 @@ AK_IterableStrToArray1D(
         return array;
 }
 
-
 //------------------------------------------------------------------------------
 // AK module public methods
 //------------------------------------------------------------------------------
@@ -2579,6 +2574,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
 // Return the integer version of the pointer to underlying data-buffer of array.
 static PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
@@ -2687,7 +2683,7 @@ static char *array_deepcopy_kwarg_names[] = {
 
 // Specialized array deepcopy that stores immutable arrays in an optional memo dict that can be provided with kwargs.
 static PyObject *
-array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 {
     PyObject *array;
     PyObject *memo = NULL;
@@ -2698,7 +2694,7 @@ array_deepcopy(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
     AK_CHECK_NUMPY_ARRAY(array);
-    return AK_ArrayDeepCopy((PyArrayObject*)array, memo);
+    return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
 //------------------------------------------------------------------------------
@@ -2724,6 +2720,71 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 
 //------------------------------------------------------------------------------
 // general utility
+
+static PyObject *
+dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    // -------------------------------------------------------------------------
+    // 1. Handle fast, exact type checks first.
+
+    // None
+    if (arg == Py_None) {
+        return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+    }
+
+    // Float
+    if (PyFloat_CheckExact(arg)) {
+        return (PyObject*)PyArray_DescrFromType(NPY_DOUBLE);
+    }
+
+    // Integers
+    if (PyLong_CheckExact(arg)) {
+        return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+    }
+
+    // Bool
+    if (PyBool_Check(arg)) {
+        return (PyObject*)PyArray_DescrFromType(NPY_BOOL);
+    }
+
+    PyObject* dtype = NULL;
+
+    // String
+    if (PyUnicode_CheckExact(arg)) {
+        PyArray_Descr* descr = PyArray_DescrFromType(NPY_UNICODE);
+        if (descr == NULL) {
+            return NULL;
+        }
+        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
+        Py_DECREF(descr);
+        return dtype;
+    }
+
+    // Bytes
+    if (PyBytes_CheckExact(arg)) {
+        PyArray_Descr* descr = PyArray_DescrFromType(NPY_STRING);
+        if (descr == NULL) {
+            return NULL;
+        }
+        dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
+        Py_DECREF(descr);
+        return dtype;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Construct dtype (slightly more complicated)
+
+    // Already known
+    dtype = PyObject_GetAttrString(arg, "dtype");
+    if (dtype) {
+        return dtype;
+    }
+    PyErr_Clear();
+
+    // -------------------------------------------------------------------------
+    // 3. Handles everything else.
+    return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
+}
 
 static PyObject *
 isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
@@ -3072,12 +3133,16 @@ static PyMethodDef arraykit_methods[] =  {
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
     // {"_test", _test, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
-
+    {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {NULL},
 };
 
 static struct PyModuleDef arraykit_module = {
-    PyModuleDef_HEAD_INIT, "_arraykit", NULL, -1, arraykit_methods,
+    PyModuleDef_HEAD_INIT,
+    .m_name = "_arraykit",
+    .m_doc = NULL,
+    .m_size = -1,
+    .m_methods = arraykit_methods,
 };
 
 PyObject *
@@ -3085,11 +3150,26 @@ PyInit__arraykit(void)
 {
     import_array();
     PyObject *m = PyModule_Create(&arraykit_module);
+
+    PyObject *copy = PyImport_ImportModule("copy");
+    if (!copy) {
+        Py_XDECREF(m);
+        return NULL;
+    }
+    PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
+    Py_DECREF(copy);
+    if (!deepcopy) {
+        Py_XDECREF(m);
+        return NULL;
+    }
+
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&ArrayGOType) ||
-        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType))
+        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
+        PyModule_AddObject(m, "deepcopy", deepcopy))
     {
+        Py_DECREF(deepcopy);
         Py_XDECREF(m);
         return NULL;
     }
