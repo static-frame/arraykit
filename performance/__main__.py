@@ -19,7 +19,8 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
-from performance.reference.util import get_new_indexers_and_screen as get_new_indexers_and_screen_ref
+from performance.reference.util import get_new_indexers_and_screen_ak
+from performance.reference.util import get_new_indexers_and_screen_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -35,7 +36,6 @@ from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import isna_element as isna_element_ak
-from arraykit import get_new_indexers_and_screen as get_new_indexers_and_screen_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -423,9 +423,9 @@ class GetNewIndexersAndScreenPerf(Perf):
                 increment *= 10
 
     def evaluate_cases_by_condition(self, condition):
-        for key, (array, positions) in self.cases.items():
+        for key, (indexers, positions) in self.cases.items():
             if condition(key):
-                self.entry(array=array, positions=positions)
+                self.entry(indexers=indexers, positions=positions)
 
     def ordered(self):
         self.evaluate_cases_by_condition(lambda key: key.type2 == self.ORDERED)

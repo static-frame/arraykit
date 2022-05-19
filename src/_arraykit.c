@@ -492,88 +492,6 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
-// get_new_indexers_and_screen & related
-
-static PyObject *
-AK_get_index_screen(PyObject *element_locations,
-                    PyObject *positions,
-                    PyObject *num_unique
-                    )
-{
-    /*
-    Returns the index screen built up from an array of element locations and a
-    positions array. The index screen will be applied to the original index to
-    determine the labels of what the new indexers map to
-
-    num_unique == len(positions), and is used as the flag to determine which
-    elements were not found.
-
-    Also, len(element_locations) == len(positions).
-
-    Example:
-        input:
-            element_locations = [6, 3, 1, 6, 0, 2]
-            positions         = [0, 1, 2, 3, 4, 5]
-            num_unique        = 6
-
-        algorithm:
-            found_mask        = [F, T, T, F, T, T] (element_locations != num_unique)
-            found_locations   = [3, 1, 0, 2]       (element_locations[found_mask])
-            found_positions   = [1, 2, 4, 5]       (positions[found_mask])
-
-        output:
-                                [4, 2, 5, 1]       (found_positions[argsort(found_locations)])
-
-    Equivalent Python code:
-
-        found_mask = element_locations != num_unique             # 1
-
-        found_element_locations = element_locations[found_mask]  # 2
-        order_found = np.argsort(found_element_locations)        # 3
-
-        found_positions = positions[found_mask]                  # 4
-        return found_positions[order_found]                      # 5
-    */
-    // 1. Build mask
-    PyObject *found_mask = PyObject_RichCompare(element_locations, num_unique, Py_NE);
-    if (found_mask == NULL) {
-        return NULL;
-    }
-
-    // 2. Apply mask to ``element_locations``
-    PyObject *found_element_locations = PyObject_GetItem(element_locations, found_mask);
-    if (found_element_locations == NULL) {
-        Py_DECREF(found_mask);
-        return NULL;
-    }
-
-    // 3. Argsort ``found_element_locations``
-    // Quicksort is safe since array just contains integers
-    PyObject* order_found = PyArray_ArgSort(
-            (PyArrayObject*)found_element_locations, // array
-            0,                                       // axis
-            NPY_QUICKSORT                            // kind
-            );
-    Py_DECREF(found_element_locations);
-    if (order_found == NULL) {
-        Py_DECREF(found_mask);
-        return NULL;
-    }
-
-    // 4. Apply mask to ``positions``
-    PyObject *found_positions = PyObject_GetItem(positions, found_mask);
-    Py_DECREF(found_mask);
-    if (found_positions == NULL) {
-        Py_DECREF(order_found);
-        return NULL;
-    }
-
-    // 5. Apply ``order_found`` to ``found_positions``
-    PyObject *result = PyObject_GetItem(found_positions, order_found);
-    Py_DECREF(order_found);
-    Py_DECREF(found_positions);
-    return result; // This can be NULL
-}
 
 static PyObject *
 get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
@@ -604,12 +522,12 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
         Function:
             input:
-                array:     [0, 0, 2, 3] (i.e. indexer_at_depth[1:4])
-                positions: [0, 1, 2, 3] (i.e. which ilocs from index that ``array`` maps to)
+                indexers:  [0, 0, 2, 3] (i.e. indexer_at_depth[1:4])
+                positions: [0, 1, 2, 3] (i.e. which ilocs from index that ``indexers`` maps to)
 
             algorithm:
-                Loop through ``array``. Since we know that ``array`` only contains
-                integers from 0 -> ``num_unique`` - 1, we can use a new array called
+                Loop through ``indexers``. Since we know that ``indexers`` only contains
+                integers from 0 -> ``num_unique`` - 1, we can use a new indexers called
                 ``element_locations`` to keep track of which elements have been found, and when.
                 (Use ``num_unique`` as the flag for which elements have not been
                 found since it's not possible for one of our inputs to equal that)
@@ -618,17 +536,17 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
                     element_locations =
                     [4, 4, 4, 4] (starting)
-                    [0, 4, 4, 4] (first loop)  array[0] = 0, so mark it as the 0th element found
-                    [0, 4, 4, 4] (second loop) array[1] = 0, already marked, move on
-                    [0, 4, 1, 4] (third loop)  array[2] = 2, so mark it as the 1th element found
-                    [0, 4, 1, 2] (fourth loop) array[3] = 3, so mark it as the 2th element found
+                    [0, 4, 4, 4] (first loop)  indexers[0] = 0, so mark it as the 0th element found
+                    [0, 4, 4, 4] (second loop) indexers[1] = 0, already marked, move on
+                    [0, 4, 1, 4] (third loop)  indexers[2] = 2, so mark it as the 1th element found
+                    [0, 4, 1, 2] (fourth loop) indexers[3] = 3, so mark it as the 2th element found
 
                 Now, if during this loop, we discover every single element, it means
                 we can exit early, and just return back the original inputs, since
                 those arrays contain all the information the caller needs! This is the
                 core optimization of this function.
                 Example:
-                    array     = [0, 3, 1, 2, 3, 1, 0, 0]
+                    indexers  = [0, 3, 1, 2, 3, 1, 0, 0]
                     positions = [0, 1, 2, 3]
 
                     There is no remapping needed! Simple re-use everything!
@@ -641,10 +559,10 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
                 Using the above example, this would look like:
                     [x, x, x, x] (starting)
-                    [0, x, x, x] (first loop)  element_locations[array[0]] = 0
-                    [0, 0, x, x] (second loop) element_locations[array[1]] = 0
-                    [0, 0, 1, x] (third loop)  element_locations[array[2]] = 1
-                    [0, 0, 1, 2] (fourth loop) element_locations[array[3]] = 2
+                    [0, x, x, x] (first loop)  element_locations[indexers[0]] = 0
+                    [0, 0, x, x] (second loop) element_locations[indexers[1]] = 0
+                    [0, 0, 1, x] (third loop)  element_locations[indexers[2]] = 1
+                    [0, 0, 1, 2] (fourth loop) element_locations[indexers[3]] = 2
 
                 Finally, all that's left is to construct ``index_screen``, which
                 is essentially a way to condense and remap ``element_locations``.
@@ -658,30 +576,43 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
         num_unique = len(positions)                                          # 1
         element_locations = np.full(num_unique, num_unique, dtype=np.int64)  # 2
-        new_indexers = np.empty(len(array), dtype=np.int64)                  # 3
+        new_indexers = np.empty(len(indexers), dtype=np.int64)               # 3
 
         num_found = 0                                                        # 4
 
-        for i, element in enumerate(array):                                  # 5
+        for i, element in enumerate(indexers):                               # 5
             if element_locations[element] == num_unique:                     # 6
                 element_locations[element] = num_found                       # 7
                 num_found += 1                                               # 8
 
             if num_found == num_unique:                                      # 9
-                return positions, array                                      # 10
+                return indexers, positions                                   # 10
 
             new_indexers[i] = element_locations[element]                     # 11
 
-        x = get_index_screen(element_locations, num_unique)                  # 12
-        return x, new_indexers                                               # 13
+        return new_indexers, element_locations
+        # This return values will be used in CPython like this
+
+        # The rest of this will be implemented in Python since there is no
+        # benefit to using Cpython for this.
+        found_mask = element_locations != num_unique
+
+        found_element_locations = element_locations[found_mask]
+        order_found = np.argsort(found_element_locations)
+
+        found_positions = positions[found_mask]
+        return found_positions[order_found]
+
+        index_screen = get_index_screen(element_locations, num_unique)
+        return new_indexers, index_screen
     */
-    PyArrayObject *array;
+    PyArrayObject *indexers;
     PyArrayObject *positions;
 
-    static char *kwlist[] = {"array", "positions", NULL};
+    static char *kwlist[] = {"indexers", "positions", NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!:get_new_indexers_and_screen", kwlist,
-                &PyArray_Type, &array,
+                &PyArray_Type, &indexers,
                 &PyArray_Type, &positions
         ))
     {
@@ -690,20 +621,20 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     npy_intp num_unique = PyArray_SIZE(positions);
 
-    if (num_unique > PyArray_SIZE(array))
+    if (num_unique > PyArray_SIZE(indexers))
     {
         // This algorithm is only optimal if the number of unique elements is
-        // less than the number of elements in the array.
-        // Otherwise, the most optimal code is ``np.unique(array, return_index=True)[1]``
+        // less than the number of elements in the indexers.
+        // Otherwise, the most optimal code is ``np.unique(indexers, return_index=True)[1]``
         // and we don't want to re-implement that in C.
         PyErr_SetString(
                 PyExc_ValueError,
-                "Number of unique elements must be less than or equal to the length of the array"
+                "Number of unique elements must be less than or equal to the length of ``indexers``"
                 );
         return NULL;
     }
 
-    if (PyArray_TYPE(array) != NPY_INT64)
+    if (PyArray_TYPE(indexers) != NPY_INT64)
     {
         PyErr_SetString(
                 PyExc_ValueError,
@@ -731,22 +662,21 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     // We use ``num_unique`` to signal that we haven't found the element yet
     // This works, because each element must be 0 < num_unique.
-    if (PyArray_FillWithScalar(element_locations, num_unique_pyint)) {
+    int fill_success = PyArray_FillWithScalar(element_locations, num_unique_pyint);
+    Py_DECREF(num_unique_pyint);
+    if (fill_success != 0) {
         Py_DECREF(element_locations);
-        Py_DECREF(num_unique_pyint);
         return NULL;
     }
 
-
     PyArrayObject *new_indexers = (PyArrayObject*)PyArray_Empty(
-            1,                                // ndim
-            PyArray_DIMS(array),              // shape
-            PyArray_DescrFromType(NPY_INT64), // dtype
-            0                                 // fortran
+            1,                                 // ndim
+            PyArray_DIMS(indexers),            // shape
+            PyArray_DescrFromType(NPY_INT64),  // dtype
+            0                                  // fortran
             );
     if (new_indexers == NULL) {
         Py_DECREF(element_locations);
-        Py_DECREF(num_unique_pyint);
         return NULL;
     }
 
@@ -755,11 +685,11 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     // over using numpy's iteration APIs.
     npy_int64 *element_location_values = (npy_int64*)PyArray_DATA(element_locations);
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
-    npy_int64 *array_values = (npy_int64*)PyArray_DATA(array);
+    npy_int64 *array_values = (npy_int64*)PyArray_DATA(indexers);
 
     npy_int64 num_found = 0;
 
-    for (size_t i = 0; i < (size_t)PyArray_SIZE(array); ++i)
+    for (size_t i = 0; i < (size_t)PyArray_SIZE(indexers); ++i)
     {
         npy_int64 element = array_values[i];
 
@@ -776,34 +706,16 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
                 // that we have the opportunity for re-use
                 Py_DECREF(element_locations);
                 Py_DECREF(new_indexers);
-                Py_DECREF(num_unique_pyint);
-                return PyTuple_Pack(2, positions, array);
+                return PyTuple_Pack(2, indexers, positions);
             }
         }
 
         new_indexers_values[i] = element_location_values[element];
     }
 
-    PyObject *index_screen = AK_get_index_screen(
-            (PyObject*)element_locations,
-            (PyObject*)positions,
-            num_unique_pyint
-            );
+    PyObject *result = PyTuple_Pack(2, new_indexers, element_locations);
     Py_DECREF(element_locations);
-    Py_DECREF(num_unique_pyint);
-    if (index_screen == NULL) {
-        Py_DECREF(new_indexers);
-        return NULL;
-    }
-
-    PyObject *result = PyTuple_New(2);
-    if (result == NULL) {
-        Py_DECREF(index_screen);
-        Py_DECREF(new_indexers);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(result, 0, index_screen);
-    PyTuple_SET_ITEM(result, 1, new_indexers);
+    Py_DECREF(new_indexers);
     return result;
 }
 

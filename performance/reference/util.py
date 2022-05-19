@@ -217,22 +217,44 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     return np.array(value).dtype
 
 
-def get_new_indexers_and_screen(
-        array: np.ndarray,
+def get_new_indexers_and_screen_ref(
+        indexers: np.ndarray,
         positions: np.ndarray,
     ) -> tp.Tuple[np.ndarray, np.ndarray]:
 
-    positions = array.argsort()
+    positions = indexers.argsort()
 
-    # get the sorted array
-    array = array[positions]
+    # get the sorted indexers
+    indexers = indexers[positions]
 
-    mask = np.empty(array.shape, dtype=DTYPE_BOOL)
+    mask = np.empty(indexers.shape, dtype=DTYPE_BOOL)
     mask[0] = True
-    mask[1:] = array[1:] != array[:-1]
+    mask[1:] = indexers[1:] != indexers[:-1]
 
-    indexer = np.empty(mask.shape, dtype=DTYPE_INT_DEFAULT)
-    indexer[positions] = np.cumsum(mask) - 1
-    indexer.flags.writeable = False
+    new_indexers = np.empty(mask.shape, dtype=DTYPE_INT_DEFAULT)
+    new_indexers[positions] = np.cumsum(mask) - 1
+    new_indexers.flags.writeable = False
 
-    return array[mask], indexer
+    return new_indexers, indexers[mask]
+
+
+def get_new_indexers_and_screen_ak(
+        indexers: np.ndarray,
+        positions: np.ndarray,
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
+    from arraykit import get_new_indexers_and_screen as ak_routine
+
+    new_indexers, index_screen = ak_routine(indexers, positions)
+    if new_indexers is indexers and index_screen is positions:
+        return indexers, positions
+
+    # Use a more helpful alias!
+    element_locations = index_screen
+
+    found_mask = element_locations != len(positions)
+
+    found_element_locations = element_locations[found_mask]
+    order_found = np.argsort(found_element_locations)
+
+    found_positions = positions[found_mask]
+    return new_indexers, found_positions[order_found]
