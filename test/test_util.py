@@ -393,7 +393,7 @@ class TestUnit(unittest.TestCase):
         )
 
         # Prove we can handle non-continuous arrays
-        indexersB = np.full((len(indexersA), 3), -1)
+        indexersB = np.full((len(indexersA), 3), -1, dtype=np.int64)
         indexersB[:,1] = indexersA.copy()
         assert not indexersB[:,1].flags.c_contiguous
         assert not indexersB[:,1].flags.f_contiguous
