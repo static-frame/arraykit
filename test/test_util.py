@@ -337,38 +337,40 @@ class TestUnit(unittest.TestCase):
                 np.bool_,
         ]
         for dtype in dtypes:
-            self.assertEqual(dtype, dtype_from_element(dtype()))
+            self.assertEqual(dtype, dtype_from_element(dtype()), dtype)
 
     def test_dtype_from_element_str_and_misc_dtypes(self) -> None:
         dtype_obj_pairs = [
-                (np.dtype('<U1'), np.str_('1')),
-                (np.dtype('<U1'), np.unicode_('1')),
-                (np.dtype('V1'), np.void(1)),
-                (np.dtype('O'), np.object()),
-                (np.dtype('<M8'), np.datetime64('NaT')),
-                (np.dtype('<m8'), np.timedelta64('NaT')),
-                (np.float_, np.nan),
+                np.str_('1'),
+                np.unicode_('1'),
+                np.void(1),
+                np.object(),
+                np.datetime64('NaT'),
+                np.timedelta64('NaT'),
+                np.nan,
         ]
-        for dtype, obj in dtype_obj_pairs:
-            self.assertEqual(dtype, dtype_from_element(obj))
+        for obj in dtype_obj_pairs:
+            self.assertEqual(np.array(obj).dtype, dtype_from_element(obj), obj)
 
     def test_dtype_from_element_obj_dtypes(self) -> None:
         NT = collections.namedtuple('NT', tuple('abc'))
 
         dtype_obj_pairs = [
-                (np.int_, 12),
-                (np.float_, 12.0),
-                (np.bool_, True),
-                (np.dtype('O'), None),
-                (np.float_, float('NaN')),
-                (np.dtype('O'), object()),
-                (np.dtype('O'), (1, 2, 3)),
-                (np.dtype('O'), NT(1, 2, 3)),
-                (np.dtype('O'), datetime.date(2020, 12, 31)),
-                (np.dtype('O'), datetime.timedelta(14)),
+                12,
+                12.0,
+                True,
+                None,
+                float('NaN'),
+                object(),
+                datetime.date(2020, 12, 31),
+                datetime.timedelta(14),
         ]
-        for dtype, obj in dtype_obj_pairs:
-            self.assertEqual(dtype, dtype_from_element(obj))
+        for obj in dtype_obj_pairs:
+            self.assertEqual(np.array(obj).dtype, dtype_from_element(obj), obj)
+
+        # Tuples
+        self.assertEqual(np.object, dtype_from_element((1, 2, 3)), obj)
+        self.assertEqual(np.object, dtype_from_element(NT(1, 2, 3)), obj)
 
     def test_dtype_from_element_time_dtypes(self) -> None:
         # Datetime & Timedelta
@@ -376,6 +378,24 @@ class TestUnit(unittest.TestCase):
             for kind, ctor in (('m', np.timedelta64), ('M', np.datetime64)):
                 obj = ctor(12, precision)
                 self.assertEqual(np.dtype(f'<{kind}8[{precision}]'), dtype_from_element(obj))
+
+    def test_dtype_from_element_int_boundaries(self) -> None:
+        failed = False
+        for offset, power in itertools.product((-1, 0, 1), range(-65, 66)):
+            val = 2**power + offset
+
+            actual = dtype_from_element(val)
+            expected = np.array(val).dtype
+
+            if actual != expected:
+                print(str(val) + '. actual=' + str(actual) + ' expected=' + str(expected))
+                failed = True
+            else:
+                # Check doesn't raise Overflow error
+                self.assertEqual(np.array(val, dtype=actual).item(), val)
+                self.assertEqual(np.array(val, dtype=expected).item(), val)
+
+        self.assertTrue(not failed)
 
     def test_dtype_from_element_str_and_bytes_dtypes(self) -> None:
         for size in (1, 8, 16, 32, 64, 128, 256, 512):

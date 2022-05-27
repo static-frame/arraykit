@@ -384,7 +384,8 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 
     // Integers
     if (PyLong_CheckExact(arg)) {
-        return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+        // It turned out to be very complex to determine the dtype from manually examining the integer, as numpy is rather inscrutable
+        return (PyObject*)PyArray_DescrFromObject(arg, NULL);
     }
 
     // Bool
