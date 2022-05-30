@@ -574,37 +574,32 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     Equivalent Python code:
 
-        num_unique = len(positions)                                          # 1
-        element_locations = np.full(num_unique, num_unique, dtype=np.int64)  # 2
-        new_indexers = np.empty(len(indexers), dtype=np.int64)               # 3
+        num_unique = len(positions)
+        element_locations = np.full(num_unique, num_unique, dtype=np.int64)
+        new_indexers = np.empty(len(indexers), dtype=np.int64)
 
-        num_found = 0                                                        # 4
+        num_found = 0
 
-        for i, element in enumerate(indexers):                               # 5
-            if element_locations[element] == num_unique:                     # 6
-                element_locations[element] = num_found                       # 7
-                num_found += 1                                               # 8
+        for i, element in enumerate(indexers):
+            if element_locations[element] == num_unique:
+                element_locations[element] = num_found
+                num_found += 1
 
-            if num_found == num_unique:                                      # 9
-                return indexers, positions                                   # 10
+            if num_found == num_unique:
+                return positions, indexers
 
-            new_indexers[i] = element_locations[element]                     # 11
+            new_indexers[i] = element_locations[element]
 
-        return new_indexers, element_locations
-        # This return values will be used in CPython like this
-
-        # The rest of this will be implemented in Python since there is no
-        # benefit to using Cpython for this.
+        return element_locations, new_indexers
+        # ...
+        # NOTE: These return values will be used in a Python wrapper like this:
         found_mask = element_locations != num_unique
 
         found_element_locations = element_locations[found_mask]
         order_found = np.argsort(found_element_locations)
 
         found_positions = positions[found_mask]
-        return found_positions[order_found]
-
-        index_screen = get_index_screen(element_locations, num_unique)
-        return new_indexers, index_screen
+        return found_positions[order_found], new_indexers
     */
     PyArrayObject *indexers;
     PyArrayObject *positions;
@@ -615,7 +610,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
                 &PyArray_Type, &indexers,
                 &PyArray_Type, &positions
         ))
-{
+    {
         return NULL;
     }
 
@@ -634,7 +629,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     if (num_unique > PyArray_SIZE(indexers)) {
         // This algorithm is only optimal if the number of unique elements is
         // less than the number of elements in the indexers.
-        // Otherwise, the most optimal code is ``np.unique(indexers, return_index=True)[1]``
+        // Otherwise, the most optimal code is ``np.unique(indexers, return_index=True)``
         // and we don't want to re-implement that in C.
         PyErr_SetString(
                 PyExc_ValueError,
@@ -691,11 +686,11 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     // C-contiguous, F-contiguous, both, or neither.
     // See https://numpy.org/doc/stable/reference/c-api/iterator.html#simple-iteration-example
     NpyIter *indexer_iter = NpyIter_New(
-            indexers,
-            NPY_ITER_READONLY| NPY_ITER_EXTERNAL_LOOP,
-            NPY_KEEPORDER,
-            NPY_NO_CASTING,
-            NULL
+            indexers,                                   // array
+            NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP, // iter flags
+            NPY_KEEPORDER,                              // order
+            NPY_NO_CASTING,                             // casting
+            NULL                                        // dtype
             );
     if (indexer_iter == NULL) {
         Py_DECREF(element_locations);
@@ -727,7 +722,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         npy_int64 element;
 
         while (inner_size--) {
-            memcpy (&element, data, sizeof (npy_int64));
+            element = *((npy_int64 *)data);
 
             if (element_location_values[element] == num_unique) {
                 element_location_values[element] = num_found;

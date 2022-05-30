@@ -244,9 +244,13 @@ def get_new_indexers_and_screen_ak(
     ) -> tp.Tuple[np.ndarray, np.ndarray]:
     from arraykit import get_new_indexers_and_screen as ak_routine
 
+    if len(positions) > len(indexers):
+        return np.unique(indexers, return_inverse=True)
+
+    # Will return same *objects* back if it was able to finish early.
     new_indexers, index_screen = ak_routine(indexers, positions)
     if new_indexers is indexers and index_screen is positions:
-        return indexers, positions
+        return positions, indexers
 
     # Use a more helpful alias!
     element_locations = index_screen
@@ -257,4 +261,4 @@ def get_new_indexers_and_screen_ak(
     order_found = np.argsort(found_element_locations)
 
     found_positions = positions[found_mask]
-    return new_indexers, found_positions[order_found]
+    return found_positions[order_found], new_indexers
