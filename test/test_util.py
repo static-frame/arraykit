@@ -427,6 +427,9 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             get_new_indexers_and_screen(indexersA.astype(np.int32), np.arange(5))
 
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(5).astype(np.int32))
+
         indexersB = np.arange(25, dtype=np.int64)
         postB = get_new_indexers_and_screen(indexersB, indexersB)
         assert tuple(map(list, postB)) == (list(indexersB), list(indexersB))

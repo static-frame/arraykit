@@ -619,6 +619,11 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
     }
 
+    if (PyArray_NDIM(positions) != 1) {
+        PyErr_SetString(PyExc_ValueError, "positions must be 1-dimensional");
+        return NULL;
+    }
+
     if (PyArray_TYPE(indexers) != NPY_INT64) {
         PyErr_SetString(PyExc_ValueError, "Array must be of type np.int64");
         return NULL;
