@@ -247,18 +247,4 @@ def get_new_indexers_and_screen_ak(
     if len(positions) > len(indexers):
         return np.unique(indexers, return_inverse=True)
 
-    # Will return same *objects* back if it was able to finish early.
-    new_indexers, index_screen = ak_routine(indexers, positions)
-    if new_indexers is indexers and index_screen is positions:
-        return positions, indexers
-
-    # Use a more helpful alias!
-    element_locations = index_screen
-
-    found_mask = element_locations != len(positions)
-
-    found_element_locations = element_locations[found_mask]
-    order_found = np.argsort(found_element_locations)
-
-    found_positions = positions[found_mask]
-    return found_positions[order_found], new_indexers
+    return ak_routine(indexers, positions)

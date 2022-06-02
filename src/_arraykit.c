@@ -576,6 +576,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
         num_unique = len(positions)
         element_locations = np.full(num_unique, num_unique, dtype=np.int64)
+        order_found = np.full(num_unique, num_unique, dtype=np.int64)
         new_indexers = np.empty(len(indexers), dtype=np.int64)
 
         num_found = 0
@@ -583,6 +584,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         for i, element in enumerate(indexers):
             if element_locations[element] == num_unique:
                 element_locations[element] = num_found
+                order_found[num_found] = element
                 num_found += 1
 
             if num_found == num_unique:
@@ -590,16 +592,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
             new_indexers[i] = element_locations[element]
 
-        return element_locations, new_indexers
-        # ...
-        # NOTE: These return values will be used in a Python wrapper like this:
-        found_mask = element_locations != num_unique
-
-        found_element_locations = element_locations[found_mask]
-        order_found = np.argsort(found_element_locations)
-
-        found_positions = positions[found_mask]
-        return found_positions[order_found], new_indexers
+        return order_found[:num_found], new_indexers
     */
     PyArrayObject *indexers;
     PyArrayObject *positions;
@@ -644,46 +637,61 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     }
 
     npy_intp dims = {num_unique};
-    PyArrayObject *element_locations = (PyArrayObject*)PyArray_Empty(
-            1,                                 // ndim
-            &dims,                             // shape
-            PyArray_DescrFromType(NPY_INT64),  // dtype
-            0                                  // fortran
+    PyArrayObject *element_locations = (PyArrayObject*)PyArray_EMPTY(
+            1,         // ndim
+            &dims,     // shape
+            NPY_INT64, // dtype
+            0          // fortran
             );
     if (element_locations == NULL) {
         return NULL;
     }
 
+    PyArrayObject *order_found = (PyArrayObject*)PyArray_EMPTY(
+            1,         // ndim
+            &dims,     // shape
+            NPY_INT64, // dtype
+            0          // fortran
+            );
+    if (order_found == NULL) {
+        Py_DECREF(element_locations);
+        return NULL;
+    }
+
     PyObject *num_unique_pyint = PyLong_FromLong(num_unique);
     if (num_unique_pyint == NULL) {
-        Py_DECREF(element_locations);
-        return NULL;
+        goto fail;
     }
 
-    // We use ``num_unique`` to signal that we haven't found the element yet
+    // We use ``num_unique`` here to signal that we haven't found the element yet
     // This works, because each element must be 0 < num_unique.
     int fill_success = PyArray_FillWithScalar(element_locations, num_unique_pyint);
-    Py_DECREF(num_unique_pyint);
     if (fill_success != 0) {
-        Py_DECREF(element_locations);
-        return NULL;
+        Py_DECREF(num_unique_pyint);
+        goto fail;
     }
 
-    PyArrayObject *new_indexers = (PyArrayObject*)PyArray_Empty(
-            1,                                 // ndim
-            PyArray_DIMS(indexers),            // shape
-            PyArray_DescrFromType(NPY_INT64),  // dtype
-            0                                  // fortran
+    fill_success = PyArray_FillWithScalar(order_found, num_unique_pyint);
+    Py_DECREF(num_unique_pyint);
+    if (fill_success != 0) {
+        goto fail;
+    }
+
+    PyArrayObject *new_indexers = (PyArrayObject*)PyArray_EMPTY(
+            1,                      // ndim
+            PyArray_DIMS(indexers), // shape
+            NPY_INT64,              // dtype
+            0                       // fortran
             );
     if (new_indexers == NULL) {
-        Py_DECREF(element_locations);
-        return NULL;
+        goto fail;
     }
 
     // We know that our incoming dtypes are all int64! This is a safe cast.
     // Plus, it's easier (and less error prone) to work with native C-arrays
     // over using numpy's iteration APIs.
     npy_int64 *element_location_values = (npy_int64*)PyArray_DATA(element_locations);
+    npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(order_found);
     npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
 
     // Now, implement the core algorithm by looping over the ``indexers``.
@@ -698,24 +706,26 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
             NULL                                        // dtype
             );
     if (indexer_iter == NULL) {
-        Py_DECREF(element_locations);
         Py_DECREF(new_indexers);
-        return NULL;
+        goto fail;
     }
 
     // The iternext function gets stored in a local variable so it can be called repeatedly in an efficient manner.
     NpyIter_IterNextFunc *indexer_iternext = NpyIter_GetIterNext(indexer_iter, NULL);
     if (indexer_iternext == NULL) {
         NpyIter_Deallocate(indexer_iter);
-        Py_DECREF(element_locations);
         Py_DECREF(new_indexers);
-        return NULL;
+        goto fail;
     }
 
     // All of these will be updated by the iterator
     char **dataptr = NpyIter_GetDataPtrArray(indexer_iter);
     npy_intp *strideptr = NpyIter_GetInnerStrideArray(indexer_iter);
     npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(indexer_iter);
+
+    // No gil is required from here on!
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
 
     size_t i = 0;
     npy_int64 num_found = 0;
@@ -731,6 +741,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
             if (element_location_values[element] == num_unique) {
                 element_location_values[element] = num_found;
+                order_found_values[num_found] = element;
                 ++num_found;
 
                 if (num_found == num_unique) {
@@ -738,10 +749,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
                     // If we have found every possible indexer, we can simply return
                     // back the inputs! Essentially, we can observe on <= single pass
                     // that we have the opportunity for re-use
-                    NpyIter_Deallocate(indexer_iter);
-                    Py_DECREF(element_locations);
-                    Py_DECREF(new_indexers);
-                    return PyTuple_Pack(2, indexers, positions);
+                    goto finish_early;
                 }
             }
 
@@ -754,12 +762,37 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     // Increment the iterator to the next inner loop
     } while(indexer_iternext(indexer_iter));
 
-    NpyIter_Deallocate(indexer_iter);
+    NPY_END_THREADS;
 
-    PyObject *result = PyTuple_Pack(2, new_indexers, element_locations);
+    NpyIter_Deallocate(indexer_iter);
     Py_DECREF(element_locations);
+
+    // new_positions = order_found[:num_unique]
+    PyObject *new_positions = PySequence_GetSlice(order_found, 0, num_found);
+    Py_DECREF(order_found);
+    if (new_positions == NULL) {
+        return NULL;
+    }
+
+    // return new_positions, new_indexers
+    PyObject *result = PyTuple_Pack(2, new_positions, new_indexers);
     Py_DECREF(new_indexers);
+    Py_DECREF(new_positions);
     return result;
+
+    finish_early:
+        NPY_END_THREADS;
+
+        NpyIter_Deallocate(indexer_iter);
+        Py_DECREF(element_locations);
+        Py_DECREF(order_found);
+        Py_DECREF(new_indexers);
+        return PyTuple_Pack(2, positions, indexers);
+
+    fail:
+        Py_DECREF(element_locations);
+        Py_DECREF(order_found);
+        return NULL;
 }
 
 //------------------------------------------------------------------------------
