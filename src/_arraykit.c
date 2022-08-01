@@ -2130,12 +2130,13 @@ typedef struct AK_DelimitedReader{
 
 } AK_DelimitedReader;
 
+// Returns 0 on success, -1 on failure
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    AK_CPG_AppendOffsetAtLine(cpg,
+    if (AK_CPG_AppendOffsetAtLine(cpg,
             dr->axis == 0 ? dr->line_number : dr->field_number,
-            dr->field_len);
+            dr->field_len)) return -1;
     dr->field_len = 0; // clear to close
     ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
     return 0;
