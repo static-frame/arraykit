@@ -16,7 +16,9 @@ Packages: https://pypi.org/project/arraykit
 # NOTE: we do this to avoid importing numpy: https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
 
 site_pkg = site.getsitepackages()[0]
-ext_kwargs = dict(
+ak_extension = Extension(
+        name='arraykit._arraykit', # build into module
+        sources=['src/_arraykit.c'],
         include_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'include')],
         library_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'lib')],
         define_macros=[("AK_VERSION", AK_VERSION)],
@@ -32,11 +34,6 @@ ext_kwargs = dict(
 # ext_kwargs['library_dirs'] = get_info('npymath')['library_dirs']
 # ext_kwargs['libraries'] = ['npymath', 'm']
 
-ak_extension = Extension(
-        name='arraykit._arraykit', # build into module
-        sources=['src/_arraykit.c'],
-        **ext_kwargs,
-        )
 
 setup(
     name='arraykit',
