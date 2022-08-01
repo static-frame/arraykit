@@ -32,7 +32,6 @@ ext_kwargs = dict(
 # ext_kwargs['library_dirs'] = get_info('npymath')['library_dirs']
 # ext_kwargs['libraries'] = ['npymath', 'm']
 
-# raise Exception(ext_kwargs)
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=['src/_arraykit.c'],
