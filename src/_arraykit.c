@@ -1828,6 +1828,7 @@ AK_CPG_AppendOffsetAtLine(
 //     return list;
 // }
 
+// Returns NULL on failure.
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
     PyObject* list = PyList_New(cpg->lines_count);
@@ -2558,11 +2559,14 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             strict);
 
     if (dtypes == Py_None) {
-        // Py_DECREF(dtypes); not sure if this is needed
         dtypes = NULL;
     }
     Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
+    if (cpg == NULL) {
+        AK_DR_Free(dr);
+        return NULL;
+    }
 
     // Consume all lines from dr and load into cpg
     while (AK_DR_ProcessLine(dr, cpg)); // check for -1
@@ -2570,7 +2574,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg);
     AK_CPG_Free(cpg); // will free reference to dtypes
-
     return arrays; // could be NULL
 }
 
