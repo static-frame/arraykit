@@ -1,12 +1,9 @@
+import site
+import os
 from setuptools import Extension  # type: ignore
 from setuptools import setup
 
-from numpy.distutils.misc_util import get_info
-import numpy as np  # type: ignore
-
-
 AK_VERSION = '0.1.12'
-
 
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
@@ -16,17 +13,31 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 '''
 
-additional_info = get_info('npymath') # We need this for various numpy C math APIs to work
+# NOTE: we do this to avoid importing numpy: https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
 
-# Update the dictionary to include configuration we want.
-additional_info['include_dirs'] = [np.get_include()] + additional_info['include_dirs']
-additional_info['define_macros'] = [("AK_VERSION", AK_VERSION)] + additional_info['define_macros']
+site_pkg = site.getsitepackages()[0]
+ext_kwargs = dict(
+        include_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'include')],
+        library_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'lib')],
+        define_macros=[("AK_VERSION", AK_VERSION)],
+        libraries=['npymath', 'm'], # as observed from get_info('npymath')['libraries']
+        )
 
+# old approach that imported numpy
+# from numpy.distutils.misc_util import get_info
+# import numpy as np  # type: ignore
+# ext_kwargs = {}
+# ext_kwargs['include_dirs'] = [np.get_include()]
+# ext_kwargs['define_macros'] = [("AK_VERSION", AK_VERSION)]
+# ext_kwargs['library_dirs'] = get_info('npymath')['library_dirs']
+# ext_kwargs['libraries'] = ['npymath', 'm']
+
+# raise Exception(ext_kwargs)
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=['src/_arraykit.c'],
-        **additional_info,
-)
+        **ext_kwargs,
+        )
 
 setup(
     name='arraykit',
