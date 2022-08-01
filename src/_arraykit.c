@@ -1243,7 +1243,7 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 {
     npy_intp dims[] = {cpl->offsets_count};
     PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
-    // TODO: check error
+    if (dtype == NULL) return NULL;
 
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
@@ -2173,7 +2173,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     case START_FIELD: /* expecting field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* save empty field - return [fields] */
-            if (AK_DR_close_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg))
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -2188,7 +2188,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             /* ignore space at start of field */
             ;
         else if (c == dialect->delimiter) { /* save empty field */
-            if (AK_DR_close_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg))
                 return -1;
         }
         else { /* begin new unquoted field */
@@ -2223,7 +2223,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     case IN_FIELD: /* in unquoted field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
-            if (AK_DR_close_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg))
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -2231,7 +2231,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = ESCAPED_CHAR;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AK_DR_close_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg))
                 return -1;
             dr->state = START_FIELD;
         }
@@ -2279,13 +2279,13 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = IN_QUOTED_FIELD;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AK_DR_close_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg))
                 return -1;
             dr->state = START_FIELD;
         }
         else if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
-            if (AK_DR_close_field(dr, cpg) < 0)
+            if (AK_DR_close_field(dr, cpg))
                 return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -2351,7 +2351,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                 if (dr->dialect->strict)
                     PyErr_SetString(PyExc_RuntimeError,
                             "unexpected end of data");
-                else if (AK_DR_close_field(dr, cpg) >= 0)
+                else if (AK_DR_close_field(dr, cpg) == 0)
                     break;
             }
             return 0;
@@ -2466,7 +2466,6 @@ AK_IterableStrToArray1D(
         PyObject *sequence,
         PyObject *dtype_specifier)
 {
-
         PyArray_Descr* dtype = NULL;
         // will set NULL for None, and propagate NULLs
         AK_DTypeFromSpecifier(dtype_specifier, &dtype);
@@ -2766,9 +2765,7 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // String
     if (PyUnicode_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_UNICODE);
-        if (descr == NULL) {
-            return NULL;
-        }
+        if (descr == NULL) return NULL;
         dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
         Py_DECREF(descr);
         return dtype;
@@ -2777,9 +2774,8 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     // Bytes
     if (PyBytes_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_STRING);
-        if (descr == NULL) {
-            return NULL;
-        }
+        if (descr == NULL) return NULL;
+
         dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
         Py_DECREF(descr);
         return dtype;
