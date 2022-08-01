@@ -33,7 +33,6 @@ setup(
     version=AK_VERSION,
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
-    setup_requires=['numpy>=1.18.5'],
     python_requires='>3.7.0',
     install_requires=['numpy>=1.18.5'],
     url='https://github.com/InvestmentSystems/arraykit',
