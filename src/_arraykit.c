@@ -166,9 +166,7 @@ PyObject*
 AK_ArrayDeepCopy(PyObject* m, PyArrayObject *array, PyObject *memo)
 {
     PyObject *id = PyLong_FromVoidPtr((PyObject*)array);
-    if (!id) {
-        return NULL;
-    }
+    if (!id) return NULL;
 
     if (memo) {
         PyObject *found = PyDict_GetItemWithError(memo, id);
@@ -221,7 +219,7 @@ error:
     return NULL;
 }
 
-// Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 1 on success. This will never set dtype_returned to None.
+// Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will never set dtype_returned to None.
 static inline int
 AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 {
@@ -235,10 +233,10 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
     // make a copy as we will give ownership to array and might mutate
     if (dtype) {
         dtype = PyArray_DescrNew(dtype);
-        // this can fail
+        if (dtype == NULL) return -1;
     }
     *dtype_returned = dtype;
-    return 1;
+    return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -309,6 +307,7 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     return TPS_COMPLEX;
 }
 
+// Returns NULL on errror
 PyArray_Descr*
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
@@ -340,6 +339,7 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
             break;
     }
     // get a fresh instance as we might mutate
+    if (dtype == NULL) return NULL;
     dtype_final = PyArray_DescrNew(dtype);
     Py_DECREF(dtype);
     return dtype_final;
@@ -1103,14 +1103,12 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 //------------------------------------------------------------------------------
 // CodePointLine: Constructors
 
-// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for testing.
+// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for testing. Return NULL on errror.
 AK_CodePointLine*
 AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
 {
     PyObject *iter = PyObject_GetIter(iterable);
-    if (iter == NULL) {
-        return NULL;
-    }
+    if (iter == NULL) return NULL;
 
     AK_CodePointLine *cpl = AK_CPL_New(type_parse);
     if (cpl == NULL) {
@@ -1384,7 +1382,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 
-// Given a type of signed integer, return the corresponding array.
+// Given a type of signed integer, return the corresponding array. Return NULL on error.
 static inline PyObject*
 AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
@@ -1502,6 +1500,7 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
+// Return NULL on error
 static inline PyObject*
 AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
@@ -1560,12 +1559,13 @@ static inline PyObject*
 AK_CPL_ToArrayDatetime(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     PyArray_Descr *dtype_temp = PyArray_DescrFromType(NPY_STRING);
-    if (!dtype_temp) {
+    if (dtype_temp == NULL) {
         return NULL;
     }
 
     PyArray_Descr *dtype_pre = PyArray_DescrNew(dtype_temp);
-    if (!dtype_pre) {
+    if (dtype_pre == NULL) {
+        Py_DECREF(dtype_temp);
         return NULL;
     }
     Py_DECREF(dtype_temp);
@@ -1829,7 +1829,7 @@ PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
     PyObject* list = PyList_New(cpg->lines_count);
-    // handle error
+    if (list == NULL) return NULL;
 
     PyObject* dtypes = cpg->dtypes;
 
@@ -1840,15 +1840,20 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
         if (dtypes) {
             PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
             // Set dtype; this value can be NULL or a dtype (never Py_None)
-            AK_DTypeFromSpecifier(dtype_specifier, &dtype);
-            // TODO: handle error
+            if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
+                Py_DECREF(list);
+                return NULL;
+            }
         }
-
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
-
+        if (array == NULL) {
+            Py_DECREF(list);
+            return NULL;
+        }
         if (PyList_SetItem(list, i, array)) { // steals reference
-           // handle error
+            Py_DECREF(list);
+            return NULL;
         }
     }
     return list;
@@ -2468,15 +2473,21 @@ AK_IterableStrToArray1D(
 {
         PyArray_Descr* dtype = NULL;
         // will set NULL for None, and propagate NULLs
-        AK_DTypeFromSpecifier(dtype_specifier, &dtype);
+        if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) return NULL;
 
         // dtype only NULL from here
         bool type_parse = dtype == NULL;
 
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse);
-        PyObject* array = AK_CPL_ToArray(cpl, dtype);
-        AK_CPL_Free(cpl);
+        if (cpl == NULL) return NULL;
 
+        PyObject* array = AK_CPL_ToArray(cpl, dtype);
+        if (array == NULL) {
+            AK_CPL_Free(cpl);
+            return NULL;
+        }
+
+        AK_CPL_Free(cpl);
         return array;
 }
 
