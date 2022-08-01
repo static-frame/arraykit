@@ -1814,17 +1814,19 @@ AK_CPG_AppendOffsetAtLine(
 //------------------------------------------------------------------------------
 // CPL: Exporters
 
-PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
-{
-    PyObject* list = PyList_New(0);
-    // handle error
-    for (int i = 0; i < cpg->lines_count; ++i) {
-        if (PyList_Append(list, AK_CPL_ToUnicode(cpg->lines[i]))) {
-           // handle error
-        }
-    }
-    return list;
-}
+// Returns NULL on error.
+// PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
+// {
+//     PyObject* list = PyList_New(0);
+//     // handle error
+//     for (int i = 0; i < cpg->lines_count; ++i) {
+//         if (PyList_Append(list, AK_CPL_ToUnicode(cpg->lines[i]))) {
+//            Py_DECREF(list);
+//            return NULL;
+//         }
+//     }
+//     return list;
+// }
 
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
