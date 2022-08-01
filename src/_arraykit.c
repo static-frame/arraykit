@@ -955,6 +955,7 @@ typedef struct AK_CodePointLine{
 
 } AK_CodePointLine;
 
+// on error return NULL
 AK_CodePointLine* AK_CPL_New(bool type_parse)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
@@ -1005,7 +1006,7 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CodePointLine: Mutation
 
-// Resize in place if necessary; noop if not. Return 1 on success.
+// Resize in place if necessary; noop if not. Return 0 on success, -1 on error.
 static inline int
 AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
 {
@@ -1025,7 +1026,7 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
                 sizeof(Py_ssize_t) * cpl->offsets_capacity);
         // TODO: handle error
     }
-    return 1;
+    return 0;
 }
 
 // Given a PyUnicode PyObject, load the string content into the CPL
@@ -1033,10 +1034,11 @@ static inline int
 AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 {
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
-    if (!AK_CPL_resize(cpl, element_length)) {
+    if (AK_CPL_resize(cpl, element_length)) {
         return -1;
     }
     // use PyUnicode_CheckExact
+    // NOTE: this returns NULL on error
     if(!PyUnicode_AsUCS4(element,
             cpl->pos_current,
             cpl->buffer + cpl->buffer_capacity - cpl->pos_current,
@@ -1061,16 +1063,16 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
     if (element_length > cpl->offset_max) cpl->offset_max = element_length;
-    return 1;
+    return 0;
 }
 
-// Add a single point to a line. This does not update offsets. This is valled when updating a character.
+// Add a single point to a line. This does not update offsets. This is valled when updating a character. Returns 0 on success, -1 on error.
 static inline int
 AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         Py_UCS4 p,
         Py_ssize_t pos)
 {
-    if (!AK_CPL_resize(cpl, 1)) {
+    if (AK_CPL_resize(cpl, 1)) {
         return -1;
     }
     if (cpl->type_parser && cpl->type_parser_active) {
@@ -1085,7 +1087,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
 static inline int
 AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 {
-    if (!AK_CPL_resize(cpl, 1)) {
+    if (AK_CPL_resize(cpl, 1)) {
         return -1;
     }
     if (cpl->type_parser) {
@@ -1106,15 +1108,23 @@ AK_CodePointLine*
 AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
 {
     PyObject *iter = PyObject_GetIter(iterable);
-    // TODO: error handle
+    if (iter == NULL) {
+        return NULL;
+    }
 
     AK_CodePointLine *cpl = AK_CPL_New(type_parse);
-    // TODO: handle error
+    if (cpl == NULL) {
+        Py_DECREF(iter);
+        return NULL;
+    }
 
     PyObject *element;
     while ((element = PyIter_Next(iter))) {
-        AK_CPL_AppendObject(cpl, element);
-        // TODO: handle error
+        if (AK_CPL_AppendObject(cpl, element)) {
+            Py_DECREF(element);
+            Py_DECREF(iter);
+            return NULL;
+        }
         Py_DECREF(element);
     }
     // TODO: handle error
@@ -1681,6 +1691,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
 //------------------------------------------------------------------------------
 // CodePointGrid: Mutation
 
+// Return 0 on succes, -1 on failure.
 static inline int
 AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
@@ -1708,11 +1719,15 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             }
         }
         // Always initialize a CPL in the new position
-        cpg->lines[line] = AK_CPL_New(type_parse);
+        AK_CodePointLine *cpl = AK_CPL_New(type_parse);
+        if (cpl == NULL) {
+            return -1; // signal error condition
+        }
+        cpg->lines[line] = cpl;
         ++cpg->lines_count;
     }
 
-    return 1;
+    return 0;
 }
 
 // static inline int
@@ -1736,11 +1751,10 @@ AK_CPG_AppendPointAtLine(
         Py_UCS4 p
         )
 {
-    AK_CPG_resize(cpg, line);
-    // handle failure
+    if (AK_CPG_resize(cpg, line)) return -1;
     AK_CPL_AppendPoint(cpg->lines[line], p, field_len);
     // handle failure
-    return 1;
+    return 0;
 }
 
 static inline int
@@ -1749,11 +1763,11 @@ AK_CPG_AppendOffsetAtLine(
         Py_ssize_t line,
         Py_ssize_t offset)
 {
-    AK_CPG_resize(cpg, line);
+    if (AK_CPG_resize(cpg, line)) return -1;
     // handle failure
     AK_CPL_AppendOffset(cpg->lines[line], offset);
     // handle failure
-    return 1;
+    return 0;
 }
 
 
