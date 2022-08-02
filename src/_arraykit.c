@@ -2366,13 +2366,12 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
         }
         if (!PyUnicode_Check(lineobj)) {
             PyErr_Format(PyExc_RuntimeError,
-                    "iterator should return strings, "
-                    "not %.200s "
+                    "iterator should return strings, not %.200s "
                     "(the file should be opened in text mode)",
                     Py_TYPE(lineobj)->tp_name
                     );
             Py_DECREF(lineobj);
-            return -1; // check that client takes only > 0
+            return -1;
         }
         if (PyUnicode_READY(lineobj) == -1) {
             Py_DECREF(lineobj);
@@ -2569,10 +2568,25 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     // Consume all lines from dr and load into cpg
-    while (AK_DR_ProcessLine(dr, cpg)); // check for -1
+    int status;
+    while (true) {
+        status = AK_DR_ProcessLine(dr, cpg);
+        if (status == 1) {
+            continue;
+        }
+        else if (status == 0) {
+            break;
+        }
+        else if (status == -1) {
+            AK_DR_Free(dr);
+            AK_CPG_Free(cpg);
+            return NULL;
+        }
+    }
     AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg);
+    // NOTE: do not need to check if arrays is NULL
     AK_CPG_Free(cpg); // will free reference to dtypes
     return arrays; // could be NULL
 }

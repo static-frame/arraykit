@@ -501,6 +501,14 @@ class TestUnit(unittest.TestCase):
                     [np.inf, 6.5, 3.2e-10],
                     ['red', 'blue', 'green']])
 
+    def test_delimited_to_arrays_h(self) -> None:
+
+        msg = [
+            0, 1,
+            2, 3,
+        ]
+        with self.assertRaises(RuntimeError):
+            _ = delimited_to_arrays(msg, axis=1)
 
 
     #---------------------------------------------------------------------------
