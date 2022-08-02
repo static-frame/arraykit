@@ -22,7 +22,7 @@ ak_extension = Extension(
         include_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'include')],
         library_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'lib')],
         define_macros=[("AK_VERSION", AK_VERSION)],
-        libraries=['npymath', 'm'], # as observed from get_info('npymath')['libraries']
+        libraries=['npymath'], # as observed from get_info('npymath')['libraries']
         )
 
 # old approach that imported numpy
