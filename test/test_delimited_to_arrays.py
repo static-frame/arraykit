@@ -502,10 +502,18 @@ class TestUnit(unittest.TestCase):
                     ['red', 'blue', 'green']])
 
     def test_delimited_to_arrays_h(self) -> None:
-
         msg = [
             0, 1,
             2, 3,
+        ]
+        with self.assertRaises(RuntimeError):
+            _ = delimited_to_arrays(msg, axis=1)
+
+
+    def test_delimited_to_arrays_i(self) -> None:
+        msg = [
+            b'a', b'b',
+            b'c', b'd',
         ]
         with self.assertRaises(RuntimeError):
             _ = delimited_to_arrays(msg, axis=1)
