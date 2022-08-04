@@ -1,5 +1,6 @@
 import site
 import os
+import typing as tp
 from setuptools import Extension  # type: ignore
 from setuptools import setup
 from pathlib import Path
@@ -15,40 +16,29 @@ Packages: https://pypi.org/project/arraykit
 '''
 
 # NOTE: we do this to avoid importing numpy: https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
+# we used to import the following to get directories:
+# from numpy.distutils.misc_util import get_info
+# import numpy as np  # type: ignore
+# get_info('npymath')['library_dirs']
+# get_info('npymath')['libraries']
 
-# NOTE site.getsitepackages()
-# ['C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cibw-run-zn5jvx1r\\cp37-win32\\build\\venv', 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cibw-run-zn5jvx1r\\cp37-win32\\build\\venv\\lib\\site-packages']
+def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
+    dirs = []
+    for sp in site.getsitepackages():
+        fp = os.path.join(sp, *components)
+        if os.path.exists(fp):
+            dirs.append(fp)
+    return dirs
 
-# site.getsitepackages() ['C:A', 'C:A/lib/site-packages']
-# np.get_include() C:A/lib/site-packages/numpy/core/include
-# get_info('npymath')['library_dirs'] ['C:A/lib/site-packages/numpy/core/lib']
-
-
-site_packages = site.getsitepackages()
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=['src/_arraykit.c'],
-        include_dirs=[os.path.join(fp, 'numpy', 'core', 'include') for fp in site_packages],
-        library_dirs=[os.path.join(fp, 'numpy', 'core', 'lib') for fp in site_packages],
+        include_dirs=get_ext_dir('numpy', 'core', 'include'),
+        library_dirs=get_ext_dir('numpy', 'core', 'lib'),
         define_macros=[("AK_VERSION", AK_VERSION)],
-        libraries=['npymath'], # as observed from get_info('npymath')['libraries']
+        libraries=['npymath'], # not including mlib at this time
         )
 
-# old approach that imported numpy
-# from numpy.distutils.misc_util import get_info
-# import numpy as np  # type: ignore
-# print('NOTE', 'site.getsitepackages()', site.getsitepackages(), 'np.get_include()', np.get_include(), "get_info('npymath')['library_dirs']", get_info('npymath')['library_dirs'])
-
-# ak_extension = Extension(
-#         name='arraykit._arraykit', # build into module
-#         sources=['src/_arraykit.c'],
-#         include_dirs=[np.get_include()],
-#         library_dirs=get_info('npymath')['library_dirs'],
-#         # include_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'include')],
-#         # library_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'lib')],
-#         define_macros=[("AK_VERSION", AK_VERSION)],
-#         libraries=['npymath'], # as observed from get_info('npymath')['libraries']
-#         )
 
 setup(
     name='arraykit',
