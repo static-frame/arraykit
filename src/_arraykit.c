@@ -267,32 +267,32 @@ typedef enum AK_TypeParserState {
 AK_TypeParserState
 AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     // unlikely case
-    if (new == TPS_UNKNOWN) {return TPS_STRING;}
+    if (new == TPS_UNKNOWN) return TPS_STRING;
 
     // propagate new if previous is unknown or empty
-    if ((previous == TPS_UNKNOWN) || (previous == TPS_EMPTY)) {return new;}
+    if ((previous == TPS_UNKNOWN) || (previous == TPS_EMPTY)) return new;
 
     // if either are string, go to string
-    if (previous == TPS_STRING || new == TPS_STRING) {return TPS_STRING;}
+    if (previous == TPS_STRING || new == TPS_STRING) return TPS_STRING;
 
     // handle both new, previous bool directly
     if (previous == TPS_BOOL) {
-        if (new == TPS_EMPTY || new == TPS_BOOL) {return TPS_BOOL;}
+        if (new == TPS_EMPTY || new == TPS_BOOL) return TPS_BOOL;
         else {return TPS_STRING;} // bool found with anything except empty is string
     }
     if (new == TPS_BOOL) {
-        if (previous == TPS_EMPTY) {return TPS_BOOL;}
-        else {return TPS_STRING;} // bool found with anything except empty is string
+        if (previous == TPS_EMPTY) return TPS_BOOL;
+        else return TPS_STRING; // bool found with anything except empty is string
     }
     // numerical promotion
     if (previous == TPS_INT) {
-        if (new == TPS_EMPTY || new == TPS_INT) {return TPS_INT;}
-        if (new == TPS_FLOAT) {return TPS_FLOAT;}
-        if (new == TPS_COMPLEX) {return TPS_COMPLEX;}
+        if (new == TPS_EMPTY || new == TPS_INT) return TPS_INT;
+        if (new == TPS_FLOAT) return TPS_FLOAT;
+        if (new == TPS_COMPLEX) return TPS_COMPLEX;
     }
     if (previous == TPS_FLOAT) {
-        if (new == TPS_EMPTY || new == TPS_INT || new == TPS_FLOAT) {return TPS_FLOAT;}
-        if (new == TPS_COMPLEX) {return TPS_COMPLEX;}
+        if (new == TPS_EMPTY || new == TPS_INT || new == TPS_FLOAT) return TPS_FLOAT;
+        if (new == TPS_COMPLEX) return TPS_COMPLEX;
     }
     // previous == TPS_COMPLEX, new is TPS_EMPTY, TPS_INT, TPS_FLOAT, or TPS_COMPLEX
     return TPS_COMPLEX;
@@ -337,6 +337,7 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
 }
 
 //------------------------------------------------------------------------------
+// An AK_TypeParser accumulates the state in parsing a single code point line. It holds both "active" state in the progress of parsing as well as finalized state in parsed_line
 typedef struct AK_TypeParser {
 
     bool contiguous_leading_space;
@@ -360,12 +361,12 @@ typedef struct AK_TypeParser {
     Py_ssize_t count_digit;
     Py_ssize_t count_not_space;
 
-    AK_TypeParserState parsed_field;
-    AK_TypeParserState parsed_line;
+    AK_TypeParserState parsed_field; // state of current field
+    AK_TypeParserState parsed_line; // state of current resolved line type
 
 } AK_TypeParser;
 
-// Initialize all state. This returns no error.
+// Initialize all state. This returns no error. Thi si scalled once per field for each field in a code point line
 void AK_TP_reset_field(AK_TypeParser* tp)
 {
     tp->previous_numeric = false;
@@ -411,6 +412,7 @@ AK_TP_Free(AK_TypeParser* tp)
 //------------------------------------------------------------------------------
 // TypePArser: char, field processors
 
+// Givne a type parse, process a single character and update the tyep parser state. Return true when processing should continue, false with no further processing is necessary.
 bool
 AK_TP_ProcessChar(AK_TypeParser* tp,
         char c,
@@ -423,6 +425,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
 
     // evaluate space ..........................................................
     bool space = false;
+
     if (AK_is_space(c)) {
         if (pos == 0) {
             tp->contiguous_leading_space = true;
@@ -591,19 +594,15 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
     return true;
 }
 
-// This private function is used by AK_TP_ProcessField to evaluate the state of the AK_TypeParser and determine the the resolved AK_TypeParserState.
+// This private function is used by AK_TP_ProcessField to evaluate the state of the AK_TypeParser and determine the resolved AK_TypeParserState.
 AK_TypeParserState
 AK_TP_resolve_field(AK_TypeParser* tp,
         Py_ssize_t count)
 {
-    // AK_DEBUG("calling AK_TP_resolve_field, tp->parsed_field");
-    // AK_DEBUG_OBJ(PyLong_FromLong(tp->parsed_field));
-
-    if (count == 0) {return TPS_EMPTY;}
-
+    if (count == 0) return TPS_EMPTY;
 
     // if parsed_field was set in AK_TP_ProcessChar
-    if (tp->parsed_field != TPS_UNKNOWN) {return tp->parsed_field;}
+    if (tp->parsed_field != TPS_UNKNOWN) return tp->parsed_field;
 
     if (tp->count_bool == 4 && tp->count_not_space == 4) {
         return TPS_BOOL;
@@ -613,7 +612,7 @@ AK_TP_resolve_field(AK_TypeParser* tp,
     }
 
     if (tp->contiguous_numeric) {
-        if (tp->count_digit == 0) {return TPS_STRING;}
+        if (tp->count_digit == 0) return TPS_STRING;
         // AK_DEBUG("contiguous numeric");
 
         // int
@@ -711,7 +710,7 @@ AK_TP_resolve_field(AK_TypeParser* tp,
 }
 
 
-// After field is complete, call AK_TP_ProcessField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called
+// After field is complete, call AK_TP_ProcessField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called.
 void
 AK_TP_ProcessField(AK_TypeParser* tp,
         Py_ssize_t count)
