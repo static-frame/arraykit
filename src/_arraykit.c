@@ -11,16 +11,6 @@
 
 //------------------------------------------------------------------------------
 // Macros
-//------------------------------------------------------------------------------
-// Py_UNREACHABLE() isn't available in Python 3.6:
-# ifndef Py_UNREACHABLE
-# define Py_UNREACHABLE() Py_FatalError("https://xkcd.com/2200")
-# endif
-
-// Bug in NumPy < 1.16 (https://github.com/numpy/numpy/pull/12131):
-# undef PyDataType_ISBOOL
-# define PyDataType_ISBOOL(obj) \
-    PyTypeNum_ISBOOL(((PyArray_Descr*)(obj))->type_num)
 
 //------------------------------------------------------------------------------
 // Given a PyObject, raise if not an array.
