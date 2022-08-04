@@ -1749,7 +1749,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 //     // handle failure
 //     AK_CPL_AppendObject(cpg->lines[line], element);
 //     // handle failure
-//     return 1;
+//     return 0;
 // }
 
 // Return 0 on success, -1 on failure.
