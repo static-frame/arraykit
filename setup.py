@@ -16,22 +16,28 @@ Packages: https://pypi.org/project/arraykit
 
 # NOTE: we do this to avoid importing numpy: https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
 
+# NOTE site.getsitepackages()
+# ['C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cibw-run-zn5jvx1r\\cp37-win32\\build\\venv', 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cibw-run-zn5jvx1r\\cp37-win32\\build\\venv\\lib\\site-packages']
+
+# site.getsitepackages() ['C:A', 'C:A/lib/site-packages']
+# np.get_include() C:A/lib/site-packages/numpy/core/include
+# get_info('npymath')['library_dirs'] ['C:A/lib/site-packages/numpy/core/lib']
 
 
-site_pkg = site.getsitepackages()[0]
+site_packages = site.getsitepackages()
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=['src/_arraykit.c'],
-        include_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'include')],
-        library_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'lib')],
+        include_dirs=[os.path.join(fp, 'numpy', 'core', 'include') for fp in site_packages],
+        library_dirs=[os.path.join(fp, 'numpy', 'core', 'lib') for fp in site_packages],
         define_macros=[("AK_VERSION", AK_VERSION)],
         libraries=['npymath'], # as observed from get_info('npymath')['libraries']
         )
 
 # old approach that imported numpy
-from numpy.distutils.misc_util import get_info
-import numpy as np  # type: ignore
-print('NOTE', 'site.getsitepackages()', site.getsitepackages(), 'np.get_include()', np.get_include(), "get_info('npymath')['library_dirs']", get_info('npymath')['library_dirs'])
+# from numpy.distutils.misc_util import get_info
+# import numpy as np  # type: ignore
+# print('NOTE', 'site.getsitepackages()', site.getsitepackages(), 'np.get_include()', np.get_include(), "get_info('npymath')['library_dirs']", get_info('npymath')['library_dirs'])
 
 # ak_extension = Extension(
 #         name='arraykit._arraykit', # build into module
