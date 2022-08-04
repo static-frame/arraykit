@@ -412,7 +412,7 @@ AK_TP_Free(AK_TypeParser* tp)
 //------------------------------------------------------------------------------
 // TypePArser: char, field processors
 
-// Givne a type parse, process a single character and update the tyep parser state. Return true when processing should continue, false with no further processing is necessary.
+// Given a type parse, process a single character and update the tyep parser state. Return true when processing should continue, false with no further processing is necessary. `pos` is the raw position within the current field.
 bool
 AK_TP_ProcessChar(AK_TypeParser* tp,
         char c,
@@ -460,6 +460,8 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
     }
     // no longer in contiguous leading space
     tp->contiguous_leading_space = false;
+
+    // pos_field defines the position within the field less leading space
     Py_ssize_t pos_field = pos - tp->count_leading_space;
 
     // evaluate numeric, non-positional ........................................
@@ -594,14 +596,14 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
     return true;
 }
 
-// This private function is used by AK_TP_ProcessField to evaluate the state of the AK_TypeParser and determine the resolved AK_TypeParserState.
+// This private function is used by AK_TP_ResolveLineResetField to evaluate the state of the AK_TypeParser and determine the resolved AK_TypeParserState.
 AK_TypeParserState
 AK_TP_resolve_field(AK_TypeParser* tp,
         Py_ssize_t count)
 {
     if (count == 0) return TPS_EMPTY;
 
-    // if parsed_field was set in AK_TP_ProcessChar
+    // if parsed_field is known, return it
     if (tp->parsed_field != TPS_UNKNOWN) return tp->parsed_field;
 
     if (tp->count_bool == 4 && tp->count_not_space == 4) {
@@ -710,9 +712,9 @@ AK_TP_resolve_field(AK_TypeParser* tp,
 }
 
 
-// After field is complete, call AK_TP_ProcessField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called.
+// After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called.
 void
-AK_TP_ProcessField(AK_TypeParser* tp,
+AK_TP_ResolveLineResetField(AK_TypeParser* tp,
         Py_ssize_t count)
 {
     if (tp->parsed_line != TPS_STRING) {
@@ -1026,6 +1028,8 @@ static inline int
 AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 {
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
+
+    // if we cannot fit element length, resize
     if (AK_CPL_resize(cpl, element_length)) {
         return -1;
     }
@@ -1037,16 +1041,17 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
             0)) { // last zero means do not copy null
         return -1; // need to handle error
     }
+    // if type parsing has been enabled
     if (cpl->type_parser) {
         Py_UCS4* p = cpl->pos_current;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
         for (; p < end; ++p) {
             cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)*p, pos);
-            if (!cpl->type_parser_active) {break;}
+            if (!cpl->type_parser_active) break;
             ++pos;
         }
-        AK_TP_ProcessField(cpl->type_parser, element_length);
+        AK_TP_ResolveLineResetField(cpl->type_parser, element_length);
         cpl->type_parser_active = true; // turn back on for next field
     }
 
@@ -1054,42 +1059,46 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     cpl->offsets[cpl->offsets_count++] = element_length;
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
+
     if (element_length > cpl->offset_max) cpl->offset_max = element_length;
     return 0;
 }
 
-// Add a single point to a line. This does not update offsets. This is valled when updating a character. Returns 0 on success, -1 on error.
+// Add a single point (or chacter) to a line. This does not update offsets. This is valid when updating a character. Returns 0 on success, -1 on error.
 static inline int
 AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         Py_UCS4 p,
         Py_ssize_t pos)
 {
-    if (AK_CPL_resize(cpl, 1)) {
-        return -1;
-    }
+    // based on buffer_count, resize if we cannot fit one more character
+    if (AK_CPL_resize(cpl, 1)) return -1;
+
+    // type_parser might not be active if we already know the dtype
     if (cpl->type_parser && cpl->type_parser_active) {
         cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
-    *cpl->pos_current++ = p;
+    *cpl->pos_current++ = p; // shift forward by size of p
     ++cpl->buffer_count;
     return 1;
 }
 
-// Append to offsets. This does not update buffer lines. This is called when closing a field.
+// Append to offsets. This does not update buffer lines. This is called when closing a field. Return -1 on failure, 0 on success.
 static inline int
 AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 {
-    if (AK_CPL_resize(cpl, 1)) {
-        return -1;
-    }
+    // this will update cpl->offsets if necessary
+    if (AK_CPL_resize(cpl, 1)) return -1;
+
     if (cpl->type_parser) {
-        AK_TP_ProcessField(cpl->type_parser, offset);
+        AK_TP_ResolveLineResetField(cpl->type_parser, offset);
         cpl->type_parser_active = true; // turn back on for next field
     }
+
+    // increment offset_count after assignment so we can grow if needed next time
     cpl->offsets[cpl->offsets_count++] = offset;
 
     if (offset > cpl->offset_max) {cpl->offset_max = offset;}
-    return 1;
+    return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -1764,9 +1773,7 @@ AK_CPG_AppendOffsetAtLine(
         Py_ssize_t offset)
 {
     if (AK_CPG_resize(cpg, line)) return -1;
-    // handle failure
-    AK_CPL_AppendOffset(cpg->lines[line], offset);
-    // handle failure
+    if (AK_CPL_AppendOffset(cpg->lines[line], offset)) return -1;
     return 0;
 }
 
