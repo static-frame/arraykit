@@ -2,6 +2,7 @@ import site
 import os
 from setuptools import Extension  # type: ignore
 from setuptools import setup
+from pathlib import Path
 
 AK_VERSION = '0.1.12'
 
@@ -15,6 +16,8 @@ Packages: https://pypi.org/project/arraykit
 
 # NOTE: we do this to avoid importing numpy: https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
 
+
+
 site_pkg = site.getsitepackages()[0]
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
@@ -26,14 +29,20 @@ ak_extension = Extension(
         )
 
 # old approach that imported numpy
-# from numpy.distutils.misc_util import get_info
-# import numpy as np  # type: ignore
-# ext_kwargs = {}
-# ext_kwargs['include_dirs'] = [np.get_include()]
-# ext_kwargs['define_macros'] = [("AK_VERSION", AK_VERSION)]
-# ext_kwargs['library_dirs'] = get_info('npymath')['library_dirs']
-# ext_kwargs['libraries'] = ['npymath', 'm']
+from numpy.distutils.misc_util import get_info
+import numpy as np  # type: ignore
+print('NOTE', 'site.getsitepackages()', site.getsitepackages(), 'np.get_include()', np.get_include(), "get_info('npymath')['library_dirs']", get_info('npymath')['library_dirs'])
 
+# ak_extension = Extension(
+#         name='arraykit._arraykit', # build into module
+#         sources=['src/_arraykit.c'],
+#         include_dirs=[np.get_include()],
+#         library_dirs=get_info('npymath')['library_dirs'],
+#         # include_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'include')],
+#         # library_dirs=[os.path.join(site_pkg, 'numpy', 'core', 'lib')],
+#         define_macros=[("AK_VERSION", AK_VERSION)],
+#         libraries=['npymath'], # as observed from get_info('npymath')['libraries']
+#         )
 
 setup(
     name='arraykit',
