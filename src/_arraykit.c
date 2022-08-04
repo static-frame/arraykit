@@ -263,6 +263,7 @@ typedef enum AK_TypeParserState {
     TPS_EMPTY
 } AK_TypeParserState;
 
+// Given previous and new, return a parser state. Does not error.
 AK_TypeParserState
 AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     // unlikely case
@@ -297,7 +298,7 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     return TPS_COMPLEX;
 }
 
-// Returns NULL on errror
+// Given a parser state, return a dtype. Returns NULL on errror.
 PyArray_Descr*
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
@@ -333,7 +334,6 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
     dtype_final = PyArray_DescrNew(dtype);
     Py_DECREF(dtype);
     return dtype_final;
-
 }
 
 //------------------------------------------------------------------------------
@@ -1006,7 +1006,8 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
         cpl->buffer_capacity *= 2; // needs to be max of this or element_length
         cpl->buffer = PyMem_Realloc(cpl->buffer,
                 sizeof(Py_UCS4) * cpl->buffer_capacity);
-        // TODO: handle error
+        if (cpl->buffer == NULL) return -1;
+
         cpl->pos_current = cpl->buffer + cpl->buffer_count;
     }
     // increment by at most one, so only need to check if equal
@@ -1015,7 +1016,8 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
         cpl->offsets_capacity *= 2;
         cpl->offsets = PyMem_Realloc(cpl->offsets,
                 sizeof(Py_ssize_t) * cpl->offsets_capacity);
-        // TODO: handle error
+        if (cpl->offsets == NULL) return -1;
+
     }
     return 0;
 }
@@ -1125,6 +1127,7 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
 //------------------------------------------------------------------------------
 // CodePointLine: Navigation
 
+// Cannot error.
 void
 AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 {
@@ -1132,6 +1135,7 @@ AK_CPL_CurrentReset(AK_CodePointLine* cpl)
     cpl->index_current = 0;
 }
 
+// Advance the current position by the current offset. Cannot error.
 static inline void
 AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
@@ -1237,7 +1241,7 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    // TODO: check error
+    if (array == NULL) return NULL;
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA((PyArrayObject*)array);
 
@@ -1593,18 +1597,18 @@ AK_CPL_ToArrayComplex(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 
-// Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. Might return NULL if array creation fails; an exception should be set.
+// Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
 static inline PyObject*
 AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     if (!dtype) {
         // get from CPL
         if (cpl->type_parser) {
             // will return a fresh instance
-            // AK_DEBUG("CPL calling AK_TPS_ToDtype");
             dtype = AK_TPS_ToDtype(cpl->type_parser->parsed_line);
+            if (dtype == NULL) return NULL;
         }
         else {
-            AK_NOT_IMPLEMENTED("no handling for x dtype yet");
+            AK_NOT_IMPLEMENTED("dtype not passed to AK_CPL_ToArray, and CodePointLine has no type_parser");
         }
     }
 
@@ -1699,7 +1703,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
         // NOTE: as we sure we are only copying pointers?
         cpg->lines = PyMem_Realloc(cpg->lines,
                 sizeof(AK_CodePointLine*) * cpg->lines_capacity);
-        // TODO: handle error, initialize lines to NULL
+        if (cpg->lines == NULL) return -1;
     }
     // for now we assume sequential growth, so should only check if equal
     if (line >= cpg->lines_count) {
@@ -1833,8 +1837,8 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 
     PyObject* dtypes = cpg->dtypes;
 
+    // Iterate over lines in the code point grid
     for (int i = 0; i < cpg->lines_count; ++i) {
-
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
         if (dtypes) {
