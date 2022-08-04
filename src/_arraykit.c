@@ -1079,7 +1079,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     }
     *cpl->pos_current++ = p; // shift forward by size of p
     ++cpl->buffer_count;
-    return 1;
+    return 0;
 }
 
 // Append to offsets. This does not update buffer lines. This is called when closing a field. Return -1 on failure, 0 on success.
@@ -1752,6 +1752,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 //     return 1;
 // }
 
+// Return 0 on success, -1 on failure.
 static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
@@ -1761,11 +1762,11 @@ AK_CPG_AppendPointAtLine(
         )
 {
     if (AK_CPG_resize(cpg, line)) return -1;
-    AK_CPL_AppendPoint(cpg->lines[line], p, field_len);
-    // handle failure
+    if (AK_CPL_AppendPoint(cpg->lines[line], p, field_len)) return -1;
     return 0;
 }
 
+// Returns 0 on success, -1 on failure.
 static inline int
 AK_CPG_AppendOffsetAtLine(
         AK_CodePointGrid* cpg,
@@ -2144,7 +2145,7 @@ typedef struct AK_DelimitedReader{
 
 } AK_DelimitedReader;
 
-// Returns 0 on success, -1 on failure
+// Called once at the close of each field in a line. Returns 0 on success, -1 on failure
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
@@ -2156,18 +2157,19 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
     return 0;
 }
 
+// Return 0 on success, -1 on failure.
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
-    AK_CPG_AppendPointAtLine(cpg,
+    if (AK_CPG_AppendPointAtLine(cpg,
             dr->axis == 0 ? dr->line_number : dr->field_number,
             dr->field_len,
-            c);
+            c)) return -1;
     ++dr->field_len; // reset in AK_DR_close_field
     return 0;
 }
 
-// Process each char and update AK_DelimitedReader state. When appropriate, call AK_DR_add_char to accumulate field characters, AK_DR_close_field to end a field
+// Process each char and update AK_DelimitedReader state. When appropriate, call AK_DR_add_char to accumulate field characters, AK_DR_close_field to end a field. Return -1 on failure, 0 on success.
 static int
 AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
@@ -2208,7 +2210,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         else { /* begin new unquoted field */
             if (dialect->quoting == QUOTE_NONNUMERIC)
                 dr->numeric_field = 1;
-            if (AK_DR_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c))
                 return -1;
             dr->state = IN_FIELD;
         }
@@ -2216,14 +2218,14 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 
     case ESCAPED_CHAR:
         if (c == '\n' || c=='\r') {
-            if (AK_DR_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c))
                 return -1;
             dr->state = AFTER_ESCAPED_CRNL;
             break;
         }
         if (c == '\0')
             c = '\n';
-        if (AK_DR_add_char(dr, cpg, c) < 0)
+        if (AK_DR_add_char(dr, cpg, c))
             return -1;
         dr->state = IN_FIELD;
         break;
@@ -2250,7 +2252,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = START_FIELD;
         }
         else { /* normal character - save in field */
-            if (AK_DR_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c))
                 return -1;
         }
         break;
@@ -2271,7 +2273,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             }
         }
         else { /* normal character - save in field */
-            if (AK_DR_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c))
                 return -1;
         }
         break;
@@ -2279,7 +2281,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     case ESCAPE_IN_QUOTED_FIELD:
         if (c == '\0')
             c = '\n';
-        if (AK_DR_add_char(dr, cpg, c) < 0)
+        if (AK_DR_add_char(dr, cpg, c))
             return -1;
         dr->state = IN_QUOTED_FIELD;
         break;
@@ -2288,7 +2290,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         /* doublequote - seen a quote in a quoted field */
         if (dialect->quoting != QUOTE_NONE && c == dialect->quotechar) {
             /* save "" as " */
-            if (AK_DR_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c))
                 return -1;
             dr->state = IN_QUOTED_FIELD;
         }
@@ -2304,7 +2306,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
         else if (!dialect->strict) {
-            if (AK_DR_add_char(dr, cpg, c) < 0)
+            if (AK_DR_add_char(dr, cpg, c))
                 return -1;
             dr->state = IN_FIELD;
         }
