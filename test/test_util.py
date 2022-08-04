@@ -2,7 +2,6 @@ import pytest
 import collections
 import datetime
 import unittest
-import itertools
 
 import numpy as np  # type: ignore
 
@@ -17,6 +16,8 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
+from arraykit import get_new_indexers_and_screen
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -380,6 +381,57 @@ class TestUnit(unittest.TestCase):
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
+
+    def test_get_new_indexers_and_screen_a(self) -> None:
+        indexersA = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1], dtype=np.int64)
+        postA = get_new_indexers_and_screen_full(indexersA, np.arange(10, dtype=np.int64))
+        assert indexersA.flags.c_contiguous
+        assert indexersA.flags.f_contiguous
+        assert tuple(map(list, postA)) == (
+            [9, 0, 1, 4, 5],
+            [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2],
+        )
+
+        # Prove we can handle non-continuous arrays
+        indexersB = np.full((len(indexersA), 3), -1, dtype=np.int64)
+        indexersB[:,1] = indexersA.copy()
+        assert not indexersB[:,1].flags.c_contiguous
+        assert not indexersB[:,1].flags.f_contiguous
+        postB = get_new_indexers_and_screen_full(indexersB[:,1], np.arange(10, dtype=np.int64))
+        assert tuple(map(list, postA)) == tuple(map(list, postB))
+
+        indexersC = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.int64)
+        postC = get_new_indexers_and_screen_full(indexersC, positions=np.arange(15, dtype=np.int64))
+        assert tuple(map(list, postC)) == (
+            [9, 0, 1, 4, 5, 2, 3, 6, 7, 8, 10],
+            [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2, 5, 6, 3, 4,7, 8, 9, 0, 10],
+        )
+
+        indexersD = np.array([2, 1, 0, 2, 0, 1, 1, 2, 0], dtype=np.int64)
+        postD = get_new_indexers_and_screen_full(indexers=indexersD, positions=np.arange(3, dtype=np.int64))
+        assert tuple(map(list, postD)) == (
+            [0, 1, 2],
+            [2, 1, 0, 2, 0, 1, 1, 2, 0],
+        )
+
+    def test_get_new_indexers_and_screen_b(self) -> None:
+        indexersA = np.array([5], dtype=np.int64)
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(6, dtype=np.int64))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(106, dtype=np.int64))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA.astype(np.int32), np.arange(5))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(5).astype(np.int32))
+
+        indexersB = np.arange(25, dtype=np.int64)
+        postB = get_new_indexers_and_screen(indexersB, indexersB)
+        assert tuple(map(list, postB)) == (list(indexersB), list(indexersB))
 
 
 if __name__ == '__main__':

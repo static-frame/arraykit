@@ -1,11 +1,11 @@
+import site
+import os
+import typing as tp
 from setuptools import Extension  # type: ignore
 from setuptools import setup
-from numpy.distutils.misc_util import get_info
-import numpy as np  # type: ignore
+from pathlib import Path
 
-
-AK_VERSION = '0.1.11'
-
+AK_VERSION = '0.1.12'
 
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
@@ -15,17 +15,30 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 '''
 
-additional_info = get_info('npymath') # We need this for various numpy C math APIs to work
+# NOTE: we do this to avoid importing numpy: https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
+# we used to import the following to get directories:
+# from numpy.distutils.misc_util import get_info
+# import numpy as np  # type: ignore
+# get_info('npymath')['library_dirs']
+# get_info('npymath')['libraries']
 
-# Update the dictionary to include configuration we want.
-additional_info['include_dirs'] = [np.get_include()] + additional_info['include_dirs']
-additional_info['define_macros'] = [("AK_VERSION", AK_VERSION)] + additional_info['define_macros']
+def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
+    dirs = []
+    for sp in site.getsitepackages():
+        fp = os.path.join(sp, *components)
+        if os.path.exists(fp):
+            dirs.append(fp)
+    return dirs
 
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=['src/_arraykit.c'],
-        **additional_info,
-)
+        include_dirs=get_ext_dir('numpy', 'core', 'include'),
+        library_dirs=get_ext_dir('numpy', 'core', 'lib'),
+        define_macros=[("AK_VERSION", AK_VERSION)],
+        libraries=['npymath'], # not including mlib at this time
+        )
+
 
 setup(
     name='arraykit',
@@ -49,6 +62,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
     keywords='numpy array',
     packages=['arraykit'],

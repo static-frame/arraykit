@@ -23,6 +23,7 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 
 
+
 Dependencies
 --------------
 
@@ -35,6 +36,18 @@ ArrayKit requires the following:
 
 What is New in ArrayKit
 -------------------------
+
+0.1.12
+............
+
+Added ``get_new_indexers_and_screen``.
+
+
+0.1.10
+............
+
+Updated minimum NumPy to 1.18.5
+
 
 0.1.9
 ............

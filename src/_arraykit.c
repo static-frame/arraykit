@@ -2894,6 +2894,310 @@ isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
 }
 
 //------------------------------------------------------------------------------
+
+static PyObject *
+get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    /*
+    Used to determine the new indexers and index screen in an index hierarchy selection.
+
+    Example:
+
+        Context:
+            We are an index hierarchy, constructing a new index hierarchy from a
+            selection of ourself. We need to build this up for each depth. For
+            example:
+
+            index_at_depth: ["a", "b", "c", "d"]
+            indexer_at_depth: [1, 0, 0, 2, 3, 0, 3, 3, 2]
+            (i.e. our index_hierarchy has these labels at depth = ["b", "a", "a", "c", "d", "a", "d", "d", "c"])
+
+            Imagine we are choosing this selection:
+                index_hierarchy.iloc[1:4]
+                At our depth, this would result in these labels: ["a", "a", "c", "d"]
+
+            We need to output:
+                index_screen: [0, 2, 3]
+                    - New index is created by: index_at_depth[[0, 2, 3]] (i.e. ["a", "c", "d"])
+                new_indexer:  [0, 0, 1, 2]
+                    - When applied to our new_index, results in ["a", "a", "c", "d"]
+
+        Function:
+            input:
+                indexers:  [0, 0, 2, 3] (i.e. indexer_at_depth[1:4])
+                positions: [0, 1, 2, 3] (i.e. which ilocs from index that ``indexers`` maps to)
+
+            algorithm:
+                Loop through ``indexers``. Since we know that ``indexers`` only contains
+                integers from 0 -> ``num_unique`` - 1, we can use a new indexers called
+                ``element_locations`` to keep track of which elements have been found, and when.
+                (Use ``num_unique`` as the flag for which elements have not been
+                found since it's not possible for one of our inputs to equal that)
+
+                Using the above example, this would look like:
+
+                    element_locations =
+                    [4, 4, 4, 4] (starting)
+                    [0, 4, 4, 4] (first loop)  indexers[0] = 0, so mark it as the 0th element found
+                    [0, 4, 4, 4] (second loop) indexers[1] = 0, already marked, move on
+                    [0, 4, 1, 4] (third loop)  indexers[2] = 2, so mark it as the 1th element found
+                    [0, 4, 1, 2] (fourth loop) indexers[3] = 3, so mark it as the 2th element found
+
+                Now, if during this loop, we discover every single element, it means
+                we can exit early, and just return back the original inputs, since
+                those arrays contain all the information the caller needs! This is the
+                core optimization of this function.
+                Example:
+                    indexers  = [0, 3, 1, 2, 3, 1, 0, 0]
+                    positions = [0, 1, 2, 3]
+
+                    There is no remapping needed! Simple re-use everything!
+
+                Now, if we don't find all the elements, then we need to construct
+                ``new_indexers`` and ``index_screen``.
+
+                We can construct ``new_indexers`` during the loop, by using the
+                information we have placed into ``element_locations``.
+
+                Using the above example, this would look like:
+                    [x, x, x, x] (starting)
+                    [0, x, x, x] (first loop)  element_locations[indexers[0]] = 0
+                    [0, 0, x, x] (second loop) element_locations[indexers[1]] = 0
+                    [0, 0, 1, x] (third loop)  element_locations[indexers[2]] = 1
+                    [0, 0, 1, 2] (fourth loop) element_locations[indexers[3]] = 2
+
+                Finally, all that's left is to construct ``index_screen``, which
+                is essentially a way to condense and remap ``element_locations``.
+                See ``AK_get_index_screen`` for more details.
+
+            output:
+                index_screen: [0, 2, 3]
+                new_indexer:  [0, 0, 1, 2]
+
+    Equivalent Python code:
+
+        num_unique = len(positions)
+        element_locations = np.full(num_unique, num_unique, dtype=np.int64)
+        order_found = np.full(num_unique, num_unique, dtype=np.int64)
+        new_indexers = np.empty(len(indexers), dtype=np.int64)
+
+        num_found = 0
+
+        for i, element in enumerate(indexers):
+            if element_locations[element] == num_unique:
+                element_locations[element] = num_found
+                order_found[num_found] = element
+                num_found += 1
+
+            if num_found == num_unique:
+                return positions, indexers
+
+            new_indexers[i] = element_locations[element]
+
+        return order_found[:num_found], new_indexers
+    */
+    PyArrayObject *indexers;
+    PyArrayObject *positions;
+
+    static char *kwlist[] = {"indexers", "positions", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!:get_new_indexers_and_screen", kwlist,
+                &PyArray_Type, &indexers,
+                &PyArray_Type, &positions
+        ))
+    {
+        return NULL;
+    }
+
+    if (PyArray_NDIM(indexers) != 1) {
+        PyErr_SetString(PyExc_ValueError, "indexers must be 1-dimensional");
+        return NULL;
+    }
+
+    if (PyArray_NDIM(positions) != 1) {
+        PyErr_SetString(PyExc_ValueError, "positions must be 1-dimensional");
+        return NULL;
+    }
+
+    if (PyArray_TYPE(indexers) != NPY_INT64) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type np.int64");
+        return NULL;
+    }
+
+    npy_intp num_unique = PyArray_SIZE(positions);
+
+    if (num_unique > PyArray_SIZE(indexers)) {
+        // This algorithm is only optimal if the number of unique elements is
+        // less than the number of elements in the indexers.
+        // Otherwise, the most optimal code is ``np.unique(indexers, return_index=True)``
+        // and we don't want to re-implement that in C.
+        PyErr_SetString(
+                PyExc_ValueError,
+                "Number of unique elements must be less than or equal to the length of ``indexers``"
+                );
+        return NULL;
+    }
+
+    npy_intp dims = {num_unique};
+    PyArrayObject *element_locations = (PyArrayObject*)PyArray_EMPTY(
+            1,         // ndim
+            &dims,     // shape
+            NPY_INT64, // dtype
+            0          // fortran
+            );
+    if (element_locations == NULL) {
+        return NULL;
+    }
+
+    PyArrayObject *order_found = (PyArrayObject*)PyArray_EMPTY(
+            1,         // ndim
+            &dims,     // shape
+            NPY_INT64, // dtype
+            0          // fortran
+            );
+    if (order_found == NULL) {
+        Py_DECREF(element_locations);
+        return NULL;
+    }
+
+    PyObject *num_unique_pyint = PyLong_FromLong(num_unique);
+    if (num_unique_pyint == NULL) {
+        goto fail;
+    }
+
+    // We use ``num_unique`` here to signal that we haven't found the element yet
+    // This works, because each element must be 0 < num_unique.
+    int fill_success = PyArray_FillWithScalar(element_locations, num_unique_pyint);
+    if (fill_success != 0) {
+        Py_DECREF(num_unique_pyint);
+        goto fail;
+    }
+
+    fill_success = PyArray_FillWithScalar(order_found, num_unique_pyint);
+    Py_DECREF(num_unique_pyint);
+    if (fill_success != 0) {
+        goto fail;
+    }
+
+    PyArrayObject *new_indexers = (PyArrayObject*)PyArray_EMPTY(
+            1,                      // ndim
+            PyArray_DIMS(indexers), // shape
+            NPY_INT64,              // dtype
+            0                       // fortran
+            );
+    if (new_indexers == NULL) {
+        goto fail;
+    }
+
+    // We know that our incoming dtypes are all int64! This is a safe cast.
+    // Plus, it's easier (and less error prone) to work with native C-arrays
+    // over using numpy's iteration APIs.
+    npy_int64 *element_location_values = (npy_int64*)PyArray_DATA(element_locations);
+    npy_int64 *order_found_values = (npy_int64*)PyArray_DATA(order_found);
+    npy_int64 *new_indexers_values = (npy_int64*)PyArray_DATA(new_indexers);
+
+    // Now, implement the core algorithm by looping over the ``indexers``.
+    // We need to use numpy's iteration API, as the ``indexers`` could be
+    // C-contiguous, F-contiguous, both, or neither.
+    // See https://numpy.org/doc/stable/reference/c-api/iterator.html#simple-iteration-example
+    NpyIter *indexer_iter = NpyIter_New(
+            indexers,                                   // array
+            NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP, // iter flags
+            NPY_KEEPORDER,                              // order
+            NPY_NO_CASTING,                             // casting
+            NULL                                        // dtype
+            );
+    if (indexer_iter == NULL) {
+        Py_DECREF(new_indexers);
+        goto fail;
+    }
+
+    // The iternext function gets stored in a local variable so it can be called repeatedly in an efficient manner.
+    NpyIter_IterNextFunc *indexer_iternext = NpyIter_GetIterNext(indexer_iter, NULL);
+    if (indexer_iternext == NULL) {
+        NpyIter_Deallocate(indexer_iter);
+        Py_DECREF(new_indexers);
+        goto fail;
+    }
+
+    // All of these will be updated by the iterator
+    char **dataptr = NpyIter_GetDataPtrArray(indexer_iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(indexer_iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(indexer_iter);
+
+    // No gil is required from here on!
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
+    size_t i = 0;
+    npy_int64 num_found = 0;
+    do {
+        // Get the inner loop data/stride/inner_size values
+        char* data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp inner_size = *innersizeptr;
+        npy_int64 element;
+
+        while (inner_size--) {
+            element = *((npy_int64 *)data);
+
+            if (element_location_values[element] == num_unique) {
+                element_location_values[element] = num_found;
+                order_found_values[num_found] = element;
+                ++num_found;
+
+                if (num_found == num_unique) {
+                    // This insight is core to the performance of the algorithm.
+                    // If we have found every possible indexer, we can simply return
+                    // back the inputs! Essentially, we can observe on <= single pass
+                    // that we have the opportunity for re-use
+                    goto finish_early;
+                }
+            }
+
+            new_indexers_values[i] = element_location_values[element];
+
+            data += stride;
+            ++i;
+        }
+
+    // Increment the iterator to the next inner loop
+    } while(indexer_iternext(indexer_iter));
+
+    NPY_END_THREADS;
+
+    NpyIter_Deallocate(indexer_iter);
+    Py_DECREF(element_locations);
+
+    // new_positions = order_found[:num_unique]
+    PyObject *new_positions = PySequence_GetSlice(order_found, 0, num_found);
+    Py_DECREF(order_found);
+    if (new_positions == NULL) {
+        return NULL;
+    }
+
+    // return new_positions, new_indexers
+    PyObject *result = PyTuple_Pack(2, new_positions, new_indexers);
+    Py_DECREF(new_indexers);
+    Py_DECREF(new_positions);
+    return result;
+
+    finish_early:
+        NPY_END_THREADS;
+
+        NpyIter_Deallocate(indexer_iter);
+        Py_DECREF(element_locations);
+        Py_DECREF(order_found);
+        Py_DECREF(new_indexers);
+        return PyTuple_Pack(2, positions, indexers);
+
+    fail:
+        Py_DECREF(element_locations);
+        Py_DECREF(order_found);
+        return NULL;
+}
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -3181,6 +3485,10 @@ static PyMethodDef arraykit_methods[] =  {
     // {"_test", _test, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"get_new_indexers_and_screen",
+            (PyCFunction)get_new_indexers_and_screen,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 

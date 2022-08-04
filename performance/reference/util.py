@@ -216,3 +216,35 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
 
+
+def get_new_indexers_and_screen_ref(
+        indexers: np.ndarray,
+        positions: np.ndarray,
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
+
+    positions = indexers.argsort()
+
+    # get the sorted indexers
+    indexers = indexers[positions]
+
+    mask = np.empty(indexers.shape, dtype=DTYPE_BOOL)
+    mask[0] = True
+    mask[1:] = indexers[1:] != indexers[:-1]
+
+    new_indexers = np.empty(mask.shape, dtype=DTYPE_INT_DEFAULT)
+    new_indexers[positions] = np.cumsum(mask) - 1
+    new_indexers.flags.writeable = False
+
+    return new_indexers, indexers[mask]
+
+
+def get_new_indexers_and_screen_ak(
+        indexers: np.ndarray,
+        positions: np.ndarray,
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
+    from arraykit import get_new_indexers_and_screen as ak_routine
+
+    if len(positions) > len(indexers):
+        return np.unique(indexers, return_inverse=True)
+
+    return ak_routine(indexers, positions)
