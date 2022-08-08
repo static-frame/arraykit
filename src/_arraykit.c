@@ -1164,17 +1164,20 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 }
 
 //------------------------------------------------------------------------------
-// Set the internal field to the current field.
+// Set the CPL field to the characters accumulated in the CPL's buffer. This is only used for field converters that need a char* as an input argument. This has to be dynamically allocated and cleaned up appropriately.
 static inline char*
 AK_CPL_current_to_field(AK_CodePointLine* cpl)
 {
-    // NOTE: we assume this is only called after offset_max is complete
+    // NOTE: we assume this is only called after offset_max is complete, and that this is only called once per CPL; we set it to the maximum size on first usage and then overwrite context on each subsequent usage.
     if (cpl->field == NULL) {
+        // need one more for string terminator
         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
         if (cpl->field == NULL) return PyErr_NoMemory();
     }
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+
+    // get pointer to field buffer to write to
     char *t = cpl->field;
 
     while (p < end) {
@@ -1194,7 +1197,7 @@ static inline bool
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     // must have at least 4 characters
     if (cpl->offsets[cpl->index_current] < 4) {
-        return 0;
+        return false;
     }
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + 4; // we must have at least 4 characters
@@ -1229,6 +1232,7 @@ AK_CPL_current_to_int64(AK_CodePointLine* cpl)
     return v;
 }
 
+// Provide start and end buffer positions to provide a range of bytes to read and transform into an integer. Returns 0 on error; does not set exception.
 static inline npy_uint64
 AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
 {
@@ -1245,7 +1249,9 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
 static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 {
-    return PyOS_string_to_double(AK_CPL_current_to_field(cpl), NULL, NULL);
+    char* field = AK_CPL_current_to_field(cpl);
+    // NOTE: field can be NULL on memory failure!
+    return PyOS_string_to_double(field, NULL, NULL);
 }
 
 
