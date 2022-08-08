@@ -231,7 +231,7 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-// TypePArser: Type, New, Destrctor
+// TypeParser: Type, New, Destructor
 
 #define AK_is_digit(c) (((unsigned)(c) - '0') < 10u)
 #define AK_is_space(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
