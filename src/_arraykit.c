@@ -253,17 +253,19 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 #define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
 
 //------------------------------------------------------------------------------
+
+// This defines the observed type of each field, or an entire line of fields. Note that TPS_STRING serves as the last resort, the type that needs no conversion (or cannot be converted).
 typedef enum AK_TypeParserState {
-    TPS_UNKNOWN,
+    TPS_UNKNOWN, // for initial state
     TPS_BOOL,
     TPS_INT,
     TPS_FLOAT,
     TPS_COMPLEX, // 4
     TPS_STRING,
-    TPS_EMPTY
+    TPS_EMPTY // empty fields
 } AK_TypeParserState;
 
-// Given previous and new, return a parser state. Does not error.
+// Given previous and new parser states, return a next parser state. Does not error.
 AK_TypeParserState
 AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     // unlikely case
@@ -298,7 +300,7 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     return TPS_COMPLEX;
 }
 
-// Given a parser state, return a dtype. Returns NULL on errror.
+// Given a TypeParser state, return a dtype. Returns NULL on error.
 PyArray_Descr*
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
@@ -329,15 +331,15 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
             dtype = PyArray_DescrFromType(NPY_COMPLEX128);
             break;
     }
+    if (dtype == NULL) return NULL; // assume error is set by PyArray_DescrFromType
     // get a fresh instance as we might mutate
-    if (dtype == NULL) return NULL;
     dtype_final = PyArray_DescrNew(dtype);
     Py_DECREF(dtype);
     return dtype_final;
 }
 
 //------------------------------------------------------------------------------
-// An AK_TypeParser accumulates the state in parsing a single code point line. It holds both "active" state in the progress of parsing as well as finalized state in parsed_line
+// An AK_TypeParser accumulates the state in parsing a single code point line. It holds both "active" state in the progress of parsing each field as well as finalized state in parsed_line
 typedef struct AK_TypeParser {
 
     bool contiguous_leading_space;
@@ -366,7 +368,7 @@ typedef struct AK_TypeParser {
 
 } AK_TypeParser;
 
-// Initialize all state. This returns no error. Thi si scalled once per field for each field in a code point line
+// Initialize all state. This returns no error. This is called once per field for each field in a code point line: this is why parsed_field is reset, but parsed_line is not.
 void AK_TP_reset_field(AK_TypeParser* tp)
 {
     tp->previous_numeric = false;
@@ -956,13 +958,18 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     cpl->buffer_count = 0;
     cpl->buffer_capacity = 2048;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
-    if (cpl->buffer == NULL) return PyErr_NoMemory();
-
+    if (cpl->buffer == NULL) {
+        PyMem_Free(cpl);
+        return PyErr_NoMemory();
+    }
     cpl->offsets_count = 0;
     cpl->offsets_capacity = 2048;
     cpl->offsets = (Py_ssize_t*)PyMem_Malloc(sizeof(Py_ssize_t) * cpl->offsets_capacity);
-    if (cpl->offsets == NULL) return PyErr_NoMemory();
-
+    if (cpl->offsets == NULL) {
+        PyMem_Free(cpl->buffer);
+        PyMem_Free(cpl);
+        return PyErr_NoMemory();
+    }
     cpl->pos_current = cpl->buffer;
     cpl->index_current = 0;
     cpl->offset_max = 0;
@@ -971,8 +978,13 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     cpl->field = NULL;
 
     if (type_parse) {
-        // AK_DEBUG("AK_CodePointLin calling AK_TP_New()");
         cpl->type_parser = AK_TP_New();
+        if (cpl->type_parser == NULL) {
+            PyMem_Free(cpl->offsets);
+            PyMem_Free(cpl->buffer);
+            PyMem_Free(cpl);
+            return NULL; // exception already set
+        }
         cpl->type_parser_active = true;
     }
     else {
