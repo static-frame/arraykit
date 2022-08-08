@@ -1634,6 +1634,7 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
             if (dtype == NULL) return NULL;
         }
         else {
+            // sets exception, returns NULL
             AK_NOT_IMPLEMENTED("dtype not passed to AK_CPL_ToArray, and CodePointLine has no type_parser");
         }
     }
@@ -1688,7 +1689,7 @@ typedef struct AK_CodePointGrid {
     PyObject *dtypes; // a PyList of dtype objects
 } AK_CodePointGrid;
 
-// Returns NULL on error.
+// Create a new Code Point Grid; returns NULL on error. Missing `dtypes` has been normalized as NULL.
 AK_CodePointGrid*
 AK_CPG_New(PyObject *dtypes)
 {
@@ -1712,7 +1713,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
-    Py_XDECREF(cpg->dtypes);
+    Py_XDECREF(cpg->dtypes); // might be NULL
     PyMem_Free(cpg);
 }
 //------------------------------------------------------------------------------
@@ -1736,12 +1737,13 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
         assert(line == cpg->lines_count);
         // determine if we need to parse types
         bool type_parse = false;
-        if (!cpg->dtypes) {
+        if (cpg->dtypes == NULL) {
             type_parse = true;
         }
         else {
             PyObject* dtype_specifier = PyList_GetItem(cpg->dtypes, line);
-            if (!dtype_specifier || dtype_specifier == Py_None) {
+            if (dtype_specifier == NULL) return NULL;
+            if (dtype_specifier == Py_None) {
                 type_parse = true;
             }
         }
@@ -1753,7 +1755,6 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
         cpg->lines[line] = cpl;
         ++cpg->lines_count;
     }
-
     return 0;
 }
 
@@ -1868,6 +1869,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
         PyArray_Descr* dtype = NULL;
         if (dtypes) {
             PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
+            if (dtype_specifier == NULL) return NULL; // exception will be set
             // Set dtype; this value can be NULL or a dtype (never Py_None)
             if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
                 Py_DECREF(list);
@@ -2363,7 +2365,7 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
     return 0;
 }
 
-// Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid
+// Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more characters to process, 0 when there are not characters to process, and -1 for error.
 static int
 AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
@@ -2417,14 +2419,14 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                              "line contains NUL");
                 goto exit;
             }
-            if (AK_DR_process_char(dr, cpg, c) < 0) {
+            if (AK_DR_process_char(dr, cpg, c)) {
                 Py_DECREF(lineobj);
                 goto exit;
             }
             pos++;
         }
         Py_DECREF(lineobj);
-        if (AK_DR_process_char(dr, cpg, 0) < 0)
+        if (AK_DR_process_char(dr, cpg, 0))
             goto exit;
     } while (dr->state != START_RECORD);
 
