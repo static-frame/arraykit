@@ -234,6 +234,7 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 // TypeParser: Type, New, Destructor
 
 #define AK_is_digit(c) (((unsigned)(c) - '0') < 10u)
+// NOTE: there is Py_UNICODE_ISSPACE
 #define AK_is_space(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
 #define AK_is_sign(c) (((c) == '+') || ((c) == '-'))
 #define AK_is_paren_open(c) ((c) == '(')
@@ -1170,7 +1171,7 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
 {
     // NOTE: we assume this is only called after offset_max is complete, and that this is only called once per CPL; we set it to the maximum size on first usage and then overwrite context on each subsequent usage.
     if (cpl->field == NULL) {
-        // need one more for string terminator
+        // create a NULL-terminated string; need one more for string terminator
         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
         if (cpl->field == NULL) return (char*)PyErr_NoMemory();
     }
