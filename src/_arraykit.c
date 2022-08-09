@@ -1356,14 +1356,13 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     npy_intp dims[] = {count};
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (!array) {
-        return NULL;
-    }
+    if (array == NULL) return NULL;
+
+    AK_CPL_CurrentReset(cpl);
+
     if (dtype->elsize == 8) {
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
-
        // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_int64(cpl);
@@ -1373,8 +1372,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else if (dtype->elsize == 4) {
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
-
        // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl);
@@ -1384,8 +1381,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else if (dtype->elsize == 2) {
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
-
        // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl);
@@ -1395,8 +1390,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else if (dtype->elsize == 1) {
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
-
        // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl);
