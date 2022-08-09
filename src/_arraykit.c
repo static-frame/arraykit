@@ -1273,6 +1273,7 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 
     AK_CPL_CurrentReset(cpl);
 
+    // TODO: release GIL
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
         if (AK_CPL_current_to_bool(cpl)) {
@@ -1362,6 +1363,8 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1371,6 +1374,8 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1380,6 +1385,8 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1389,6 +1396,8 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1419,6 +1428,8 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1428,6 +1439,8 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
         npy_uint32 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1437,6 +1450,8 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
         npy_uint16 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1446,6 +1461,8 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
         npy_uint8 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
+
+       // TODO: release GIL
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1567,6 +1584,7 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         Py_UCS4 *p_end = p + copy_points;
         char *field_end = array_buffer + field_points;
 
+        // TODO: release GIL
         while (p < p_end) {
             *array_buffer++ = (char)*p++; // truncate
         }
@@ -1627,7 +1645,7 @@ AK_CPL_ToArrayComplex(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 static inline PyObject*
 AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     if (!dtype) {
-        // get from CPL
+        // If we have a type_parser on the CPL, we can use that to get the dtype
         if (cpl->type_parser) {
             // will return a fresh instance
             dtype = AK_TPS_ToDtype(cpl->type_parser->parsed_line);
@@ -1758,19 +1776,6 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     return 0;
 }
 
-// static inline int
-// AK_CPG_AppendObjectAtLine(
-//         AK_CodePointGrid* cpg,
-//         Py_ssize_t line,
-//         PyObject* element)
-// {
-//     AK_CPG_resize(cpg, line);
-//     // handle failure
-//     AK_CPL_AppendObject(cpg->lines[line], element);
-//     // handle failure
-//     return 0;
-// }
-
 // Return 0 on success, -1 on failure.
 static inline int
 AK_CPG_AppendPointAtLine(
@@ -1855,7 +1860,7 @@ AK_CPG_AppendOffsetAtLine(
 //     return list;
 // }
 
-// Returns NULL on failure.
+// Given a fully-loaded CodePointGrid, process each CodePointLine into an array. Returns NULL on failure.
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
     PyObject* list = PyList_New(cpg->lines_count);
