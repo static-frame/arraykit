@@ -1274,7 +1274,8 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
 
     AK_CPL_CurrentReset(cpl);
 
-    // TODO: release GIL
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
         if (AK_CPL_current_to_bool(cpl)) {
@@ -1282,6 +1283,8 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
         }
         AK_CPL_CurrentAdvance(cpl);
     }
+    NPY_END_THREADS;
+
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
@@ -1364,38 +1367,50 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (dtype->elsize == 8) {
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else if (dtype->elsize == 4) {
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else if (dtype->elsize == 2) {
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else if (dtype->elsize == 1) {
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else {
         PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
@@ -1422,38 +1437,50 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (dtype->elsize == 8) {
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else if (dtype->elsize == 4) {
         npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
         npy_uint32 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else if (dtype->elsize == 2) {
         npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
         npy_uint16 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else if (dtype->elsize == 1) {
         npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
         npy_uint8 *end = array_buffer + count;
-       // TODO: release GIL
+
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl);
             AK_CPL_CurrentAdvance(cpl);
         }
+        NPY_END_THREADS;
     }
     else {
         PyErr_SetString(PyExc_TypeError, "cannot create array from unsigned integer itemsize");
@@ -1497,6 +1524,9 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     AK_CPL_CurrentReset(cpl);
 
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
     if (capped_points) {
         // NOTE: is it worth branching for this special case?
         Py_ssize_t copy_bytes;
@@ -1522,6 +1552,8 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
+    NPY_END_THREADS;
+
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
@@ -1557,6 +1589,9 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     AK_CPL_CurrentReset(cpl);
 
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
     while (array_buffer < end) {
         if (!capped_points || cpl->offsets[cpl->index_current] < field_points) {
             // if not capped, or capped and offset is less than field points, use offset
@@ -1571,13 +1606,14 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         Py_UCS4 *p_end = p + copy_points;
         char *field_end = array_buffer + field_points;
 
-        // TODO: release GIL
         while (p < p_end) {
             *array_buffer++ = (char)*p++; // truncate
         }
         array_buffer = field_end;
         AK_CPL_CurrentAdvance(cpl);
     }
+    NPY_END_THREADS;
+
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }

@@ -72,7 +72,7 @@ class FixtureFileLike:
 
 # #-------------------------------------------------------------------------------
 class DelimitedToArraysTypedPandas(Perf, FixtureFileLike):
-    NUMBER = 10
+    NUMBER = 20
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
@@ -84,19 +84,19 @@ class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
 
     def int_uniform(self):
         self.file_like_int.seek(0)
-        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int.__getitem__, axis=self.axis)
 
     def bool_uniform(self):
         self.file_like_bool.seek(0)
-        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
+        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool.__getitem__, axis=self.axis)
 
     def str_uniform(self):
         self.file_like_str.seek(0)
-        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
+        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str.__getitem__, axis=self.axis)
 
     def float_uniform(self):
         self.file_like_float.seek(0)
-        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
+        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float.__getitem__, axis=self.axis)
 
 
 class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
