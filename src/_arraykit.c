@@ -1036,10 +1036,14 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
     return 0;
 }
 
-// Given a PyUnicode PyObject, load the string content into the CPL
+// Given a PyUnicode PyObject, load the string content into the CPL. Used for iterable_str_to_array_1d. Returns 0 on success, -1 on error.
 static inline int
 AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
 {
+    if (!PyUnicode_Check(element)) {
+        PyErr_SetString(PyExc_TypeError, "elements must be strings");
+        return -1;
+    }
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
 
     // if we cannot fit element length, resize
@@ -1073,7 +1077,9 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     cpl->buffer_count += element_length;
     cpl->pos_current += element_length; // add to pointer
 
-    if (element_length > cpl->offset_max) cpl->offset_max = element_length;
+    if (element_length > cpl->offset_max) {
+        cpl->offset_max = element_length;
+    }
     return 0;
 }
 
@@ -1117,7 +1123,7 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 //------------------------------------------------------------------------------
 // CodePointLine: Constructors
 
-// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for testing. Return NULL on errror.
+// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for iterable_str_to_array_1d. Return NULL on errror.
 AK_CodePointLine*
 AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
 {
@@ -1132,6 +1138,7 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
 
     PyObject *element;
     while ((element = PyIter_Next(iter))) {
+        if (element == NULL) return NULL;
         if (AK_CPL_AppendObject(cpl, element)) {
             Py_DECREF(element);
             Py_DECREF(iter);
@@ -1139,7 +1146,6 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
         }
         Py_DECREF(element);
     }
-    // TODO: handle error
 
     Py_DECREF(iter);
     return cpl;

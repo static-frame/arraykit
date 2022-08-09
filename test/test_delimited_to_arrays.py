@@ -368,6 +368,10 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), ['b', 'ee', 't'])
 
 
+    #---------------------------------------------------------------------------
+    def test_iterable_str_to_array_1d_raise_a(self) -> None:
+        with self.assertRaises(TypeError):
+            a1 = iterable_str_to_array_1d([3, 4, 5], None)
 
     #---------------------------------------------------------------------------
     # def test_test_a(self) -> None:
