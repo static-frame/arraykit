@@ -398,7 +398,7 @@ AK_TypeParser*
 AK_TP_New()
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
-    if (tp == NULL) return PyErr_NoMemory();
+    if (tp == NULL) return (AK_TypeParser*)PyErr_NoMemory();
 
     AK_TP_reset_field(tp);
     tp->parsed_line = TPS_UNKNOWN;
@@ -953,14 +953,14 @@ typedef struct AK_CodePointLine{
 AK_CodePointLine* AK_CPL_New(bool type_parse)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
-    if (cpl == NULL) return PyErr_NoMemory();
+    if (cpl == NULL) return (AK_CodePointLine*)PyErr_NoMemory();
 
     cpl->buffer_count = 0;
     cpl->buffer_capacity = 2048;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
     if (cpl->buffer == NULL) {
         PyMem_Free(cpl);
-        return PyErr_NoMemory();
+        return (AK_CodePointLine*)PyErr_NoMemory();
     }
     cpl->offsets_count = 0;
     cpl->offsets_capacity = 2048;
@@ -968,7 +968,7 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     if (cpl->offsets == NULL) {
         PyMem_Free(cpl->buffer);
         PyMem_Free(cpl);
-        return PyErr_NoMemory();
+        return (AK_CodePointLine*)PyErr_NoMemory();
     }
     cpl->pos_current = cpl->buffer;
     cpl->index_current = 0;
@@ -1172,7 +1172,7 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
     if (cpl->field == NULL) {
         // need one more for string terminator
         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
-        if (cpl->field == NULL) return PyErr_NoMemory();
+        if (cpl->field == NULL) return (char*)PyErr_NoMemory();
     }
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
@@ -1698,13 +1698,13 @@ AK_CodePointGrid*
 AK_CPG_New(PyObject *dtypes)
 {
     AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
-    if (cpg == NULL) return PyErr_NoMemory();
+    if (cpg == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
     cpg->lines_count = 0;
     cpg->lines_capacity = 100;
     cpg->lines = (AK_CodePointLine**)PyMem_Malloc(
             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
-    if (cpg->lines == NULL) return PyErr_NoMemory();
+    if (cpg->lines == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
     cpg->dtypes = dtypes;
     return cpg;
@@ -1752,7 +1752,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
                     NULL
                     );
 
-            if (dtype_specifier == NULL) return NULL;
+            if (dtype_specifier == NULL) return -1;
             if (dtype_specifier == Py_None) {
                 type_parse = true;
             }
@@ -2047,7 +2047,7 @@ AK_Dialect_New(PyObject *delimiter,
         )
 {
     AK_Dialect *dialect = (AK_Dialect *) PyMem_Malloc(sizeof(AK_Dialect));
-    if (dialect == NULL) return PyErr_NoMemory();
+    if (dialect == NULL) return (AK_Dialect *)PyErr_NoMemory();
 
     // TODO: are these increfs necessary?
     Py_XINCREF(delimiter);
@@ -2451,7 +2451,7 @@ AK_DR_New(PyObject *iterable,
         )
 {
     AK_DelimitedReader *dr = (AK_DelimitedReader*)PyMem_Malloc(sizeof(AK_DelimitedReader));
-    if (dr == NULL) return PyErr_NoMemory();
+    if (dr == NULL) return (AK_DelimitedReader*)PyErr_NoMemory();
 
     dr->input_iter = NULL;
     dr->axis = axis;
@@ -3199,7 +3199,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     Py_DECREF(element_locations);
 
     // new_positions = order_found[:num_unique]
-    PyObject *new_positions = PySequence_GetSlice(order_found, 0, num_found);
+    PyObject *new_positions = PySequence_GetSlice((PyObject*)order_found, 0, num_found);
     Py_DECREF(order_found);
     if (new_positions == NULL) {
         return NULL;
