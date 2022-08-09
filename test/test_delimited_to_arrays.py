@@ -388,13 +388,13 @@ class TestUnit(unittest.TestCase):
             'True,False,TRUE,FALSE',
         ]
 
-        dtypes0 = [bool, np.dtype(bool), bool]
+        dtypes0 = [bool, np.dtype(bool), bool].__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=0)
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 3)
         self.assertTrue(all(len(e) == 4 for e in post0))
 
-        dtypes1 = [bool, np.dtype(bool), bool, bool]
+        dtypes1 = [bool, np.dtype(bool), bool, bool].__getitem__
         post1 = delimited_to_arrays(msg, dtypes=dtypes1, axis=1)
         self.assertTrue(isinstance(post1, list))
         self.assertEqual(len(post1), 4)
@@ -409,7 +409,7 @@ class TestUnit(unittest.TestCase):
             ','.join(['False', 'False'] * 20),
         ]
 
-        dtypes0 = [bool] * 40
+        dtypes0 = ([bool] * 40).__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 40)
@@ -424,7 +424,7 @@ class TestUnit(unittest.TestCase):
             ','.join(['False', '82342343'] * 20),
         ]
 
-        dtypes0 = [bool, int] * 20
+        dtypes0 = ([bool, int] * 20).__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 40)
@@ -441,7 +441,7 @@ class TestUnit(unittest.TestCase):
             '|'.join(['False', '82342343'] * 20),
         ]
 
-        dtypes0 = [bool, int] * 20
+        dtypes0 = ([bool, int] * 20).__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1, delimiter='|')
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 40)
@@ -457,7 +457,7 @@ class TestUnit(unittest.TestCase):
             ','.join(['False', '82342343', 'baz'] * 20),
         ]
 
-        dtypes0 = [bool, np.int64, str] * 20
+        dtypes0 = ([bool, np.int64, str] * 20).__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
         self.assertTrue(isinstance(post0, list))
         self.assertEqual(len(post0), 60)
@@ -473,7 +473,7 @@ class TestUnit(unittest.TestCase):
             ','.join(['False', '82342343', 'baz'] * 2),
         ]
 
-        dtypes0 = ['<U1'] * 6
+        dtypes0 = (['<U1'] * 6).__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
         self.assertTrue(isinstance(post0, list))
         self.assertEqual([a.tolist() for a in post0],
@@ -490,7 +490,7 @@ class TestUnit(unittest.TestCase):
             'True,-234,3.2e-10,green',
         ]
 
-        dtypes0 = [bool, int, float, str]
+        dtypes0 = ([bool, int, float, str]).__getitem__
         post0 = delimited_to_arrays(msg, dtypes=dtypes0, axis=1)
         self.assertEqual([a.dtype.kind for a in post0],
                 ['b', 'i', 'f', 'U'])

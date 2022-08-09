@@ -1745,7 +1745,13 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             type_parse = true;
         }
         else {
-            PyObject* dtype_specifier = PyList_GetItem(cpg->dtypes, line);
+            // PyObject* dtype_specifier = PyList_GetItem(cpg->dtypes, line);
+            PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
+                    cpg->dtypes,
+                    PyLong_FromLong(line),
+                    NULL
+                    );
+
             if (dtype_specifier == NULL) return NULL;
             if (dtype_specifier == Py_None) {
                 type_parse = true;
@@ -1858,8 +1864,14 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
     for (int i = 0; i < cpg->lines_count; ++i) {
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
-        if (dtypes) {
-            PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
+        if (dtypes != NULL) {
+            // PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
+            PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
+                    dtypes,
+                    PyLong_FromLong(i),
+                    NULL
+                    );
+
             if (dtype_specifier == NULL) return NULL; // exception will be set
             // Set dtype; this value can be NULL or a dtype (never Py_None)
             if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
@@ -2564,6 +2576,15 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &strict))
         return NULL;
 
+    // normalize dtypes to NULL or callable
+    if ((dtypes == NULL) || (dtypes == Py_None)) {
+        dtypes = NULL;
+    }
+    else if (!PyCallable_Check(dtypes)) {
+        PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
+        return NULL;
+    }
+
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
             delimiter,
@@ -2575,9 +2596,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
 
-    if (dtypes == Py_None) {
-        dtypes = NULL;
-    }
     Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
     if (cpg == NULL) {
