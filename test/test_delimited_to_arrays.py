@@ -568,9 +568,33 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             post1 = delimited_to_arrays(msg, dtypes=dtypes, axis=1)
 
+    def test_delimited_to_arrays_parse_e(self) -> None:
+
+        msg = [
+            'a, "10",  "foo"',
+            'b,  "20",  "bar',
+            ]
+        with self.assertRaises(NotImplementedError):
+            post1 = delimited_to_arrays(msg,
+                    dtypes=[str, int, 'V'].__getitem__,
+                    axis=1,
+                    )
 
 
+    #---------------------------------------------------------------------------
 
+    def test_delimited_to_arrays_parse_f(self) -> None:
+
+        msg = [
+            'a, "10",  "foo", ,',
+            'b,  "20",  "bar", ,',
+            ]
+
+        # dtypes = [str, int, str, str].__getitem__
+        dtypes = [str, int, str, str, str].__getitem__
+
+        # import ipdb; ipdb.set_trace()
+        post1 = delimited_to_arrays(msg, axis=1, dtypes=dtypes)
 
     #---------------------------------------------------------------------------
 
