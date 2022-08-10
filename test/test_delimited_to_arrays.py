@@ -580,20 +580,26 @@ class TestUnit(unittest.TestCase):
                     axis=1,
                     )
 
-
-    #---------------------------------------------------------------------------
-
     def test_delimited_to_arrays_parse_f(self) -> None:
 
         msg = [
             'a, 10, foo',
             'b,  20, bar',
             ]
-        # NOTE: fewer than expected leads to strange error
         dtypes = [str, int].__getitem__
-
+        # dtypes fails for argument 2
         with self.assertRaises(RuntimeError):
             _ = delimited_to_arrays(msg, axis=1, dtypes=dtypes)
+
+
+    def test_delimited_to_arrays_parse_g(self) -> None:
+        msg = [
+            'a, 10, foo',
+            'b,  20, \0',
+            ]
+        # if a null character is encountered
+        with self.assertRaises(RuntimeError):
+            _ = delimited_to_arrays(msg, axis=1)
 
 
     #---------------------------------------------------------------------------

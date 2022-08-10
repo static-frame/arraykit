@@ -2354,20 +2354,18 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             return -1;
         }
         break;
-
     }
     return 0;
 }
 
-// Called once at the start of processing each line in AK_DR_ProcessLine.
-static int
+// Called once at the start of processing each line in AK_DR_ProcessLine. This cannot error.
+static void
 AK_DR_line_reset(AK_DelimitedReader *dr)
 {
     dr->field_len = 0;
     dr->state = START_RECORD;
     dr->numeric_field = 0;
     dr->field_number = 0;
-    return 0;
 }
 
 // Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more lines to process, 0 when there are no lines to process, and -1 for error.
@@ -2380,8 +2378,8 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
     const void *data;
     PyObject *lineobj;
 
-    if (AK_DR_line_reset(dr) < 0)
-        return 0;
+    AK_DR_line_reset(dr);
+
     do {
         // get one line to parse
         lineobj = PyIter_Next(dr->input_iter);
@@ -2422,7 +2420,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             if (c == '\0') {
                 Py_DECREF(lineobj);
                 PyErr_Format(PyExc_RuntimeError, "line contains NUL");
-                goto exit; // should return -1 ?
+                return -1;
             }
             if (AK_DR_process_char(dr, cpg, c)) {
                 Py_DECREF(lineobj);
@@ -2434,9 +2432,18 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
         if (AK_DR_process_char(dr, cpg, 0)) return -1;
     } while (dr->state != START_RECORD);
 
-exit:
-    return 1;
+    return 1; // more lines to process
 }
+
+static void
+AK_DR_Free(AK_DelimitedReader *dr)
+{
+    AK_Dialect_Free(dr->dialect);
+    dr->dialect = NULL;
+    Py_CLEAR(dr->input_iter);
+    PyMem_Free(dr);
+}
+
 
 static AK_DelimitedReader*
 AK_DR_New(PyObject *iterable,
@@ -2458,14 +2465,9 @@ AK_DR_New(PyObject *iterable,
     dr->axis = axis;
     dr->line_number = -1;
 
-    if (AK_DR_line_reset(dr) < 0) {
-        Py_DECREF(dr);
-        return NULL;
-    }
-
     dr->input_iter = PyObject_GetIter(iterable);
     if (dr->input_iter == NULL) {
-        Py_DECREF(dr);
+        AK_DR_Free(dr);
         return NULL;
     }
 
@@ -2480,20 +2482,12 @@ AK_DR_New(PyObject *iterable,
             strict);
 
     if (dr->dialect == NULL) {
-        Py_DECREF(dr);
+        AK_DR_Free(dr);
         return NULL;
     }
     return dr;
 }
 
-static void
-AK_DR_Free(AK_DelimitedReader *dr)
-{
-    AK_Dialect_Free(dr->dialect);
-    dr->dialect = NULL;
-    Py_CLEAR(dr->input_iter);
-    PyMem_Free(dr);
-}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -2621,8 +2615,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         }
     }
     AK_DR_Free(dr);
-
-    // is the cpg well formed?
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg);
     // NOTE: do not need to check if arrays is NULL
