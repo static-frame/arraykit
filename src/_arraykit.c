@@ -1794,7 +1794,6 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
                     PyLong_FromLong(line),
                     NULL
                     );
-
             if (dtype_specifier == NULL) return -1;
             if (dtype_specifier == Py_None) {
                 type_parse = true;
@@ -1841,60 +1840,6 @@ AK_CPG_AppendOffsetAtLine(
 //------------------------------------------------------------------------------
 // CodePointGrid: Constructors
 
-// Given an iterable, load a CPG. If axis is 0, interpret the first level of as the primary level (rows become columns); if axis is 1, align values by position per row (rows are partitioned into columns).
-// AK_CodePointGrid* AK_CPG_FromIterable(
-//         PyObject* iterable,
-//         int axis)
-// {
-//     AK_CodePointGrid* cpg = AK_CPG_New();
-//     // expect an iterable of iterables
-//     PyObject *outer_iter = PyObject_GetIter(iterable);
-//     // TODO: handle error
-//     PyObject *outer;
-//     PyObject *inner_iter;
-//     PyObject *inner;
-
-//     int inner_count;
-//     int outer_count = 0;
-
-//     int *count_src = axis == 0 ? &outer_count : &inner_count;
-
-//     while ((outer = PyIter_Next(outer_iter))) {
-//         inner_iter = PyObject_GetIter(outer);
-//         // TODO: handle error
-//         inner_count = 0;
-
-//         while ((inner = PyIter_Next(inner_iter))) {
-//             AK_CPG_AppendObjectAtLine(cpg, *count_src, inner);
-//             // TODO: handle error
-//             ++inner_count;
-//             Py_DECREF(inner);
-//         }
-//         ++outer_count;
-//         Py_DECREF(outer);
-//         Py_DECREF(inner_iter);
-//     }
-//     Py_DECREF(outer_iter);
-//     return cpg;
-// }
-
-//------------------------------------------------------------------------------
-// CPL: Exporters
-
-// Returns NULL on error.
-// PyObject* AK_CPG_ToUnicodeList(AK_CodePointGrid* cpg)
-// {
-//     PyObject* list = PyList_New(0);
-//     // handle error
-//     for (int i = 0; i < cpg->lines_count; ++i) {
-//         if (PyList_Append(list, AK_CPL_ToUnicode(cpg->lines[i]))) {
-//            Py_DECREF(list);
-//            return NULL;
-//         }
-//     }
-//     return list;
-// }
-
 // Given a fully-loaded CodePointGrid, process each CodePointLine into an array. Returns NULL on failure.
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
@@ -1907,19 +1852,28 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
     for (int i = 0; i < cpg->lines_count; ++i) {
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
+
         if (dtypes != NULL) {
-            // PyObject* dtype_specifier = PyList_GetItem(dtypes, i);
             PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
                     dtypes,
                     PyLong_FromLong(i),
                     NULL
                     );
-
-            if (dtype_specifier == NULL) return NULL; // exception will be set
-            // Set dtype; this value can be NULL or a dtype (never Py_None)
-            if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
+            if (dtype_specifier == NULL) {
                 Py_DECREF(list);
+                // NOTE: not sure how to get the exception from the failed call...
+                PyErr_Format(PyExc_RuntimeError,
+                        "dtypes callable failed for input: %d",
+                        i
+                        );
                 return NULL;
+            }
+            if (dtype_specifier != Py_None) {
+                // Set dtype; this value can be NULL or a dtype (never Py_None); if dtype_specifier is Py_None, keep dtype as NULL
+                if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
+                    Py_DECREF(list);
+                    return NULL;
+                }
             }
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
@@ -1929,6 +1883,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
             return NULL;
         }
         if (PyList_SetItem(list, i, array)) { // steals reference
+            Py_DECREF(array);
             Py_DECREF(list);
             return NULL;
         }
@@ -2589,10 +2544,9 @@ static PyObject*
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *file_like;
-    int axis = 0;
 
     PyObject *dtypes = NULL;
-
+    int axis = 0;
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
     PyObject *escapechar = NULL;
@@ -2627,6 +2581,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
         return NULL;
     }
+
 
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,

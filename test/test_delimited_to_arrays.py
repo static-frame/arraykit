@@ -533,7 +533,6 @@ class TestUnit(unittest.TestCase):
         ]
 
         post0 = delimited_to_arrays(msg, dtypes=None, axis=1)
-        # import ipdb; ipdb.set_trace()
         self.assertEqual([a.dtype.kind for a in post0],
                 ['b', 'i', 'f', 'U'])
 
@@ -547,6 +546,28 @@ class TestUnit(unittest.TestCase):
         msg = ['0j', '(-0+infj)']
         post = delimited_to_arrays(msg, dtypes=None, axis=1)
         self.assertEqual([a.dtype.kind for a in post], ['c'])
+
+    def test_delimited_to_arrays_parse_c(self) -> None:
+
+        msg = [
+            'false, 10,  inf',
+            'true,  20,  6.5',
+            'True,  -24, 3.2e-10',
+            ]
+        dtypes = [None, np.int16, None].__getitem__
+        post1 = delimited_to_arrays(msg, dtypes=dtypes, axis=1)
+        self.assertEqual([a.dtype.str for a  in post1], ['|b1', '<i2', '<f8'])
+
+    def test_delimited_to_arrays_parse_d(self) -> None:
+
+        msg = [
+            'false, 10,  inf',
+            'true,  20,  6.5',
+            ]
+        dtypes = [None].__getitem__
+        with self.assertRaises(RuntimeError):
+            post1 = delimited_to_arrays(msg, dtypes=dtypes, axis=1)
+
 
 
 
