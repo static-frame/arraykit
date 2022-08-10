@@ -1866,8 +1866,8 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
                     PyLong_FromLong(i),
                     NULL
                     );
-            AK_DEBUG_MSG_OBJ("dtype_specifier", dtype_specifier);
-            AK_DEBUG_MSG_OBJ("line pos", PyLong_FromLong(i));
+            // AK_DEBUG_MSG_OBJ("dtype_specifier", dtype_specifier);
+            // AK_DEBUG_MSG_OBJ("line pos", PyLong_FromLong(i));
 
             if (dtype_specifier == NULL) {
                 Py_DECREF(list);
@@ -2184,7 +2184,7 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             dr->axis == 0 ? dr->line_number : dr->field_number,
             dr->field_len)) return -1;
     dr->field_len = 0; // clear to close
-    AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
+    // AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
 
     ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
     return 0;
@@ -2416,7 +2416,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             return -1;
         }
         ++dr->line_number; // initialized to -1
-        AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->line_number));
+        // AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->line_number));
 
         kind = PyUnicode_KIND(lineobj);
         data = PyUnicode_DATA(lineobj);

@@ -589,7 +589,7 @@ class TestUnit(unittest.TestCase):
             'a, "10",  "foo", ,',
             'b,  "20",  "bar", ,',
             ]
-
+        # NOTE: fewer than expected leads to strange error
         # dtypes = [str, int, str, str].__getitem__
         dtypes = [str, int, str, str, str].__getitem__
 
