@@ -2444,7 +2444,6 @@ AK_DR_Free(AK_DelimitedReader *dr)
     PyMem_Free(dr);
 }
 
-
 static AK_DelimitedReader*
 AK_DR_New(PyObject *iterable,
         int axis,
