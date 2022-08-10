@@ -1814,16 +1814,15 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
         }
         // Always initialize a CPL in the new position
         AK_CodePointLine *cpl = AK_CPL_New(type_parse);
-        if (cpl == NULL) {
-            return -1; // signal error condition
-        }
+        if (cpl == NULL) return -1; // memory error set
+
         cpg->lines[line] = cpl;
         ++cpg->lines_count;
     }
     return 0;
 }
 
-// Return 0 on success, -1 on failure.
+// Append a point on the line; called for each character in a field. Return 0 on success, -1 on failure.
 static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
