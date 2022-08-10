@@ -586,15 +586,15 @@ class TestUnit(unittest.TestCase):
     def test_delimited_to_arrays_parse_f(self) -> None:
 
         msg = [
-            'a, "10",  "foo", ,',
-            'b,  "20",  "bar", ,',
+            'a, 10, foo',
+            'b,  20, bar',
             ]
         # NOTE: fewer than expected leads to strange error
-        # dtypes = [str, int, str, str].__getitem__
-        dtypes = [str, int, str, str, str].__getitem__
+        dtypes = [str, int].__getitem__
 
-        # import ipdb; ipdb.set_trace()
-        post1 = delimited_to_arrays(msg, axis=1, dtypes=dtypes)
+        with self.assertRaises(RuntimeError):
+            _ = delimited_to_arrays(msg, axis=1, dtypes=dtypes)
+
 
     #---------------------------------------------------------------------------
 

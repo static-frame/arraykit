@@ -1773,7 +1773,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
 //------------------------------------------------------------------------------
 // CodePointGrid: Mutation
 
-// Return 0 on succes, -1 on failure.
+// Determine if a new CPL needs to be created and add it if needed. Return 0 on succes, -1 on failure.
 static inline int
 AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
@@ -1786,7 +1786,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
                 sizeof(AK_CodePointLine*) * cpg->lines_capacity);
         if (cpg->lines == NULL) return -1;
     }
-    // for now we assume sequential growth, so should only check if equal
+    // Create the new CPL; first check if we need to set type_parse by calling into the dtypes function. For now we assume sequential growth, so should only check if equal
     if (line >= cpg->lines_count) {
         assert(line == cpg->lines_count);
         // determine if we need to parse types
@@ -1800,7 +1800,14 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
                     PyLong_FromLong(line),
                     NULL
                     );
-            if (dtype_specifier == NULL) return -1;
+            if (dtype_specifier == NULL) {
+                // NOTE: not sure how to get the exception from the failed call...
+                PyErr_Format(PyExc_RuntimeError,
+                        "dtypes callable failed for input: %d",
+                        line
+                        );
+                return -1;
+            }
             if (dtype_specifier == Py_None) {
                 type_parse = true;
             }
@@ -1858,17 +1865,14 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
     for (int i = 0; i < cpg->lines_count; ++i) {
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
+        // AK_DEBUG_MSG_OBJ("line pos", PyLong_FromLong(i));
 
         if (dtypes != NULL) {
-            // Py_INCREF(dtypes);
             PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
                     dtypes,
                     PyLong_FromLong(i),
                     NULL
                     );
-            // AK_DEBUG_MSG_OBJ("dtype_specifier", dtype_specifier);
-            // AK_DEBUG_MSG_OBJ("line pos", PyLong_FromLong(i));
-
             if (dtype_specifier == NULL) {
                 Py_DECREF(list);
                 // NOTE: not sure how to get the exception from the failed call...
@@ -1879,7 +1883,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
                 return NULL;
             }
             if (dtype_specifier != Py_None) {
-                // Set dtype; this value can be NULL or a dtype (never Py_None); if dtype_specifier is Py_None, keep dtype as NULL
+                // Set dtype; this value can be NULL or a dtype (never Py_None); if dtype_specifier is Py_None, keep dtype set as NULL (above)
                 if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
                     Py_DECREF(list);
                     return NULL;
@@ -2237,29 +2241,25 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             /* ignore space at start of field */
             ;
         else if (c == dialect->delimiter) { /* save empty field */
-            if (AK_DR_close_field(dr, cpg))
-                return -1;
+            if (AK_DR_close_field(dr, cpg)) return -1;
         }
         else { /* begin new unquoted field */
             if (dialect->quoting == QUOTE_NONNUMERIC)
                 dr->numeric_field = 1;
-            if (AK_DR_add_char(dr, cpg, c))
-                return -1;
+            if (AK_DR_add_char(dr, cpg, c)) return -1;
             dr->state = IN_FIELD;
         }
         break;
 
     case ESCAPED_CHAR:
         if (c == '\n' || c=='\r') {
-            if (AK_DR_add_char(dr, cpg, c))
-                return -1;
+            if (AK_DR_add_char(dr, cpg, c)) return -1;
             dr->state = AFTER_ESCAPED_CRNL;
             break;
         }
         if (c == '\0')
             c = '\n';
-        if (AK_DR_add_char(dr, cpg, c))
-            return -1;
+        if (AK_DR_add_char(dr, cpg, c)) return -1;
         dr->state = IN_FIELD;
         break;
 
@@ -2280,13 +2280,11 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = ESCAPED_CHAR;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AK_DR_close_field(dr, cpg))
-                return -1;
+            if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = START_FIELD;
         }
         else { /* normal character - save in field */
-            if (AK_DR_add_char(dr, cpg, c))
-                return -1;
+            if (AK_DR_add_char(dr, cpg, c)) return -1;
         }
         break;
 
@@ -2306,8 +2304,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             }
         }
         else { /* normal character - save in field */
-            if (AK_DR_add_char(dr, cpg, c))
-                return -1;
+            if (AK_DR_add_char(dr, cpg, c)) return -1;
         }
         break;
 
@@ -2327,8 +2324,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = IN_QUOTED_FIELD;
         }
         else if (c == dialect->delimiter) { /* save field - wait for new field */
-            if (AK_DR_close_field(dr, cpg))
-                return -1;
+            if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = START_FIELD;
         }
         else if (c == '\n' || c == '\r' || c == '\0') {
@@ -2375,7 +2371,7 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
     return 0;
 }
 
-// Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more characters to process, 0 when there are not characters to process, and -1 for error.
+// Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more lines to process, 0 when there are no lines to process, and -1 for error.
 static int
 AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
@@ -2400,7 +2396,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                 else if (AK_DR_close_field(dr, cpg) == 0)
                     break;
             }
-            return 0;
+            return 0; // end of input
         }
         if (!PyUnicode_Check(lineobj)) {
             PyErr_Format(PyExc_RuntimeError,
@@ -2427,17 +2423,16 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             if (c == '\0') {
                 Py_DECREF(lineobj);
                 PyErr_Format(PyExc_RuntimeError, "line contains NUL");
-                goto exit;
+                goto exit; // should return -1 ?
             }
             if (AK_DR_process_char(dr, cpg, c)) {
                 Py_DECREF(lineobj);
-                goto exit;
+                return -1;
             }
             pos++;
         }
         Py_DECREF(lineobj);
-        if (AK_DR_process_char(dr, cpg, 0))
-            goto exit;
+        if (AK_DR_process_char(dr, cpg, 0)) return -1;
     } while (dr->state != START_RECORD);
 
 exit:
@@ -2605,7 +2600,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
-    if (cpg == NULL) {
+    if (cpg == NULL) { // error will be set
         AK_DR_Free(dr);
         return NULL;
     }
@@ -2615,7 +2610,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     while (true) {
         status = AK_DR_ProcessLine(dr, cpg);
         if (status == 1) {
-            continue;
+            continue; // more lines to process
         }
         else if (status == 0) {
             break;
