@@ -612,7 +612,17 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([a.tolist() for a in post2], [['', 'False'], [0, 1]])
 
 
+    def test_delimited_to_arrays_parse_i(self) -> None:
+        msg = [
+            'a, 10, foo',
+            'b,  20,   c',
+            ]
 
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=False)
+        self.assertEqual([a.tolist() for a in post1], [['a', 'b'], [10, 20], [' foo', '   c']])
+
+        post2 = delimited_to_arrays(msg, axis=1, skipinitialspace=True)
+        self.assertEqual([a.tolist() for a in post2], [['a', 'b'], [10, 20], ['foo', 'c']])
 
 
     #---------------------------------------------------------------------------
