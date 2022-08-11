@@ -2536,6 +2536,16 @@ static char *delimited_to_ararys_kwarg_names[] = {
     NULL
 };
 
+// TODO:
+// implement skip_header: int = 0,
+// possibly implement skip_footer: int = 0,
+// test `skipinitialspace`
+// test `quoting`
+// test `quotechar`
+// test `doublequote`
+// test `escapechar`
+// figure out what `strict` does
+
 static PyObject*
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
