@@ -602,6 +602,19 @@ class TestUnit(unittest.TestCase):
             _ = delimited_to_arrays(msg, axis=1)
 
 
+    def test_delimited_to_arrays_parse_h(self) -> None:
+        msg = [',0', 'False,1']
+        post1 = delimited_to_arrays(msg, axis=1)
+        # without specifying dtypes we get bool and int
+        self.assertEqual([a.tolist() for a in post1], [[False, False], [0, 1]])
+
+        post2 = delimited_to_arrays(msg, axis=1, dtypes=[str, None].__getitem__)
+        self.assertEqual([a.tolist() for a in post2], [['', 'False'], [0, 1]])
+
+
+
+
+
     #---------------------------------------------------------------------------
 
     @given(st.lists(st.integers(), min_size=1, max_size=10))
