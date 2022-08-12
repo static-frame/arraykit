@@ -30,7 +30,7 @@ jobs:
       matrix:
         os: [macOS, Ubuntu, Windows]
         major: [3]
-        minor: [7, 8, 9]
+        minor: [7, 8, 9, 10]
     runs-on: ${{ matrix.os }}-latest
     steps:
       - uses: actions/checkout@master
