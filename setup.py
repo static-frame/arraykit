@@ -46,7 +46,7 @@ setup(
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
     python_requires='>3.7.0',
-    install_requires=['numpy>=1.22.4'],
+    install_requires=['numpy>=1.19.5'],
     url='https://github.com/InvestmentSystems/arraykit',
     author='Christopher Ariza, Brandt Bucher, Charles Burkland',
     license='MIT',
