@@ -23,14 +23,14 @@ jobs:
         with:
           name: dist
           path: dist
-  whl_lt_3_10:
+  whl_lt_3_9:
     name: Build / ${{ matrix.os }} / Python ${{ matrix.major }}.${{ matrix.minor }}
     strategy:
       fail-fast: false
       matrix:
         os: [macOS, Ubuntu, Windows]
         major: [3]
-        minor: [7, 8, 9]
+        minor: [7, 8]
     runs-on: ${{ matrix.os }}-latest
     steps:
       - uses: actions/checkout@master
@@ -53,14 +53,14 @@ jobs:
         with:
           name: dist
           path: dist
-  whl_eq_3_10:
+  whl_gte_3_9:
     name: Build / ${{ matrix.os }} / Python ${{ matrix.major }}.${{ matrix.minor }}
     strategy:
       fail-fast: false
       matrix:
         os: [macOS, Ubuntu, Windows]
         major: [3]
-        minor: [10]
+        minor: [9, 10]
     runs-on: ${{ matrix.os }}-latest
     steps:
       - uses: actions/checkout@master
@@ -86,7 +86,7 @@ jobs:
   upload:
     name: Publish
     if: github.event_name == 'release' && github.event.action == 'published'
-    needs: [tar_gz, whl_lt_3_10, whl_eq_3_10]
+    needs: [tar_gz, whl_lt_3_9, whl_gte_3_9]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@master
