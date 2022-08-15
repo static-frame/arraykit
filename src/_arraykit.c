@@ -2000,28 +2000,28 @@ AK_Dialect_set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 df
     return 0;
 }
 
-static int
-AK_Dialect_set_str(const char *name, PyObject **target, PyObject *src, const char *dflt)
-{
-    if (src == NULL)
-        *target = PyUnicode_DecodeASCII(dflt, strlen(dflt), NULL);
-    else {
-        if (src == Py_None)
-            *target = NULL;
-        else if (!PyUnicode_Check(src)) {
-            PyErr_Format(PyExc_TypeError,
-                         "\"%s\" must be a string", name);
-            return -1;
-        }
-        else {
-            if (PyUnicode_READY(src) == -1)
-                return -1;
-            Py_INCREF(src);
-            Py_XSETREF(*target, src);
-        }
-    }
-    return 0;
-}
+// static int
+// AK_Dialect_set_str(const char *name, PyObject **target, PyObject *src, const char *dflt)
+// {
+//     if (src == NULL)
+//         *target = PyUnicode_DecodeASCII(dflt, strlen(dflt), NULL);
+//     else {
+//         if (src == Py_None)
+//             *target = NULL;
+//         else if (!PyUnicode_Check(src)) {
+//             PyErr_Format(PyExc_TypeError,
+//                          "\"%s\" must be a string", name);
+//             return -1;
+//         }
+//         else {
+//             if (PyUnicode_READY(src) == -1)
+//                 return -1;
+//             Py_INCREF(src);
+//             Py_XSETREF(*target, src);
+//         }
+//     }
+//     return 0;
+// }
 
 static int
 AK_Dialect_check_quoting(int quoting)
@@ -2043,7 +2043,7 @@ typedef struct AK_Dialect{
     Py_UCS4 delimiter;          /* field separator */
     Py_UCS4 quotechar;          /* quote character */
     Py_UCS4 escapechar;         /* escape character */
-    PyObject *lineterminator;   /* string to write between records */
+    // PyObject *lineterminator;   /* string to write between records */
 } AK_Dialect;
 
 // check types and convert to C values
@@ -2055,7 +2055,7 @@ static AK_Dialect*
 AK_Dialect_New(PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
-        PyObject *lineterminator,
+        // PyObject *lineterminator,
         PyObject *quotechar,
         PyObject *quoting,
         PyObject *skipinitialspace,
@@ -2068,7 +2068,7 @@ AK_Dialect_New(PyObject *delimiter,
     Py_XINCREF(delimiter);
     Py_XINCREF(doublequote);
     Py_XINCREF(escapechar);
-    Py_XINCREF(lineterminator);
+    // Py_XINCREF(lineterminator);
     Py_XINCREF(quotechar);
     Py_XINCREF(quoting);
     Py_XINCREF(skipinitialspace);
@@ -2090,11 +2090,11 @@ AK_Dialect_New(PyObject *delimiter,
             &dialect->escapechar,
             escapechar,
             0);
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_str,
-            "lineterminator",
-            &dialect->lineterminator,
-            lineterminator,
-            "\r\n");
+    // AK_Dialect_CALL_SETTER(AK_Dialect_set_str,
+    //         "lineterminator",
+    //         &dialect->lineterminator,
+    //         lineterminator,
+    //         "\r\n");
     AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
             "quotechar",
             &dialect->quotechar,
@@ -2131,10 +2131,10 @@ AK_Dialect_New(PyObject *delimiter,
                "quotechar must be set if quoting enabled");
         goto error;
     }
-    if (dialect->lineterminator == 0) {
-        PyErr_SetString(PyExc_TypeError, "lineterminator must be set");
-        goto error;
-    }
+    // if (dialect->lineterminator == 0) {
+    //     PyErr_SetString(PyExc_TypeError, "lineterminator must be set");
+    //     goto error;
+    // }
     return dialect;
 error:
     // We may have gone to error after allocating dialect but found an error in a parameter
@@ -2143,7 +2143,7 @@ error:
     Py_CLEAR(delimiter);
     Py_CLEAR(doublequote);
     Py_CLEAR(escapechar);
-    Py_CLEAR(lineterminator);
+    // Py_CLEAR(lineterminator);
     Py_CLEAR(quotechar);
     Py_CLEAR(quoting);
     Py_CLEAR(skipinitialspace);
@@ -2450,7 +2450,7 @@ AK_DR_New(PyObject *iterable,
         PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
-        PyObject *lineterminator,
+        // PyObject *lineterminator,
         PyObject *quotechar,
         PyObject *quoting,
         PyObject *skipinitialspace,
@@ -2473,7 +2473,7 @@ AK_DR_New(PyObject *iterable,
             delimiter,
             doublequote,
             escapechar,
-            lineterminator,
+            // lineterminator,
             quotechar,
             quoting,
             skipinitialspace,
@@ -2526,7 +2526,7 @@ static char *delimited_to_ararys_kwarg_names[] = {
     "delimiter",
     "doublequote",
     "escapechar",
-    "lineterminator",
+    // "lineterminator",
     "quotechar",
     "quoting",
     "skipinitialspace",
@@ -2552,7 +2552,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
     PyObject *escapechar = NULL;
-    PyObject *lineterminator = NULL;
+    // PyObject *lineterminator = NULL;
     PyObject *quotechar = NULL;
     PyObject *quoting = NULL;
     PyObject *skipinitialspace = NULL;
@@ -2568,7 +2568,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &delimiter,
             &doublequote,
             &escapechar,
-            &lineterminator,
+            // &lineterminator,
             &quotechar,
             &quoting,
             &skipinitialspace,
@@ -2589,7 +2589,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             delimiter,
             doublequote,
             escapechar,
-            lineterminator,
+            // lineterminator,
             quotechar,
             quoting,
             skipinitialspace,
