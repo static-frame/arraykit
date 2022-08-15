@@ -1,6 +1,6 @@
 import unittest
 import datetime
-
+import csv
 import numpy as np
 
 from hypothesis import strategies as st
@@ -623,6 +623,12 @@ class TestUnit(unittest.TestCase):
 
         post2 = delimited_to_arrays(msg, axis=1, skipinitialspace=True)
         self.assertEqual([a.tolist() for a in post2], [['a', 'b'], [10, 20], ['foo', 'c']])
+
+
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_quoting_a(self) -> None:
+        pass
 
 
     #---------------------------------------------------------------------------

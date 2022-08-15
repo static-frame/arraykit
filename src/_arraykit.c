@@ -459,7 +459,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
         ++tp->count_paren_close;
         space = true;
         // NOTE: might evaluate if previous is contiguous numeric
-        if (tp->count_paren_close > 1) { // CHECK!
+        if (tp->count_paren_close > 1) {
             tp->parsed_field = TPS_STRING;
             return false;
         }
@@ -746,7 +746,7 @@ static char* TRUE_UPPER = "TRUE";
 #define ERROR_OVERFLOW 2
 #define ERROR_INVALID_CHARS 3
 
-// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c
+// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets `error` to values greater than 0 on error.
 static inline npy_int64
 AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 {
@@ -861,7 +861,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     return number;
 }
 
-// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c
+// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets error to > 0 on error.
 static inline npy_uint64
 AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
 
@@ -1911,7 +1911,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 typedef enum AK_DialectQuoteStyle {
     QUOTE_MINIMAL,
     QUOTE_ALL,
-    QUOTE_NONNUMERIC,
+    QUOTE_NONNUMERIC, // NOTE: kept to match csv module, but has no effect here
     QUOTE_NONE
 } AK_DialectQuoteStyle;
 
@@ -2174,9 +2174,6 @@ typedef struct AK_DelimitedReader{
     Py_ssize_t line_number;
     Py_ssize_t field_number;
     int axis;
-    // NOTE: this may need to go, or could be used as an indicator in type evaluation
-    int numeric_field; // treat field as numeric
-
 } AK_DelimitedReader;
 
 // Called once at the close of each field in a line. Returns 0 on success, -1 on failure
@@ -2188,12 +2185,11 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             dr->field_len)) return -1;
     dr->field_len = 0; // clear to close
     // AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
-
     ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
     return 0;
 }
 
-// Return 0 on success, -1 on failure.
+// Called once to add each character, appending that character to the CPL. Return 0 on success, -1 on failure.
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
@@ -2242,9 +2238,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         else if (c == dialect->delimiter) { /* save empty field */
             if (AK_DR_close_field(dr, cpg)) return -1;
         }
-        else { /* begin new unquoted field */
-            if (dialect->quoting == QUOTE_NONNUMERIC)
-                dr->numeric_field = 1;
+        else { // begin new unquoted field
             if (AK_DR_add_char(dr, cpg, c)) return -1;
             dr->state = IN_FIELD;
         }
@@ -2266,7 +2260,6 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         if (c == '\0')
             break;
         /*fallthru*/
-
 
     case IN_FIELD: /* in unquoted field */
         if (c == '\n' || c == '\r' || c == '\0') {
@@ -2364,7 +2357,6 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
 {
     dr->field_len = 0;
     dr->state = START_RECORD;
-    dr->numeric_field = 0;
     dr->field_number = 0;
 }
 
@@ -2388,8 +2380,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             if (!PyErr_Occurred() && (dr->field_len != 0 ||
                     dr->state == IN_QUOTED_FIELD)) {
                 if (dr->dialect->strict)
-                    PyErr_SetString(PyExc_RuntimeError,
-                            "unexpected end of data");
+                    PyErr_SetString(PyExc_RuntimeError, "unexpected end of data");
                 else if (AK_DR_close_field(dr, cpg) == 0)
                     break;
             }
@@ -2408,7 +2399,9 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             Py_DECREF(lineobj);
             return -1;
         }
-        ++dr->line_number; // initialized to -1
+
+        // NOTE: line_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
+        ++dr->line_number;
         // AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->line_number));
 
         kind = PyUnicode_KIND(lineobj);
@@ -2587,7 +2580,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
         return NULL;
     }
-
 
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
