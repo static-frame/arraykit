@@ -628,7 +628,20 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_quoting_a(self) -> None:
-        pass
+        msg  = ['a,3,True', 'b,-1,False']
+        post1 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_MINIMAL)
+        self.assertEqual([a.tolist() for a in post1], [['a', 'b'], [3, -1], [True, False]])
+
+        post2 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL)
+        self.assertEqual([a.tolist() for a in post2], [['a', 'b'], [3, -1], [True, False]])
+
+        post3 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_NONE)
+        self.assertEqual([a.tolist() for a in post3], [['a', 'b'], [3, -1], [True, False]])
+
+        # this is supported but has no effect
+        post4 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_NONNUMERIC)
+        self.assertEqual([a.tolist() for a in post4], [['a', 'b'], [3, -1], [True, False]])
+
 
 
     #---------------------------------------------------------------------------
