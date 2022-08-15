@@ -643,6 +643,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([a.tolist() for a in post4], [['a', 'b'], [3, -1], [True, False]])
 
 
+    def test_delimited_to_arrays_quoting_b(self) -> None:
+        msg  = ['"fo,o",3,True', '"ba,r",-1,False']
+        post1 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_MINIMAL)
+        self.assertEqual([a.tolist() for a in post1], [['fo,o', 'ba,r'], [3, -1], [True, False]])
+
+
 
     #---------------------------------------------------------------------------
 
