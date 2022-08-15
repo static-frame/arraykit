@@ -242,6 +242,7 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 #define AK_is_digit(c) (((unsigned)(c) - '0') < 10u)
 // NOTE: there is Py_UNICODE_ISSPACE
 #define AK_is_space(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
+#define AK_is_quote(c) (((c) == '"') || ((c) == '\''))
 #define AK_is_sign(c) (((c) == '+') || ((c) == '-'))
 #define AK_is_paren_open(c) ((c) == '(')
 #define AK_is_paren_close(c) ((c) == ')')
@@ -444,6 +445,11 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
             return true;
         }
         space = true;
+    }
+    else if (AK_is_quote(c)) {
+        // any quote, leading or otherwise, defines a string
+        tp->parsed_field = TPS_STRING;
+        return false;
     }
     else if (AK_is_paren_open(c)) {
         ++tp->count_paren_open;
@@ -1963,6 +1969,7 @@ AK_Dialect_set_int(const char *name, int *target, PyObject *src, int dflt)
     return 0;
 }
 
+// Set a character from `src` on `target`; if src is NULL use default. Returns -1 on error, else 0.
 static int
 AK_Dialect_set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 dflt)
 {
@@ -2060,7 +2067,6 @@ AK_Dialect_New(PyObject *delimiter,
     AK_Dialect *dialect = (AK_Dialect *) PyMem_Malloc(sizeof(AK_Dialect));
     if (dialect == NULL) return (AK_Dialect *)PyErr_NoMemory();
 
-    // TODO: are these increfs necessary?
     Py_XINCREF(delimiter);
     Py_XINCREF(doublequote);
     Py_XINCREF(escapechar);
@@ -2099,7 +2105,7 @@ AK_Dialect_New(PyObject *delimiter,
             "quoting",
             &dialect->quoting,
             quoting,
-            QUOTE_MINIMAL);
+            QUOTE_MINIMAL); // we set QUOTE_MINIMAL by default
     AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
             "skipinitialspace",
             &dialect->skipinitialspace,
@@ -2148,7 +2154,7 @@ error:
 void
 AK_Dialect_Free(AK_Dialect* dialect)
 {
-    PyMem_Free(dialect);
+    PyMem_Free(dialect); // might alrady be NULL
 }
 
 //------------------------------------------------------------------------------
@@ -2462,7 +2468,6 @@ AK_DR_New(PyObject *iterable,
         AK_DR_Free(dr);
         return NULL;
     }
-
     dr->dialect = AK_Dialect_New(
             delimiter,
             doublequote,
@@ -2479,7 +2484,6 @@ AK_DR_New(PyObject *iterable,
     }
     return dr;
 }
-
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -2591,6 +2595,9 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             quoting,
             skipinitialspace,
             strict);
+    if (dr == NULL) { // can happen due to validation of dialect parameters
+        return NULL;
+    }
 
     Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);

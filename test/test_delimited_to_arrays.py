@@ -642,13 +642,46 @@ class TestUnit(unittest.TestCase):
         post4 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_NONNUMERIC)
         self.assertEqual([a.tolist() for a in post4], [['a', 'b'], [3, -1], [True, False]])
 
-
     def test_delimited_to_arrays_quoting_b(self) -> None:
         msg  = ['"fo,o",3,True', '"ba,r",-1,False']
         post1 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_MINIMAL)
         self.assertEqual([a.tolist() for a in post1], [['fo,o', 'ba,r'], [3, -1], [True, False]])
 
+        post2 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL)
+        self.assertEqual([a.tolist() for a in post2], [['fo,o', 'ba,r'], [3, -1], [True, False]])
 
+
+    def test_delimited_to_arrays_quoting_c(self) -> None:
+        msg  = ['"fo,o",3,True', '"ba,r",-1,False']
+        post1 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_NONE)
+        # NOTE: with quoting disabled, we observe the comma as a delimiter
+        self.assertEqual([a.tolist() for a in post1], [['"fo', '"ba'], ['o"', 'r"'], [3, -1], [True, False]])
+
+    def test_delimited_to_arrays_quoting_d(self) -> None:
+        msg  = ['"foo","3","True"', '"bar","-1","False"']
+        # with QUOTE_NONE, all remain string types
+        post1 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_NONE)
+        self.assertEqual([a.tolist() for a in post1], [['"foo"', '"bar"'], ['"3"', '"-1"'], ['"True"', '"False"']])
+
+        # with QUOTE_ALL, quotes are stripped, types are evaluated
+        post2 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL)
+        self.assertEqual([a.tolist() for a in post2], [['foo', 'bar'], [3, -1], [True, False]])
+
+        # import ipdb; ipdb.set_trace()
+
+    def test_delimited_to_arrays_quoting_e(self) -> None:
+        msg  = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, quoting=20)
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, quoting="foo")
+
+
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_delimiter_a(self) -> None:
+        msg  = ['a,3,True', 'b,-1,False']
+        # post1 = delimited_to_arrays(msg, axis=1, delimiter='foo')
 
     #---------------------------------------------------------------------------
 
