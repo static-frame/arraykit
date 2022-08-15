@@ -681,7 +681,15 @@ class TestUnit(unittest.TestCase):
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_delimiter_a(self) -> None:
         msg  = ['a,3,True', 'b,-1,False']
-        # post1 = delimited_to_arrays(msg, axis=1, delimiter='foo')
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, delimiter='foo')
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_escapechar_a(self) -> None:
+        msg  = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, escapechar='foo')
+
 
     #---------------------------------------------------------------------------
 

@@ -2035,7 +2035,6 @@ AK_Dialect_check_quoting(int quoting)
     return -1;
 }
 
-
 typedef struct AK_Dialect{
     char doublequote;           /* is " represented by ""? */
     char skipinitialspace;      /* ignore spaces following delimiter? */
@@ -2046,7 +2045,6 @@ typedef struct AK_Dialect{
     Py_UCS4 escapechar;         /* escape character */
     PyObject *lineterminator;   /* string to write between records */
 } AK_Dialect;
-
 
 // check types and convert to C values
 #define AK_Dialect_CALL_SETTER(meth, name, target, src, default) \
@@ -2076,6 +2074,7 @@ AK_Dialect_New(PyObject *delimiter,
     Py_XINCREF(skipinitialspace);
     Py_XINCREF(strict);
 
+    // all goto error on error from function used in macro setting
     AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
             "delimiter",
             &dialect->delimiter,
@@ -2117,7 +2116,6 @@ AK_Dialect_New(PyObject *delimiter,
             strict,
             false);
 
-    /* validate options */
     if (AK_Dialect_check_quoting(dialect->quoting))
         goto error;
 
@@ -2139,7 +2137,9 @@ AK_Dialect_New(PyObject *delimiter,
     }
     return dialect;
 error:
-    Py_CLEAR(dialect);
+    // We may have gone to error after allocating dialect but found an error in a parameter
+    PyMem_Free(dialect);
+
     Py_CLEAR(delimiter);
     Py_CLEAR(doublequote);
     Py_CLEAR(escapechar);
@@ -2441,6 +2441,7 @@ AK_DR_Free(AK_DelimitedReader *dr)
     dr->dialect = NULL;
     Py_CLEAR(dr->input_iter);
     PyMem_Free(dr);
+
 }
 
 static AK_DelimitedReader*
@@ -2536,8 +2537,6 @@ static char *delimited_to_ararys_kwarg_names[] = {
 // TODO:
 // implement skip_header: int = 0,
 // possibly implement skip_footer: int = 0,
-// test `skipinitialspace`
-// test `quoting`
 // test `quotechar`
 // test `doublequote`
 // test `escapechar`
