@@ -1265,6 +1265,7 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
     return v;
 }
 
+// A wrapper to PyOS_string_to_double. Might set an exception on error.
 static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 {
@@ -1361,6 +1362,11 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
     else {
         PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
+        Py_DECREF(array);
+        return NULL;
+    }
+    // Current implementation of float conversion will set an exception if value is invalid
+    if (PyErr_Occurred()) {
         Py_DECREF(array);
         return NULL;
     }
@@ -2517,7 +2523,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiOOOOOOOO:delimited_to_array",
+            "O|$OiOOOOOOO:delimited_to_array",
             delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only

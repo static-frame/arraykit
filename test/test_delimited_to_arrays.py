@@ -729,6 +729,44 @@ class TestUnit(unittest.TestCase):
             [['f"oo', 'b"ar'], [3, -1], [True, False]])
 
     #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_strict_a(self) -> None:
+        msg = ['"f"oo",3,True', '"b"ar",-1,False']
+        # will fail because , expected after a quite
+        with self.assertRaises(RuntimeError):
+            _ = delimited_to_arrays(msg, axis=1, strict=True)
+
+        # with stract False we drop only two quotes and keep the rest
+        post1 = delimited_to_arrays(msg, axis=1, strict=False)
+        self.assertEqual([a.tolist() for a in post1],
+            [['foo"', 'bar"'], [3, -1], [True, False]])
+
+    def test_delimited_to_arrays_strict_b(self) -> None:
+        msg = ['a,3,True', 'b,-1,False', '', '']
+
+        # empty lines are ignored regardless of strict
+        post1 = delimited_to_arrays(msg, axis=1, strict=True)
+        self.assertEqual([len(a) for a in post1], [2, 2, 2])
+
+        post2 = delimited_to_arrays(msg, axis=1, strict=False)
+        self.assertEqual([len(a) for a in post2], [2, 2, 2])
+
+    def test_delimited_to_arrays_strict_c(self) -> None:
+        msg = ['a,3,True', 'b,-1,False', 'c,']
+        # strict does not care about different lengths
+        post1 = delimited_to_arrays(msg, axis=1, strict=True)
+        self.assertEqual([len(a) for a in post1], [3, 3, 2])
+        # NOTE: the empty string is being converted to 0... not sure that is correct
+        self.assertEqual(post1[1].tolist(), [3, -1, 0])
+
+
+    def test_delimited_to_arrays_strict_d(self) -> None:
+        msg = ['a,3,True', 'b,-1,False,,', 'c,']
+        # empty string fails to convert to float and raises
+        with self.assertRaises(ValueError):
+            post1 = delimited_to_arrays(msg, axis=1, strict=True)
+
+
+    #---------------------------------------------------------------------------
 
     @given(st.lists(st.integers(), min_size=1, max_size=10))
     def test_delimited_to_arrays_property_parse_a(self, v) -> None:
