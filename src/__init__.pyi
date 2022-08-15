@@ -22,8 +22,16 @@ class ArrayGO:
 
 def iterable_str_to_array_1d(): ...
 def delimited_to_arrays(__file_like: tp.Iterable[str],
-        __dtypes: np.array,
-        __axis: int,
+        *,
+        dtypes: tp.Callable[[int], tp.Any],
+        axis: int,
+        delimiter: str,
+        doublequote: bool,
+        escapechar: str,
+        quotechar: str,
+        quoting: int,
+        skipinitialspace: bool,
+        strict: bool,
         ) -> tp.Iterable[np.array]: ...
 
 def immutable_filter(__array: np.ndarray) -> np.ndarray: ...

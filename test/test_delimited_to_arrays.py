@@ -677,7 +677,6 @@ class TestUnit(unittest.TestCase):
             _ = delimited_to_arrays(msg, axis=1, quoting="foo")
 
 
-
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_delimiter_a(self) -> None:
         msg  = ['a,3,True', 'b,-1,False']
@@ -690,6 +689,44 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = delimited_to_arrays(msg, axis=1, escapechar='foo')
 
+    def test_delimited_to_arrays_escapechar_b(self) -> None:
+        msg  = ['f/"oo,3,True', 'b/,ar,-1,False']
+        post1 = delimited_to_arrays(msg,
+                axis=1,
+                escapechar='/',
+                quoting=csv.QUOTE_NONE,
+                doublequote=False,
+                )
+
+        self.assertEqual([a.tolist() for a in post1],
+                [['f"oo', 'b,ar'], [3, -1], [True, False]])
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_quotechar_a(self) -> None:
+        msg  = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL, quotechar='')
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL, quotechar='foo')
+
+    def test_delimited_to_arrays_quotechar_b(self) -> None:
+        msg  = ['|foo|,|3|,|True|', '|bar|,|-1|,|False|']
+        post1 = delimited_to_arrays(msg, axis=1)
+        self.assertEqual([a.dtype.kind for a in post1], ['U', 'U', 'U'])
+
+    def test_delimited_to_arrays_quotechar_c(self) -> None:
+        msg  = ['|a|,|3|,|True|', '|b|,|-1|,|False|']
+        post1 = delimited_to_arrays(msg, axis=1, quotechar='|')
+        self.assertEqual([a.dtype.kind for a in post1], ['U', 'i', 'b'])
+        self.assertEqual([a.tolist() for a in post1], [['a', 'b'], [3, -1], [True, False]])
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_doublequote_a(self) -> None:
+        msg  = ['"f""oo",3,True', '"b""ar",-1,False']
+        post1 = delimited_to_arrays(msg, axis=1, doublequote=True, quoting=csv.QUOTE_ALL)
+        self.assertEqual([a.tolist() for a in post1],
+            [['f"oo', 'b"ar'], [3, -1], [True, False]])
 
     #---------------------------------------------------------------------------
 
