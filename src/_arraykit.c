@@ -2515,6 +2515,8 @@ static char *delimited_to_ararys_kwarg_names[] = {
     "file_like",
     "dtypes",
     "axis",
+    "skip_header",
+    "skip_footer",
     "delimiter",
     "doublequote",
     "escapechar",
@@ -2538,6 +2540,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     PyObject *dtypes = NULL;
     int axis = 0;
+    int skip_header = 0;
+    int skip_footer = 0;
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
     PyObject *escapechar = NULL;
@@ -2547,12 +2551,14 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiOOOOOOO:delimited_to_array",
+            "O|$OiiiOOOOOOO:delimited_to_array",
             delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only
             &dtypes,
             &axis,
+            &skip_header,
+            &skip_footer,
             &delimiter,
             &doublequote,
             &escapechar,
@@ -2568,6 +2574,19 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     else if (!PyCallable_Check(dtypes)) {
         PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
+        return NULL;
+    }
+
+    if ((axis < 0) || (axis > 1)) {
+        PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
+        return NULL;
+    }
+    if (skip_header < 0) {
+        PyErr_SetString(PyExc_ValueError, "skip_header must be greater or equal to 0");
+        return NULL;
+    }
+    if (skip_footer < 0) {
+        PyErr_SetString(PyExc_ValueError, "skip_footer must be greater or equal to 0");
         return NULL;
     }
 

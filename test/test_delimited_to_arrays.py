@@ -788,6 +788,32 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_axis_a(self) -> None:
+        msg = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(ValueError):
+            _ = delimited_to_arrays(msg, axis=-1)
+
+        with self.assertRaises(ValueError):
+            _ = delimited_to_arrays(msg, axis=2)
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=None)
+
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_skip_header_a(self) -> None:
+        msg = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(ValueError):
+            _ = delimited_to_arrays(msg, axis=1, skip_header=-1)
+
+
+    def test_delimited_to_arrays_skip_footer_a(self) -> None:
+        msg = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(ValueError):
+            _ = delimited_to_arrays(msg, axis=1, skip_footer=-1)
+
+
+    #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
         # genfromtxt might translate an empty field to -1 or 0
 
