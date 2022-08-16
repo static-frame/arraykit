@@ -2441,6 +2441,8 @@ AK_DR_Free(AK_DelimitedReader *dr)
 static AK_DelimitedReader*
 AK_DR_New(PyObject *iterable,
         int axis,
+        int skip_header,
+        int skip_footer,
         PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
@@ -2462,6 +2464,8 @@ AK_DR_New(PyObject *iterable,
         AK_DR_Free(dr);
         return NULL;
     }
+
+
     dr->dialect = AK_Dialect_New(
             delimiter,
             doublequote,
@@ -2592,6 +2596,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
+            skip_header,
+            skip_footer,
             delimiter,
             doublequote,
             escapechar,
