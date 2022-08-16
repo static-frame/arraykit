@@ -1385,7 +1385,9 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (array == NULL) return NULL;
 
     AK_CPL_CurrentReset(cpl);
-    int error;
+
+    // initialize error code to 0; only update on error.
+    int error = 0;
 
     if (dtype->elsize == 8) {
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
@@ -1441,12 +1443,12 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         return NULL;
     }
 
-    // // if (error != 0) {
-    // +    //     AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
-    // +    //     PyErr_SetString(PyExc_TypeError, "error parsing integer");
-    // +    //     Py_DECREF(array);
-    // +    //     return NULL;
-    // +    // }
+    if (error != 0) {
+        AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
+        PyErr_SetString(PyExc_TypeError, "error parsing integer");
+        Py_DECREF(array);
+        return NULL;
+     }
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
