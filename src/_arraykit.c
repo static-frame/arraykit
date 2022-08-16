@@ -2443,8 +2443,6 @@ AK_DR_Free(AK_DelimitedReader *dr)
 static AK_DelimitedReader*
 AK_DR_New(PyObject *iterable,
         int axis,
-        int skip_header,
-        int skip_footer,
         PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
@@ -2461,23 +2459,11 @@ AK_DR_New(PyObject *iterable,
     dr->axis = axis;
     dr->line_number = -1;
 
+
     dr->input_iter = PyObject_GetIter(iterable);
     if (dr->input_iter == NULL) {
         AK_DR_Free(dr);
         return NULL;
-    }
-
-    // apply skip_header
-    PyObject *lineobj;
-    for (int i=0; i < skip_header; ++i) {
-        lineobj = PyIter_Next(dr->input_iter);
-        if (lineobj == NULL) {
-            if (PyErr_Occurred()) {
-                return NULL;
-            }
-            break; // no data will be loaded
-        }
-        Py_DECREF(lineobj);
     }
 
     dr->dialect = AK_Dialect_New(
@@ -2533,8 +2519,6 @@ static char *delimited_to_ararys_kwarg_names[] = {
     "file_like",
     "dtypes",
     "axis",
-    "skip_header",
-    "skip_footer",
     "delimiter",
     "doublequote",
     "escapechar",
@@ -2546,11 +2530,9 @@ static char *delimited_to_ararys_kwarg_names[] = {
 };
 
 // TODO:
-// implement skip_header: int = 0,
-// possibly implement skip_footer: int = 0,
-// figure out what `strict` does
 // add axis_select as a tp.Callable[[int], bool]
 
+// NOTE: implement skip_header, skip_footer in client Python, not here.
 static PyObject*
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
@@ -2558,8 +2540,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     PyObject *dtypes = NULL;
     int axis = 0;
-    int skip_header = 0;
-    int skip_footer = 0;
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
     PyObject *escapechar = NULL;
@@ -2569,14 +2549,12 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiiiOOOOOOO:delimited_to_array",
+            "O|$OiOOOOOOO:delimited_to_array",
             delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only
             &dtypes,
             &axis,
-            &skip_header,
-            &skip_footer,
             &delimiter,
             &doublequote,
             &escapechar,
@@ -2599,19 +2577,9 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
         return NULL;
     }
-    if (skip_header < 0) {
-        PyErr_SetString(PyExc_ValueError, "skip_header must be greater or equal to 0");
-        return NULL;
-    }
-    if (skip_footer < 0) {
-        PyErr_SetString(PyExc_ValueError, "skip_footer must be greater or equal to 0");
-        return NULL;
-    }
 
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
-            skip_header,
-            skip_footer,
             delimiter,
             doublequote,
             escapechar,

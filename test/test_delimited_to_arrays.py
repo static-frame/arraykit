@@ -801,30 +801,6 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
-    def test_delimited_to_arrays_skip_header_a(self) -> None:
-        msg = ['a,3,True', 'b,-1,False']
-        with self.assertRaises(ValueError):
-            _ = delimited_to_arrays(msg, axis=1, skip_header=-1)
-
-    def test_delimited_to_arrays_skip_header_b(self) -> None:
-        msg = ['a,3,True', 'b,-1,False']
-        post1 = delimited_to_arrays(msg, axis=1, skip_header=3)
-        self.assertEqual(post1, [])
-
-    def test_delimited_to_arrays_skip_header_c(self) -> None:
-        msg = ['foo', 'bar', 'a,3,True', 'b,-1,False']
-        post1 = delimited_to_arrays(msg, axis=1, skip_header=2)
-
-        self.assertEqual([a.tolist() for a in post1],
-            [['a', 'b'], [3, -1], [True, False]])
-
-    def test_delimited_to_arrays_skip_footer_a(self) -> None:
-        msg = ['a,3,True', 'b,-1,False']
-        with self.assertRaises(ValueError):
-            _ = delimited_to_arrays(msg, axis=1, skip_footer=-1)
-
-
-    #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
         # genfromtxt might translate an empty field to -1 or 0
 
