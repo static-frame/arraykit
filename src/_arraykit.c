@@ -1444,7 +1444,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
 
     if (error != 0) {
-        AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
+        // AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
         PyErr_SetString(PyExc_TypeError, "error parsing integer");
         Py_DECREF(array);
         return NULL;
@@ -1523,6 +1523,14 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         Py_DECREF(array);
         return NULL;
     }
+
+    if (error != 0) {
+        // AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
+        PyErr_SetString(PyExc_TypeError, "error parsing unisigned integer");
+        Py_DECREF(array);
+        return NULL;
+     }
+
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }

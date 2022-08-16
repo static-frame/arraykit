@@ -155,12 +155,9 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.uint64))
         self.assertFalse(a1.flags.writeable)
 
-    def test_iterable_str_to_array_1d_uint_2a(self) -> None:
-        a1 = iterable_str_to_array_1d([str(18_446_744_073_709_551_616), '0'], np.uint64)
-        # overflow for now simply returns 0
-        self.assertEqual(a1.tolist(), [0, 0])
-        self.assertEqual(a1.dtype, np.dtype(np.uint64))
-        self.assertFalse(a1.flags.writeable)
+    def test_iterable_str_to_array_1d_uint_2b(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = iterable_str_to_array_1d([str(18_446_744_073_709_551_616), '0'], np.uint64)
 
     def test_iterable_str_to_array_1d_uint_3(self) -> None:
         a1 = iterable_str_to_array_1d([
