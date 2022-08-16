@@ -374,14 +374,22 @@ class TestUnit(unittest.TestCase):
             a1 = iterable_str_to_array_1d([3, 4, 5], None)
 
     #---------------------------------------------------------------------------
-    # def test_test_a(self) -> None:
-    #     from arraykit import _test
-    #     post = _test(
-    #             [['true', 'True', 'TRUE', 'FALSE', 'fAlse', 'tRUE'],
-    #             ['g', 't', 'w', 'g', 'true', 'f']]
-    #             )
-    #     print(post)
 
+
+    def test_iterable_str_to_array_1d_empty_a(self) -> None:
+        with self.assertRaises(ValueError):
+            # an empty string is an invalid identifier for float
+            _ = iterable_str_to_array_1d(['', '', '3.4'], float)
+
+        post = iterable_str_to_array_1d(['', '', ''], None)
+        self.assertEqual(post.tolist(), ['', '', ''])
+
+# +    def test_iterable_str_to_array_1d_empty_b(self) -> None:
+# +        # with self.assertRaises(ValueError):
+# +            # an empty string is an invalid identifier for
+# +        with self.assertRaises(TypeError):
+# +            _ = iterable_str_to_array_1d(['', '', '3'], int)
+# +
     #---------------------------------------------------------------------------
 
     def test_delimited_to_arrays_a(self) -> None:
@@ -761,9 +769,8 @@ class TestUnit(unittest.TestCase):
 
     def test_delimited_to_arrays_strict_d(self) -> None:
         msg = ['a,3,True', 'b,-1,False,,', 'c,']
-        # empty string fails to convert to float and raises
-        with self.assertRaises(ValueError):
-            post1 = delimited_to_arrays(msg, axis=1, strict=True)
+        post1 = delimited_to_arrays(msg, axis=1, strict=True)
+        self.assertEqual([len(a) for a in post1], [3, 3, 2, 1, 1])
 
 
     #---------------------------------------------------------------------------

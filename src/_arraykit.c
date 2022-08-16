@@ -319,8 +319,8 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
             // AK_DEBUG("TPS_to_dtype: UNKNOWN");
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
-        case TPS_EMPTY:
-            dtype = PyArray_DescrFromType(NPY_FLOAT64);
+        case TPS_EMPTY: // empty defaults to string
+            dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_STRING:
             // AK_DEBUG("TPS_to_dtype: STRING");
@@ -1374,8 +1374,6 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-
-
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
 AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
@@ -1441,6 +1439,14 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         Py_DECREF(array);
         return NULL;
     }
+
+    // // if (error != 0) {
+    // +    //     AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
+    // +    //     PyErr_SetString(PyExc_TypeError, "error parsing integer");
+    // +    //     Py_DECREF(array);
+    // +    //     return NULL;
+    // +    // }
+
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
