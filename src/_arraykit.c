@@ -1269,6 +1269,10 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
 static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 {
+    // interpret an empty field as NaN
+    if (cpl->offsets[cpl->index_current] == 0) {
+        return NPY_NAN;
+    }
     char* field = AK_CPL_current_to_field(cpl);
     // NOTE: field can be NULL on memory failure!
     return PyOS_string_to_double(field, NULL, NULL);

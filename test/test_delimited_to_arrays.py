@@ -373,12 +373,12 @@ class TestUnit(unittest.TestCase):
 
 
     def test_iterable_str_to_array_1d_empty_a(self) -> None:
-        with self.assertRaises(ValueError):
-            # an empty string is an invalid identifier for float
-            _ = iterable_str_to_array_1d(['', '', '3.4'], float)
+        # an empty string is an nan float
+        post1 = iterable_str_to_array_1d(['', '', '3.4'], float)
+        self.assertEqual(post1.dtype, np.dtype(float))
 
-        post = iterable_str_to_array_1d(['', '', ''], None)
-        self.assertEqual(post.tolist(), ['', '', ''])
+        post2 = iterable_str_to_array_1d(['', '', ''], None)
+        self.assertEqual(post2.tolist(), ['', '', ''])
 
 # +    def test_iterable_str_to_array_1d_empty_b(self) -> None:
 # +        # with self.assertRaises(ValueError):
@@ -804,6 +804,22 @@ class TestUnit(unittest.TestCase):
         post3 = delimited_to_arrays(('1,', '3,'), axis=1)
         self.assertEqual([a.tolist() for a in post3], [[1, 3], ['', '']])
 
+    def test_delimited_to_arrays_compare_float_a(self) -> None:
+        # genfromtxt might translate an empty field to nan or zero
+        # >>> np.genfromtxt(['1.8,2.7', '3.1,'], dtype=None, delimiter=',')
+        # array([[1.8, 2.7],
+        #     [3.1, nan]])
+        # >>> np.genfromtxt(['1.8,', '3.1,'], dtype=None, delimiter=',')
+        # array([[1.8, 0. ],
+        #     [3.1, 0. ]])
+
+        post1 = delimited_to_arrays(('1.8,2.7', '3.1,'), axis=1)
+        self.assertEqual(post1[0].tolist(), [1.8, 3.1])
+        self.assertEqual(post1[1][0], 2.7)
+        self.assertTrue(np.isnan(post1[1][1]))
+
+        post3 = delimited_to_arrays(('1.8,', '3.1,'), axis=1)
+        self.assertEqual([a.tolist() for a in post3], [[1.8, 3.1], ['', '']])
 
     #---------------------------------------------------------------------------
 
