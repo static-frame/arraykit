@@ -2376,15 +2376,17 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
         // get one line to parse
         lineobj = PyIter_Next(dr->input_iter);
         if (lineobj == NULL) {
-            // End of input OR exception
-            if (!PyErr_Occurred() && (dr->field_len != 0 ||
-                    dr->state == IN_QUOTED_FIELD)) {
-                if (dr->dialect->strict)
+            if (PyErr_Occurred()) return -1;
+            // if parser is in an unexptected state
+            if ((dr->field_len != 0) || (dr->state == IN_QUOTED_FIELD)) {
+                if (dr->dialect->strict) {
                     PyErr_SetString(PyExc_RuntimeError, "unexpected end of data");
-                else if (AK_DR_close_field(dr, cpg) == 0)
-                    break;
+                    return -1;
+                }
+                // try to close the field, propagate error
+                if (AK_DR_close_field(dr, cpg)) return -1;
             }
-            return 0; // end of input
+            return 0; // end of input, not an error
         }
         if (!PyUnicode_Check(lineobj)) {
             PyErr_Format(PyExc_RuntimeError,
@@ -2465,6 +2467,18 @@ AK_DR_New(PyObject *iterable,
         return NULL;
     }
 
+    // apply skip_header
+    PyObject *lineobj;
+    for (int i=0; i < skip_header; ++i) {
+        lineobj = PyIter_Next(dr->input_iter);
+        if (lineobj == NULL) {
+            if (PyErr_Occurred()) {
+                return NULL;
+            }
+            break; // no data will be loaded
+        }
+        Py_DECREF(lineobj);
+    }
 
     dr->dialect = AK_Dialect_New(
             delimiter,
