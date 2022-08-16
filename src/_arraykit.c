@@ -752,7 +752,7 @@ static char* TRUE_UPPER = "TRUE";
 #define ERROR_OVERFLOW 2
 #define ERROR_INVALID_CHARS 3
 
-// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets `error` to values greater than 0 on error.
+// Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets `error` to values greater than 0 on error; never sets error on success.
 static inline npy_int64
 AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 {
@@ -863,7 +863,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             }
         }
     }
-    *error = 0;
+    // *error = 0;
     return number;
 }
 

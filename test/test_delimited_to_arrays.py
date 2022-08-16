@@ -139,8 +139,7 @@ class TestUnit(unittest.TestCase):
 
     def test_iterable_str_to_array_1d_int_8(self) -> None:
         a1 = iterable_str_to_array_1d(['3', '4', 'foo'], int)
-        import ipdb; ipdb.set_trace()
-
+        # import ipdb; ipdb.set_trace()
 
 
     def test_iterable_str_to_array_1d_uint_1(self) -> None:
