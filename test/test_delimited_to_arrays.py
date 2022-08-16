@@ -137,6 +137,10 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.int8))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_int_8(self) -> None:
+        a1 = iterable_str_to_array_1d(['3', '4', 'foo'], int)
+        import ipdb; ipdb.set_trace()
+
 
 
     def test_iterable_str_to_array_1d_uint_1(self) -> None:
