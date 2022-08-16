@@ -867,7 +867,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     return number;
 }
 
-// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets error to > 0 on error.
+// Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets error to > 0 on error; never sets error on success.
 static inline npy_uint64
 AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
 
@@ -933,7 +933,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
             }
         }
     }
-    *error = 0;
+    // *error = 0;
     return number;
 }
 
@@ -1253,15 +1253,15 @@ AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error)
 
 // Provide start and end buffer positions to provide a range of bytes to read and transform into an integer. Returns 0 on error; does not set exception.
 static inline npy_uint64
-AK_CPL_current_to_uint64(AK_CodePointLine* cpl)
+AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
 {
     Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
-    int error = 0;
-    npy_uint64 v = AK_UCS4_to_uint64(p, end, &error);
-    if (error > 0) {
-        return 0;
-    }
+    Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+    // int error = 0;
+    npy_uint64 v = AK_UCS4_to_uint64(p, end, error);
+    // if (error > 0) {
+    //     return 0;
+    // }
     return v;
 }
 
@@ -1467,6 +1467,9 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     AK_CPL_CurrentReset(cpl);
 
+    // initialize error code to 0; only update on error.
+    int error = 0;
+
     if (dtype->elsize == 8) {
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
@@ -1474,7 +1477,7 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_uint64(cpl);
+            *array_buffer++ = AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
@@ -1486,7 +1489,7 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl);
+            *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
@@ -1498,7 +1501,7 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl);
+            *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
@@ -1510,7 +1513,7 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl);
+            *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
