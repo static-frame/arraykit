@@ -83,14 +83,15 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
 
     def test_iterable_str_to_array_1d_int_3b(self) -> None:
-        a1 = iterable_str_to_array_1d([
-                str(9_223_372_036_854_775_808),
-                '0',
-                str(-9_223_372_036_854_775_809)], np.int64)
-        # NOTE: overflow may not be stable
-        self.assertEqual(a1.tolist(), [0, 0, 0])
-        self.assertEqual(a1.dtype, np.dtype(np.int64))
-        self.assertFalse(a1.flags.writeable)
+        with self.assertRaises(TypeError):
+            _ = iterable_str_to_array_1d([
+                    str(9_223_372_036_854_775_808),
+                    '0',
+                    str(-9_223_372_036_854_775_809)], np.int64)
+
+        # self.assertEqual(a1.tolist(), [0, 0, 0])
+        # self.assertEqual(a1.dtype, np.dtype(np.int64))
+        # self.assertFalse(a1.flags.writeable)
 
     def test_iterable_str_to_array_1d_int_4(self) -> None:
         # NOTE: floats will be truncated
@@ -137,9 +138,9 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.int8))
         self.assertFalse(a1.flags.writeable)
 
-    def test_iterable_str_to_array_1d_int_8(self) -> None:
-        a1 = iterable_str_to_array_1d(['3', '4', 'foo'], int)
-        # import ipdb; ipdb.set_trace()
+    def test_iterable_str_to_array_1d_int_9(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = iterable_str_to_array_1d(['3', '4', 'foo'], int)
 
 
     def test_iterable_str_to_array_1d_uint_1(self) -> None:
@@ -579,7 +580,7 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             post1 = delimited_to_arrays(msg, dtypes=dtypes, axis=1)
 
-    def test_delimited_to_arrays_parse_e(self) -> None:
+    def test_delimited_to_arrays_parse_e1(self) -> None:
 
         msg = [
             'a, "10",  "foo"',
@@ -589,7 +590,25 @@ class TestUnit(unittest.TestCase):
             post1 = delimited_to_arrays(msg,
                     dtypes=[str, int, 'V'].__getitem__,
                     axis=1,
+                    quoting=csv.QUOTE_ALL,
+                    skipinitialspace=True,
                     )
+
+    def test_delimited_to_arrays_parse_e2(self) -> None:
+
+        msg = [
+            'a, "10",  "foo"',
+            'b,  "20",  "bar',
+            ]
+        post1 = delimited_to_arrays(msg,
+                dtypes=[str, int, str].__getitem__,
+                axis=1,
+                quoting=csv.QUOTE_ALL,
+                skipinitialspace=True,
+                )
+        self.assertEqual([x.tolist() for x in post1],
+            [['a', 'b'], [10, 20], ['foo', 'bar']])
+
 
     def test_delimited_to_arrays_parse_f(self) -> None:
 
@@ -778,15 +797,13 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
 
-    @given(st.lists(st.integers(), min_size=1, max_size=10))
+    @given(st.lists(st.integers(min_value=-9223372036854775809, max_value=9223372036854775807), min_size=1, max_size=10))
     def test_delimited_to_arrays_property_parse_a(self, v) -> None:
         msg = [f'{x},{x}' for x in v]
         post = delimited_to_arrays(msg, dtypes=None, axis=1)
         self.assertEqual([a.dtype.kind for a in post],
                 ['i', 'i'])
-        # NOTE: there are some areas where this fails as we overflow and return zero:
-        # 9223372036854775808
-        # self.assertEqual(post[0].tolist(), v)
+        self.assertEqual(post[0].tolist(), v)
 
     @given(st.lists(st.booleans(), min_size=1, max_size=10))
     def test_delimited_to_arrays_property_parse_b(self, v) -> None:
