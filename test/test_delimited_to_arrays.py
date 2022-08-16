@@ -788,6 +788,24 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_compare_int_a(self) -> None:
+        # genfromtxt might translate an empty field to -1 or 0
+
+        # >>> np.genfromtxt(['1,2', '3,'], dtype=None, delimiter=',')
+        # array([[ 1,  2],
+        #        [ 3, -1]])
+        # >>> np.genfromtxt(['1,', '3,'], dtype=None, delimiter=',')
+        # array([[1, 0],
+        #        [3, 0]])
+
+        post1 = delimited_to_arrays(('1,2', '3,'), axis=1)
+        self.assertEqual([a.tolist() for a in post1], [[1, 3], [2, 0]])
+
+        post3 = delimited_to_arrays(('1,', '3,'), axis=1)
+        self.assertEqual([a.tolist() for a in post3], [[1, 3], ['', '']])
+
+
+    #---------------------------------------------------------------------------
 
     @given(st.lists(st.integers(min_value=-9223372036854775809, max_value=9223372036854775807), min_size=1, max_size=10))
     def test_delimited_to_arrays_property_parse_a(self, v) -> None:
