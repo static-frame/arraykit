@@ -1239,15 +1239,15 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
 
 // NOTE: using PyOS_strtol was an alternative, but needed to be passed a null-terminated char, which would require copying the data out of the CPL. This approach reads directly from the CPL without copying.
 static inline npy_int64
-AK_CPL_current_to_int64(AK_CodePointLine* cpl)
+AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error)
 {
     Py_UCS4 *p = cpl->pos_current;
     Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
-    int error = 0;
-    npy_int64 v = AK_UCS4_to_int64(p, end, &error);
-    if (error > 0) {
-        return 0;
-    }
+    // int error = 0;
+    npy_int64 v = AK_UCS4_to_int64(p, end, error);
+    // if (error > 0) {
+    //     return 0;
+    // }
     return v;
 }
 
@@ -1385,6 +1385,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (array == NULL) return NULL;
 
     AK_CPL_CurrentReset(cpl);
+    int error;
 
     if (dtype->elsize == 8) {
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
@@ -1393,7 +1394,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_int64(cpl);
+            *array_buffer++ = AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
@@ -1405,7 +1406,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl);
+            *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
@@ -1417,7 +1418,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl);
+            *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
@@ -1429,7 +1430,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         NPY_BEGIN_THREADS_DEF;
         NPY_BEGIN_THREADS;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl);
+            *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         NPY_END_THREADS;
