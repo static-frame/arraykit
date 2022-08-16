@@ -2,6 +2,7 @@ import pytest
 import collections
 import datetime
 import unittest
+import warnings
 
 import numpy as np  # type: ignore
 
@@ -224,7 +225,10 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_c1(self) -> None:
         mutable = [np.nan]
         memo = {}
-        a1 = np.array((None, 'foo', True, mutable))
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
 
         self.assertIsNot(a1, a2)
@@ -235,7 +239,9 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_c2(self) -> None:
         memo = {}
         mutable = [np.nan]
-        a1 = np.array((None, 'foo', True, mutable))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
         self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
@@ -246,7 +252,9 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_d(self) -> None:
         memo = {}
         mutable = [3, 4, 5]
-        a1 = np.array((None, 'foo', True, mutable))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo=memo)
         self.assertIsNot(a1, a2)
         self.assertTrue(id(mutable) in memo)
@@ -344,7 +352,7 @@ class TestUnit(unittest.TestCase):
                 (np.dtype('<U1'), np.str_('1')),
                 (np.dtype('<U1'), np.unicode_('1')),
                 (np.dtype('V1'), np.void(1)),
-                (np.dtype('O'), np.object()),
+                (np.dtype('O'), object),
                 (np.dtype('<M8'), np.datetime64('NaT')),
                 (np.dtype('<m8'), np.timedelta64('NaT')),
                 (np.float_, np.nan),

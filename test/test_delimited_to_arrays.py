@@ -12,22 +12,17 @@ from arraykit import iterable_str_to_array_1d
 
 class TestUnit(unittest.TestCase):
 
+    def test_iterable_str_to_array_1d_a(self) -> None:
+        a1 = iterable_str_to_array_1d(['1', '3', '4'], int)
+        self.assertEqual(a1.tolist(), [1, 3, 4])
+        self.assertEqual(a1.dtype, np.dtype(int))
 
+        a2 = iterable_str_to_array_1d(['1', '30', '4'], str)
+        self.assertEqual(a2.tolist(), ['1', '30', '4'])
+        self.assertEqual(a2.dtype, np.dtype('<U2'))
 
-    # def test_iterable_str_to_array_1d_a(self) -> None:
-    #     a1 = iterable_str_to_array_1d(['1', '3', '4'], int)
-    #     self.assertEqual(a1.tolist(), [1, 3, 4])
-    #     self.assertEqual(a1.dtype, np.dtype(int))
-
-    #     a2 = iterable_str_to_array_1d(['1', '30', '4'], str)
-    #     self.assertEqual(a2.tolist(), ['1', '30', '4'])
-    #     self.assertEqual(a2.dtype, np.dtype('<U2'))
-
-    #     # with dtype_discover set to True, this should return integers in an object array
-    #     a3 = iterable_str_to_array_1d(['1', '3', '4'], object)
-    #     self.assertEqual(a3.tolist(), ['1', '3', '4'])
-    #     self.assertEqual(a3.dtype, np.dtype('O'))
-
+        with self.assertRaises(NotImplementedError):
+            a3 = iterable_str_to_array_1d(['1', '3', '4'], object)
 
     def test_iterable_str_to_array_1d_bool_1(self) -> None:
         a1 = iterable_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
