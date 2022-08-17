@@ -2488,6 +2488,7 @@ static char *delimited_to_ararys_kwarg_names[] = {
     "file_like",
     "dtypes",
     "axis",
+    "line_select",
     "delimiter",
     "doublequote",
     "escapechar",
@@ -2509,6 +2510,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     PyObject *dtypes = NULL;
     int axis = 0;
+    PyObject *line_select = NULL;
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
     PyObject *escapechar = NULL;
@@ -2518,12 +2520,13 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiOOOOOOO:delimited_to_array",
+            "O|$OiOOOOOOOO:delimited_to_array",
             delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only
             &dtypes,
             &axis,
+            &line_select,
             &delimiter,
             &doublequote,
             &escapechar,
@@ -2539,6 +2542,14 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     else if (!PyCallable_Check(dtypes)) {
         PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
+        return NULL;
+    }
+    // normalize line_select to NULL or callable
+    if ((line_select == NULL) || (line_select == Py_None)) {
+        line_select = NULL;
+    }
+    else if (!PyCallable_Check(line_select)) {
+        PyErr_SetString(PyExc_TypeError, "line_select must be a callable or None");
         return NULL;
     }
 

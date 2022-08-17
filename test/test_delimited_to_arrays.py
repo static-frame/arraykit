@@ -801,6 +801,13 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_line_select_a(self) -> None:
+        msg = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, line_select=-1)
+
+
+    #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
         # genfromtxt might translate an empty field to -1 or 0
 
