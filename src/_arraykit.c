@@ -2257,7 +2257,6 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = IN_FIELD;
         }
         break;
-
     case ESCAPED_CHAR:
         if (c == '\n' || c=='\r') {
             if (AK_DR_add_char(dr, cpg, c)) return -1;
@@ -2269,12 +2268,10 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         if (AK_DR_add_char(dr, cpg, c)) return -1;
         dr->state = IN_FIELD;
         break;
-
     case AFTER_ESCAPED_CRNL:
         if (c == '\0')
             break;
         /*fallthru*/
-
     case IN_FIELD: /* in unquoted field */
         if (c == '\n' || c == '\r' || c == '\0') {
             /* end of line - return [fields] */
@@ -2293,7 +2290,6 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             if (AK_DR_add_char(dr, cpg, c)) return -1;
         }
         break;
-
     case IN_QUOTED_FIELD: // in quoted field
         if (c == '\0')
             ;
@@ -2313,7 +2309,6 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             if (AK_DR_add_char(dr, cpg, c)) return -1;
         }
         break;
-
     case ESCAPE_IN_QUOTED_FIELD:
         if (c == '\0') {
             c = '\n';
@@ -2321,7 +2316,6 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         if (AK_DR_add_char(dr, cpg, c)) return -1;
         dr->state = IN_QUOTED_FIELD;
         break;
-
     case QUOTE_IN_QUOTED_FIELD:
         /* doublequote - seen a quote in a quoted field */
         if (dialect->quoting != QUOTE_NONE && c == dialect->quotechar) {
@@ -2349,7 +2343,6 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             return -1;
         }
         break;
-
     case EAT_CRNL:
         if (c == '\n' || c == '\r')
             ;
@@ -2472,7 +2465,6 @@ AK_DR_New(PyObject *iterable,
     dr->input_iter = NULL;
     dr->axis = axis;
     dr->line_number = -1;
-
 
     dr->input_iter = PyObject_GetIter(iterable);
     if (dr->input_iter == NULL) {
