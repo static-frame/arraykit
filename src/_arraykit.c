@@ -1666,24 +1666,31 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
+// NOTE: combine these into AK_CPL_ToArrayViaCast
+
 static inline PyObject*
 AK_CPL_ToArrayDatetime(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
-    PyArray_Descr *dtype_temp = PyArray_DescrFromType(NPY_STRING);
-    if (dtype_temp == NULL) {
+    // we cannot use this dtype in array construction as it will mutate a global
+    PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
+    if (dtype_bytes_proto == NULL) return NULL;
+
+    PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
+    if (dtype_bytes == NULL) {
+        Py_DECREF(dtype_bytes_proto);
         return NULL;
     }
+    Py_DECREF(dtype_bytes_proto);
 
-    PyArray_Descr *dtype_pre = PyArray_DescrNew(dtype_temp);
-    if (dtype_pre == NULL) {
-        Py_DECREF(dtype_temp);
+    PyObject* array_bytes = AK_CPL_ToArrayBytes(cpl, dtype_bytes);
+    if (array_bytes == NULL) return NULL; // dtype_bytes is stolen
+
+    PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
+    if (array == NULL) {
+        Py_DECREF(array_bytes);
         return NULL;
     }
-    Py_DECREF(dtype_temp);
-
-    PyObject* array_temp = AK_CPL_ToArrayBytes(cpl, dtype_pre); // will steal dtype_pre
-    PyObject *array = PyArray_CastToType((PyArrayObject*)array_temp, dtype, 0);
-    Py_DECREF(array_temp);
+    Py_DECREF(array_bytes);
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
@@ -1692,20 +1699,27 @@ AK_CPL_ToArrayDatetime(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 static inline PyObject*
 AK_CPL_ToArrayComplex(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
-    PyArray_Descr *dtype_temp = PyArray_DescrFromType(NPY_STRING);
-    if (!dtype_temp) {
+    // we cannot use this dtype in array construction as it will mutate a global
+    PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
+    if (!dtype_bytes_proto) {
         return NULL;
     }
 
-    PyArray_Descr *dtype_pre = PyArray_DescrNew(dtype_temp);
-    if (!dtype_pre) {
+    PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
+    if (!dtype_bytes) {
         return NULL;
     }
-    Py_DECREF(dtype_temp);
+    Py_DECREF(dtype_bytes_proto);
 
-    PyObject* array_temp = AK_CPL_ToArrayBytes(cpl, dtype_pre); // will steal dtype_pre
-    PyObject *array = PyArray_CastToType((PyArrayObject*)array_temp, dtype, 0);
-    Py_DECREF(array_temp);
+    PyObject* array_bytes = AK_CPL_ToArrayBytes(cpl, dtype_bytes);
+    if (array_bytes == NULL) return NULL; // dtype_bytes is stolen
+
+    PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
+    if (array == NULL) {
+        Py_DECREF(array_bytes);
+        return NULL;
+    }
+    Py_DECREF(array_bytes);
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
