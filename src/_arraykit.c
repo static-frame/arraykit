@@ -1666,65 +1666,28 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-// NOTE: combine these into AK_CPL_ToArrayViaCast
-
+// If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array. This forces
 static inline PyObject*
-AK_CPL_ToArrayDatetime(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_ToArrayViaCast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     // we cannot use this dtype in array construction as it will mutate a global
     PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
     if (dtype_bytes_proto == NULL) return NULL;
 
     PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
-    if (dtype_bytes == NULL) {
-        Py_DECREF(dtype_bytes_proto);
-        return NULL;
-    }
     Py_DECREF(dtype_bytes_proto);
+    if (dtype_bytes == NULL) return NULL;
 
     PyObject* array_bytes = AK_CPL_ToArrayBytes(cpl, dtype_bytes);
     if (array_bytes == NULL) return NULL; // dtype_bytes is stolen
 
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
-    if (array == NULL) {
-        Py_DECREF(array_bytes);
-        return NULL;
-    }
     Py_DECREF(array_bytes);
+    if (array == NULL) return NULL;
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
-
-static inline PyObject*
-AK_CPL_ToArrayComplex(AK_CodePointLine* cpl, PyArray_Descr* dtype)
-{
-    // we cannot use this dtype in array construction as it will mutate a global
-    PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
-    if (!dtype_bytes_proto) {
-        return NULL;
-    }
-
-    PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
-    if (!dtype_bytes) {
-        return NULL;
-    }
-    Py_DECREF(dtype_bytes_proto);
-
-    PyObject* array_bytes = AK_CPL_ToArrayBytes(cpl, dtype_bytes);
-    if (array_bytes == NULL) return NULL; // dtype_bytes is stolen
-
-    PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
-    if (array == NULL) {
-        Py_DECREF(array_bytes);
-        return NULL;
-    }
-    Py_DECREF(array_bytes);
-
-    PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
-    return array;
-}
-
 
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
 static inline PyObject*
@@ -1761,10 +1724,10 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
         return AK_CPL_ToArrayFloat(cpl, dtype);
     }
     else if (PyDataType_ISDATETIME(dtype)) {
-        return AK_CPL_ToArrayDatetime(cpl, dtype);
+        return AK_CPL_ToArrayViaCast(cpl, dtype);
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
-        return AK_CPL_ToArrayComplex(cpl, dtype);
+        return AK_CPL_ToArrayViaCast(cpl, dtype);
     }
     else {
         PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
