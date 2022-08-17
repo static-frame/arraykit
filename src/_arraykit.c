@@ -1824,6 +1824,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             if (dtype_specifier == Py_None) {
                 type_parse = true;
             }
+            // decref dtype_specifier?
         }
         // Always initialize a CPL in the new position
         AK_CodePointLine *cpl = AK_CPL_New(type_parse);
@@ -1948,8 +1949,7 @@ AK_Dialect_set_bool(const char *name, char *target, PyObject *src, bool dflt)
         *target = dflt;
     else {
         int b = PyObject_IsTrue(src);
-        if (b < 0)
-            return -1;
+        if (b < 0) return -1;
         *target = (char)b;
     }
     return 0;
@@ -2144,9 +2144,10 @@ typedef enum AK_DR_DelimitedReaderState {
 } AK_DR_DelimitedReaderState;
 
 typedef struct AK_DelimitedReader{
-    PyObject *input_iter;   // iterate over this for input lines
+    PyObject *input_iter;
+    PyObject *line_select;
     AK_Dialect *dialect;
-    AK_DR_DelimitedReaderState state;          // current CSV parse state
+    AK_DR_DelimitedReaderState state;
     Py_ssize_t field_len;
     Py_ssize_t line_number;
     Py_ssize_t field_number;
@@ -2371,10 +2372,37 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             Py_DECREF(lineobj);
             return -1;
         }
-
         // NOTE: line_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
         ++dr->line_number;
         // AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->line_number));
+
+        // if our axis is 0 (line per row) we can skip entire lines if line_select is defined
+        if ((dr->line_select != NULL) && (dr->axis == 0)) {
+            PyObject* keep = PyObject_CallFunctionObjArgs(
+                    dr->line_select,
+                    PyLong_FromLong(dr->line_number),
+                    NULL
+                    );
+            // AK_DEBUG_MSG_OBJ("keep", keep);
+            if (keep == NULL) {
+                Py_DECREF(lineobj);
+                PyErr_Format(PyExc_RuntimeError,
+                        "line_select callable failed for input: %d",
+                        dr->line_number
+                        );
+                return -1;
+            }
+            int t = PyObject_IsTrue(keep); // 1 if truthy
+            if (t < 0) {
+                Py_DECREF(lineobj);
+                return -1; // error
+            }
+            // NOTE: enabling this is causing seg fault; probably something in CPG?
+            // if (t == 0) {
+            //     Py_DECREF(lineobj);
+            //     return 1; // skip, process more lines
+            // }
+        }
 
         kind = PyUnicode_KIND(lineobj);
         data = PyUnicode_DATA(lineobj);
@@ -2406,13 +2434,16 @@ AK_DR_Free(AK_DelimitedReader *dr)
     AK_Dialect_Free(dr->dialect);
     dr->dialect = NULL;
     Py_CLEAR(dr->input_iter);
+    Py_XDECREF(dr->line_select); // might be NULL
     PyMem_Free(dr);
 
 }
 
+// The arguments to this constructor are validated before this function is valled. Returns NULL on error.
 static AK_DelimitedReader*
 AK_DR_New(PyObject *iterable,
         int axis,
+        PyObject *line_select,
         PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
@@ -2425,8 +2456,8 @@ AK_DR_New(PyObject *iterable,
     AK_DelimitedReader *dr = (AK_DelimitedReader*)PyMem_Malloc(sizeof(AK_DelimitedReader));
     if (dr == NULL) return (AK_DelimitedReader*)PyErr_NoMemory();
 
-    dr->input_iter = NULL;
     dr->axis = axis;
+    dr->line_select = line_select;
     dr->line_number = -1;
 
     dr->input_iter = PyObject_GetIter(iterable);
@@ -2558,8 +2589,10 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    Py_XINCREF(line_select);
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
+            line_select,
             delimiter,
             doublequote,
             escapechar,
