@@ -2143,7 +2143,7 @@ typedef struct AK_DelimitedReader{
     AK_DR_DelimitedReaderState state;
     Py_ssize_t field_len;
     Py_ssize_t record_number;
-    Py_ssize_t input_number;
+    Py_ssize_t record_iter_number;
     Py_ssize_t field_number;
     int axis;
 } AK_DelimitedReader;
@@ -2161,10 +2161,39 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
     return 0;
 }
 
+// Returns -1 on error (with exception set), 1 on line keep, 0 on line pass
+static inline int
+AK_DR_line_select_keep(AK_DelimitedReader *dr, int axis_target, int lookup_number)
+{
+    if ((dr->line_select != NULL) && (dr->axis == axis_target)) {
+        PyObject* keep = PyObject_CallFunctionObjArgs(
+                dr->line_select,
+                PyLong_FromLong(lookup_number),
+                NULL
+                );
+        if (keep == NULL) {
+            PyErr_Format(PyExc_RuntimeError,
+                    "line_select callable failed for input: %d",
+                    dr->record_number
+                    );
+            return -1;
+        }
+        int t = PyObject_IsTrue(keep); // 1 if truthy
+        if (t < 0) {
+            return -1; // error
+        }
+        return t;
+    }
+    return 1;
+}
+
 // Called once to add each character, appending that character to the CPL. Return 0 on success, -1 on failure.
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
+    if ((dr->line_select != NULL) && (dr->axis == 1)) {
+
+    }
     if (AK_CPG_AppendPointAtLine(cpg,
             dr->axis == 0 ? dr->record_number : dr->field_number,
             dr->field_len,
@@ -2353,7 +2382,7 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             }
             return 0; // end of input, not an error
         }
-        ++dr->input_number;
+        ++dr->record_iter_number;
 
         if (!PyUnicode_Check(record)) {
             PyErr_Format(PyExc_RuntimeError,
@@ -2369,30 +2398,14 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             return -1;
         }
 
-        // if our axis is 0 (line per row) we can skip entire lines if line_select is defined
-        if ((dr->line_select != NULL) && (dr->axis == 0)) {
-            PyObject* keep = PyObject_CallFunctionObjArgs(
-                    dr->line_select,
-                    PyLong_FromLong(dr->input_number),
-                    NULL
-                    );
-            if (keep == NULL) {
-                Py_DECREF(record);
-                PyErr_Format(PyExc_RuntimeError,
-                        "line_select callable failed for input: %d",
-                        dr->record_number
-                        );
-                return -1;
-            }
-            int t = PyObject_IsTrue(keep); // 1 if truthy
-            if (t < 0) {
-                Py_DECREF(record);
-                return -1; // error
-            }
-            if (t == 0) {
-                Py_DECREF(record);
-                return 1; // skip, process more lines
-            }
+        int keep = AK_DR_line_select_keep(dr, 0, dr->record_iter_number);
+        if (keep < 0) {
+            Py_DECREF(record);
+            return -1;
+        }
+        else if (keep == 0) {
+            Py_DECREF(record);
+            return 1; // skip, process more lines
         }
 
         // NOTE: record_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
@@ -2454,7 +2467,7 @@ AK_DR_New(PyObject *iterable,
     dr->axis = axis;
     dr->line_select = line_select;
     dr->record_number = -1;
-    dr->input_number = -1;
+    dr->record_iter_number = -1;
 
     dr->input_iter = PyObject_GetIter(iterable);
     if (dr->input_iter == NULL) {

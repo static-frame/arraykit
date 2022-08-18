@@ -806,12 +806,18 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = delimited_to_arrays(msg, line_select=-1)
 
-
     def test_delimited_to_arrays_line_select_b(self) -> None:
         msg = ['1,2', 'False,True', 'foo,bar', '3.2,5.2']
         line_select = lambda i: i in (0, 2)
         post1 = delimited_to_arrays(msg, line_select=line_select, axis=0)
         self.assertEqual([x.tolist() for x in post1], [[1, 2], ['foo', 'bar']])
+
+    def test_delimited_to_arrays_line_select_c(self) -> None:
+        msg = ['1,2', 'False,True', 'foo,bar', '3.2,5.2']
+        line_select = lambda i: i == 1
+        post1 = delimited_to_arrays(msg, line_select=line_select, axis=0)
+        self.assertEqual([x.tolist() for x in post1], [[False, True]])
+
 
         # import ipdb; ipdb.set_trace()
 
