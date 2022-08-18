@@ -316,14 +316,12 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
 
     switch(state) {
         case TPS_UNKNOWN:
-            // AK_DEBUG("TPS_to_dtype: UNKNOWN");
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_EMPTY: // empty defaults to string
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_STRING:
-            // AK_DEBUG("TPS_to_dtype: STRING");
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_BOOL:
@@ -630,8 +628,6 @@ AK_TP_resolve_field(AK_TypeParser* tp,
 
     if (tp->contiguous_numeric) {
         if (tp->count_digit == 0) return TPS_STRING;
-        // AK_DEBUG("contiguous numeric");
-
         // int
         if (tp->count_j == 0 &&
                 tp->count_e == 0 &&
@@ -1448,7 +1444,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
 
     if (error != 0) {
-        // AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
         PyErr_SetString(PyExc_TypeError, "error parsing integer");
         Py_DECREF(array);
         return NULL;
@@ -1529,7 +1524,6 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
 
     if (error != 0) {
-        // AK_DEBUG_MSG_OBJ("found error", PyLong_FromLong(error));
         PyErr_SetString(PyExc_TypeError, "error parsing unisigned integer");
         Py_DECREF(array);
         return NULL;
@@ -1840,7 +1834,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
-        Py_ssize_t line,
+        Py_ssize_t line, // number
         Py_ssize_t field_len,
         Py_UCS4 p
         )
@@ -1850,7 +1844,7 @@ AK_CPG_AppendPointAtLine(
     return 0;
 }
 
-// Returns 0 on success, -1 on failure.
+// Append an offset in a line. Returns 0 on success, -1 on failure.
 static inline int
 AK_CPG_AppendOffsetAtLine(
         AK_CodePointGrid* cpg,
@@ -1878,7 +1872,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
     for (int i = 0; i < cpg->lines_count; ++i) {
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
-        // AK_DEBUG_MSG_OBJ("line pos", PyLong_FromLong(i));
 
         if (dtypes != NULL) {
             PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
@@ -2149,7 +2142,8 @@ typedef struct AK_DelimitedReader{
     AK_Dialect *dialect;
     AK_DR_DelimitedReaderState state;
     Py_ssize_t field_len;
-    Py_ssize_t line_number;
+    Py_ssize_t record_number;
+    Py_ssize_t input_number;
     Py_ssize_t field_number;
     int axis;
 } AK_DelimitedReader;
@@ -2159,7 +2153,7 @@ static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
     if (AK_CPG_AppendOffsetAtLine(cpg,
-            dr->axis == 0 ? dr->line_number : dr->field_number,
+            dr->axis == 0 ? dr->record_number : dr->field_number,
             dr->field_len)) return -1;
     dr->field_len = 0; // clear to close
     // AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
@@ -2172,7 +2166,7 @@ static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     if (AK_CPG_AppendPointAtLine(cpg,
-            dr->axis == 0 ? dr->line_number : dr->field_number,
+            dr->axis == 0 ? dr->record_number : dr->field_number,
             dr->field_len,
             c)) return -1;
     ++dr->field_len; // reset in AK_DR_close_field
@@ -2339,14 +2333,14 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
     Py_ssize_t pos, linelen;
     unsigned int kind;
     const void *data;
-    PyObject *lineobj;
+    PyObject *record;
 
     AK_DR_line_reset(dr);
 
     do {
-        // get one line to parse
-        lineobj = PyIter_Next(dr->input_iter);
-        if (lineobj == NULL) {
+        // get a string, representing one record, to parse
+        record = PyIter_Next(dr->input_iter);
+        if (record == NULL) {
             if (PyErr_Occurred()) return -1;
             // if parser is in an unexptected state
             if ((dr->field_len != 0) || (dr->state == IN_QUOTED_FIELD)) {
@@ -2359,69 +2353,70 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
             }
             return 0; // end of input, not an error
         }
-        if (!PyUnicode_Check(lineobj)) {
+        ++dr->input_number;
+
+        if (!PyUnicode_Check(record)) {
             PyErr_Format(PyExc_RuntimeError,
                     "iterator should return strings, not %.200s "
                     "(the file should be opened in text mode)",
-                    Py_TYPE(lineobj)->tp_name
+                    Py_TYPE(record)->tp_name
                     );
-            Py_DECREF(lineobj);
+            Py_DECREF(record);
             return -1;
         }
-        if (PyUnicode_READY(lineobj) == -1) {
-            Py_DECREF(lineobj);
+        if (PyUnicode_READY(record) == -1) {
+            Py_DECREF(record);
             return -1;
         }
-        // NOTE: line_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
-        ++dr->line_number;
-        // AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->line_number));
 
         // if our axis is 0 (line per row) we can skip entire lines if line_select is defined
         if ((dr->line_select != NULL) && (dr->axis == 0)) {
             PyObject* keep = PyObject_CallFunctionObjArgs(
                     dr->line_select,
-                    PyLong_FromLong(dr->line_number),
+                    PyLong_FromLong(dr->input_number),
                     NULL
                     );
-            // AK_DEBUG_MSG_OBJ("keep", keep);
             if (keep == NULL) {
-                Py_DECREF(lineobj);
+                Py_DECREF(record);
                 PyErr_Format(PyExc_RuntimeError,
                         "line_select callable failed for input: %d",
-                        dr->line_number
+                        dr->record_number
                         );
                 return -1;
             }
             int t = PyObject_IsTrue(keep); // 1 if truthy
             if (t < 0) {
-                Py_DECREF(lineobj);
+                Py_DECREF(record);
                 return -1; // error
             }
-            // NOTE: enabling this is causing seg fault; probably something in CPG?
-            // if (t == 0) {
-            //     Py_DECREF(lineobj);
-            //     return 1; // skip, process more lines
-            // }
+            if (t == 0) {
+                Py_DECREF(record);
+                return 1; // skip, process more lines
+            }
         }
 
-        kind = PyUnicode_KIND(lineobj);
-        data = PyUnicode_DATA(lineobj);
+        // NOTE: record_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
+        ++dr->record_number;
+        // AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->record_number));
+
+        kind = PyUnicode_KIND(record);
+        data = PyUnicode_DATA(record);
         pos = 0;
-        linelen = PyUnicode_GET_LENGTH(lineobj);
+        linelen = PyUnicode_GET_LENGTH(record);
         while (linelen--) {
             c = PyUnicode_READ(kind, data, pos);
             if (c == '\0') {
-                Py_DECREF(lineobj);
+                Py_DECREF(record);
                 PyErr_Format(PyExc_RuntimeError, "line contains NUL");
                 return -1;
             }
             if (AK_DR_process_char(dr, cpg, c)) {
-                Py_DECREF(lineobj);
+                Py_DECREF(record);
                 return -1;
             }
             pos++;
         }
-        Py_DECREF(lineobj);
+        Py_DECREF(record);
         if (AK_DR_process_char(dr, cpg, 0)) return -1;
     } while (dr->state != START_RECORD);
 
@@ -2458,7 +2453,8 @@ AK_DR_New(PyObject *iterable,
 
     dr->axis = axis;
     dr->line_select = line_select;
-    dr->line_number = -1;
+    dr->record_number = -1;
+    dr->input_number = -1;
 
     dr->input_iter = PyObject_GetIter(iterable);
     if (dr->input_iter == NULL) {
@@ -2529,9 +2525,6 @@ static char *delimited_to_ararys_kwarg_names[] = {
     "strict",
     NULL
 };
-
-// TODO:
-// add axis_select as a tp.Callable[[int], bool]
 
 // NOTE: implement skip_header, skip_footer in client Python, not here.
 static PyObject*

@@ -811,8 +811,9 @@ class TestUnit(unittest.TestCase):
         msg = ['1,2', 'False,True', 'foo,bar', '3.2,5.2']
         line_select = lambda i: i in (0, 2)
         post1 = delimited_to_arrays(msg, line_select=line_select, axis=0)
-        # import ipdb; ipdb.set_trace()
+        self.assertEqual([x.tolist() for x in post1], [[1, 2], ['foo', 'bar']])
 
+        # import ipdb; ipdb.set_trace()
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
