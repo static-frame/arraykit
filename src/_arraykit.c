@@ -1856,6 +1856,18 @@ AK_CPG_AppendOffsetAtLine(
     return 0;
 }
 
+static inline int
+AK_CPG_UndoOffsetAtLine(
+        AK_CodePointGrid* cpg,
+        Py_ssize_t line,
+        Py_ssize_t offset)
+{
+    // TODO: implement
+    if (AK_CPG_resize(cpg, line)) return -1;
+    if (AK_CPL_AppendOffset(cpg->lines[line], offset)) return -1;
+    return 0;
+}
+
 
 //------------------------------------------------------------------------------
 // CodePointGrid: Constructors
@@ -2148,19 +2160,6 @@ typedef struct AK_DelimitedReader{
     int axis;
 } AK_DelimitedReader;
 
-// Called once at the close of each field in a line. Returns 0 on success, -1 on failure
-static inline int
-AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
-{
-    if (AK_CPG_AppendOffsetAtLine(cpg,
-            dr->axis == 0 ? dr->record_number : dr->field_number,
-            dr->field_len)) return -1;
-    dr->field_len = 0; // clear to close
-    // AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
-    ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
-    return 0;
-}
-
 // Returns -1 on error (with exception set), 1 on line keep, 0 on line pass
 static inline int
 AK_DR_line_select_keep(AK_DelimitedReader *dr, int axis_target, int lookup_number)
@@ -2187,13 +2186,37 @@ AK_DR_line_select_keep(AK_DelimitedReader *dr, int axis_target, int lookup_numbe
     return 1;
 }
 
+// Called once at the close of each field in a line. Returns 0 on success, -1 on failure
+static inline int
+AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
+{
+    int keep = AK_DR_line_select_keep(dr, 1, dr->field_number);
+    if (keep < 0) return -1;
+    if (keep == 0) {
+        // do not advance field, just back up the
+        AK_CPG_UndoOffsetAtLine(cpg,
+                dr->axis == 0 ? dr->record_number : dr->field_number,
+                dr->field_len
+                );
+        return 0; // not error
+    }
+
+    if (AK_CPG_AppendOffsetAtLine(cpg,
+            dr->axis == 0 ? dr->record_number : dr->field_number,
+            dr->field_len)) return -1;
+    dr->field_len = 0; // clear to close
+    // AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
+    ++dr->field_number; // increment after adding each offset, reset in AK_DR_line_reset
+    return 0;
+}
+
 // Called once to add each character, appending that character to the CPL. Return 0 on success, -1 on failure.
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
-    if ((dr->line_select != NULL) && (dr->axis == 1)) {
+    // NOTE: this cannot be called once per character!
+    // int keep = AK_DR_line_select_keep(dr, 0, dr->field_number);
 
-    }
     if (AK_CPG_AppendPointAtLine(cpg,
             dr->axis == 0 ? dr->record_number : dr->field_number,
             dr->field_len,
