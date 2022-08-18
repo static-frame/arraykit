@@ -943,12 +943,13 @@ typedef struct AK_CodePointLine{
     Py_ssize_t buffer_capacity; // max number of code points
     Py_UCS4 *buffer;
 
-    Py_ssize_t offsets_count; // accumulated number of elements
+    Py_ssize_t offsets_count; // accumulated number of elements, never reset
     Py_ssize_t offsets_capacity; // max number of elements
     Py_ssize_t *offsets;
 
     Py_ssize_t offset_max; // observe max offset found across all
 
+    // these can be reset
     Py_UCS4 *pos_current;
     Py_ssize_t index_current;
 
@@ -980,7 +981,7 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
         return (AK_CodePointLine*)PyErr_NoMemory();
     }
     cpl->pos_current = cpl->buffer;
-    cpl->index_current = 0;
+    cpl->index_current = 0; // position in offsets
     cpl->offset_max = 0;
 
     // optional, dynamic values
@@ -1860,11 +1861,26 @@ static inline int
 AK_CPG_UndoOffsetAtLine(
         AK_CodePointGrid* cpg,
         Py_ssize_t line,
-        Py_ssize_t offset)
+        Py_ssize_t offset) // field len
 {
-    // TODO: implement
-    if (AK_CPG_resize(cpg, line)) return -1;
-    if (AK_CPL_AppendOffset(cpg->lines[line], offset)) return -1;
+
+    if (line < cpg->lines_count) {
+        return 0; // nothing to do
+    }
+    AK_CodePointLine *cpl = cpg->lines[line];
+    // if we do not call AK_CPL_AppendOffset, we do not need to change this
+    // cpl->offsets_count
+
+    if (cpl->buffer_count == offset) {
+        // remove the cpl from the grid
+        AK_CPL_Free(cpl);
+        cpg->lines[line] = NULL;
+        --cpg->lines_count;
+        return 0;
+    }
+    // buffer_capacity will stay greater then this value; we can safely reduce buffer count and ignore the previously writtne values
+    cpl->buffer_count -= offset;
+    cpl->pos_current -= offset;
     return 0;
 }
 
@@ -2190,6 +2206,7 @@ AK_DR_line_select_keep(AK_DelimitedReader *dr, int axis_target, int lookup_numbe
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
+    // TODO: need to split field_number from field_number_iter
     int keep = AK_DR_line_select_keep(dr, 1, dr->field_number);
     if (keep < 0) return -1;
     if (keep == 0) {
@@ -2198,6 +2215,8 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
                 dr->axis == 0 ? dr->record_number : dr->field_number,
                 dr->field_len
                 );
+        dr->field_len = 0; // clear to close
+        // ++dr->field_number;
         return 0; // not error
     }
 
