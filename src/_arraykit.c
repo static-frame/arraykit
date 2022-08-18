@@ -1857,38 +1857,37 @@ AK_CPG_AppendOffsetAtLine(
     return 0;
 }
 
-static inline int
-AK_CPG_UndoOffsetAtLine(
-        AK_CodePointGrid* cpg,
-        Py_ssize_t line,
-        Py_ssize_t offset) // field len
-{
 
-    if (line < cpg->lines_count) {
-        return 0; // nothing to do
-    }
-    AK_CodePointLine *cpl = cpg->lines[line];
-    // if we do not call AK_CPL_AppendOffset, we do not need to change this
-    // cpl->offsets_count
+// The implications of this is that when reading the first record that uses line_select, when we find a line to not be kept we will have added a new CPL to the CPG and will have written all chracters in the field; we will then call this function, observe that buffer count is offset, and remove the CPL. This could happen over many skipped lines. Finally, on the second row, when encountering a skiped field characters will be written to the "wrong" CPL but will be "removed"; if there is a last skipped columns they will all create and destroy new CPL on each row. This is bad.
+// static inline int
+// AK_CPG_UndoOffsetAtLine(
+//         AK_CodePointGrid* cpg,
+//         Py_ssize_t line,
+//         Py_ssize_t offset) // field len
+// {
 
-    if (cpl->buffer_count == offset) {
-        // remove the cpl from the grid
-        AK_CPL_Free(cpl);
-        cpg->lines[line] = NULL;
-        --cpg->lines_count;
-        return 0;
-    }
-    // buffer_capacity will stay greater then this value; we can safely reduce buffer count and ignore the previously writtne values
-    cpl->buffer_count -= offset;
-    cpl->pos_current -= offset;
-    return 0;
-}
+//     if (line < cpg->lines_count) {
+//         return 0; // nothing to do
+//     }
+//     AK_CodePointLine *cpl = cpg->lines[line];
+//     // if we do not call AK_CPL_AppendOffset, we do not need to change this
+//     // cpl->offsets_count
+
+//     if (cpl->buffer_count == offset) {
+//         // remove the cpl from the grid
+//         AK_CPL_Free(cpl);
+//         cpg->lines[line] = NULL;
+//         --cpg->lines_count;
+//         return 0;
+//     }
+//     // buffer_capacity will stay greater then this value; we can safely reduce buffer count and ignore the previously writtne values
+//     cpl->buffer_count -= offset;
+//     cpl->pos_current -= offset;
+//     return 0;
+// }
 
 
-//------------------------------------------------------------------------------
-// CodePointGrid: Constructors
-
-// Given a fully-loaded CodePointGrid, process each CodePointLine into an array. Returns NULL on failure.
+// Given a fully-loaded CodePointGrid, process each CodePointLine into an array and return a new list of those arrays. Returns NULL on failure.
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 {
     PyObject* list = PyList_New(cpg->lines_count);
@@ -1898,6 +1897,16 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
 
     // Iterate over lines in the code point grid
     for (int i = 0; i < cpg->lines_count; ++i) {
+
+        // keep = AK_DR_line_select_keep(dr, 1, i); // applying for axis1
+        // if (keep < 0) {
+        //     Py_DECREF(list);
+        //     return NULL;
+        // }
+        // else if (keep == 0) {
+        //     continue;
+        // }
+
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
 
@@ -1925,6 +1934,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
             }
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
+        // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
         if (array == NULL) {
             Py_DECREF(list);
@@ -2177,8 +2187,11 @@ typedef struct AK_DelimitedReader{
 } AK_DelimitedReader;
 
 // Returns -1 on error (with exception set), 1 on line keep, 0 on line pass
-static inline int
-AK_DR_line_select_keep(AK_DelimitedReader *dr, int axis_target, int lookup_number)
+inline int
+AK_DR_line_select_keep(
+        AK_DelimitedReader *dr,
+        int axis_target,
+        int lookup_number)
 {
     if ((dr->line_select != NULL) && (dr->axis == axis_target)) {
         PyObject* keep = PyObject_CallFunctionObjArgs(
@@ -2206,20 +2219,18 @@ AK_DR_line_select_keep(AK_DelimitedReader *dr, int axis_target, int lookup_numbe
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    // TODO: need to split field_number from field_number_iter
-    int keep = AK_DR_line_select_keep(dr, 1, dr->field_number);
-    if (keep < 0) return -1;
-    if (keep == 0) {
-        // do not advance field, just back up the
-        AK_CPG_UndoOffsetAtLine(cpg,
-                dr->axis == 0 ? dr->record_number : dr->field_number,
-                dr->field_len
-                );
-        dr->field_len = 0; // clear to close
-        // ++dr->field_number;
-        return 0; // not error
-    }
-
+    // int keep = AK_DR_line_select_keep(dr, 1, dr->field_number);
+    // if (keep < 0) return -1;
+    // if (keep == 0) {
+    //     // do not advance field, just back up the
+    //     AK_CPG_UndoOffsetAtLine(cpg,
+    //             dr->axis == 0 ? dr->record_number : dr->field_number,
+    //             dr->field_len
+    //             );
+    //     dr->field_len = 0; // clear to close
+    //     // ++dr->field_number;
+    //     return 0; // not error
+    // }
     if (AK_CPG_AppendOffsetAtLine(cpg,
             dr->axis == 0 ? dr->record_number : dr->field_number,
             dr->field_len)) return -1;
@@ -2678,7 +2689,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg);
-    // NOTE: do not need to check if arrays is NULL
+    // NOTE: do not need to check if arrays is NULL as weill return anyway
     AK_CPG_Free(cpg); // will free reference to dtypes
     return arrays; // could be NULL
 }
@@ -2697,16 +2708,6 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
     }
     return AK_IterableStrToArray1D(iterable, dtype_specifier);
 }
-
-// static PyObject *
-// _test(PyObject *Py_UNUSED(m), PyObject *value)
-// {
-//     AK_CodePointGrid* cpg = AK_CPG_FromIterable(value, 1);
-//     PyObject* post = AK_CPG_ToUnicodeList(cpg);
-//     AK_CPG_Free(cpg);
-//     return post;
-// }
-
 
 //------------------------------------------------------------------------------
 
@@ -3567,7 +3568,6 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
-    // {"_test", _test, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {"get_new_indexers_and_screen",
