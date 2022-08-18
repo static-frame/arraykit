@@ -1920,8 +1920,12 @@ AK_CPG_AppendOffsetAtLine(
 
 
 // Given a fully-loaded CodePointGrid, process each CodePointLine into an array and return a new list of those arrays. Returns NULL on failure.
-PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
+PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
+        int axis,
+        PyObject* line_select)
 {
+    int keep;
+
     PyObject* list = PyList_New(cpg->lines_count);
     if (list == NULL) return NULL;
 
@@ -1930,14 +1934,15 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg)
     // Iterate over lines in the code point grid
     for (int i = 0; i < cpg->lines_count; ++i) {
 
-        // keep = AK_DR_line_select_keep(dr, 1, i); // applying for axis1
-        // if (keep < 0) {
-        //     Py_DECREF(list);
-        //     return NULL;
-        // }
-        // else if (keep == 0) {
-        //     continue;
-        // }
+        // if axis is axis 1, apply keep
+        keep = AK_line_select_keep(line_select, 1 == axis, i);
+        if (keep < 0) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        else if (keep == 0) {
+            continue;
+        }
 
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
@@ -2724,7 +2729,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_DR_Free(dr);
 
-    PyObject* arrays = AK_CPG_ToArrayList(cpg);
+    PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select);
     Py_XDECREF(line_select); // might be NULL
 
     // NOTE: do not need to check if arrays is NULL as weill return anyway
