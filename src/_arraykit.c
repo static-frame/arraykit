@@ -950,14 +950,14 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     if (cpl == NULL) return (AK_CodePointLine*)PyErr_NoMemory();
 
     cpl->buffer_count = 0;
-    cpl->buffer_capacity = 2048;
+    cpl->buffer_capacity =  16384; // 2048;
     cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
     if (cpl->buffer == NULL) {
         PyMem_Free(cpl);
         return (AK_CodePointLine*)PyErr_NoMemory();
     }
     cpl->offsets_count = 0;
-    cpl->offsets_capacity = 2048;
+    cpl->offsets_capacity = 2048; // 16384; // 2048;
     cpl->offsets = (Py_ssize_t*)PyMem_Malloc(sizeof(Py_ssize_t) * cpl->offsets_capacity);
     if (cpl->offsets == NULL) {
         PyMem_Free(cpl->buffer);

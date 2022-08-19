@@ -49,63 +49,62 @@ class Perf:
     FUNCTIONS = ('main',)
     NUMBER = 500_000
 
-
-
 class FixtureFileLike:
 
-    COUNT_ROW = 1_000
+    COUNT_ROW = 10_000
+    COUNT_COLUMN = 500
 
     def __init__(self):
-        records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
+        records_int = [','.join(str(x) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
         self.file_like_int = io.StringIO('\n'.join(records_int))
 
-        records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
+        records_bool = [','.join(str(bool(x % 2)) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
         self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
-        records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
+        records_str = [','.join('foobar' for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
         self.file_like_str = io.StringIO('\n'.join(records_str))
 
-        records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
+        records_float = [','.join('1.2345' for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
         self.file_like_float = io.StringIO('\n'.join(records_float))
 
         self.axis = 1
 
 # #-------------------------------------------------------------------------------
 class DelimitedToArraysTypedPandas(Perf, FixtureFileLike):
-    NUMBER = 20
+    NUMBER = 5
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
     entry = staticmethod(delimited_to_arrays_ak)
-    dtypes_int = [int] * FixtureFileLike.COUNT_ROW
-    dtypes_bool = [bool] * FixtureFileLike.COUNT_ROW
-    dtypes_str = [str] * FixtureFileLike.COUNT_ROW
-    dtypes_float = [float] * FixtureFileLike.COUNT_ROW
+    dtypes_int = ([int] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_bool = ([bool] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_str = ([str] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_float = ([float] * FixtureFileLike.COUNT_COLUMN).__getitem__
 
     def int_uniform(self):
         self.file_like_int.seek(0)
-        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int.__getitem__, axis=self.axis)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
 
     def bool_uniform(self):
         self.file_like_bool.seek(0)
-        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool.__getitem__, axis=self.axis)
+        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
 
     def str_uniform(self):
         self.file_like_str.seek(0)
-        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str.__getitem__, axis=self.axis)
+        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
 
     def float_uniform(self):
         self.file_like_float.seek(0)
-        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float.__getitem__, axis=self.axis)
+        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
 
 
 class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
     import pandas
     entry = staticmethod(pandas.read_csv)
-    dtypes_int = {i: int for i in range(FixtureFileLike.COUNT_ROW)}
-    dtypes_bool = {i: bool for i in range(FixtureFileLike.COUNT_ROW)}
-    dtypes_str = {i: object for i in range(FixtureFileLike.COUNT_ROW)}
-    dtypes_float = {i: float for i in range(FixtureFileLike.COUNT_ROW)}
+    dtypes_int = {i: int for i in range(FixtureFileLike.COUNT_COLUMN)}
+    dtypes_bool = {i: bool for i in range(FixtureFileLike.COUNT_COLUMN)}
+    dtypes_str = {i: object for i in range(FixtureFileLike.COUNT_COLUMN)}
+    dtypes_float = {i: float for i in range(FixtureFileLike.COUNT_COLUMN)}
 
     def int_uniform(self):
         self.file_like_int.seek(0)
@@ -126,7 +125,7 @@ class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
 # #-------------------------------------------------------------------------------
 
 class DelimitedToArraysParsedPandas(Perf, FixtureFileLike):
-    NUMBER = 10
+    NUMBER = 5
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
@@ -171,76 +170,59 @@ class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
 
 
 # #-------------------------------------------------------------------------------
-# class DelimitedToArraysTypedGenft(Perf, FixtureFileLike):
-#     NUMBER = 10
-#     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
-#     COUNT_ROW = 1_000
+class DelimitedToArraysTypedGenft(Perf, FixtureFileLike):
+    NUMBER = 2
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
-#     # def __init__(self):
-#     #     records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
-#     #     self.file_like_int = io.StringIO('\n'.join(records_int))
+class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
+    entry = staticmethod(delimited_to_arrays_ak)
 
-#     #     records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
-#     #     self.file_like_bool = io.StringIO('\n'.join(records_bool))
+    dtypes_int = ([int] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_bool = ([bool] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_str = ([str] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_float = ([float] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    axis = 1
 
-#     #     records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
-#     #     self.file_like_str = io.StringIO('\n'.join(records_str))
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
 
-#     #     records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
-#     #     self.file_like_float = io.StringIO('\n'.join(records_float))
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
 
-# class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
-#     entry = staticmethod(delimited_to_arrays_ak)
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
 
-#     def __init__(self):
-#         self.dtypes_int = [int] * 1000
-#         self.dtypes_bool = [bool] * 1000
-#         self.dtypes_str = [str] * 1000
-#         self.dtypes_float = [float] * 1000
-#         self.axis = 1
-
-#     def int_uniform(self):
-#         self.file_like_int.seek(0)
-#         _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
-
-#     def bool_uniform(self):
-#         self.file_like_bool.seek(0)
-#         _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
-
-#     def str_uniform(self):
-#         self.file_like_str.seek(0)
-#         _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
-
-#     def float_uniform(self):
-#         self.file_like_float.seek(0)
-#         _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
 
 
-# class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
-#     entry = staticmethod(np.genfromtxt)
+class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
+    entry = staticmethod(np.genfromtxt)
 
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, delimiter=',', dtype=int)
 
-#     def int_uniform(self):
-#         self.file_like_int.seek(0)
-#         _ = self.entry(self.file_like_int, delimiter=',', dtype=int)
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, delimiter=',', dtype=bool)
 
-#     def bool_uniform(self):
-#         self.file_like_bool.seek(0)
-#         _ = self.entry(self.file_like_bool, delimiter=',', dtype=bool)
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, delimiter=',', dtype=str)
 
-#     def str_uniform(self):
-#         self.file_like_str.seek(0)
-#         _ = self.entry(self.file_like_str, delimiter=',', dtype=str)
-
-#     def float_uniform(self):
-#         self.file_like_float.seek(0)
-#         _ = self.entry(self.file_like_float, delimiter=',', dtype=float)
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, delimiter=',', dtype=float)
 
 
 # #-------------------------------------------------------------------------------
 # class DelimitedToArraysParsedGenft(Perf, FixtureFileLike):
 #     NUMBER = 10
-#     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 #     COUNT_ROW = 1_000
 
 #     def __init__(self):
