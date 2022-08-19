@@ -318,7 +318,7 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
         case TPS_UNKNOWN:
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
-        case TPS_EMPTY: // empty defaults to string
+        case TPS_EMPTY: // all empty defaults to string
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
         case TPS_STRING:
@@ -347,11 +347,9 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
 //------------------------------------------------------------------------------
 // An AK_TypeParser accumulates the state in parsing a single code point line. It holds both "active" state in the progress of parsing each field as well as finalized state in parsed_line
 typedef struct AK_TypeParser {
-
-    bool contiguous_leading_space;
     bool previous_numeric;
     bool contiguous_numeric;
-
+    bool contiguous_leading_space;
     // counting will always stop before 8 or less
     npy_int8 count_bool;
     npy_int8 count_sign;
@@ -362,7 +360,6 @@ typedef struct AK_TypeParser {
     npy_int8 count_inf;
     npy_int8 count_paren_open;
     npy_int8 count_paren_close;
-
     // bound by number of chars in field
     Py_ssize_t last_sign_pos; // signed
     Py_ssize_t count_leading_space;
@@ -405,7 +402,6 @@ AK_TP_New()
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
     if (tp == NULL) return (AK_TypeParser*)PyErr_NoMemory();
-
     AK_TP_reset_field(tp);
     tp->parsed_line = TPS_UNKNOWN;
     return tp;
@@ -418,9 +414,8 @@ AK_TP_Free(AK_TypeParser* tp)
 }
 
 //------------------------------------------------------------------------------
-// TypePArser: char, field processors
 
-// Given a type parse, process a single character and update the tyep parser state. Return true when processing should continue, false with no further processing is necessary. `pos` is the raw position within the current field.
+// Given a type parse, process a single character and update the type parser state. Return true when processing should continue, false when no further processing is necessary. `pos` is the raw position within the current field.
 bool
 AK_TP_ProcessChar(AK_TypeParser* tp,
         char c,
@@ -551,6 +546,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
         pos_field -= tp->last_sign_pos + 1;
     }
 
+    // given relative positions `pos_field`, map to known character sequences
     switch (pos_field) {
         case 0:
             if      (AK_is_t(c)) {++tp->count_bool;}
@@ -605,8 +601,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
                 return false;
             }
     }
-    // continue processing
-    return true;
+    return true; // continue processing
 }
 
 // This private function is used by AK_TP_ResolveLineResetField to evaluate the state of the AK_TypeParser and determine the resolved AK_TypeParserState.
@@ -625,7 +620,6 @@ AK_TP_resolve_field(AK_TypeParser* tp,
     if (tp->count_bool == -5 && tp->count_not_space == 5) {
         return TPS_BOOL;
     }
-
     if (tp->contiguous_numeric) {
         if (tp->count_digit == 0) return TPS_STRING;
         // int
@@ -638,7 +632,6 @@ AK_TP_resolve_field(AK_TypeParser* tp,
                 tp->count_inf == 0) {
             return TPS_INT;
         }
-
         // float
         if (tp->count_j == 0 &&
                 tp->count_sign <= 2 &&
@@ -659,7 +652,6 @@ AK_TP_resolve_field(AK_TypeParser* tp,
             if (tp->count_sign > 2 + tp->count_e) {
                 return TPS_STRING;
             }
-            // AK_DEBUG("found j == 1, returning complex");
             return TPS_COMPLEX;
         }
         // complex with parens (no j)
@@ -715,13 +707,8 @@ AK_TP_resolve_field(AK_TypeParser* tp,
             return TPS_COMPLEX;
         }
     }
-    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_j));
-    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_inf));
-    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_sign));
-    // AK_DEBUG_OBJ(PyLong_FromLong(tp->count_not_space));
     return TPS_STRING; // default
 }
-
 
 // After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called.
 void
@@ -734,9 +721,6 @@ AK_TP_ResolveLineResetField(AK_TypeParser* tp,
     }
     AK_TP_reset_field(tp);
 }
-
-//------------------------------------------------------------------------------
-
 
 //------------------------------------------------------------------------------
 // UCS4 array processors
@@ -950,8 +934,8 @@ typedef struct AK_CodePointLine{
     Py_ssize_t offset_max; // observe max offset found across all
 
     // these can be reset
-    Py_UCS4 *pos_current;
-    Py_ssize_t index_current;
+    Py_UCS4 *buffer_current_ptr;
+    Py_ssize_t offsets_current_index;
 
     char *field;
     AK_TypeParser *type_parser;
@@ -980,8 +964,8 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
         PyMem_Free(cpl);
         return (AK_CodePointLine*)PyErr_NoMemory();
     }
-    cpl->pos_current = cpl->buffer;
-    cpl->index_current = 0; // position in offsets
+    cpl->buffer_current_ptr = cpl->buffer;
+    cpl->offsets_current_index = 0; // position in offsets
     cpl->offset_max = 0;
 
     // optional, dynamic values
@@ -1031,7 +1015,7 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
                 sizeof(Py_UCS4) * cpl->buffer_capacity);
         if (cpl->buffer == NULL) return -1;
 
-        cpl->pos_current = cpl->buffer + cpl->buffer_count;
+        cpl->buffer_current_ptr = cpl->buffer + cpl->buffer_count;
     }
     // increment by at most one, so only need to check if equal
     if (cpl->offsets_count == cpl->offsets_capacity) {
@@ -1060,16 +1044,15 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
         return -1;
     }
     // use PyUnicode_CheckExact
-    // NOTE: this returns NULL on error
-    if(!PyUnicode_AsUCS4(element,
-            cpl->pos_current,
-            cpl->buffer + cpl->buffer_capacity - cpl->pos_current,
-            0)) { // last zero means do not copy null
+    if(PyUnicode_AsUCS4(element,
+            cpl->buffer_current_ptr,
+            cpl->buffer + cpl->buffer_capacity - cpl->buffer_current_ptr,
+            0) == NULL) { // last zero means do not copy null
         return -1; // need to handle error
     }
     // if type parsing has been enabled
     if (cpl->type_parser) {
-        Py_UCS4* p = cpl->pos_current;
+        Py_UCS4* p = cpl->buffer_current_ptr;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
         for (; p < end; ++p) {
@@ -1084,7 +1067,7 @@ AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
     // read offset_count, then increment
     cpl->offsets[cpl->offsets_count++] = element_length;
     cpl->buffer_count += element_length;
-    cpl->pos_current += element_length; // add to pointer
+    cpl->buffer_current_ptr += element_length; // add to pointer
 
     if (element_length > cpl->offset_max) {
         cpl->offset_max = element_length;
@@ -1105,7 +1088,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (cpl->type_parser && cpl->type_parser_active) {
         cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
-    *cpl->pos_current++ = p; // shift forward by size of p
+    *cpl->buffer_current_ptr++ = p; // shift forward by size of p
     ++cpl->buffer_count;
     return 0;
 }
@@ -1167,16 +1150,16 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
 void
 AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 {
-    cpl->pos_current = cpl->buffer;
-    cpl->index_current = 0;
+    cpl->buffer_current_ptr = cpl->buffer;
+    cpl->offsets_current_index = 0;
 }
 
 // Advance the current position by the current offset. Cannot error.
 static inline void
 AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
-    // use index_current, then increment
-    cpl->pos_current += cpl->offsets[cpl->index_current++];
+    // use offsets_current_index, then increment
+    cpl->buffer_current_ptr += cpl->offsets[cpl->offsets_current_index++];
 }
 
 //------------------------------------------------------------------------------
@@ -1190,8 +1173,8 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
         if (cpl->field == NULL) return (char*)PyErr_NoMemory();
     }
-    Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+    Py_UCS4 *p = cpl->buffer_current_ptr;
+    Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
 
     // get pointer to field buffer to write to
     char *t = cpl->field;
@@ -1212,10 +1195,10 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
 static inline bool
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     // must have at least 4 characters
-    if (cpl->offsets[cpl->index_current] < 4) {
+    if (cpl->offsets[cpl->offsets_current_index] < 4) {
         return false;
     }
-    Py_UCS4 *p = cpl->pos_current;
+    Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + 4; // we must have at least 4 characters
     int i = 0;
     char c;
@@ -1238,8 +1221,8 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
 static inline npy_int64
 AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error)
 {
-    Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + cpl->offsets[cpl->index_current]; // size is either 4 or 5
+    Py_UCS4 *p = cpl->buffer_current_ptr;
+    Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index]; // size is either 4 or 5
     // int error = 0;
     npy_int64 v = AK_UCS4_to_int64(p, end, error);
     // if (error > 0) {
@@ -1252,8 +1235,8 @@ AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error)
 static inline npy_uint64
 AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
 {
-    Py_UCS4 *p = cpl->pos_current;
-    Py_UCS4 *end = p + cpl->offsets[cpl->index_current];
+    Py_UCS4 *p = cpl->buffer_current_ptr;
+    Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
     // int error = 0;
     npy_uint64 v = AK_UCS4_to_uint64(p, end, error);
     // if (error > 0) {
@@ -1267,7 +1250,7 @@ static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 {
     // interpret an empty field as NaN
-    if (cpl->offsets[cpl->index_current] == 0) {
+    if (cpl->offsets[cpl->offsets_current_index] == 0) {
         return NPY_NAN;
     }
     char* field = AK_CPL_current_to_field(cpl);
@@ -1574,13 +1557,13 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         // NOTE: is it worth branching for this special case?
         Py_ssize_t copy_bytes;
         while (array_buffer < end) {
-            if (cpl->offsets[cpl->index_current] >= field_points) {
+            if (cpl->offsets[cpl->offsets_current_index] >= field_points) {
                 copy_bytes = field_points * sizeof(Py_UCS4);
             } else {
-                copy_bytes = cpl->offsets[cpl->index_current] * sizeof(Py_UCS4);
+                copy_bytes = cpl->offsets[cpl->offsets_current_index] * sizeof(Py_UCS4);
             }
             memcpy(array_buffer,
-                    cpl->pos_current,
+                    cpl->buffer_current_ptr,
                     copy_bytes);
             array_buffer += field_points;
             AK_CPL_CurrentAdvance(cpl);
@@ -1589,8 +1572,8 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     else { // faster we always know the offset will fit
         while (array_buffer < end) {
             memcpy(array_buffer,
-                    cpl->pos_current,
-                    cpl->offsets[cpl->index_current] * sizeof(Py_UCS4));
+                    cpl->buffer_current_ptr,
+                    cpl->offsets[cpl->offsets_current_index] * sizeof(Py_UCS4));
             array_buffer += field_points;
             AK_CPL_CurrentAdvance(cpl);
         }
@@ -1636,16 +1619,16 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     NPY_BEGIN_THREADS;
 
     while (array_buffer < end) {
-        if (!capped_points || cpl->offsets[cpl->index_current] < field_points) {
+        if (!capped_points || cpl->offsets[cpl->offsets_current_index] < field_points) {
             // if not capped, or capped and offset is less than field points, use offset
-            copy_points = cpl->offsets[cpl->index_current];
+            copy_points = cpl->offsets[cpl->offsets_current_index];
         }
         else {
             // if capped and offset is greater than feild points, use field points
             copy_points = field_points;
         }
 
-        Py_UCS4 *p = cpl->pos_current;
+        Py_UCS4 *p = cpl->buffer_current_ptr;
         Py_UCS4 *p_end = p + copy_points;
         char *field_end = array_buffer + field_points;
 
@@ -1914,7 +1897,7 @@ AK_CPG_AppendOffsetAtLine(
 //     }
 //     // buffer_capacity will stay greater then this value; we can safely reduce buffer count and ignore the previously writtne values
 //     cpl->buffer_count -= offset;
-//     cpl->pos_current -= offset;
+//     cpl->buffer_current_ptr -= offset;
 //     return 0;
 // }
 
