@@ -818,8 +818,21 @@ class TestUnit(unittest.TestCase):
         post1 = delimited_to_arrays(msg, line_select=line_select, axis=0)
         self.assertEqual([x.tolist() for x in post1], [[False, True]])
 
+    def test_delimited_to_arrays_line_select_d(self) -> None:
+        msg  = ['a,3,True,c', 'b,-1,False,d']
+        post1 = delimited_to_arrays(msg, axis=1, line_select=lambda i: i in (0, 2))
+        self.assertEqual([x.tolist() for x in post1], [['a', 'b'], [True, False]])
 
-        # import ipdb; ipdb.set_trace()
+    def test_delimited_to_arrays_line_select_e(self) -> None:
+        msg  = ['a,3,True,c', 'b,-1,False,d']
+        post1 = delimited_to_arrays(msg, axis=1, line_select=lambda i: i == 3)
+        self.assertEqual([x.tolist() for x in post1], [['c', 'd']])
+
+    def test_delimited_to_arrays_line_select_f(self) -> None:
+        msg  = ['a,3,True,c', 'b,-1,False,d']
+        post1 = delimited_to_arrays(msg, axis=1, line_select=lambda i: False)
+        self.assertEqual([x.tolist() for x in post1], [])
+
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:

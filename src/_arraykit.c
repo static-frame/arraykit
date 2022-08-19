@@ -314,7 +314,7 @@ AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
     PyArray_Descr *dtype_final;
 
-    switch(state) {
+    switch (state) {
         case TPS_UNKNOWN:
             dtype = PyArray_DescrFromType(NPY_UNICODE);
             break;
@@ -1750,7 +1750,7 @@ AK_line_select_keep(
         bool axis_target,
         int lookup_number)
 {
-    if ((line_select != NULL) && axis_target) {
+    if (axis_target && (line_select != NULL)) {
         PyObject* keep = PyObject_CallFunctionObjArgs(
                 line_select,
                 PyLong_FromLong(lookup_number),
@@ -1767,7 +1767,7 @@ AK_line_select_keep(
         if (t < 0) {
             return -1; // error
         }
-        return t;
+        return t; // 0 or 1
     }
     return 1;
 }
@@ -1924,26 +1924,30 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         int axis,
         PyObject* line_select)
 {
-    int keep;
+    bool ls_inactive = line_select == NULL;
+    int list_error;
+    PyObject *list;
 
-    PyObject* list = PyList_New(cpg->lines_count);
+    if (ls_inactive) {
+        list = PyList_New(cpg->lines_count);
+    }
+    else {
+        list = PyList_New(0);
+    }
     if (list == NULL) return NULL;
 
     PyObject* dtypes = cpg->dtypes;
 
     // Iterate over lines in the code point grid
     for (int i = 0; i < cpg->lines_count; ++i) {
-
         // if axis is axis 1, apply keep
-        keep = AK_line_select_keep(line_select, 1 == axis, i);
-        if (keep < 0) {
-            Py_DECREF(list);
-            return NULL;
+        switch (AK_line_select_keep(line_select, 1 == axis, i)) {
+            case -1:
+                Py_DECREF(list);
+                return NULL;
+            case 0:
+                continue;
         }
-        else if (keep == 0) {
-            continue;
-        }
-
         // If dtypes is not NULL, fetch the dtype_specifier and use it to set dtype; else, pass the dtype as NULL to CPL.
         PyArray_Descr* dtype = NULL;
 
@@ -1977,7 +1981,14 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
             Py_DECREF(list);
             return NULL;
         }
-        if (PyList_SetItem(list, i, array)) { // steals reference
+
+        if (ls_inactive) {
+            list_error = PyList_SetItem(list, i, array); // steals reference
+        }
+        else {
+            list_error = PyList_Append(list, array);
+        }
+        if (list_error) {
             Py_DECREF(array);
             Py_DECREF(list);
             return NULL;
@@ -2223,51 +2234,10 @@ typedef struct AK_DelimitedReader{
     int axis;
 } AK_DelimitedReader;
 
-// Returns -1 on error (with exception set), 1 on line keep, 0 on line pass
-// inline int
-// AK_DR_line_select_keep(
-//         AK_DelimitedReader *dr,
-//         int axis_target,
-//         int lookup_number)
-// {
-//     if ((dr->line_select != NULL) && (dr->axis == axis_target)) {
-//         PyObject* keep = PyObject_CallFunctionObjArgs(
-//                 dr->line_select,
-//                 PyLong_FromLong(lookup_number),
-//                 NULL
-//                 );
-//         if (keep == NULL) {
-//             PyErr_Format(PyExc_RuntimeError,
-//                     "line_select callable failed for input: %d",
-//                     dr->record_number
-//                     );
-//             return -1;
-//         }
-//         int t = PyObject_IsTrue(keep); // 1 if truthy
-//         if (t < 0) {
-//             return -1; // error
-//         }
-//         return t;
-//     }
-//     return 1;
-// }
-
 // Called once at the close of each field in a line. Returns 0 on success, -1 on failure
 static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
-    // int keep = AK_DR_line_select_keep(dr, 1, dr->field_number);
-    // if (keep < 0) return -1;
-    // if (keep == 0) {
-    //     // do not advance field, just back up the
-    //     AK_CPG_UndoOffsetAtLine(cpg,
-    //             dr->axis == 0 ? dr->record_number : dr->field_number,
-    //             dr->field_len
-    //             );
-    //     dr->field_len = 0; // clear to close
-    //     // ++dr->field_number;
-    //     return 0; // not error
-    // }
     if (AK_CPG_AppendOffsetAtLine(cpg,
             dr->axis == 0 ? dr->record_number : dr->field_number,
             dr->field_len)) return -1;
@@ -2281,8 +2251,7 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
-    // NOTE: this cannot be called once per character!
-    // int keep = AK_DR_line_select_keep(dr, 0, dr->field_number);
+    // NOTE: ideally we could use line_select here; however, we would need to cache the lookup in another container as this is called once per char and line_select is a Python function; further, we would need to increment the field_number separately from another counter, which is done in AK_DR_close_field
 
     if (AK_CPG_AppendPointAtLine(cpg,
             dr->axis == 0 ? dr->record_number : dr->field_number,
@@ -2456,7 +2425,6 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr,
     unsigned int kind;
     const void *data;
     PyObject *record;
-    int keep;
 
     AK_DR_line_reset(dr);
 
@@ -2492,18 +2460,15 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr,
             return -1;
         }
 
-        keep = AK_line_select_keep(line_select,
+        switch (AK_line_select_keep(line_select,
                 0 == dr->axis,
-                dr->record_iter_number);
-
-        // int keep = AK_DR_line_select_keep(dr, 0, dr->record_iter_number);
-        if (keep < 0) {
-            Py_DECREF(record);
-            return -1;
-        }
-        else if (keep == 0) {
-            Py_DECREF(record);
-            return 1; // skip, process more lines
+                dr->record_iter_number)) {
+            case -1 :
+                Py_DECREF(record);
+                return -1;
+            case 0:
+                Py_DECREF(record);
+                return 1; // skip, process more lines
         }
 
         // NOTE: record_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
