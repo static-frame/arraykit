@@ -1139,7 +1139,6 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
         }
         Py_DECREF(field);
     }
-
     Py_DECREF(iter);
     return cpl;
 }
@@ -1179,7 +1178,6 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
 
     // get pointer to field buffer to write to
     char *t = cpl->field;
-
     while (p < end) {
         if (AK_is_space(*p)) {
             ++p;
@@ -1187,8 +1185,7 @@ AK_CPL_current_to_field(AK_CodePointLine* cpl)
         }
         *t++ = (char)*p++;
     }
-    *t = '\0';
-    // AK_DEBUG_OBJ(PyUnicode_FromString(cpl->field));
+    *t = '\0'; // must be NULL-terminated string
     return cpl->field;
 }
 
@@ -1200,7 +1197,7 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
         return false;
     }
     Py_UCS4 *p = cpl->buffer_current_ptr;
-    Py_UCS4 *end = p + 4; // we must have at least 4 characters
+    Py_UCS4 *end = p + 4; // we must have at least 4 characters for True
     int i = 0;
     char c;
 
@@ -1292,7 +1289,6 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
-
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
