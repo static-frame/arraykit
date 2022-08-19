@@ -28,4 +28,8 @@ AK_CodePointLine (CPL)
 
     The CPL also tracks the `offset_max`, the largest offset observed, while processing each field. This is needed when determining the element size of unicode dtypes, or when creating a re-usable Py_UCS4 buffer (for usage of PyOS_string_to_double which requires a NULL-terminated string).
 
-    The CPL tracks the current position in the buffer, as well as the current offset position
+    In addition, a CPL on creation optionally composes an AK_TypeParser instance. This permits the CPL to optionally call AK_TP_ProcessChar for each char when accumlating chars.
+
+    The CPL tracks the pointer to the current position in the buffer, as well as the current index in the offsets.
+
+    In general operation, AK_CPL_AppendPoint is calles for each point, which in turn calls AK_TP_ProcessChar for each char if `type_parser` is active. At the end of each field, AK_CPL_AppendOffset is called, which calls AK_TP_ResolveLineResetField if `type_parser` is active.

@@ -939,7 +939,7 @@ typedef struct AK_CodePointLine{
 
     char *field;
     AK_TypeParser *type_parser;
-    bool type_parser_active;
+    bool type_parser_field_active;
 
 } AK_CodePointLine;
 
@@ -979,11 +979,11 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
             PyMem_Free(cpl);
             return NULL; // exception already set
         }
-        cpl->type_parser_active = true;
+        cpl->type_parser_field_active = true;
     }
     else {
         cpl->type_parser = NULL;
-        cpl->type_parser_active = false;
+        cpl->type_parser_field_active = false;
     }
     return cpl;
 }
@@ -1029,39 +1029,42 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
     return 0;
 }
 
-// Given a PyUnicode PyObject, load the string content into the CPL. Used for iterable_str_to_array_1d. Returns 0 on success, -1 on error.
+// Given a PyUnicode PyObject representing a complete field, load the string content into the CPL. Used for iterable_str_to_array_1d. Returns 0 on success, -1 on error.
 static inline int
-AK_CPL_AppendObject(AK_CodePointLine* cpl, PyObject* element)
+AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
 {
-    if (!PyUnicode_Check(element)) {
+    if (!PyUnicode_Check(field)) {
         PyErr_SetString(PyExc_TypeError, "elements must be strings");
         return -1;
     }
-    Py_ssize_t element_length = PyUnicode_GET_LENGTH(element);
+    Py_ssize_t element_length = PyUnicode_GET_LENGTH(field);
 
-    // if we cannot fit element length, resize
+    // if we cannot fit field length, resize
     if (AK_CPL_resize(cpl, element_length)) {
         return -1;
     }
-    // use PyUnicode_CheckExact
-    if(PyUnicode_AsUCS4(element,
+    // we write teh field direclty into the CPL buffer
+    if(PyUnicode_AsUCS4(field,
             cpl->buffer_current_ptr,
             cpl->buffer + cpl->buffer_capacity - cpl->buffer_current_ptr,
             0) == NULL) { // last zero means do not copy null
-        return -1; // need to handle error
+        return -1;
     }
-    // if type parsing has been enabled
+    // if type parsing has been enabled, we must process each char
     if (cpl->type_parser) {
         Py_UCS4* p = cpl->buffer_current_ptr;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
         for (; p < end; ++p) {
-            cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)*p, pos);
-            if (!cpl->type_parser_active) break;
+            cpl->type_parser_field_active = AK_TP_ProcessChar(
+                    cpl->type_parser,
+                    (char)*p,
+                    pos);
+            if (!cpl->type_parser_field_active) break;
             ++pos;
         }
         AK_TP_ResolveLineResetField(cpl->type_parser, element_length);
-        cpl->type_parser_active = true; // turn back on for next field
+        cpl->type_parser_field_active = true; // turn back on for next field
     }
 
     // read offset_count, then increment
@@ -1085,8 +1088,8 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (AK_CPL_resize(cpl, 1)) return -1;
 
     // type_parser might not be active if we already know the dtype
-    if (cpl->type_parser && cpl->type_parser_active) {
-        cpl->type_parser_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
+    if (cpl->type_parser && cpl->type_parser_field_active) {
+        cpl->type_parser_field_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
     *cpl->buffer_current_ptr++ = p; // shift forward by size of p
     ++cpl->buffer_count;
@@ -1102,12 +1105,10 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 
     if (cpl->type_parser) {
         AK_TP_ResolveLineResetField(cpl->type_parser, offset);
-        cpl->type_parser_active = true; // turn back on for next field
+        cpl->type_parser_field_active = true; // turn back on for next field
     }
-
     // increment offset_count after assignment so we can grow if needed next time
     cpl->offsets[cpl->offsets_count++] = offset;
-
     if (offset > cpl->offset_max) {cpl->offset_max = offset;}
     return 0;
 }
@@ -1128,15 +1129,15 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
         return NULL;
     }
 
-    PyObject *element;
-    while ((element = PyIter_Next(iter))) {
-        if (element == NULL) return NULL;
-        if (AK_CPL_AppendObject(cpl, element)) {
-            Py_DECREF(element);
+    PyObject *field;
+    while ((field = PyIter_Next(iter))) {
+        if (field == NULL) return NULL;
+        if (AK_CPL_AppendField(cpl, field)) {
+            Py_DECREF(field);
             Py_DECREF(iter);
             return NULL;
         }
-        Py_DECREF(element);
+        Py_DECREF(field);
     }
 
     Py_DECREF(iter);
