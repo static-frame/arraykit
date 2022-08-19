@@ -1434,7 +1434,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-
 // Given a type of signed integer, return the corresponding array. Return NULL on error.
 static inline PyObject*
 AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
@@ -1513,7 +1512,6 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
-
 
 static inline PyObject*
 AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
@@ -1608,8 +1606,8 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     char *array_buffer = (char*)PyArray_DATA((PyArrayObject*)array);
     char *end = array_buffer + count * field_points;
-    Py_ssize_t copy_points;
 
+    Py_ssize_t copy_points;
     AK_CPL_CurrentReset(cpl);
 
     NPY_BEGIN_THREADS_DEF;
