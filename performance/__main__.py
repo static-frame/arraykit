@@ -53,6 +53,7 @@ class FixtureFileLike:
 
     COUNT_ROW = 10_000
     COUNT_COLUMN = 500
+    NUMBER = 1
 
     def __init__(self):
         records_int = [','.join(str(x) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
@@ -70,8 +71,7 @@ class FixtureFileLike:
         self.axis = 1
 
 # #-------------------------------------------------------------------------------
-class DelimitedToArraysTypedPandas(Perf, FixtureFileLike):
-    NUMBER = 5
+class DelimitedToArraysTypedPandas(FixtureFileLike, Perf):
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
@@ -124,8 +124,7 @@ class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
 
 # #-------------------------------------------------------------------------------
 
-class DelimitedToArraysParsedPandas(Perf, FixtureFileLike):
-    NUMBER = 5
+class DelimitedToArraysParsedPandas(FixtureFileLike, Perf):
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
@@ -170,8 +169,7 @@ class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
 
 
 # #-------------------------------------------------------------------------------
-class DelimitedToArraysTypedGenft(Perf, FixtureFileLike):
-    NUMBER = 2
+class DelimitedToArraysTypedGenft(FixtureFileLike, Perf):
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
@@ -221,7 +219,7 @@ class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
 
 
 # #-------------------------------------------------------------------------------
-# class DelimitedToArraysParsedGenft(Perf, FixtureFileLike):
+# class DelimitedToArraysParsedGenft(FixtureFileLike, Perf):
 #     NUMBER = 10
 #     COUNT_ROW = 1_000
 
