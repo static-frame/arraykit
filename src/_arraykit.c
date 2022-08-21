@@ -1723,6 +1723,7 @@ AK_line_select_keep(
             return -1;
         }
         int t = PyObject_IsTrue(keep); // 1 if truthy
+        Py_DECREF(keep);
         if (t < 0) {
             return -1; // error
         }
@@ -1810,7 +1811,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             if (dtype_specifier == Py_None) {
                 type_parse = true;
             }
-            // decref dtype_specifier?
+            Py_DECREF(dtype_specifier);
         }
         // Always initialize a CPL in the new position
         AK_CodePointLine *cpl = AK_CPL_New(type_parse);
@@ -1884,7 +1885,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         PyObject* line_select)
 {
     bool ls_inactive = line_select == NULL;
-    int list_error;
     PyObject *list;
 
     if (ls_inactive) {
@@ -1928,10 +1928,12 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
             if (dtype_specifier != Py_None) {
                 // Set dtype; this value can be NULL or a dtype (never Py_None); if dtype_specifier is Py_None, keep dtype set as NULL (above)
                 if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
+                    Py_DECREF(dtype_specifier);
                     Py_DECREF(list);
                     return NULL;
                 }
             }
+            Py_DECREF(dtype_specifier);
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
@@ -1942,15 +1944,15 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         }
 
         if (ls_inactive) {
-            list_error = PyList_SetItem(list, i, array); // steals reference
+            PyList_SET_ITEM(list, i, array); // steals reference, no pre-allocated
         }
         else {
-            list_error = PyList_Append(list, array);
-        }
-        if (list_error) {
-            Py_DECREF(array);
-            Py_DECREF(list);
-            return NULL;
+            if (PyList_Append(list, array)) {
+                Py_DECREF(array);
+                Py_DECREF(list);
+                return NULL;
+            }
+            Py_DECREF(array); // decref as list owns
         }
     }
     return list;
@@ -2191,6 +2193,7 @@ typedef struct AK_DelimitedReader{
     Py_ssize_t record_iter_number;
     Py_ssize_t field_number;
     int axis;
+    Py_ssize_t *axis_pos;
 } AK_DelimitedReader;
 
 // Called once at the close of each field in a line. Returns 0 on success, -1 on failure
@@ -2198,7 +2201,7 @@ static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
     if (AK_CPG_AppendOffsetAtLine(cpg,
-            dr->axis == 0 ? dr->record_number : dr->field_number,
+            *(dr->axis_pos),
             dr->field_len)) return -1;
     dr->field_len = 0; // clear to close
     // AK_DEBUG_MSG_OBJ("closing field", PyLong_FromLong(dr->field_number));
@@ -2213,7 +2216,7 @@ AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     // NOTE: ideally we could use line_select here; however, we would need to cache the lookup in another container as this is called once per char and line_select is a Python function; further, we would need to increment the field_number separately from another counter, which is done in AK_DR_close_field
 
     if (AK_CPG_AppendPointAtLine(cpg,
-            dr->axis == 0 ? dr->record_number : dr->field_number,
+            *(dr->axis_pos),
             dr->field_len,
             c)) return -1;
     ++dr->field_len; // reset in AK_DR_close_field
@@ -2485,6 +2488,15 @@ AK_DR_New(PyObject *iterable,
     if (dr == NULL) return (AK_DelimitedReader*)PyErr_NoMemory();
 
     dr->axis = axis;
+
+    // we configure axis_pos to be a pointer that points to either record_number or field_number to avoid doing this per char/ field.
+    if (axis == 0) {
+        dr->axis_pos = &(dr->record_number);
+    }
+    else {
+        dr->axis_pos = &(dr->field_number);
+    }
+
     dr->record_number = -1;
     dr->record_iter_number = -1;
 
