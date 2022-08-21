@@ -1703,7 +1703,7 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
 
 //------------------------------------------------------------------------------
 // utility function used by CPG and DR
-inline int
+static inline int
 AK_line_select_keep(
         PyObject *line_select,
         bool axis_target,
