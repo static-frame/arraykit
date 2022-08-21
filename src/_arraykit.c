@@ -1778,8 +1778,7 @@ static inline int
 AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
     if (line >= cpg->lines_capacity) {
-        assert(line == cpg->lines_capacity);
-
+        // assert(line == cpg->lines_capacity);
         cpg->lines_capacity *= 2;
         // NOTE: as we sure we are only copying pointers?
         cpg->lines = PyMem_Realloc(cpg->lines,
@@ -1788,7 +1787,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     }
     // Create the new CPL; first check if we need to set type_parse by calling into the dtypes function. For now we assume sequential growth, so should only check if equal
     if (line >= cpg->lines_count) {
-        assert(line == cpg->lines_count);
+        // assert(line == cpg->lines_count);
         // determine if we need to parse types
         bool type_parse = false;
         if (cpg->dtypes == NULL) {
@@ -1844,40 +1843,11 @@ AK_CPG_AppendOffsetAtLine(
         Py_ssize_t line,
         Py_ssize_t offset)
 {
+    // only need to call this if AK_CPG_AppendPointAtLine has not yet been called
     if (AK_CPG_resize(cpg, line)) return -1;
     if (AK_CPL_AppendOffset(cpg->lines[line], offset)) return -1;
     return 0;
 }
-
-
-// The implications of this is that when reading the first record that uses line_select, when we find a line to not be kept we will have added a new CPL to the CPG and will have written all chracters in the field; we will then call this function, observe that buffer count is offset, and remove the CPL. This could happen over many skipped lines. Finally, on the second row, when encountering a skiped field characters will be written to the "wrong" CPL but will be "removed"; if there is a last skipped columns they will all create and destroy new CPL on each row. This is bad.
-// static inline int
-// AK_CPG_UndoOffsetAtLine(
-//         AK_CodePointGrid* cpg,
-//         Py_ssize_t line,
-//         Py_ssize_t offset) // field len
-// {
-
-//     if (line < cpg->lines_count) {
-//         return 0; // nothing to do
-//     }
-//     AK_CodePointLine *cpl = cpg->lines[line];
-//     // if we do not call AK_CPL_AppendOffset, we do not need to change this
-//     // cpl->offsets_count
-
-//     if (cpl->buffer_count == offset) {
-//         // remove the cpl from the grid
-//         AK_CPL_Free(cpl);
-//         cpg->lines[line] = NULL;
-//         --cpg->lines_count;
-//         return 0;
-//     }
-//     // buffer_capacity will stay greater then this value; we can safely reduce buffer count and ignore the previously writtne values
-//     cpl->buffer_count -= offset;
-//     cpl->buffer_current_ptr -= offset;
-//     return 0;
-// }
-
 
 // Given a fully-loaded CodePointGrid, process each CodePointLine into an array and return a new list of those arrays. Returns NULL on failure.
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
