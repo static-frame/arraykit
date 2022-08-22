@@ -215,7 +215,7 @@ error:
     return NULL;
 }
 
-// Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will never set dtype_returned to None.
+// Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will never set dtype_returned to None. Returns a new reference.
 static inline int
 AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 {
@@ -1654,7 +1654,6 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
             if (dtype == NULL) return NULL;
         }
         else {
-            // sets exception, returns NULL
             AK_NOT_IMPLEMENTED("dtype not passed to AK_CPL_ToArray, and CodePointLine has no type_parser");
         }
     }
@@ -1845,6 +1844,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
     PyObject *list;
 
     if (ls_inactive) {
+        // if we know how many lines we will need, can pre-allocate
         list = PyList_New(cpg->lines_count);
     }
     else {
@@ -1896,12 +1896,13 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
         if (array == NULL) {
+            Py_XDECREF(dtype);
             Py_DECREF(list);
             return NULL;
         }
 
         if (ls_inactive) {
-            PyList_SET_ITEM(list, i, array); // steals reference, no pre-allocated
+            PyList_SET_ITEM(list, i, array); // steals reference
         }
         else {
             if (PyList_Append(list, array)) {
@@ -1911,6 +1912,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
             }
             Py_DECREF(array); // decref as list owns
         }
+        // Py_XDECREF(dtype); seg faults
     }
     return list;
 }

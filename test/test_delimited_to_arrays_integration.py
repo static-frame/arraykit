@@ -1,16 +1,12 @@
 import unittest
 import typing as tp
 from urllib import request
+import hashlib
+import os
 
-# import numpy as np
-
-from hypothesis import strategies as st
-from hypothesis import given
-
-# from arraykit import delimited_to_arrays
-# from arraykit import iterable_str_to_array_1d
 from arraykit import delimited_to_arrays
 
+# NOTE: this is not implemented as an automated test as it downloads data on the fly
 
 class DelimitedSource(tp.NamedTuple):
     url: str
@@ -30,31 +26,39 @@ SOURCES = {
 }
 
 def download_and_split(fp: str) -> tp.Iterable[str]:
+    fn = hashlib.sha224(bytes(fp, encoding='utf8')).hexdigest() + '.txt'
+    if os.path.exists('/tmp'):
+        fp_destination = os.path.join('/tmp', fn)
+    else:
+        fp_destination = None
+
+    if fp_destination and os.path.exists(fp_destination):
+        print(f'using {fp_destination}')
+        with open(fp_destination) as f:
+            return f.readlines()
+
     with request.urlopen(fp) as response: #pragma: no cover
-        file = response.read().decode('utf-8')
-        return file.split('\n')
+        contents = response.read().decode('utf-8')
+        if fp_destination:
+            print(f'writing {fp_destination}')
+            with open(fp_destination, 'w') as f:
+                f.write(contents)
+        return contents.split('\n')
 
 
-class TestUnit(unittest.TestCase):
-
-    #---------------------------------------------------------------------------
-
-    def test_sources(self):
-        for label, ds in SOURCES.items():
-            lines = iter(download_and_split(ds.url))
-            for _ in range(ds.skip_header):
-                next(lines)
-            post = delimited_to_arrays(lines,
-                    delimiter=ds.delimiter,
-                    skipinitialspace=True,
-                    axis=1)
-            self.assertEqual([a.dtype.kind for a in post], ds.expected_dtypes)
-            self.assertTrue(all(len(a) == ds.expected_row_count for a in post))
-            # import ipdb; ipdb.set_trace()
-
-
-
+def process_sources():
+    for label, ds in SOURCES.items():
+        lines = iter(download_and_split(ds.url))
+        for _ in range(ds.skip_header):
+            next(lines)
+        print(label)
+        post = delimited_to_arrays(lines,
+                delimiter=ds.delimiter,
+                skipinitialspace=True,
+                axis=1)
+        assert [a.dtype.kind for a in post] == ds.expected_dtypes
+        assert all(len(a) == ds.expected_row_count for a in post)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    process_sources()
