@@ -1629,7 +1629,10 @@ AK_CPL_ToArrayViaCast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     if (dtype_bytes == NULL) return NULL;
 
     PyObject* array_bytes = AK_CPL_ToArrayBytes(cpl, dtype_bytes);
-    if (array_bytes == NULL) return NULL; // dtype_bytes is stolen
+    if (array_bytes == NULL) {
+        Py_DECREF(dtype_bytes); // was not stolen if array creation failed
+        return NULL;
+    }
 
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     Py_DECREF(array_bytes);
