@@ -748,7 +748,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 
     while (AK_is_space(*p)) {
         ++p;
-        if (p >= end) {return number;}
+        if (p >= end) return number;
     }
     if (*p == '-') {
         isneg = 1;
@@ -756,7 +756,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     } else if (*p == '+') {
         ++p;
     }
-    if (p >= end) {return number;}
+    if (p >= end) return number;
 
     // Check that there is a first digit.
     if (!AK_is_digit(*p)) {
@@ -772,7 +772,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             while (1) {
                 if (d == tsep) {
                     ++p;
-                    if (p >= end) {return number;}
+                    if (p >= end) return number;
                     d = *p;
                     continue;
                 } else if (!AK_is_digit(d)) {
@@ -782,7 +782,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                     ((number == pre_min) && (d - '0' <= dig_pre_min))) {
                     number = number * 10 - (d - '0');
                     ++p;
-                    if (p >= end) {return number;}
+                    if (p >= end) return number;
                     d = *p;
                 } else {
                     *error = ERROR_OVERFLOW;
@@ -795,7 +795,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                     ((number == pre_min) && (d - '0' <= dig_pre_min))) {
                     number = number * 10 - (d - '0');
                     ++p;
-                    if (p >= end) {return number;}
+                    if (p >= end) return number;
                     d = *p;
                 } else {
                     *error = ERROR_OVERFLOW;
@@ -812,7 +812,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             while (1) {
                 if (d == tsep) {
                     ++p;
-                    if (p >= end) {return number;}
+                    if (p >= end) return number;
                     d = *p;
                     continue;
                 } else if (!AK_is_digit(d)) {
@@ -822,7 +822,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                     ((number == pre_max) && (d - '0' <= dig_pre_max))) {
                     number = number * 10 + (d - '0');
                     ++p;
-                    if (p >= end) {return number;}
+                    if (p >= end) return number;
                     d = *p;
                 } else {
                     *error = ERROR_OVERFLOW;
@@ -835,7 +835,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
                     ((number == pre_max) && (d - '0' <= dig_pre_max))) {
                     number = number * 10 + (d - '0');
                     ++p;
-                    if (p >= end) {return number;}
+                    if (p >= end) return number;
                     d = *p;
                 } else {
                     *error = ERROR_OVERFLOW;
@@ -844,7 +844,6 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             }
         }
     }
-    // *error = 0;
     return number;
 }
 
@@ -914,70 +913,69 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
             }
         }
     }
-    // *error = 0;
     return number;
 }
 
 
 // based on https://github.com/GaloisInc/minlibc/blob/master/atof.c
 // NOTE: needs inf, nan handling
-// static inline npy_float64
-// AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end)
-// {
-//     npy_float64 number = 0.0;
-//     int e = 0;
-//     Py_UCS4 *p = p_item;
+static inline npy_float64
+AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end)
+{
+    npy_float64 number = 0.0;
+    int e = 0;
+    Py_UCS4 *p = p_item;
 
-//     while (AK_is_space(*p)) {
-//         ++p;
-//         if (p >= end) return number;
-//     }
+    while (AK_is_space(*p)) {
+        ++p;
+        if (p >= end) return number;
+    }
+    // NOTE: not handling leading sign
+    int c;
+    while ((c = *p++) && AK_is_digit(c)) {
+        number = number * (npy_float64)10.0 + (npy_float64)(c - '0');
+        if (p >= end) return number;
+    }
+    // when we find the decimal, we skip it and advance further
+    if (c == '.') {
+        while ((c = *p++) && AK_is_digit(c)) {
+            number = number * (npy_float64)10.0 + (npy_float64)(c - '0');
+            e = e - 1;
+            if (p >= end) goto exit;
+        }
+    }
+    if (AK_is_e(c)) {
+        int e_sign = 1;
+        int i = 0;
+        c = *p++;
+        if (p >= end) goto exit;
 
-//     int c;
-//     while ((c = *p++) && AK_is_digit(c)) {
-//         number = number * 10.0 + (c - '0');
-//         if (p >= end) return number;
-//     }
-//     // when we find the decimal, we skip it and advance further
-//     if (c == '.') {
-//         while ((c = *p++) && AK_is_digit(c)) {
-//             number = number * 10.0 + (c - '0');
-//             e = e - 1;
-//             if (p >= end) goto exit;
-//         }
-//     }
-//     if (AK_is_e(c)) {
-//         int sign = 1;
-//         int i = 0;
-//         c = *p++;
-//         if (p >= end) goto exit;
+        if (c == '+') c = *p++;
+        else if (c == '-') {
+            c = *p++;
+            e_sign = -1;
+        }
+        if (p >= end) goto exit; // do not use e_sign of E if nothing follows; might be an error
 
-//         if (c == '+') c = *p++;
-//         else if (c == '-') {
-//             c = *p++;
-//             sign = -1;
-//         }
-//         if (p >= end) goto exit; // do not use sign of E if nothing follows; might be an error
-
-//         while (AK_is_digit(c)) {
-//             i = i * 10 + (c - '0');
-//             c = *p++;
-//             if (p >= end) break;
-//         }
-//         e += i * sign;
-//     }
-//     goto exit;
-// exit:
-//     while (e > 0) {
-//         number *= 10.0;
-//         e--;
-//     }
-//     while (e < 0) {
-//         number *= 0.1;
-//         e++;
-//     }
-//     return number;
-// }
+        while (AK_is_digit(c)) {
+            i = i * 10 + (c - '0');
+            c = *p++;
+            if (p >= end) break;
+        }
+        e += i * e_sign;
+    }
+    goto exit;
+exit:
+    while (e > 0) {
+        number *= (npy_float64)10.0;
+        e--;
+    }
+    while (e < 0) {
+        number *= (npy_float64)0.1;
+        e++;
+    }
+    return number;
+}
 
 
 //------------------------------------------------------------------------------
