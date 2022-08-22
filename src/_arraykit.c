@@ -1261,15 +1261,16 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     npy_intp dims[] = {cpl->offsets_count};
 
+    // initialize all values to False
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) return NULL;
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA((PyArrayObject*)array);
 
-    AK_CPL_CurrentReset(cpl);
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
 
-    // NPY_BEGIN_THREADS_DEF;
-    // NPY_BEGIN_THREADS;
+    AK_CPL_CurrentReset(cpl);
     for (int i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
         if (AK_CPL_current_to_bool(cpl)) {
@@ -1277,7 +1278,7 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         }
         AK_CPL_CurrentAdvance(cpl);
     }
-    // NPY_END_THREADS;
+    NPY_END_THREADS;
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
@@ -1293,8 +1294,12 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (!array) return NULL;
 
+    // NOTE: this uses PyOS_string_to_double, which sets an exception and thus cannot free the GIL
+    bool matched_elsize = false;
+
     if (dtype->elsize == 16) {
         # ifdef PyFloat128ArrType_Type
+        matched_elsize = true;
         npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
         npy_float128 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
@@ -1306,6 +1311,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         # endif
     }
     else if (dtype->elsize == 8) {
+        matched_elsize = true;
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
@@ -1315,6 +1321,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         }
     }
     else if (dtype->elsize == 4) {
+        matched_elsize = true;
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
@@ -1324,6 +1331,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         }
     }
     else if (dtype->elsize == 2) {
+        matched_elsize = true;
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         AK_CPL_CurrentReset(cpl);
@@ -1332,8 +1340,9 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else {
-        PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
+
+    if (!matched_elsize) {
+        PyErr_SetString(PyExc_TypeError, "cannot create array from itemsize");
         Py_DECREF(array);
         return NULL;
     }
@@ -1360,54 +1369,55 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     // initialize error code to 0; only update on error.
     int error = 0;
-    // NPY_BEGIN_THREADS_DEF;
-    // NPY_BEGIN_THREADS;
+    bool matched_elsize = false;
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
 
     if (dtype->elsize == 8) {
+        matched_elsize = true;
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
     else if (dtype->elsize == 4) {
+        matched_elsize = true;
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
     else if (dtype->elsize == 2) {
+        matched_elsize = true;
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
     else if (dtype->elsize == 1) {
+        matched_elsize = true;
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else {
+    NPY_END_THREADS;
+
+    if (!matched_elsize) {
         PyErr_SetString(PyExc_TypeError, "cannot create array from integer itemsize");
         Py_DECREF(array);
         return NULL;
     }
-
-    // NPY_END_THREADS;
-
-    if (error != 0) {
+    if (error) {
         PyErr_SetString(PyExc_TypeError, "error parsing integer");
         Py_DECREF(array);
         return NULL;
@@ -1427,64 +1437,62 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) return NULL;
 
-    AK_CPL_CurrentReset(cpl);
-
     // initialize error code to 0; only update on error.
     int error = 0;
+    bool matched_elsize = false;
 
-    // NPY_BEGIN_THREADS_DEF;
-    // NPY_BEGIN_THREADS;
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
 
+    AK_CPL_CurrentReset(cpl);
     if (dtype->elsize == 8) {
+        matched_elsize = true;
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
     else if (dtype->elsize == 4) {
+        matched_elsize = true;
         npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
         npy_uint32 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
     else if (dtype->elsize == 2) {
+        matched_elsize = true;
         npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
         npy_uint16 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
     else if (dtype->elsize == 1) {
+        matched_elsize = true;
         npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
         npy_uint8 *end = array_buffer + count;
-
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else {
+    NPY_END_THREADS;
+
+    if (!matched_elsize) {
         PyErr_SetString(PyExc_TypeError, "cannot create array from unsigned integer itemsize");
         Py_DECREF(array);
         return NULL;
     }
-    // NPY_END_THREADS;
-
-
     if (error != 0) {
         PyErr_SetString(PyExc_TypeError, "error parsing unisigned integer");
         Py_DECREF(array);
         return NULL;
-     }
-
+    }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
@@ -1520,11 +1528,10 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     Py_UCS4 *array_buffer = (Py_UCS4*)PyArray_DATA((PyArrayObject*)array);
     Py_UCS4 *end = array_buffer + count * field_points;
 
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
     AK_CPL_CurrentReset(cpl);
-
-    // NPY_BEGIN_THREADS_DEF;
-    // NPY_BEGIN_THREADS;
-
     if (capped_points) {
         // NOTE: is it worth branching for this special case?
         Py_ssize_t copy_bytes;
@@ -1550,7 +1557,7 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    // NPY_END_THREADS;
+    NPY_END_THREADS;
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
@@ -1585,11 +1592,11 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     char *end = array_buffer + count * field_points;
 
     Py_ssize_t copy_points;
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
     AK_CPL_CurrentReset(cpl);
-
-    // NPY_BEGIN_THREADS_DEF;
-    // NPY_BEGIN_THREADS;
-
     while (array_buffer < end) {
         if (!capped_points || cpl->offsets[cpl->offsets_current_index] < field_points) {
             // if not capped, or capped and offset is less than field points, use offset
@@ -1610,7 +1617,7 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         array_buffer = field_end;
         AK_CPL_CurrentAdvance(cpl);
     }
-    // NPY_END_THREADS;
+    NPY_END_THREADS;
 
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
