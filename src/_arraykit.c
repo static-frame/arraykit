@@ -1689,18 +1689,6 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     }
 }
 
-
-// Return a contiguous string of data stored in the buffer, without delimiters. Returns a new reference.
-// static inline PyObject*
-// AK_CPL_ToUnicode(AK_CodePointLine* cpl)
-// {
-//     return PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND,
-//             cpl->buffer,
-//             cpl->buffer_count);
-// }
-
-
-
 //------------------------------------------------------------------------------
 // utility function used by CPG and DR
 static inline int
@@ -1731,7 +1719,6 @@ AK_line_select_keep(
     }
     return 1;
 }
-
 
 //------------------------------------------------------------------------------
 // CodePointGrid Type, New, Destrctor

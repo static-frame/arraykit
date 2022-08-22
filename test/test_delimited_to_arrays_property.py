@@ -11,7 +11,6 @@ from arraykit import delimited_to_arrays
 
 class TestUnit(unittest.TestCase):
 
-
     #---------------------------------------------------------------------------
 
     @given(st.lists(st.integers(min_value=-9223372036854775809, max_value=9223372036854775807), min_size=1, max_size=40))
