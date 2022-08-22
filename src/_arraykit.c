@@ -1257,13 +1257,10 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 // CodePointLine: Exporters
 
 static inline PyObject*
-AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl)
+AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     npy_intp dims[] = {cpl->offsets_count};
-    PyArray_Descr *dtype = PyArray_DescrFromType(NPY_BOOL);
-    if (dtype == NULL) return NULL;
 
-    // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) return NULL;
 
@@ -1294,9 +1291,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     npy_intp dims[] = {count};
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (!array) {
-        return NULL;
-    }
+    if (!array) return NULL;
 
     if (dtype->elsize == 16) {
         # ifdef PyFloat128ArrType_Type
@@ -1503,6 +1498,7 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     Py_ssize_t field_points;
     bool capped_points;
 
+    // mutate the passed dtype as it is new and will be stolen in array construction
     if (dtype->elsize == 0) {
         field_points = cpl->offset_max;
         dtype->elsize = field_points * sizeof(Py_UCS4);
@@ -1659,7 +1655,7 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     }
 
     if (PyDataType_ISBOOL(dtype)) {
-        return AK_CPL_ToArrayBoolean(cpl);
+        return AK_CPL_ToArrayBoolean(cpl, dtype);
     }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
         return AK_CPL_ToArrayUnicode(cpl, dtype);
@@ -1682,10 +1678,10 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     else if (PyDataType_ISCOMPLEX(dtype)) {
         return AK_CPL_ToArrayViaCast(cpl, dtype);
     }
-    else {
-        PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
-        return NULL;
-    }
+
+    PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
+    // caller will decref the passed dtype on error
+    return NULL;
 }
 
 //------------------------------------------------------------------------------
@@ -1868,7 +1864,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         PyArray_Descr* dtype = NULL;
 
         if (dtypes != NULL) {
-            PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
+            PyObject* dtype_specifier = PyObject_CallFunctionObjArgs( // new ref
                     dtypes,
                     PyLong_FromLong(i),
                     NULL
@@ -1883,7 +1879,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
                 return NULL;
             }
             if (dtype_specifier != Py_None) {
-                // Set dtype; this value can be NULL or a dtype (never Py_None); if dtype_specifier is Py_None, keep dtype set as NULL (above)
+                // Set dtype; this value can be NULL or a dtype (never Py_None); if dtype_specifier is Py_None, keep dtype set as NULL (above); this will be a new reference that if used will be stolen in array construction.
                 if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) {
                     Py_DECREF(dtype_specifier);
                     Py_DECREF(list);
@@ -1896,7 +1892,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
         if (array == NULL) {
-            Py_XDECREF(dtype);
+            Py_XDECREF(dtype); // array could not steal reference
             Py_DECREF(list);
             return NULL;
         }
@@ -1912,7 +1908,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
             }
             Py_DECREF(array); // decref as list owns
         }
-        // Py_XDECREF(dtype); seg faults
     }
     return list;
 }
