@@ -1,6 +1,7 @@
 # include "Python.h"
 # include "structmember.h"
 # include "stdbool.h"
+// # include "stdlib.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -861,14 +862,14 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     Py_UCS4 *p = p_item;
     while (AK_is_space(*p)) {
         ++p;
-        if (p >= end) {return number;}
+        if (p >= end) return number;
     }
     if (*p == '-') {
         *error = ERROR_INVALID_CHARS;
         return 0;
     } else if (*p == '+') {
         p++;
-        if (p >= end) {return number;}
+        if (p >= end) return number;
     }
 
     // Check that there is a first digit.
@@ -882,7 +883,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
         while (1) {
             if (d == tsep) {
                 ++p;
-                if (p >= end) {return number;}
+                if (p >= end) return number;
                 d = *p;
                 continue;
             } else if (!AK_is_digit(d)) {
@@ -892,7 +893,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
                 ((number == pre_max) && (d - '0' <= dig_pre_max))) {
                 number = number * 10 + (d - '0');
                 ++p;
-                if (p >= end) {return number;}
+                if (p >= end) return number;
                 d = *p;
             } else {
                 *error = ERROR_OVERFLOW;
@@ -905,7 +906,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
                 ((number == pre_max) && (d - '0' <= dig_pre_max))) {
                 number = number * 10 + (d - '0');
                 ++p;
-                if (p >= end) {return number;}
+                if (p >= end) return number;
                 d = *p;
             } else {
                 *error = ERROR_OVERFLOW;
@@ -917,8 +918,70 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     return number;
 }
 
+
+// based on https://github.com/GaloisInc/minlibc/blob/master/atof.c
+// NOTE: needs inf, nan handling
+// static inline npy_float64
+// AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end)
+// {
+//     npy_float64 number = 0.0;
+//     int e = 0;
+//     Py_UCS4 *p = p_item;
+
+//     while (AK_is_space(*p)) {
+//         ++p;
+//         if (p >= end) return number;
+//     }
+
+//     int c;
+//     while ((c = *p++) && AK_is_digit(c)) {
+//         number = number * 10.0 + (c - '0');
+//         if (p >= end) return number;
+//     }
+//     // when we find the decimal, we skip it and advance further
+//     if (c == '.') {
+//         while ((c = *p++) && AK_is_digit(c)) {
+//             number = number * 10.0 + (c - '0');
+//             e = e - 1;
+//             if (p >= end) goto exit;
+//         }
+//     }
+//     if (AK_is_e(c)) {
+//         int sign = 1;
+//         int i = 0;
+//         c = *p++;
+//         if (p >= end) goto exit;
+
+//         if (c == '+') c = *p++;
+//         else if (c == '-') {
+//             c = *p++;
+//             sign = -1;
+//         }
+//         if (p >= end) goto exit; // do not use sign of E if nothing follows; might be an error
+
+//         while (AK_is_digit(c)) {
+//             i = i * 10 + (c - '0');
+//             c = *p++;
+//             if (p >= end) break;
+//         }
+//         e += i * sign;
+//     }
+//     goto exit;
+// exit:
+//     while (e > 0) {
+//         number *= 10.0;
+//         e--;
+//     }
+//     while (e < 0) {
+//         number *= 0.1;
+//         e++;
+//     }
+//     return number;
+// }
+
+
 //------------------------------------------------------------------------------
-// CodePointLine: Type, New, Destrctor
+// CodePointLine: Type, New, Destructor
 
 // A AK_CodePointLine stores a contiguous buffer of Py_UCS4 without null terminators between fields. Separately, we store an array of integers, where each integer is the size of each field. The total number of fields is given by offset_count.
 typedef struct AK_CodePointLine{
@@ -1221,12 +1284,7 @@ AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error)
 {
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index]; // size is either 4 or 5
-    // int error = 0;
-    npy_int64 v = AK_UCS4_to_int64(p, end, error);
-    // if (error > 0) {
-    //     return 0;
-    // }
-    return v;
+    return AK_UCS4_to_int64(p, end, error);
 }
 
 // Provide start and end buffer positions to provide a range of bytes to read and transform into an integer. Returns 0 on error; does not set exception.
@@ -1235,9 +1293,21 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
 {
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-    npy_uint64 v = AK_UCS4_to_uint64(p, end, error);
-    return v;
+    return AK_UCS4_to_uint64(p, end, error);
 }
+
+// static inline npy_float64
+// AK_CPL_current_to_float64(AK_CodePointLine* cpl)
+// {
+//     // interpret an empty field as NaN
+//     if (cpl->offsets[cpl->offsets_current_index] == 0) {
+//         return NPY_NAN;
+//     }
+//     Py_UCS4 *p = cpl->buffer_current_ptr;
+//     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
+//     return AK_UCS4_to_float64(p, end);
+// }
+
 
 // A wrapper to PyOS_string_to_double. Might set an exception on error.
 static inline npy_float64
@@ -1249,6 +1319,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl)
     }
     char* field = AK_CPL_current_to_field(cpl);
     // NOTE: field can be NULL on memory failure!
+    // NOTE: this is shown to be much faster than atof in stdlib.h
     return PyOS_string_to_double(field, NULL, NULL);
 }
 

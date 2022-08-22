@@ -1,7 +1,14 @@
 
 
 
-main components:
+Warnings:
+
+We are going to mutate a lot of arguments in place, and a lot of our struct-based classes have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers to be set. We also do this for efficiency.
+
+We are going to do a lot with pointers to character (or code point) sequences.
+
+
+Main Components:
 
 AK_TypeParserState
     Enum that defines the interpretation of a field or line of types. Can be unknown (on init) or empty (on encountering empty values).
