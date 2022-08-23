@@ -3,10 +3,15 @@
 
 Warnings:
 
-We are going to mutate a lot of arguments in place, and a lot of our struct-based classes have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers to be set. We also do this for efficiency.
+We are going to mutate a lot of arguments in place, and a lot of our struct-based classes have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for efficiency (to avoid memory allocation) we also mutate in-place.
 
-We are going to do a lot with pointers to character (or code point) sequences.
+We are going to do a lot with pointers to character (or code point) sequences. A few common moves are listed below:
 
+Some common moves:
+```C
+Py_UCS4 *p;    // pointer to the sart of an array of Py_UCS4
+char c = *p++; // de-reference p to get value, then increment to the next point
+```
 
 Main Components:
 
@@ -23,9 +28,11 @@ AK_TypeParser
     At the end of each field, we reset all attributes except `parsed_field`.
 
 
-Py_UCS4 Converts:
+Py_UCS4 Converter fcuntions:
 
     Given a pointer to an array of Py_UCS4, return a C-type. Do this for signed/unsigned. Would like to do this for floats but hard to find an isolated implementation.
+
+    These functions are unique in that they are designed to work with start/end pointer; many similar functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
 
 
 AK_CodePointLine (CPL)

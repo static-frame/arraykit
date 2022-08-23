@@ -925,17 +925,30 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end)
     npy_float64 number = 0.0;
     int e = 0;
     Py_UCS4 *p = p_item;
+    int sign = 1;
+    int e_sign;
+    char c;
 
     while (AK_is_space(*p)) {
         ++p;
         if (p >= end) return number;
     }
-    // NOTE: not handling leading sign
-    int c;
+
+    if (*p == '+') {
+        sign = 1;
+        ++p;
+    }
+    else if (*p == '-') {
+        sign = -1;
+        ++p;
+    }
+    if (p >= end) return number;
+
     while ((c = *p++) && AK_is_digit(c)) {
         number = number * (npy_float64)10.0 + (npy_float64)(c - '0');
         if (p >= end) return number;
     }
+
     // when we find the decimal, we skip it and advance further
     if (c == '.') {
         while ((c = *p++) && AK_is_digit(c)) {
@@ -945,12 +958,14 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end)
         }
     }
     if (AK_is_e(c)) {
-        int e_sign = 1;
         int i = 0;
         c = *p++;
         if (p >= end) goto exit;
 
-        if (c == '+') c = *p++;
+        if (c == '+') {
+            c = *p++;
+            e_sign = 1;
+        }
         else if (c == '-') {
             c = *p++;
             e_sign = -1;
@@ -974,7 +989,7 @@ exit:
         number *= (npy_float64)0.1;
         e++;
     }
-    return number;
+    return sign * number;
 }
 
 
