@@ -1366,12 +1366,12 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // NOTE: this uses PyOS_string_to_double, which sets an exception and thus cannot free the GIL
     bool matched_elsize = false;
 
+    AK_CPL_CurrentReset(cpl);
     if (dtype->elsize == 16) {
         # ifdef PyFloat128ArrType_Type
         matched_elsize = true;
         npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
         npy_float128 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             // NOTE: cannot cast to npy_float128 here
             *array_buffer++ = AK_CPL_current_to_float64(cpl);
@@ -1383,7 +1383,6 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         matched_elsize = true;
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_float64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1393,7 +1392,6 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         matched_elsize = true;
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1403,7 +1401,6 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         matched_elsize = true;
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
-        AK_CPL_CurrentReset(cpl);
         while (array_buffer < end) {
             *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl);
             AK_CPL_CurrentAdvance(cpl);
@@ -1434,8 +1431,6 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) return NULL;
 
-    AK_CPL_CurrentReset(cpl);
-
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = false;
@@ -1443,6 +1438,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
+    AK_CPL_CurrentReset(cpl);
     if (dtype->elsize == 8) {
         matched_elsize = true;
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
