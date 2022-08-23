@@ -1,9 +1,12 @@
 
-# Understanding `delimited_to_arrays`, A Faster-than-Pandas CSV Reader.
+# Understanding `delimited_to_arrays`, A Faster-than-Pandas CSV Reader
 
-## Warnings
+## Orientation
 
-We are going to mutate a lot of arguments in place, and a lot of our struct-based classes have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for efficiency (to avoid memory allocation) we also mutate in-place.
+C is not an object-oriented language. We can, however, create collections of state (like instance attributes) with `struct` types, and then create collections of functions (like instance methods) that take "instances" of that `struct` and perform in-place or other operations. Here, structs have full names (i.e., `AK_CodePointLine`) while methods use appreviations (i.e., `AK_CPL_New`).
+
+
+We are going to mutate a lot of arguments in place, and a lot of our structs have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for efficiency (to avoid memory allocation).
 
 We are going to do a lot with pointers to character (or code point) sequences. A few common moves are listed below:
 
