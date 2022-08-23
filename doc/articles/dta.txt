@@ -11,6 +11,10 @@ Some common moves:
 ```C
 Py_UCS4 *p;    // pointer to the sart of an array of Py_UCS4
 char c = *p++; // de-reference p to get value, then increment to the next point
+
+// which is the same as
+char c = *p;
+p++
 ```
 
 Main Components:
