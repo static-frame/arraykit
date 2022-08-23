@@ -1,7 +1,7 @@
 
+# Understanding `delimited_to_arrays`, A Faster-than-Pandas CSV Reader.
 
-
-Warnings:
+## Warnings
 
 We are going to mutate a lot of arguments in place, and a lot of our struct-based classes have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for efficiency (to avoid memory allocation) we also mutate in-place.
 
@@ -17,7 +17,7 @@ char c = *p;
 p++
 ```
 
-Main Components:
+## Main Components
 
 AK_TypeParserState
     Enum that defines the interpretation of a field or line of types. Can be unknown (on init) or empty (on encountering empty values).
