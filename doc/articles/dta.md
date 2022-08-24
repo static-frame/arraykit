@@ -59,7 +59,7 @@ The CPL tracks the pointer to the current position in the buffer, as well as the
 
 In general operation, a CPL has to phases: a loading phase, and conversion phase.
 
-In the loading phase, AK_CPL_AppendPoint is called for each point, which in turn calls AK_TP_ProcessChar for each char if `type_parser` is active. At the end of each field, AK_CPL_AppendOffset is called, which calls AK_TP_ResolveLineResetField if `type_parser` is active. This permits loading a CPL in one pass, optional evaluating type at the same time.
+In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in turn calls `AK_TP_ProcessChar` for each char if `type_parser` is active. At the end of each field, `AK_CPL_AppendOffset` is called, which calls `AK_TP_ResolveLineResetField` if `type_parser` is active. This permits loading a CPL in one pass, optional evaluating type at the same time.
 
-In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type (i.e., AK_CPL_ToArrayBoolean, AK_CPL_ToArrayFloat, AK_CPL_ToArrayInt, AK_CPL_ToArrayUInt, AK_CPL_ToArrayUnicode, AK_CPL_ToArrayBytes, AK_CPL_ToArrayViaCast). These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
+In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type (i.e., `AK_CPL_ToArrayBoolean`, `AK_CPL_ToArrayFloat`, `AK_CPL_ToArrayInt`, `AK_CPL_ToArrayUInt`, `AK_CPL_ToArrayUnicode`, `AK_CPL_ToArrayBytes`, `AK_CPL_ToArrayViaCast`). These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
 
