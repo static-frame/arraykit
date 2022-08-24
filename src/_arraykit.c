@@ -1128,7 +1128,7 @@ typedef struct AK_CodePointLine{
     Py_UCS4 *buffer_current_ptr;
     Py_ssize_t offsets_current_index;
 
-    char *field;
+    // char *field;
     AK_TypeParser *type_parser;
     bool type_parser_field_active;
 
@@ -1160,7 +1160,7 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     cpl->offset_max = 0;
 
     // optional, dynamic values
-    cpl->field = NULL;
+    // cpl->field = NULL;
 
     if (type_parse) {
         cpl->type_parser = AK_TP_New();
@@ -1183,9 +1183,9 @@ void AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
     PyMem_Free(cpl->offsets);
-    if (cpl->field) {
-        PyMem_Free(cpl->field);
-    }
+    // if (cpl->field) {
+    //     PyMem_Free(cpl->field);
+    // }
     if (cpl->type_parser) {
         PyMem_Free(cpl->type_parser);
     }
@@ -1355,30 +1355,30 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 
 //------------------------------------------------------------------------------
 // Set the CPL field to the characters accumulated in the CPL's buffer. This is only used for field converters that need a char* as an input argument. This has to be dynamically allocated and cleaned up appropriately.
-static inline char*
-AK_CPL_current_to_field(AK_CodePointLine* cpl)
-{
-    // NOTE: we assume this is only called after offset_max is complete, and that this is only called once per CPL; we set it to the maximum size on first usage and then overwrite context on each subsequent usage.
-    if (cpl->field == NULL) {
-        // create a NULL-terminated string; need one more for string terminator
-        cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
-        if (cpl->field == NULL) return (char*)PyErr_NoMemory();
-    }
-    Py_UCS4 *p = cpl->buffer_current_ptr;
-    Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
+// static inline char*
+// AK_CPL_current_to_field(AK_CodePointLine* cpl)
+// {
+//     // NOTE: we assume this is only called after offset_max is complete, and that this is only called once per CPL; we set it to the maximum size on first usage and then overwrite context on each subsequent usage.
+//     if (cpl->field == NULL) {
+//         // create a NULL-terminated string; need one more for string terminator
+//         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
+//         if (cpl->field == NULL) return (char*)PyErr_NoMemory();
+//     }
+//     Py_UCS4 *p = cpl->buffer_current_ptr;
+//     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
 
-    // get pointer to field buffer to write to
-    char *t = cpl->field;
-    while (p < end) {
-        if (AK_is_space(*p)) {
-            ++p;
-            continue;
-        }
-        *t++ = (char)*p++;
-    }
-    *t = '\0'; // must be NULL-terminated string
-    return cpl->field;
-}
+//     // get pointer to field buffer to write to
+//     char *t = cpl->field;
+//     while (p < end) {
+//         if (AK_is_space(*p)) {
+//             ++p;
+//             continue;
+//         }
+//         *t++ = (char)*p++;
+//     }
+//     *t = '\0'; // must be NULL-terminated string
+//     return cpl->field;
+// }
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 static inline bool
