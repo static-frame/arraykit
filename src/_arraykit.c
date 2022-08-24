@@ -979,9 +979,44 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             p++;
             if (p >= end) return number; // nothing to do with sign
     }
-    // check for nan, return NPY_NAN, NPY_INFINITY
-
-
+    // check for inf, nan
+    if (AK_is_i(*p)) {
+        *error = 1; // avoid setting on each exit
+        p++;
+        if (p >= end) return number; // error set
+        if (AK_is_n(*p)) {
+            p++;
+            if (p >= end) return number; // error set
+            if (AK_is_f(*p)) {
+                // not removing trailing whitespace
+                p++;
+                if (p >= end) {
+                    *error = 0; // restore non error
+                    if (negative_base) return -NPY_INFINITY;
+                    return NPY_INFINITY; // error set
+                }
+            }
+        }
+        return number; // matched i but nothing else, error set
+    }
+    else if (AK_is_n(*p)) {
+        *error = 1; // avoid setting on each exit
+        p++;
+        if (p >= end) return number; // error set
+        if (AK_is_a(*p)) {
+            p++;
+            if (p >= end) return number; // error set
+            if (AK_is_n(*p)) {
+                // not removing trailing whitespace
+                p++;
+                if (p >= end) {
+                    *error = 0; // restore non error
+                    return NPY_NAN; // error set
+                }
+            }
+        }
+        return number; // matched i but nothing else, error set
+    }
     while (AK_is_digit(*p)) {
         if (num_digits < max_digits) {
             number = number * 10. + (*p - '0');
@@ -1392,21 +1427,6 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
     return AK_UCS4_to_uint64(p, end, error);
 }
 
-// static inline npy_float64
-// AK_CPL_current_to_float64(AK_CodePointLine* cpl)
-// {
-//     // interpret an empty field as NaN
-//     if (cpl->offsets[cpl->offsets_current_index] == 0) {
-//         return NPY_NAN;
-//     }
-//     Py_UCS4 *p = cpl->buffer_current_ptr;
-//     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-//     int error;
-//     return AK_UCS4_to_float64(p, end, &error);
-// }
-
-
-// A wrapper to PyOS_string_to_double. Might set an exception on error.
 static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 {
@@ -1414,11 +1434,26 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl)
     if (cpl->offsets[cpl->offsets_current_index] == 0) {
         return NPY_NAN;
     }
-    char* field = AK_CPL_current_to_field(cpl);
-    // NOTE: field can be NULL on memory failure!
-    // NOTE: this is shown to be much faster than atof in stdlib.h
-    return PyOS_string_to_double(field, NULL, NULL);
+    Py_UCS4 *p = cpl->buffer_current_ptr;
+    Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
+    int error;
+    return AK_UCS4_to_float64(p, end, &error);
 }
+
+
+// A wrapper to PyOS_string_to_double. Might set an exception on error.
+// static inline npy_float64
+// AK_CPL_current_to_float64(AK_CodePointLine* cpl)
+// {
+//     // interpret an empty field as NaN
+//     if (cpl->offsets[cpl->offsets_current_index] == 0) {
+//         return NPY_NAN;
+//     }
+//     char* field = AK_CPL_current_to_field(cpl);
+//     // NOTE: field can be NULL on memory failure!
+//     // NOTE: this is shown to be much faster than atof in stdlib.h
+//     return PyOS_string_to_double(field, NULL, NULL);
+// }
 
 
 //------------------------------------------------------------------------------

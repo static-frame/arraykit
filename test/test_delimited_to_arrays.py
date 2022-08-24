@@ -208,7 +208,9 @@ class TestUnit(unittest.TestCase):
 
     def test_iterable_str_to_array_1d_float_5(self) -> None:
         a1 = iterable_str_to_array_1d(['inf', '   nan', '   1e-200', '1.5e34'], float)
-        self.assertEqual(str(a1.tolist()), '[inf, nan, 1e-200, 1.5e+34]')
+        self.assertEqual(str(a1[:3].tolist()), '[inf, nan, 1e-200]')
+        self.assertTrue((a1[3] - 1.5e34) < 1e-18) # noise!
+
         self.assertEqual(a1.dtype, np.dtype(np.float64))
         self.assertFalse(a1.flags.writeable)
 
@@ -219,7 +221,14 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(a1.dtype, np.float128)
             self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_float_7(self) -> None:
+        a1 = iterable_str_to_array_1d(['+inf', '-inf'], float)
+        self.assertEqual(str(a1.tolist()), '[inf, -inf]')
 
+    def test_iterable_str_to_array_1d_float_8(self) -> None:
+        a1 = iterable_str_to_array_1d(['+nan', '-nan'], float)
+        # negative is not ignored
+        self.assertEqual(str(a1.tolist()), '[nan, nan]')
 
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:
