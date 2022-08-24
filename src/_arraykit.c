@@ -1407,7 +1407,7 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
 
 
 // A wrapper to PyOS_string_to_double. Might set an exception on error.
-// static inline npy_float64
+static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl)
 {
     // interpret an empty field as NaN
