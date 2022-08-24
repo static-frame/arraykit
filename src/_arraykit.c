@@ -981,41 +981,35 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     }
     // check for inf, nan
     if (AK_is_i(*p)) {
-        *error = 1; // avoid setting on each exit
         p++;
-        if (p >= end) return number; // error set
+        if (p >= end) goto error;
         if (AK_is_n(*p)) {
             p++;
-            if (p >= end) return number; // error set
+            if (p >= end) goto error;
             if (AK_is_f(*p)) {
                 // not removing trailing whitespace
                 p++;
                 if (p >= end) {
-                    *error = 0; // restore non error
                     if (negative_base) return -NPY_INFINITY;
-                    return NPY_INFINITY; // error set
+                    return NPY_INFINITY;
                 }
             }
         }
-        return number; // matched i but nothing else, error set
+        goto error; // matched i but nothing else
     }
     else if (AK_is_n(*p)) {
-        *error = 1; // avoid setting on each exit
         p++;
-        if (p >= end) return number; // error set
+        if (p >= end) goto error;
         if (AK_is_a(*p)) {
             p++;
-            if (p >= end) return number; // error set
+            if (p >= end) goto error;
             if (AK_is_n(*p)) {
                 // not removing trailing whitespace
                 p++;
-                if (p >= end) {
-                    *error = 0; // restore non error
-                    return NPY_NAN; // error set
-                }
+                if (p >= end) return NPY_NAN;
             }
         }
-        return number; // matched i but nothing else, error set
+        goto error; // matched n but nothing else
     }
     while (AK_is_digit(*p)) {
         if (num_digits < max_digits) {
@@ -1104,6 +1098,9 @@ exit:
     }
 
     if (number == HUGE_VAL || number == -HUGE_VAL) *error = ERANGE;
+    return number;
+error:
+    *error = 1;
     return number;
 }
 
