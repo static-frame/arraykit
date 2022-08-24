@@ -1428,7 +1428,7 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
 }
 
 static inline npy_float64
-AK_CPL_current_to_float64(AK_CodePointLine* cpl)
+AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error)
 {
     // interpret an empty field as NaN
     if (cpl->offsets[cpl->offsets_current_index] == 0) {
@@ -1436,8 +1436,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl)
     }
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-    int error;
-    return AK_UCS4_to_float64(p, end, &error);
+    return AK_UCS4_to_float64(p, end, error);
 }
 
 
@@ -1497,8 +1496,12 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (!array) return NULL;
 
-    // NOTE: this uses PyOS_string_to_double, which sets an exception and thus cannot free the GIL
+    // initialize error code to 0; only update on error.
+    int error = 0;
     bool matched_elsize = false;
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
     if (dtype->elsize == 16) {
@@ -1508,7 +1511,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float128 *end = array_buffer + count;
         while (array_buffer < end) {
             // NOTE: cannot cast to npy_float128 here
-            *array_buffer++ = AK_CPL_current_to_float64(cpl);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
         # endif
@@ -1518,7 +1521,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_float64(cpl);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1527,7 +1530,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl);
+            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1536,21 +1539,23 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl);
+            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl, &error);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
+    NPY_END_THREADS;
 
     if (!matched_elsize) {
         PyErr_SetString(PyExc_TypeError, "cannot create array from itemsize");
         Py_DECREF(array);
         return NULL;
     }
-    // Current implementation of float conversion will set an exception if value is invalid
-    if (PyErr_Occurred()) {
+    if (error) {
+        PyErr_SetString(PyExc_TypeError, "error parsing float");
         Py_DECREF(array);
         return NULL;
-    }
+     }
+
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
