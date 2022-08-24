@@ -7,9 +7,10 @@ C is not an object-oriented language. We can, however, create collections of sta
 
 We are going to mutate a lot of arguments in place, and a lot of our structs have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for efficiency (to avoid memory allocation).
 
-We are going to do a lot with pointers to character (or code point) sequences. A few common moves are listed below:
+We are going to do a lot with pointers to character (or code point) sequences. A there are a couple of common moves to be aware of.
 
-Some common moves:
+We of often want to de-reference a pointer (to get a charcter) and then increment the pointer to be read to read the next character. This is what we are doing here:
+
 ```C
 Py_UCS4 *p;    // pointer to the sart of an array of Py_UCS4
 char c = *p++; // de-reference p to get value, then increment to the next point
@@ -18,6 +19,12 @@ char c = *p++; // de-reference p to get value, then increment to the next point
 char c = *p;
 p++
 ```
+A variation of this move is done in assignment, where we assign the target of the de-referenced pointer, and then increment it to be ready to assign to the next character.
+
+```C
+*array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl, &error);
+```
+
 
 We will use `goto`! This is a common pattern in CPython where, on error, we often need to tear-down a bunch of memory and can get reuse of those routines through a direct jump.
 
