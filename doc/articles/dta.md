@@ -19,7 +19,7 @@ char c = *p;
 p++
 ```
 
-We will use `goto`! This is a common pattern in Python where, on error, we often need to tear-down bunch of memory.
+We will use `goto`! This is a common pattern in CPython where, on error, we often need to tear-down a bunch of memory and can get reuse of those routines through a direct jump.
 
 
 ## Main Components
