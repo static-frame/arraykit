@@ -5,7 +5,6 @@
 
 C is not an object-oriented language. We can, however, create collections of state (like instance attributes) with `struct` types, and then create collections of functions (like instance methods) that take "instances" of that `struct` and perform in-place or other operations. Here, structs have full names (i.e., `AK_CodePointLine`) while methods use appreviations (i.e., `AK_CPL_New`).
 
-
 We are going to mutate a lot of arguments in place, and a lot of our structs have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for efficiency (to avoid memory allocation).
 
 We are going to do a lot with pointers to character (or code point) sequences. A few common moves are listed below:
@@ -19,6 +18,9 @@ char c = *p++; // de-reference p to get value, then increment to the next point
 char c = *p;
 p++
 ```
+
+We will use `goto`! This is a common pattern in Python where, on error, we often need to tear-down bunch of memory.
+
 
 ## Main Components
 
