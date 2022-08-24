@@ -38,7 +38,7 @@ For each field, counts of numerous indicators are measured as well as the contig
 At the end of each field, we reset all attributes except `parsed_field`.
 
 
-### Py_UCS4 Converter fcuntions:
+### Py_UCS4 Converter functions:
 
 Given a pointer to an array of Py_UCS4, return a C-type. Do this for signed/unsigned. Would like to do this for floats but hard to find an isolated implementation.
 
