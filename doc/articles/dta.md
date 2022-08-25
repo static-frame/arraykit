@@ -51,8 +51,8 @@ Enum that defines the interpretation of a field or line of types. Can be unknown
 
 Can be used to get a dtype instance. Can be used, with another AK_TypeParserState, to "resolve" the dtype. Unlike with normal dtype resolution, the dtype of "no-return" is string.
 
-* AK_TPS_Resolve
-* AK_TPS_ToDtype
+* `AK_TPS_Resolve`
+* `AK_TPS_ToDtype`
 
 
 ### AK_TypeParser (AK_TP)
@@ -62,12 +62,12 @@ For each field, counts of numerous indicators are measured as well as the contig
 
 At the end of each field, we reset all attributes except `parsed_field`.
 
-* AK_TP_New
-* AK_TP_Free
-* AK_TP_reset_field
-* AK_TP_ProcessChar
-* AK_TP_resolve_field
-* AK_TP_ResolveLineResetField
+* `AK_TP_New`
+* `AK_TP_Free`
+* `AK_TP_reset_field`
+* `AK_TP_ProcessChar`
+* `AK_TP_resolve_field`
+* `AK_TP_ResolveLineResetField`
 
 ### Py_UCS4 Converter functions:
 
@@ -75,9 +75,9 @@ These function are designed to convert a region of a contiguous byte data (given
 
 These functions are different than common library functions in that they they take start/end pointers, nout a NULL-terminated string. Common library functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
 
-* AK_UCS4_to_int64
-* AK_UCS4_to_uint64
-* AK_UCS4_to_float64
+* `AK_UCS4_to_int64`
+* `AK_UCS4_to_uint64`
+* `AK_UCS4_to_float64`
 
 
 ### AK_CodePointLine (CPL)
@@ -96,33 +96,33 @@ In general operation, a CPL has to phases: a loading phase, and conversion phase
 
 In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in turn calls `AK_TP_ProcessChar` for each char if `type_parser` is active. At the end of each field, `AK_CPL_AppendOffset` is called, which calls `AK_TP_ResolveLineResetField` if `type_parser` is active. This permits loading a CPL in one pass, optional evaluating type at the same time.
 
-* AK_CPL_New
-* AK_CPL_Free
-* AK_CPL_resize
-* AK_CPL_AppendField
-* AK_CPL_AppendPoint
-* AK_CPL_AppendOffset
-* AK_CPL_FromIterable
+* `AK_CPL_New`
+* `AK_CPL_Free`
+* `AK_CPL_resize`
+* `AK_CPL_AppendField`
+* `AK_CPL_AppendPoint`
+* `AK_CPL_AppendOffset`
+* `AK_CPL_FromIterable`
 
 
-* AK_CPL_CurrentReset
-* AK_CPL_CurrentAdvance
-* AK_CPL_current_to_bool
-* AK_CPL_current_to_int64
-* AK_CPL_current_to_float64
+* `AK_CPL_CurrentReset`
+* `AK_CPL_CurrentAdvance`
+* `AK_CPL_current_to_bool`
+* `AK_CPL_current_to_int64`
+* `AK_CPL_current_to_float64`
 
 
 In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type. These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
 
 
-* AK_CPL_to_array_bool
-* AK_CPL_to_array_float
-* AK_CPL_to_array_int
-* AK_CPL_to_array_uint
-* AK_CPL_to_array_unicode
-* AK_CPL_to_array_bytes
-* AK_CPL_to_array_via_cast
-* AK_CPL_ToArray
+* `AK_CPL_to_array_bool`
+* `AK_CPL_to_array_float`
+* `AK_CPL_to_array_int`
+* `AK_CPL_to_array_uint`
+* `AK_CPL_to_array_unicode`
+* `AK_CPL_to_array_bytes`
+* `AK_CPL_to_array_via_cast`
+* `AK_CPL_ToArray`
 
 
 ### AK_CodePointGrid (CPG)
@@ -139,12 +139,12 @@ typedef struct AK_CodePointGrid {
 ```
 
 
-* AK_CPG_New
-* AK_CPG_Free
-* AK_CPG_resize
-* AK_CPG_AppendPointAtLine
-* AK_CPG_AppendOffsetAtLine
-* AK_CPG_ToArrayList
+* `AK_CPG_New`
+* `AK_CPG_Free`
+* `AK_CPG_resize`
+* `AK_CPG_AppendPointAtLine`
+* `AK_CPG_AppendOffsetAtLine`
+* `AK_CPG_ToArrayList`
 
 ### AK_Dialect, AK_DelimitedReaderState, AK_DelimitedReader
 
@@ -153,14 +153,16 @@ These components are all extensions of the original CPython csv reader.
 Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maitains state regarding the progress of the parsing.
 
 
-* AK_DR_New
-* AK_DR_Free
-* AK_DR_close_field
-* AK_DR_add_char
-* AK_DR_process_char
-* AK_DR_line_reset
-* AK_DR_ProcessLine
+* `AK_DR_New`
+* `AK_DR_Free`
+* `AK_DR_close_field`
+* `AK_DR_add_char`
+* `AK_DR_process_char`
+* `AK_DR_line_reset`
+* `AK_DR_ProcessLine`
 
-### The `delimited_to_arrays` entry point.
+### The `delimited_to_arrays` Entry Point
 
-Given apropriate parameters and type checking, this function creates an AK_DelimitedReader and an AK_CodePointGrid. Then, `AK_DR_ProcessLine` is called once for each line in the iterable of record strings.
+Given appropriately typed parameters, this function creates an `AK_DelimitedReader` and an `AK_CodePointGrid` (CPG). Then, `AK_DR_ProcessLine`, given the CPG, is called once for each line in the iterable of strings. Within each line, one character at time is read and passed to `AK_DR_process_char` along with the CPG. `AK_DR_process_char` is the core parser of delimited state, and is able to call `AK_DR_add_char` for each char within a field and then `AK_DR_close_field` once each field is complete. Those functions, which are also given the CPG, call `AK_CPG_AppendPointAtLine` and `AK_CPG_AppendOffsetAtLine` respectively, growing the CPG, and creating and extending new CPLs, as necessary.
+
+After all records are processed, the CPG is full loaded. `AK_CPG_ToArrayList` can then be called to realize each CPL as an array.
