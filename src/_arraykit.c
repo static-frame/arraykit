@@ -2217,13 +2217,13 @@ AK_Dialect_check_quoting(int quoting)
 }
 
 typedef struct AK_Dialect{
-    char doublequote;           /* is " represented by ""? */
-    char skipinitialspace;      /* ignore spaces following delimiter? */
-    char strict;                /* raise exception on bad CSV */
-    int quoting;                /* style of quoting to write */
-    Py_UCS4 delimiter;          /* field separator */
-    Py_UCS4 quotechar;          /* quote character */
-    Py_UCS4 escapechar;         /* escape character */
+    char doublequote;           // is " represented by ""?
+    char skipinitialspace;      // ignore spaces following delimiter?
+    char strict;                // raise exception on bad CSV
+    int quoting;                // style of quoting to write
+    Py_UCS4 delimiter;          // field separator
+    Py_UCS4 quotechar;          // quote character
+    Py_UCS4 escapechar;         // escape character
 } AK_Dialect;
 
 // check types and convert to C values
@@ -2388,34 +2388,29 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     AK_Dialect *dialect = dr->dialect;
 
     switch (dr->state) {
-    case START_RECORD: /* start of record */
-        if (c == '\0') /* empty line - return [] */
+    case START_RECORD: // start of record
+        if (c == '\0') // empty line
             break;
         else if (c == '\n' || c == '\r') {
             dr->state = EAT_CRNL;
             break;
         }
-        /* normal character - handle as START_FIELD */
-        dr->state = START_FIELD;
-        /* fallthru */
-    case START_FIELD: /* expecting field */
-        if (c == '\n' || c == '\r' || c == '\0') {
-            /* save empty field - return [fields] */
-            if (AK_DR_close_field(dr, cpg))
-                return -1;
+        dr->state = START_FIELD; // normal character
+        // fallthru
+    case START_FIELD: // expecting field
+        if (c == '\n' || c == '\r' || c == '\0') { // save empty field
+            if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
-        else if (c == dialect->quotechar &&
-                 dialect->quoting != QUOTE_NONE) { /* start quoted field */
+        else if (c == dialect->quotechar && dialect->quoting != QUOTE_NONE) {
+            // start quoted field
             dr->state = IN_QUOTED_FIELD;
         }
-        else if (c == dialect->escapechar) { /* possible escaped character */
+        else if (c == dialect->escapechar) { // possible escaped character
             dr->state = ESCAPED_CHAR;
         }
-        else if (c == ' ' && dialect->skipinitialspace)
-            /* ignore space at start of field */
-            ;
-        else if (c == dialect->delimiter) { /* save empty field */
+        else if (c == ' ' && dialect->skipinitialspace);
+        else if (c == dialect->delimiter) { // save empty field
             if (AK_DR_close_field(dr, cpg)) return -1;
         }
         else { // begin new unquoted field
@@ -2435,43 +2430,33 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         dr->state = IN_FIELD;
         break;
     case AFTER_ESCAPED_CRNL:
-        if (c == '\0')
-            break;
-        /*fallthru*/
-    case IN_FIELD: /* in unquoted field */
-        if (c == '\n' || c == '\r' || c == '\0') {
-            /* end of line - return [fields] */
-            if (AK_DR_close_field(dr, cpg))
-                return -1;
+        if (c == '\0') break;
+        // fallthru
+    case IN_FIELD: // in unquoted field
+        if (c == '\n' || c == '\r' || c == '\0') { // end of line
+            if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
-        else if (c == dialect->escapechar) { /* possible escaped character */
+        else if (c == dialect->escapechar) { // possible escaped character
             dr->state = ESCAPED_CHAR;
         }
-        else if (c == dialect->delimiter) { /* save field - wait for new field */
+        else if (c == dialect->delimiter) { // save field - wait for new field
             if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = START_FIELD;
         }
-        else { /* normal character - save in field */
+        else { // normal character - save in field
             if (AK_DR_add_char(dr, cpg, c)) return -1;
         }
         break;
     case IN_QUOTED_FIELD: // in quoted field
-        if (c == '\0')
-            ;
+        if (c == '\0');
         else if (c == dialect->escapechar) {
             dr->state = ESCAPE_IN_QUOTED_FIELD;
         }
-        else if (c == dialect->quotechar &&
-                 dialect->quoting != QUOTE_NONE) {
-            if (dialect->doublequote) {
-                dr->state = QUOTE_IN_QUOTED_FIELD;
-            }
-            else { // end of quote part of field
-                dr->state = IN_FIELD;
-            }
+        else if (c == dialect->quotechar && dialect->quoting != QUOTE_NONE) {
+            dr->state = (dialect->doublequote ? QUOTE_IN_QUOTED_FIELD : IN_FIELD);
         }
-        else { /* normal character - save in field */
+        else { // normal character - save in field
             if (AK_DR_add_char(dr, cpg, c)) return -1;
         }
         break;
@@ -2483,18 +2468,17 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         dr->state = IN_QUOTED_FIELD;
         break;
     case QUOTE_IN_QUOTED_FIELD:
-        /* doublequote - seen a quote in a quoted field */
+        // doublequote - seen a quote in a quoted field
         if (dialect->quoting != QUOTE_NONE && c == dialect->quotechar) {
-            /* save "" as " */
+            // save "" as "
             if (AK_DR_add_char(dr, cpg, c)) return -1;
             dr->state = IN_QUOTED_FIELD;
         }
-        else if (c == dialect->delimiter) { /* save field - wait for new field */
+        else if (c == dialect->delimiter) { // save field - wait for new field
             if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = START_FIELD;
         }
-        else if (c == '\n' || c == '\r' || c == '\0') {
-            /* end of line - return [fields] */
+        else if (c == '\n' || c == '\r' || c == '\0') { // end of line
             if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
@@ -2502,7 +2486,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             if (AK_DR_add_char(dr, cpg, c)) return -1;
             dr->state = IN_FIELD;
         }
-        else { /* illegal */
+        else { // illegal
             PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
                     dialect->delimiter,
                     dialect->quotechar);
@@ -2510,8 +2494,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         }
         break;
     case EAT_CRNL:
-        if (c == '\n' || c == '\r')
-            ;
+        if (c == '\n' || c == '\r');
         else if (c == '\0')
             dr->state = START_RECORD;
         else {
@@ -2612,8 +2595,8 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr,
             pos++;
         }
         Py_DECREF(record);
-        // this is necessary; what does it do?
-        if (AK_DR_process_char(dr, cpg, 0)) return -1;
+        // force signaling we are at the end of a line
+        if (AK_DR_process_char(dr, cpg, '\0')) return -1;
 
     } while (dr->state != START_RECORD);
 

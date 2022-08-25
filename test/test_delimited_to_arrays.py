@@ -231,6 +231,11 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(str(a1.tolist()), '[nan, nan]')
 
 
+    def test_iterable_str_to_array_1d_float_9(self) -> None:
+        with self.assertRaises(TypeError):
+            a1 = iterable_str_to_array_1d(['+na', '-in'], float)
+
+
     def test_iterable_str_to_array_1d_str_1(self) -> None:
         a1 = iterable_str_to_array_1d(['    sdf  ', '  we', 'aaa', 'qqqqq '], str)
         self.assertEqual(a1.dtype.str, '<U9')
