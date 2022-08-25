@@ -1104,7 +1104,7 @@ error:
 }
 
 //------------------------------------------------------------------------------
-// CodePointLine: Type, New, Destructor
+// CodePointLine
 
 // A AK_CodePointLine stores a contiguous buffer of Py_UCS4 without null terminators between fields. Separately, we store an array of integers, where each integer is the size of each field. The total number of fields is given by offset_count.
 typedef struct AK_CodePointLine{
@@ -1450,7 +1450,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error)
 // CodePointLine: Exporters
 
 static inline PyObject*
-AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     npy_intp dims[] = {cpl->offsets_count};
 
@@ -1479,7 +1479,7 @@ AK_CPL_ToArrayBoolean(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
-AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1553,7 +1553,7 @@ AK_CPL_ToArrayFloat(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
-AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1624,7 +1624,7 @@ AK_CPL_ToArrayInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array. Return NULL on error.
 static inline PyObject*
-AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1693,7 +1693,7 @@ AK_CPL_ToArrayUInt(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 static inline PyObject*
-AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1760,7 +1760,7 @@ AK_CPL_ToArrayUnicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Return NULL on error
 static inline PyObject*
-AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1820,7 +1820,7 @@ AK_CPL_ToArrayBytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array. This forces
 static inline PyObject*
-AK_CPL_ToArrayViaCast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     // we cannot use this dtype in array construction as it will mutate a global
     PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
@@ -1830,7 +1830,7 @@ AK_CPL_ToArrayViaCast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     Py_DECREF(dtype_bytes_proto);
     if (dtype_bytes == NULL) return NULL;
 
-    PyObject* array_bytes = AK_CPL_ToArrayBytes(cpl, dtype_bytes);
+    PyObject* array_bytes = AK_CPL_to_array_bytes(cpl, dtype_bytes);
     if (array_bytes == NULL) {
         Py_DECREF(dtype_bytes); // was not stolen if array creation failed
         return NULL;
@@ -1860,28 +1860,28 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
     }
 
     if (PyDataType_ISBOOL(dtype)) {
-        return AK_CPL_ToArrayBoolean(cpl, dtype);
+        return AK_CPL_to_array_bool(cpl, dtype);
     }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
-        return AK_CPL_ToArrayUnicode(cpl, dtype);
+        return AK_CPL_to_array_unicode(cpl, dtype);
     }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'S') {
-        return AK_CPL_ToArrayBytes(cpl, dtype);
+        return AK_CPL_to_array_bytes(cpl, dtype);
     }
     else if (PyDataType_ISUNSIGNED(dtype)) { // must come before integer check
-        return AK_CPL_ToArrayUInt(cpl, dtype);
+        return AK_CPL_to_array_uint(cpl, dtype);
     }
     else if (PyDataType_ISINTEGER(dtype)) {
-        return AK_CPL_ToArrayInt(cpl, dtype);
+        return AK_CPL_to_array_int(cpl, dtype);
     }
     else if (PyDataType_ISFLOAT(dtype)) {
-        return AK_CPL_ToArrayFloat(cpl, dtype);
+        return AK_CPL_to_array_float(cpl, dtype);
     }
     else if (PyDataType_ISDATETIME(dtype)) {
-        return AK_CPL_ToArrayViaCast(cpl, dtype);
+        return AK_CPL_to_array_via_cast(cpl, dtype);
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
-        return AK_CPL_ToArrayViaCast(cpl, dtype);
+        return AK_CPL_to_array_via_cast(cpl, dtype);
     }
 
     PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
@@ -1924,10 +1924,10 @@ AK_line_select_keep(
 // CodePointGrid Type, New, Destrctor
 
 typedef struct AK_CodePointGrid {
-    Py_ssize_t lines_count; // accumulated number of lines
+    Py_ssize_t lines_count;    // accumulated number of lines
     Py_ssize_t lines_capacity; // max number of lines
-    AK_CodePointLine **lines; // array of pointers
-    PyObject *dtypes; // a PyList of dtype objects
+    AK_CodePointLine **lines;  // array of pointers
+    PyObject *dtypes;          // a callable that returns None or a dtype initializer
 } AK_CodePointGrid;
 
 // Create a new Code Point Grid; returns NULL on error. Missing `dtypes` has been normalized as NULL.
@@ -2329,7 +2329,7 @@ AK_Dialect_Free(AK_Dialect* dialect)
 //------------------------------------------------------------------------------
 // AK_DelimitedReader, based on _csv.c from CPython
 
-typedef enum AK_DR_DelimitedReaderState {
+typedef enum AK_DelimitedReaderState {
     START_RECORD,
     START_FIELD,
     ESCAPED_CHAR,
@@ -2339,13 +2339,13 @@ typedef enum AK_DR_DelimitedReaderState {
     QUOTE_IN_QUOTED_FIELD,
     EAT_CRNL,
     AFTER_ESCAPED_CRNL
-} AK_DR_DelimitedReaderState;
+} AK_DelimitedReaderState;
 
 typedef struct AK_DelimitedReader{
     PyObject *input_iter;
     PyObject *line_select;
     AK_Dialect *dialect;
-    AK_DR_DelimitedReaderState state;
+    AK_DelimitedReaderState state;
     Py_ssize_t field_len;
     Py_ssize_t record_number;
     Py_ssize_t record_iter_number;
@@ -2612,7 +2612,9 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr,
             pos++;
         }
         Py_DECREF(record);
+        // this is necessary; what does it do?
         if (AK_DR_process_char(dr, cpg, 0)) return -1;
+
     } while (dr->state != START_RECORD);
 
     return 1; // more lines to process

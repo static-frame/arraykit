@@ -7,14 +7,14 @@ After loading, each line is converted to an array. For each line, an empty array
 
 The implementation limits features to those essential to the C implementation. The `file_like` parameter is an iterable of strings; this removes concern for file opening and encoding configuration (if necessary). The `axis` parameter is provided with an integer. Both the `dtypes` parameter and the `line_select` parameter are Python functions that, when called with an index, return the per-line parameter. For `dytpes`, a dtype initializer can be provided per line to set the type, or `None` to use type evaluation. For `line_select`, a Boolean is returned to select inclusion of the line on the specified axis. (The use of functions for these parameters permits callers to consolidate hetergenous argument types into a single interface.) As the delimited file parser is built on the Python CSV reader, all relevant parameters from that interface are retained here, including full support for diverse quoting and escaping configurations. A few features can more easily be implemented external to the C implementation: optionally skipping leading or trailing file lines can be done by preparing the generator of strings.
 
-Performance of `delimited_to_arrays` on linux compared to Pandas for loading uniform-typed data (without type evaluation) is around 1.5 times faster than Pandas at scales of 100,000 rows and 500 columns. This ratio appears robust at larger scales; at smaller scales `delimited_to_arrays` approaches 2 times faster. Type evaluation incurs overhead to reduce the outperformance to approximately 1.25 times faster.
+Performance of `delimited_to_arrays` on Linux compared to Pandas for loading uniform-typed data (without type evaluation) is around 1.5 times faster than Pandas at scales of 100,000 rows and 500 columns. This ratio appears robust at larger scales; at smaller scales `delimited_to_arrays` approaches 2 times faster. Type evaluation incurs overhead to reduce the outperformance to approximately 1.1 times faster.
 
 An alternative interface,`iterable_str_to_array_1d`, provides a way to load and convert a single line to single array. This is mostly useful for testing.
 
 
 ## CPython C Orientation
 
-C is not an object-oriented language. We can, however, create collections of state (like instance attributes) with `struct` types, and then create collections of functions (like instance methods) that take "instances" of that `struct` and perform in-place or other operations. The convention used here names `struct`s with full names (e.g., `AK_CodePointLine`) while functions that take those `struct`s use abbreviations (e.g., `AK_CPL_New`). Dynamic allocation happens with "New" functions (e.g., `AK_CPL_New`) using `PyMem_Malloc` while memory freeing happens with "Free" functions (e.g. `AK_CPL_Free`) using `PyMem_Free`.
+C is not an object-oriented language. We can, however, create collections of state (like instance attributes) with `struct` types, and then create collections of functions (like instance methods) that take "instances" of that `struct` and perform in-place or other operations. The convention used here names `struct`s with full names (e.g., `AK_CodePointLine`) while functions that take those `struct`s use abbreviations (e.g., `AK_CPL_New`). Dynamic allocation happens with "New" functions (e.g., `AK_CPL_New`) using `PyMem_Malloc` while memory freeing happens with "Free" functions (e.g. `AK_CPL_Free`) using `PyMem_Free`. Public functions are given in upper camel case (e.g., `AK_CPL_ToArray`) while private functions (called only within the public functions of the same type group) are given in lower snake case (e.g., `AK_CPL_to_array_bool`).
 
 In C we often mutate arguments in place, and a lot of our structs are designed to have mutable state. We do this because in C we often use returned values for error signaling, and thus pass in pointers for values to be set. We also do this for memory efficiency.
 
@@ -24,14 +24,13 @@ These routines make extensive use of pointers to arrays of characters (or Unicod
 
 In C, pointer arithmetic and pointer dereferencing can happen with concise expressions. There are a couple of common moves.
 
-We often want to dereference a pointer (to get a charcter) and then increment the pointer to be read to read the next character:
+We often want to dereference a pointer (to get a charcter) and then increment the pointer to be read to read the next character. An example is the following while loop, where we advance through all characters that are spaces.
 
 ```C
-char *p;       // pointer to the sart of an array of char
-char c = *p++; // de-reference p to assign to c, then increment p to the next point
+while (AK_is_space(*p)) p++;
 ```
 
-A variation of this move is done in assignment, where we assign to a dereferenced pointer and then increment it to be ready to assign to the next character.
+A variation of this move is done in assignment, where we assign to a dereferenced pointer and then increment the same pointer to be ready to assign to the next character.
 
 ```C
 *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl, &error);
@@ -40,7 +39,7 @@ A variation of this move is done in assignment, where we assign to a dereference
 We can do the same on the right hand side of the assignment, such that we dereference a source and assign it to a dereferenced destination, then increment the source pointer and increment the destination pointer.
 
 ```C
-*array_buffer++ = (char)*p++; // truncate
+*array_buffer++ = (char)*p++;
 ```
 
 
@@ -52,6 +51,10 @@ Enum that defines the interpretation of a field or line of types. Can be unknown
 
 Can be used to get a dtype instance. Can be used, with another AK_TypeParserState, to "resolve" the dtype. Unlike with normal dtype resolution, the dtype of "no-return" is string.
 
+* AK_TPS_Resolve
+* AK_TPS_ToDtype
+
+
 ### AK_TypeParser (AK_TP)
 A struct used to store the state of the interpration of a field, and ultimately a line. One instance is created per line.
 
@@ -59,12 +62,22 @@ For each field, counts of numerous indicators are measured as well as the contig
 
 At the end of each field, we reset all attributes except `parsed_field`.
 
+* AK_TP_New
+* AK_TP_Free
+* AK_TP_reset_field
+* AK_TP_ProcessChar
+* AK_TP_resolve_field
+* AK_TP_ResolveLineResetField
 
 ### Py_UCS4 Converter functions:
 
-Given a pointer to an array of Py_UCS4, return a C-type. Do this for signed/unsigned. Would like to do this for floats but hard to find an isolated implementation.
+These function are designed to convert a region of a contiguous byte data (given a pointer to the start and end) to a C type.
 
-These functions are unique in that they are designed to work with start/end pointer; many similar functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
+These functions are different than common library functions in that they they take start/end pointers, nout a NULL-terminated string. Common library functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
+
+* AK_UCS4_to_int64
+* AK_UCS4_to_uint64
+* AK_UCS4_to_float64
 
 
 ### AK_CodePointLine (CPL)
@@ -83,5 +96,71 @@ In general operation, a CPL has to phases: a loading phase, and conversion phase
 
 In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in turn calls `AK_TP_ProcessChar` for each char if `type_parser` is active. At the end of each field, `AK_CPL_AppendOffset` is called, which calls `AK_TP_ResolveLineResetField` if `type_parser` is active. This permits loading a CPL in one pass, optional evaluating type at the same time.
 
-In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type (i.e., `AK_CPL_ToArrayBoolean`, `AK_CPL_ToArrayFloat`, `AK_CPL_ToArrayInt`, `AK_CPL_ToArrayUInt`, `AK_CPL_ToArrayUnicode`, `AK_CPL_ToArrayBytes`, `AK_CPL_ToArrayViaCast`). These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
+* AK_CPL_New
+* AK_CPL_Free
+* AK_CPL_resize
+* AK_CPL_AppendField
+* AK_CPL_AppendPoint
+* AK_CPL_AppendOffset
+* AK_CPL_FromIterable
 
+
+* AK_CPL_CurrentReset
+* AK_CPL_CurrentAdvance
+* AK_CPL_current_to_bool
+* AK_CPL_current_to_int64
+* AK_CPL_current_to_float64
+
+
+In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type. These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
+
+
+* AK_CPL_to_array_bool
+* AK_CPL_to_array_float
+* AK_CPL_to_array_int
+* AK_CPL_to_array_uint
+* AK_CPL_to_array_unicode
+* AK_CPL_to_array_bytes
+* AK_CPL_to_array_via_cast
+* AK_CPL_ToArray
+
+
+### AK_CodePointGrid (CPG)
+
+The CodePointGrid is dynamic container of CodePointLines. It largely serves as the public interface to CPLs.
+
+```C
+typedef struct AK_CodePointGrid {
+    Py_ssize_t lines_count;    // accumulated number of lines
+    Py_ssize_t lines_capacity; // max number of lines
+    AK_CodePointLine **lines;  // array of pointers
+    PyObject *dtypes;          // a callable that returns None or a dtype initializer
+} AK_CodePointGrid;
+```
+
+
+* AK_CPG_New
+* AK_CPG_Free
+* AK_CPG_resize
+* AK_CPG_AppendPointAtLine
+* AK_CPG_AppendOffsetAtLine
+* AK_CPG_ToArrayList
+
+### AK_Dialect, AK_DelimitedReaderState, AK_DelimitedReader
+
+These components are all extensions of the original CPython csv reader.
+
+Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maitains state regarding the progress of the parsing.
+
+
+* AK_DR_New
+* AK_DR_Free
+* AK_DR_close_field
+* AK_DR_add_char
+* AK_DR_process_char
+* AK_DR_line_reset
+* AK_DR_ProcessLine
+
+### The `delimited_to_arrays` entry point.
+
+Given apropriate parameters and type checking, this function creates an AK_DelimitedReader and an AK_CodePointGrid. Then, `AK_DR_ProcessLine` is called once for each line in the iterable of record strings.
