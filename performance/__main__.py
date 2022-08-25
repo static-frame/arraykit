@@ -51,7 +51,7 @@ class Perf:
 
 class FixtureFileLike:
 
-    COUNT_ROW = 10_000
+    COUNT_ROW = 100_000
     COUNT_COLUMN = 500
     NUMBER = 1
 

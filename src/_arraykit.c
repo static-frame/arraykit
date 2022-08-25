@@ -915,7 +915,6 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
     return number;
 }
 
-
 // Based on precise_xstrtod from pandas/_libs/src/parser/tokenizer.c.
 static inline npy_float64
 AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
@@ -1104,10 +1103,6 @@ error:
     return number;
 }
 
-
-
-
-
 //------------------------------------------------------------------------------
 // CodePointLine: Type, New, Destructor
 
@@ -1161,7 +1156,6 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
 
     // optional, dynamic values
     // cpl->field = NULL;
-
     if (type_parse) {
         cpl->type_parser = AK_TP_New();
         if (cpl->type_parser == NULL) {
@@ -1282,7 +1276,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (cpl->type_parser && cpl->type_parser_field_active) {
         cpl->type_parser_field_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
-    *cpl->buffer_current_ptr++ = p; // shift forward by size of p
+    *cpl->buffer_current_ptr++ = p;
     ++cpl->buffer_count;
     return 0;
 }
@@ -2123,7 +2117,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
     return list;
 }
 
-
 //------------------------------------------------------------------------------
 // AK_Dialect, based on _csv.c from CPython
 
@@ -2597,7 +2590,6 @@ AK_DR_ProcessLine(AK_DelimitedReader *dr,
                 Py_DECREF(record);
                 return 1; // skip, process more lines
         }
-
         // NOTE: record_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
         ++dr->record_number;
         // AK_DEBUG_MSG_OBJ("processing line", PyLong_FromLong(dr->record_number));
