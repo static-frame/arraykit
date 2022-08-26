@@ -2517,7 +2517,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
     return 0;
 }
 
-// Called once at the start of processing each line in AK_DR_ProcessLine. This cannot error.
+// Called once at the start of processing each line in AK_DR_ProcessRecord. This cannot error.
 static void
 AK_DR_line_reset(AK_DelimitedReader *dr)
 {
@@ -2526,9 +2526,9 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
     dr->field_number = 0;
 }
 
-// Using AK_DelimitedReader's state, process one line (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more lines to process, 0 when there are no lines to process, and -1 for error.
+// Using AK_DelimitedReader's state, process one record (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more lines to process, 0 when there are no lines to process, and -1 for error.
 static int
-AK_DR_ProcessLine(AK_DelimitedReader *dr,
+AK_DR_ProcessRecord(AK_DelimitedReader *dr,
         AK_CodePointGrid *cpg,
         PyObject *line_select
         )
@@ -2802,7 +2802,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     // Consume all lines from dr and load into cpg
     int status;
     while (true) {
-        status = AK_DR_ProcessLine(dr, cpg, line_select);
+        status = AK_DR_ProcessRecord(dr, cpg, line_select);
         if (status == 1) {
             continue; // more lines to process
         }

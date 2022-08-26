@@ -3,7 +3,7 @@
 
 The `delimited_to_arrays` function takes an iterable of strings (which might be an iterator of lines from a file) and extracts fields from that string based on a delimiter. Fields are accumulated into "lines" of contiguous Unicode byte data; lines can accumulate fields by row (axis 0) or by column (axis 1). As lines accumulate fields, types are optionally evaluated based on a heuristic, content- and count-based evaluation. After a single pass of reading the file, all lines are loaded and (optionally per line) types have been evaluated.
 
-After loading, each line is converted to an array. For each line, an empty array of appropriate size can be created. For most types (bool, ints, float, Unicode, bytes), byte data is directly translated into C types that are assigned into the array's buffer. For a few types (datetime64, complex), byte arrays are created, and then a NumPy cast is used to deliver the desired type
+After loading, each line is converted to an array. For each line, an empty array of appropriate size can be created. For most types (bool, ints, float, Unicode, bytes), byte data is directly translated into C types that are assigned into the array's buffer. For a few types (datetime64, complex), byte arrays are created, and then a NumPy cast is used to deliver the desired type; this is a stopgap approach until implementation of direct value converters.
 
 The CPython interface to `delimited_to_arrays` is given below:
 
@@ -41,11 +41,11 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
 ```
 
-The implementation limits features to those essential to the C implementation. The `file_like` parameter is an iterable of strings; this removes concern for file opening and encoding configuration (if necessary). The `axis` parameter is provided with an integer. Both the `dtypes` parameter and the `line_select` parameter are Python functions that, when called with an index, return the per-line parameter. For `dytpes`, a dtype initializer can be provided per line to set the type, or `None` to use type evaluation. For `line_select`, a Boolean is returned to select inclusion of the line on the specified axis. (The use of functions for these parameters permits callers to consolidate hetergenous argument types into a single interface.)
+The implementation limits features to those essential to the C implementation. The `file_like` parameter is an iterable of strings; this removes concern for file opening and encoding configuration (if necessary). The `axis` parameter is provided with an integer. Both the `dtypes` the `line_select` parameters are Python functions that, when called with an index, return the per-line parameter. For `dytpes`, a dtype initializer can be provided per line to set the type, or `None` to use type evaluation. For `line_select`, a Boolean is returned to select inclusion of the line on the specified axis. (The use of functions for these parameters permits callers to consolidate heterogenous argument types into a single interface.)
 
 As the delimited file parser is built on the Python CSV reader, all relevant parameters from that interface are retained here, including full support for diverse quoting and escaping configurations. A few features can more easily be implemented external to the C implementation: optionally skipping leading or trailing file lines, for example, can be done by preparing the generator of strings.
 
-A few features are closely tied to the expected usage in StaticFrame. Having `dtypes` and `line_select` given as functions permits these values to be specified as sequences or mappings associated with index or columns labels. The `axis` argument (when set to 0) is useful for realizing arrays for columns, where each row is a depth level of a single type.
+A few features are closely tied to the expected usage in StaticFrame. Having `dtypes` and `line_select` given as functions permits these values to be specified as sequences or mappings associated with index or columns labels. The `axis` argument (when set to 0) is useful for realizing arrays for columns, where each row is a depth level of a single type. Finally, NumPy Unicode and datetime64 types can be directly created.
 
 Performance of `delimited_to_arrays` on Linux compared to Pandas for loading uniform-typed data (without type evaluation) is around 1.5 times faster than Pandas at scales of 100,000 rows and 500 columns. This ratio appears robust at larger scales; at smaller scales `delimited_to_arrays` approaches 2 times faster. Type evaluation incurs overhead to reduce the outperformance to approximately 1.1 times faster.
 
@@ -92,6 +92,9 @@ We can do the same on the right hand side of the assignment, such that we derefe
 
 ## Main Components
 
+This section summarizes the main `struct`s needed to implement `delimited_to_arrays` as well as their functions. The ordering of this section follows the ordering of the code.
+
+
 ### AK_TypeParserState (AK_TPS)
 
 An Enum that defines the type interpretation of a field or line of fields. Can be unknown (on initialization) or empty (on encountering empty values). Available functions permit "resolving" the type of two states. Unlike with normal dtype resolution, the dtype of "no-return" is string, not object.
@@ -102,7 +105,7 @@ An Enum that defines the type interpretation of a field or line of fields. Can b
 
 ### AK_TypeParser (AK_TP)
 
-A struct used to store the state of the type interpretation of a field, and ultimately of a complete line. One instance is created per line.
+A struct used to store the state of the type evaluation of a field, and ultimately of a complete line. One instance is created per line if type evaluation is enabled.
 
 ```C
 typedef struct AK_TypeParser {
@@ -161,7 +164,7 @@ There exist many ways of converting floats to strings. Perhaps the most accurate
 
 ### AK_CodePointLine (CPL)
 
-A representation of a "line", or a group of fields which might be a column (when axis is 1) or a row (when axis is 0).
+A representation of a "line", or a linear collection of fields which might be a column (when axis is 1) or a row (when axis is 0).
 
 ```C
 typedef struct AK_CodePointLine{
@@ -184,15 +187,15 @@ typedef struct AK_CodePointLine{
 } AK_CodePointLine;
 ```
 
-The core representation consists of two parts, A dynamically growable contiguous array of Py_UCS4 (`buffer`) (with no null terminators), and a dynamically growable array of offsets, providing the number of Py_UCS4 in each field and (implicitly, or explicitly with `offset_count`) the number of fields.
+The core representation consists of two parts, A dynamically growable contiguous array of `Py_UCS4` (`buffer`) (with no null terminators), and a dynamically growable array of offsets, providing the number of `Py_UCS4` in each field and (implicitly, or explicitly with `offset_count`) the number of fields.
 
-The CPL also tracks the `offset_max`, the largest offset observed, while processing each field. This is needed when determining the element size of unicode or bytes dtypes.
+The CPL also tracks the `offset_max`, the largest offset observed, while processing each field. This is needed when determining the element size of Unicode or bytes dtypes.
 
-In addition, a CPL on creation optionally composes an `AK_TypeParser` instance. This permits the CPL to optionally call `AK_TP_ProcessChar` for each char as accumulating chars.
+In addition, a CPL on creation optionally composes an `AK_TypeParser` instance. This permits the CPL to optionally call `AK_TP_ProcessChar` for each character as accumulating characters.
 
 In general operation, a CPL has to phases: a loading phase, and conversion phase.
 
-In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in turn calls `AK_TP_ProcessChar` for each char if `type_parser` is active. At the end of each field, `AK_CPL_AppendOffset` is called, which calls `AK_TP_ResolveLineResetField` if `type_parser` is active. This permits loading a CPL in one pass, optional evaluating type at the same time.
+In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in turn calls `AK_TP_ProcessChar` for each character if `type_parser` is active. At the end of each field, `AK_CPL_AppendOffset` is called, which calls `AK_TP_ResolveLineResetField` if `type_parser` is active. This permits loading a CPL in one pass, optionally evaluating type at the same time.
 
 * `AK_CPL_New`
 * `AK_CPL_Free`
@@ -212,7 +215,7 @@ When converting bytes to C types, given the current CPL positions, utility funct
 * `AK_CPL_current_to_uint64`
 * `AK_CPL_current_to_float64`
 
-The outermost interface to convert a CPL to an array is `AK_CPL_ToArray`; this function branches to type-specific private functions based on dtype, provided either directly (via a `dtypes` function passed to `delimited_to_arrays`) or via a `type_parser` on the CPL. These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
+The outermost interface to convert a CPL to an array is `AK_CPL_ToArray`; this function branches to type-specific private functions based on a dtype, provided either directly (via a `dtypes` function passed to `delimited_to_arrays`) or via a `type_parser` on the CPL. These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
 
 * `AK_CPL_to_array_bool`
 * `AK_CPL_to_array_float`
@@ -232,7 +235,7 @@ Finally, an alternative loader, `AK_CPL_FromIterable`, is made available to crea
 
 ### AK_CodePointGrid (CPG)
 
-The CodePointGrid is dynamic container of `AK_CodePointLine`s. It largely serves as the public interface to CPLs, automatically creating new CPLs when needed.
+The CodePointGrid is a dynamic container of `AK_CodePointLine`s. It largely serves as the public interface to CPLs, automatically creating new CPLs when needed.
 
 ```C
 typedef struct AK_CodePointGrid {
@@ -243,13 +246,16 @@ typedef struct AK_CodePointGrid {
 } AK_CodePointGrid;
 ```
 
-Given a line number (which, depending on the `axis` argument, is either the `AK_DelimitedReader` `record_number` or the `field_number`), `AK_CPG_AppendPointAtLine` will add a character to the appropriate CPL, allocating it if it does not exist. At the conlusion of each field, `AK_CPG_AppendOffsetAtLine` is called, it in-turn calling `AK_CPL_AppendOffset` on the appropriate CPL.
+Given a line number (which, depending on the `axis` argument, is either the `AK_DelimitedReader` `record_number` or `field_number`), `AK_CPG_AppendPointAtLine` will add a character to the appropriate CPL, allocating a new CPL if it does not exist. At the conclusion of each field, `AK_CPG_AppendOffsetAtLine` is called, it in-turn calling `AK_CPL_AppendOffset` on the appropriate CPL.
 
 * `AK_CPG_New`
 * `AK_CPG_Free`
 * `AK_CPG_resize`
 * `AK_CPG_AppendPointAtLine`
 * `AK_CPG_AppendOffsetAtLine`
+
+After loading, `AK_CPG_ToArrayList` can be used to call `AK_CPL_ToArray` for each CPL, accumulating all resulting arrays in a list.
+
 * `AK_CPG_ToArrayList`
 
 
@@ -271,7 +277,7 @@ typedef struct AK_Dialect{
 } AK_Dialect;
 ```
 
-Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maintains state regarding the progress of the parsing.
+The `AK_DelimitedReader` `struct` holds the incremental state of the delimited parser, as well as the source iterable of strings.
 
 ```C
 typedef struct AK_DelimitedReader{
@@ -288,7 +294,7 @@ typedef struct AK_DelimitedReader{
 } AK_DelimitedReader;
 ```
 
-Core functionality includes `AK_DR_process_char`, which is the main function that determines the state the parser and calls `AK_DR_add_char` with valid characters and calls `AK_DR_close_field` at the end of fields.
+The core functionality of the parser is implemented in `AK_DR_process_char`. This function evaluates state one character at at ime, and calls `AK_DR_add_char` with valid characters and `AK_DR_close_field` at the end of fields. As the `AK_DelimitedReader` does not compose a CPG, a CPG is ultimately passed into each of these functions.
 
 * `AK_DR_New`
 * `AK_DR_Free`
@@ -296,23 +302,52 @@ Core functionality includes `AK_DR_process_char`, which is the main function tha
 * `AK_DR_add_char`
 * `AK_DR_process_char`
 * `AK_DR_line_reset`
-* `AK_DR_ProcessLine`
+
+The `AK_DR_ProcessRecord` is the main entry point. Each time the function is called, a CPG is provided, a record from `input_iter` is retrieved, and characters are processed and loaded in the appropriate CPLs.
+
+* `AK_DR_ProcessRecord`
 
 
 ## The `delimited_to_arrays` Function
 
-Given an iterable of "record" strings and appropriately typed parameters, this function creates an `AK_DelimitedReader` and an `AK_CodePointGrid` (CPG). Then, `AK_DR_ProcessLine`, given the CPG, is called once for each line in the iterable of strings.
+Given an iterable of "record" strings and appropriately typed parameters, this function creates an `AK_DelimitedReader` and an `AK_CodePointGrid` (CPG). Then, `AK_DR_ProcessRecord`, given the CPG, is called once for each line in the iterable of strings.
 
-Within each record, one character at time is read and passed to `AK_DR_process_char` along with the CPG. `AK_DR_process_char` is the core parser of delimited state, and is able to call `AK_DR_add_char` for each char within a field and then `AK_DR_close_field` once each field is complete. Those functions, which are also given the CPG, call `AK_CPG_AppendPointAtLine` and `AK_CPG_AppendOffsetAtLine` respectively, growing the CPG, and creating and extending new CPLs, as necessary.
+Within each record, one character at time is read and passed to `AK_DR_process_char` along with the CPG. `AK_DR_process_char`, as the core parser of delimited state, is able to call `AK_DR_add_char` for each char within a field and then `AK_DR_close_field` once each field is complete. Those functions, which are also given the CPG, call `AK_CPG_AppendPointAtLine` and `AK_CPG_AppendOffsetAtLine` respectively, growing the CPG, and creating and extending new CPLs as necessary.
 
-After all records are processed, the CPG is full loaded. `AK_CPG_ToArrayList` can then be called to realize each CPL as an array.
+After all records are processed, the CPG is fully loaded. `AK_CPG_ToArrayList` can then be called to realize each CPL as an array.
+
+```python
+>>> import arraykit as ak
+>>> ak.delimited_to_arrays(('a|true|1.2', 'b|false|5.4'), delimiter='|', axis=0)
+[array(['a', 'true', '1.2'], dtype='<U4'), array(['b', 'false', '5.4'], dtype='<U5')]
+>>>
+>>> ak.delimited_to_arrays(('a|true|1.2', 'b|false|5.4'), delimiter='|', axis=1)
+[array(['a', 'b'], dtype='<U1'), array([ True, False]), array([1.2, 5.4])]
+>>>
+>>> ak.delimited_to_arrays(('a|true|1.2', 'b|false|5.4'), delimiter='|', axis=1, line_select=lambda i: i != 1)
+[array(['a', 'b'], dtype='<U1'), array([1.2, 5.4])]
+```
+
+
+## The `iterable_str_to_array_1d` Function
+
+Given an iterable of strings, call `AK_IterableStrToArray1D`, which in-turn creates a single CPL with `AK_CPL_FromIterable`. The CPL is then used to create an array with `AK_CPL_ToArray`. As `dtype` can be given `None` to force type evaluation, this interface provides a convenient way to test type evaluation on a single CPL.
+
+```python
+>>> import arraykit as ak
+>>> ak.iterable_str_to_array_1d(('true', 'False'), None)
+array([ True, False])
+>>>
+>>> ak.iterable_str_to_array_1d(('true', 'False'), str)
+array(['true', 'False'], dtype='<U5')
+```
 
 
 ## Questions & Future Work
 
 * Better performance is available from creating datetime64 and complex values directly from bytes.
-* What growth strategies for CPL, CPG are best? Is it worth passing in collecint a record count hint when available (i.e., when the length of the string iterable is known)?
-* Is it possible to multi-thread array creation?
-* I am not using locale information to determine the meaning of decimal and comma; is this important, or should they be brought in as parameters?
+* What initial sizes and growth strategies for CPL, CPG are best? Is it worth collecting a record count hint when available (i.e., when the length of the string iterable is known)?
+* Nearly all array loading loops are wrapped in `NPY_BEGIN_THREADS`, `NPY_END_THREADS` macros, as no `PyObject`s are involved; is it possible then to multi-thread CPL array creation?
+* I am not using locale information to determine the meaning of decimal and comma; is this important, and/or should they be brought in as parameters (e.g., `decimalchar` and `thousandschar`)?
 
 
