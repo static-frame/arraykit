@@ -310,7 +310,7 @@ After all records are processed, the CPG is full loaded. `AK_CPG_ToArrayList` ca
 
 ## Questions & Future Work
 
-* Creating datetime64 and complex values directly from bytes.
-* What growth strategies for CPL, CPG are best? Is it worth passing in record count hint when available?
-* Is it possible to mulit-thread array creation?
-* I am not using locale information to determine the meaning of decimal and comma; is this important?
+* Better performance is available from vreating datetime64 and complex values directly from bytes.
+* What growth strategies for CPL, CPG are best? Is it worth passing in collecint a record count hint when available (i.e., when the length of the string iterable is known)?
+* Is it possible to multi-thread array creation?
+* I am not using locale information to determine the meaning of decimal and comma; is this important, or should they be brought in as parameters?
