@@ -1132,7 +1132,8 @@ typedef struct AK_CodePointLine{
 } AK_CodePointLine;
 
 // on error return NULL
-AK_CodePointLine* AK_CPL_New(bool type_parse)
+AK_CodePointLine*
+AK_CPL_New(bool type_parse)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
     if (cpl == NULL) return (AK_CodePointLine*)PyErr_NoMemory();
@@ -1177,7 +1178,8 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
     return cpl;
 }
 
-void AK_CPL_Free(AK_CodePointLine* cpl)
+void
+AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
     PyMem_Free(cpl->offsets);

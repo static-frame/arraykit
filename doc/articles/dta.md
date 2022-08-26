@@ -3,7 +3,9 @@
 
 The `delimited_to_arrays` function takes an iterable of strings (which might be an iterator of lines from a file) and extracts fields from that string based on a delimiter. Fields are accumulated into "lines" of contiguous Unicode byte data; lines can accumulate fields by row (axis 0) or by column (axis 1). As lines accumulate fields, types are optionally evaluated based on a heuristic, content- and count-based evaluation. After a single pass of reading the file, all lines are loaded and (optionally per line) types have been evaluated.
 
-After loading, each line is converted to an array. For each line, an empty array of appropriate size can be created. For most types (bool, ints, float, Unicode, bytes), byte data is directly translated into C types that are assigned into the array's buffer. For a few types (datetime64, complex), byte arrays are created, and then a NumPy cast is used to deliver the desired type.
+After loading, each line is converted to an array. For each line, an empty array of appropriate size can be created. For most types (bool, ints, float, Unicode, bytes), byte data is directly translated into C types that are assigned into the array's buffer. For a few types (datetime64, complex), byte arrays are created, and then a NumPy cast is used to deliver the desired type
+
+The CPython interface to `delimited_to_arrays` is given below:
 
 ```C
 static PyObject*
@@ -92,7 +94,7 @@ We can do the same on the right hand side of the assignment, such that we derefe
 
 ### AK_TypeParserState (AK_TPS)
 
-An Enum that defines the interpretation of a field or line of types. Can be unknown (on init) or empty (on encountering empty values). Available functions permit "resolving" the dtype of two states. Unlike with normal dtype resolution, the dtype of "no-return" is string, not object.
+An Enum that defines the type interpretation of a field or line of fields. Can be unknown (on initialization) or empty (on encountering empty values). Available functions permit "resolving" the type of two states. Unlike with normal dtype resolution, the dtype of "no-return" is string, not object.
 
 * `AK_TPS_Resolve`
 * `AK_TPS_ToDtype`
@@ -100,7 +102,7 @@ An Enum that defines the interpretation of a field or line of types. Can be unkn
 
 ### AK_TypeParser (AK_TP)
 
-A struct used to store the state of the type interpretation of a field, and ultimately of a compelte line. One instance is created per line.
+A struct used to store the state of the type interpretation of a field, and ultimately of a complete line. One instance is created per line.
 
 ```C
 typedef struct AK_TypeParser {
@@ -129,7 +131,7 @@ typedef struct AK_TypeParser {
 } AK_TypeParser;
 ```
 
-For each field, counts of numerous indicators are measured as well as the contiguity of various characteristics. This is done by calling `AK_TP_ProcessChar` once for each character per line. After each field is completed, `AK_TP_ResolveLineResetField` is called to determine the evualted field type (with `AK_TPS_Resolve`) as well as the the incrementally evaluated line type.
+For each field, counts of numerous indicators are measured as well as the contiguity of various characteristics. This is done by calling `AK_TP_ProcessChar` once for each character per line. After each field is completed, `AK_TP_ResolveLineResetField` is called to determine the evaluated field type (with `AK_TPS_Resolve`) as well as the incrementally evaluated line type.
 
 * `AK_TP_New`
 * `AK_TP_Free`
@@ -143,15 +145,17 @@ For each field, counts of numerous indicators are measured as well as the contig
 
 These function are designed to convert a region of contiguous byte data (given a pointer to the start and end) to a C type.
 
-These functions are different than common library functions in that they they take start/end pointers, not a NULL-terminated string. Common library functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
+These functions are different than common library functions in that they take start/end pointers, not a NULL-terminated string. Common library functions (like `atof`, `strtod` or, from the CPython API, `PyOS_string_to_double`) require a null-terminated string.
 
-All of these function are based on Pandas tokenizer.c implementations, though adapted to work with a buffer range.
+All of these functions are based on Pandas tokenizer.c implementations, though adapted to work with a buffer range.
 
 * `AK_UCS4_to_int64`
 * `AK_UCS4_to_uint64`
 * `AK_UCS4_to_float64`
 
-There are wide variety of ways of converting floats from strings. By far the most accurate is `PyOS_string_to_double`, which offers round trip float representations for all values without noise. This function, however, requires a NULL-terminated string. While I explored an implementation that used this function, it required copying out of the contiguous buffer to a pre-allocated null-terminated string, which appeared to materially degrade performance.
+There exist many ways of converting floats to strings. Perhaps the most accurate is `PyOS_string_to_double`, which offers round trip float representations for all values without noise. This function, however, requires a NULL-terminated string, and at well over a thousand lines, seemed far too complicated to replicate. While I explored an implementation that used this function, it required copying characters out of the contiguous buffer to a pre-allocated null-terminated string, which appeared to materially degrade performance. The `AK_UCS4_to_float64` implementation used here matches Pandas default configuration, though Pandas does permit optionally enabling `PyOS_string_to_double`. The following StackOverflow discussion provides additional context.
+
+* https://stackoverflow.com/questions/44697714/on-the-float-precision-argument-to-pandas-read-csv/73465048#73465048
 
 
 
@@ -180,13 +184,11 @@ typedef struct AK_CodePointLine{
 } AK_CodePointLine;
 ```
 
-The core representation consists of two parts, A dynamically growable contiguous array of Py_UCS4 (`buffer`) (with no null terminators), and a dynamically growable array of offsets, providing the number of Py_UCS4 in each field and (implicity, or explicitly with `offset_count`) the number of fields.
+The core representation consists of two parts, A dynamically growable contiguous array of Py_UCS4 (`buffer`) (with no null terminators), and a dynamically growable array of offsets, providing the number of Py_UCS4 in each field and (implicitly, or explicitly with `offset_count`) the number of fields.
 
-The CPL also tracks the `offset_max`, the largest offset observed, while processing each field. This is needed when determining the element size of unicode dtypes, or when creating a re-usable Py_UCS4 buffer (for usage of PyOS_string_to_double which requires a NULL-terminated string, loaded with AK_CPL_current_to_field).
+The CPL also tracks the `offset_max`, the largest offset observed, while processing each field. This is needed when determining the element size of unicode or bytes dtypes.
 
-In addition, a CPL on creation optionally composes an AK_TypeParser instance. This permits the CPL to optionally call AK_TP_ProcessChar for each char when accumlating chars.
-
-The CPL tracks the pointer to the current position in the buffer, as well as the current index in the offsets.
+In addition, a CPL on creation optionally composes an `AK_TypeParser` instance. This permits the CPL to optionally call `AK_TP_ProcessChar` for each char as accumulating chars.
 
 In general operation, a CPL has to phases: a loading phase, and conversion phase.
 
@@ -195,22 +197,22 @@ In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in tu
 * `AK_CPL_New`
 * `AK_CPL_Free`
 * `AK_CPL_resize`
-* `AK_CPL_AppendField`
 * `AK_CPL_AppendPoint`
 * `AK_CPL_AppendOffset`
 
-In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type. When reading from the stored bytes, utility functions advance and reset a "current" position.
+In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type. When reading from the stored bytes, utility functions advance and reset the current position in the buffer, as well as the current index in the offsets.
 
 * `AK_CPL_CurrentReset`
 * `AK_CPL_CurrentAdvance`
 
-Given the current position, utility functions can return types.
+When converting bytes to C types, given the current CPL positions, utility functions are implemented to return types. The `AK_CPL_current_to_int64`, `AK_CPL_current_to_uint64`, and `AK_CPL_current_to_float64` functions prepare pointers to call the lower level `AK_UCS4_to_int64`, `AK_UCS4_to_uint64`, and `AK_UCS4_to_float64` functions, respectively.
 
 * `AK_CPL_current_to_bool`
 * `AK_CPL_current_to_int64`
+* `AK_CPL_current_to_uint64`
 * `AK_CPL_current_to_float64`
 
-These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
+The outermost interface to convert a CPL to an array is `AK_CPL_ToArray`; this function branches to type-specific private functions based on dtype, provided either directly (via a `dtypes` function passed to `delimited_to_arrays`) or via a `type_parser` on the CPL. These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
 
 * `AK_CPL_to_array_bool`
 * `AK_CPL_to_array_float`
@@ -221,25 +223,27 @@ These methods use various techniques to convert CPL field bytes to C values that
 * `AK_CPL_to_array_via_cast`
 * `AK_CPL_ToArray`
 
-Finally, an alternative constructor is made available to create a CPL from an iterable fo string objects.
+Finally, an alternative loader, `AK_CPL_FromIterable`, is made available to create a CPL from an iterable of string objects. Each string is loaded with `AK_CPL_AppendField`. These functions are called to implement the public `iterable_str_to_array_1d` interface.
 
 * `AK_CPL_FromIterable`
+* `AK_CPL_AppendField`
 
 
 
 ### AK_CodePointGrid (CPG)
 
-The CodePointGrid is dynamic container of CodePointLines. It largely serves as the public interface to CPLs.
+The CodePointGrid is dynamic container of `AK_CodePointLine`s. It largely serves as the public interface to CPLs, automatically creating new CPLs when needed.
 
 ```C
 typedef struct AK_CodePointGrid {
-    Py_ssize_t lines_count;    // accumulated number of lines
-    Py_ssize_t lines_capacity; // max number of lines
-    AK_CodePointLine **lines;  // array of pointers
-    PyObject *dtypes;          // a callable that returns None or a dtype initializer
+    Py_ssize_t lines_count;
+    Py_ssize_t lines_capacity;
+    AK_CodePointLine **lines;
+    PyObject *dtypes;
 } AK_CodePointGrid;
 ```
 
+Given a line number (which, depending on the `axis` argument, is either the `AK_DelimitedReader` `record_number` or the `field_number`), `AK_CPG_AppendPointAtLine` will add a character to the appropriate CPL, allocating it if it does not exist. At the conlusion of each field, `AK_CPG_AppendOffsetAtLine` is called, it in-turn calling `AK_CPL_AppendOffset` on the appropriate CPL.
 
 * `AK_CPG_New`
 * `AK_CPG_Free`
@@ -248,11 +252,26 @@ typedef struct AK_CodePointGrid {
 * `AK_CPG_AppendOffsetAtLine`
 * `AK_CPG_ToArrayList`
 
+
 ### AK_Dialect, AK_DelimitedReaderState, AK_DelimitedReader
 
-These components are all extensions of the original CPython csv reader.
+These components are all extensions of the original CPython CSV reader. As much as possible, the code was simplified and renamed to match the style and usage in ArrayKit.
 
-Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maitains state regarding the progress of the parsing.
+The `AK_Dialect` struct is a utility container, bundling parsing configuration settings. An instance is composed within the `AK_DelimitedReader`.
+
+```C
+typedef struct AK_Dialect{
+    char doublequote;
+    char skipinitialspace;
+    char strict;
+    int quoting;
+    Py_UCS4 delimiter;
+    Py_UCS4 quotechar;
+    Py_UCS4 escapechar;
+} AK_Dialect;
+```
+
+Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maintains state regarding the progress of the parsing.
 
 ```C
 typedef struct AK_DelimitedReader{
@@ -269,7 +288,7 @@ typedef struct AK_DelimitedReader{
 } AK_DelimitedReader;
 ```
 
-Core functionality includes `AK_DR_process_char`, which is the main branching state the parser. Valid characters are called with `AK_DR_add_char`, and fields are completed with `AK_DR_close_field`.
+Core functionality includes `AK_DR_process_char`, which is the main function that determines the state the parser and calls `AK_DR_add_char` with valid characters and calls `AK_DR_close_field` at the end of fields.
 
 * `AK_DR_New`
 * `AK_DR_Free`
@@ -294,4 +313,4 @@ After all records are processed, the CPG is full loaded. `AK_CPG_ToArrayList` ca
 * Creating datetime64 and complex values directly from bytes.
 * What growth strategies for CPL, CPG are best? Is it worth passing in record count hint when available?
 * Is it possible to mulit-thread array creation?
-
+* I am not using locale information to determine the meaning of decimal and comma; is this important?
