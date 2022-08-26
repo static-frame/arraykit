@@ -102,7 +102,7 @@ An Enum that defines the interpretation of a field or line of types. Can be unkn
 
 A struct used to store the state of the type interpretation of a field, and ultimately of a compelte line. One instance is created per line.
 
-For each field, counts of numerous indicators are measured as well as the contiguity of various characteristics. This is done by calling `AK_TP_ProcessChar` once for each character per line. After each field is completed, `AK_TP_ResolveLineResetField` is called to determine the incremental evaluated field type.
+For each field, counts of numerous indicators are measured as well as the contiguity of various characteristics. This is done by calling `AK_TP_ProcessChar` once for each character per line. After each field is completed, `AK_TP_ResolveLineResetField` is called to determine the evualted field type (with `AK_TPS_Resolve`) as well as the the incrementally evaluated line type.
 
 * `AK_TP_New`
 * `AK_TP_Free`
@@ -111,15 +111,21 @@ For each field, counts of numerous indicators are measured as well as the contig
 * `AK_TP_resolve_field`
 * `AK_TP_ResolveLineResetField`
 
-### Py_UCS4 Converter functions:
 
-These function are designed to convert a region of a contiguous byte data (given a pointer to the start and end) to a C type.
+### Py_UCS4 Converter Functions
 
-These functions are different than common library functions in that they they take start/end pointers, nout a NULL-terminated string. Common library functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
+These function are designed to convert a region of contiguous byte data (given a pointer to the start and end) to a C type.
+
+These functions are different than common library functions in that they they take start/end pointers, not a NULL-terminated string. Common library functions (like `atof` or `PyOS_string_to_double`) require a null-terminated string.
+
+All of these function are based on Pandas tokenizer.c implementations, though adapted to work with a buffer range.
 
 * `AK_UCS4_to_int64`
 * `AK_UCS4_to_uint64`
 * `AK_UCS4_to_float64`
+
+There are wide variety of ways of converting floats from strings. By far the most accurate is `PyOS_string_to_double`, which offers round trip float representations for all values without noise. This function, however, requires a NULL-terminated string. While I explored an implementation that used this function, it required copying out of the contiguous buffer to a pre-allocated null-terminated string, which appeared to materially degrade performance.
+
 
 
 ### AK_CodePointLine (CPL)
