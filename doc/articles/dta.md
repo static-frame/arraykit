@@ -102,6 +102,33 @@ An Enum that defines the interpretation of a field or line of types. Can be unkn
 
 A struct used to store the state of the type interpretation of a field, and ultimately of a compelte line. One instance is created per line.
 
+```C
+typedef struct AK_TypeParser {
+    bool previous_numeric;
+    bool contiguous_numeric;
+    bool contiguous_leading_space;
+
+    npy_int8 count_bool;
+    npy_int8 count_sign;
+    npy_int8 count_e;
+    npy_int8 count_j;
+    npy_int8 count_decimal;
+    npy_int8 count_nan;
+    npy_int8 count_inf;
+    npy_int8 count_paren_open;
+    npy_int8 count_paren_close;
+
+    Py_ssize_t last_sign_pos;
+    Py_ssize_t count_leading_space;
+    Py_ssize_t count_digit;
+    Py_ssize_t count_not_space;
+
+    AK_TypeParserState parsed_field;
+    AK_TypeParserState parsed_line;
+
+} AK_TypeParser;
+```
+
 For each field, counts of numerous indicators are measured as well as the contiguity of various characteristics. This is done by calling `AK_TP_ProcessChar` once for each character per line. After each field is completed, `AK_TP_ResolveLineResetField` is called to determine the evualted field type (with `AK_TPS_Resolve`) as well as the the incrementally evaluated line type.
 
 * `AK_TP_New`
@@ -226,6 +253,23 @@ typedef struct AK_CodePointGrid {
 These components are all extensions of the original CPython csv reader.
 
 Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maitains state regarding the progress of the parsing.
+
+```C
+typedef struct AK_DelimitedReader{
+    PyObject *input_iter;
+    PyObject *line_select;
+    AK_Dialect *dialect;
+    AK_DelimitedReaderState state;
+    Py_ssize_t field_len;
+    Py_ssize_t record_number;
+    Py_ssize_t record_iter_number;
+    Py_ssize_t field_number;
+    int axis;
+    Py_ssize_t *axis_pos;
+} AK_DelimitedReader;
+```
+
+Core functionality includes `AK_DR_process_char`, which is the main branching state the parser. Valid characters are called with `AK_DR_add_char`, and fields are completed with `AK_DR_close_field`.
 
 * `AK_DR_New`
 * `AK_DR_Free`
