@@ -349,5 +349,4 @@ array(['true', 'False'], dtype='<U5')
 * What initial sizes and growth strategies for CPL, CPG are best? Is it worth collecting a record count hint when available (i.e., when the length of the string iterable is known)?
 * Nearly all array loading loops are wrapped in `NPY_BEGIN_THREADS`, `NPY_END_THREADS` macros, as no `PyObject`s are involved; is it possible then to multi-thread CPL array creation?
 * I am not using locale information to determine the meaning of decimal and comma; is this important, and/or should they be brought in as parameters (e.g., `decimalchar` and `thousandschar`)?
-
-
+* The current implementation of `line_select`, when used on columns, still loads de-selected lines into CPLs; the selection is only used to skip conversion of CPL data to arrays. This means that if a single column is selected, all columns will still be loaded in CPLs. This is suboptimal but avoids compromising performance in the case where a `line_select` is not used. Alternative approaches, in their simplest form, would call the Python `line_select` function once per character, dramatically degrading performance. With a bit greater complexity, a dynamic array could by built to store results of `line_select`, to be used for subsequent lookups.
