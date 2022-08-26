@@ -62,8 +62,8 @@ In C, we use `goto`. This is a common pattern in CPython where, on error, we oft
 
 In CPython, you have to manage reference counts. Failing to do so properly leads either to segmentation faults (over freeing) or memory leaks (under freeing). A few good resources are listed here:
 
-https://pythonextensionpatterns.readthedocs.io/en/latest/refcount.html
-https://docs.python.org/3/c-api/intro.html#objects-types-and-reference-counts
+* https://pythonextensionpatterns.readthedocs.io/en/latest/refcount.html
+* https://docs.python.org/3/c-api/intro.html#objects-types-and-reference-counts
 
 These routines make extensive use of pointers to arrays of characters (or Unicode code points). Recall that the handle to a C array is a pointer to its head; addition to that pointer "moves" it to point to that many positions forward in the array. Adding one to an array pointer returns a pointer to the next item. Nothing will stop you from advancing beyond the end of the array, so pointer arithmetic must often check that the end of the array has not been exceeded.
 
@@ -132,6 +132,27 @@ There are wide variety of ways of converting floats from strings. By far the mos
 
 A representation of a "line", or a group of fields which might be a column (when axis is 1) or a row (when axis is 0).
 
+```C
+typedef struct AK_CodePointLine{
+    Py_ssize_t buffer_count;
+    Py_ssize_t buffer_capacity;
+    Py_UCS4 *buffer;
+
+    Py_ssize_t offsets_count;
+    Py_ssize_t offsets_capacity;
+    Py_ssize_t *offsets;
+    Py_ssize_t offset_max;
+
+    Py_UCS4 *buffer_current_ptr;
+    Py_ssize_t offsets_current_index;
+
+    AK_TypeParser *type_parser;
+    bool type_parser_field_active;
+    bool type_parser_line_active;
+
+} AK_CodePointLine;
+```
+
 The core representation consists of two parts, A dynamically growable contiguous array of Py_UCS4 (`buffer`) (with no null terminators), and a dynamically growable array of offsets, providing the number of Py_UCS4 in each field and (implicity, or explicitly with `offset_count`) the number of fields.
 
 The CPL also tracks the `offset_max`, the largest offset observed, while processing each field. This is needed when determining the element size of unicode dtypes, or when creating a re-usable Py_UCS4 buffer (for usage of PyOS_string_to_double which requires a NULL-terminated string, loaded with AK_CPL_current_to_field).
@@ -150,18 +171,19 @@ In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in tu
 * `AK_CPL_AppendField`
 * `AK_CPL_AppendPoint`
 * `AK_CPL_AppendOffset`
-* `AK_CPL_FromIterable`
 
+In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type. When reading from the stored bytes, utility functions advance and reset a "current" position.
 
 * `AK_CPL_CurrentReset`
 * `AK_CPL_CurrentAdvance`
+
+Given the current position, utility functions can return types.
+
 * `AK_CPL_current_to_bool`
 * `AK_CPL_current_to_int64`
 * `AK_CPL_current_to_float64`
 
-
-In the conversion phase, a CPL exporter is used to convert the line to an array of a specific type. These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
-
+These methods use various techniques to convert CPL field bytes to C values that can then be directly written to a pre-sized array buffer, offering excellent performance.
 
 * `AK_CPL_to_array_bool`
 * `AK_CPL_to_array_float`
@@ -171,6 +193,11 @@ In the conversion phase, a CPL exporter is used to convert the line to an array 
 * `AK_CPL_to_array_bytes`
 * `AK_CPL_to_array_via_cast`
 * `AK_CPL_ToArray`
+
+Finally, an alternative constructor is made available to create a CPL from an iterable fo string objects.
+
+* `AK_CPL_FromIterable`
+
 
 
 ### AK_CodePointGrid (CPG)
@@ -199,7 +226,6 @@ typedef struct AK_CodePointGrid {
 These components are all extensions of the original CPython csv reader.
 
 Of these, `AK_DelimitedReader` is the primary interface. The associated struct holds the iterable of strings and maitains state regarding the progress of the parsing.
-
 
 * `AK_DR_New`
 * `AK_DR_Free`

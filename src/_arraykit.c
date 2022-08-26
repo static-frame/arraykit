@@ -1118,7 +1118,6 @@ typedef struct AK_CodePointLine{
     Py_ssize_t offsets_count; // accumulated number of elements, never reset
     Py_ssize_t offsets_capacity; // max number of elements
     Py_ssize_t *offsets;
-
     Py_ssize_t offset_max; // observe max offset found across all
 
     // these can be reset
