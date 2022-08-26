@@ -415,7 +415,7 @@ AK_TP_Free(AK_TypeParser* tp)
 
 //------------------------------------------------------------------------------
 
-// Given a type parse, process a single character and update the type parser state. Return true when processing should continue, false when no further processing is necessary. `pos` is the raw position within the current field.
+// Given a type parse, process a single character and update the type parser state in `parsed_field`. Return true when processing should continue, false when no further processing is necessary. `pos` is the raw position within the current field.
 bool
 AK_TP_ProcessChar(AK_TypeParser* tp,
         char c,
@@ -710,8 +710,8 @@ AK_TP_resolve_field(AK_TypeParser* tp,
     return TPS_STRING; // default
 }
 
-// After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributesa are reset after this is called.
-void
+// After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributes are reset after this is called. Returns true if the line still needs to be evaluated.
+bool
 AK_TP_ResolveLineResetField(AK_TypeParser* tp,
         Py_ssize_t count)
 {
@@ -720,6 +720,8 @@ AK_TP_ResolveLineResetField(AK_TypeParser* tp,
         tp->parsed_line = AK_TPS_Resolve(tp->parsed_line, AK_TP_resolve_field(tp, count));
     }
     AK_TP_reset_field(tp);
+    // if string, return false to stop further line processing
+    return tp->parsed_line != TPS_STRING;
 }
 
 //------------------------------------------------------------------------------
@@ -1126,6 +1128,7 @@ typedef struct AK_CodePointLine{
     // char *field;
     AK_TypeParser *type_parser;
     bool type_parser_field_active;
+    bool type_parser_line_active;
 
 } AK_CodePointLine;
 
@@ -1165,10 +1168,12 @@ AK_CodePointLine* AK_CPL_New(bool type_parse)
             return NULL; // exception already set
         }
         cpl->type_parser_field_active = true;
+        cpl->type_parser_line_active = true;
     }
     else {
         cpl->type_parser = NULL;
         cpl->type_parser_field_active = false;
+        cpl->type_parser_line_active = false;
     }
     return cpl;
 }
@@ -1273,7 +1278,9 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (AK_CPL_resize(cpl, 1)) return -1;
 
     // type_parser might not be active if we already know the dtype
-    if (cpl->type_parser && cpl->type_parser_field_active) {
+    if (cpl->type_parser
+            && cpl->type_parser_line_active
+            && cpl->type_parser_field_active) {
         cpl->type_parser_field_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
     }
     *cpl->buffer_current_ptr++ = p;
@@ -1288,8 +1295,10 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
     // this will update cpl->offsets if necessary
     if (AK_CPL_resize(cpl, 1)) return -1;
 
-    if (cpl->type_parser) {
-        AK_TP_ResolveLineResetField(cpl->type_parser, offset);
+    if (cpl->type_parser && cpl->type_parser_line_active) {
+        cpl->type_parser_line_active = AK_TP_ResolveLineResetField(
+                cpl->type_parser,
+                offset);
         cpl->type_parser_field_active = true; // turn back on for next field
     }
     // increment offset_count after assignment so we can grow if needed next time
