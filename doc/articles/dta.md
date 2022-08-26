@@ -249,5 +249,5 @@ After all records are processed, the CPG is full loaded. `AK_CPG_ToArrayList` ca
 
 * Creating datetime64 and complex values directly from bytes.
 * What growth strategies for CPL, CPG are best? Is it worth passing in record count hint when available?
-* Is it possible to mulit-thread array creating
+* Is it possible to mulit-thread array creation?
 
