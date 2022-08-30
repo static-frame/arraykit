@@ -199,7 +199,8 @@ In the loading phase, `AK_CPL_AppendPoint` is called for each point, which in tu
 
 * `AK_CPL_New`
 * `AK_CPL_Free`
-* `AK_CPL_resize`
+* `AK_CPL_resize_buffer`
+* `AK_CPL_resize_offsets`
 * `AK_CPL_AppendPoint`
 * `AK_CPL_AppendOffset`
 

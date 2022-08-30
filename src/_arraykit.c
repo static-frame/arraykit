@@ -1195,9 +1195,8 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CodePointLine: Mutation
 
-// Resize in place if necessary; noop if not. Return 0 on success, -1 on error.
 static inline int
-AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
+AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t count)
 {
     if ((cpl->buffer_count + count) >= cpl->buffer_capacity) {
         // realloc
@@ -1208,6 +1207,12 @@ AK_CPL_resize(AK_CodePointLine* cpl, Py_ssize_t count)
 
         cpl->buffer_current_ptr = cpl->buffer + cpl->buffer_count;
     }
+    return 0;
+}
+
+static inline int
+AK_CPL_resize_offsets(AK_CodePointLine* cpl)
+{
     // increment by at most one, so only need to check if equal
     if (cpl->offsets_count == cpl->offsets_capacity) {
         // realloc
@@ -1231,9 +1236,8 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(field);
 
     // if we cannot fit field length, resize
-    if (AK_CPL_resize(cpl, element_length)) {
-        return -1;
-    }
+    if (AK_CPL_resize_buffer(cpl, element_length)) return -1;
+
     // we write teh field direclty into the CPL buffer
     if(PyUnicode_AsUCS4(field,
             cpl->buffer_current_ptr,
@@ -1242,7 +1246,7 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
         return -1;
     }
     // if type parsing has been enabled, we must process each char
-    if (cpl->type_parser) {
+    if (cpl->type_parser && cpl->type_parser_line_active) {
         Py_UCS4* p = cpl->buffer_current_ptr;
         Py_UCS4 *end = p + element_length;
         Py_ssize_t pos = 0;
@@ -1254,11 +1258,12 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
             if (!cpl->type_parser_field_active) break;
             ++pos;
         }
-        AK_TP_ResolveLineResetField(cpl->type_parser, element_length);
+        cpl->type_parser_line_active = AK_TP_ResolveLineResetField(cpl->type_parser, element_length);
         cpl->type_parser_field_active = true; // turn back on for next field
     }
 
     // read offset_count, then increment
+    if (AK_CPL_resize_offsets(cpl)) return -1;
     cpl->offsets[cpl->offsets_count++] = element_length;
     cpl->buffer_count += element_length;
     cpl->buffer_current_ptr += element_length; // add to pointer
@@ -1276,7 +1281,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         Py_ssize_t pos)
 {
     // based on buffer_count, resize if we cannot fit one more character
-    if (AK_CPL_resize(cpl, 1)) return -1;
+    if (AK_CPL_resize_buffer(cpl, 1)) return -1;
 
     // type_parser might not be active if we already know the dtype
     if (cpl->type_parser
@@ -1294,7 +1299,7 @@ static inline int
 AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 {
     // this will update cpl->offsets if necessary
-    if (AK_CPL_resize(cpl, 1)) return -1;
+    if (AK_CPL_resize_offsets(cpl)) return -1;
 
     if (cpl->type_parser && cpl->type_parser_line_active) {
         cpl->type_parser_line_active = AK_TP_ResolveLineResetField(
@@ -1948,7 +1953,7 @@ AK_CPG_New(PyObject *dtypes)
     if (cpg == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
     cpg->lines_count = 0;
-    cpg->lines_capacity = 100;
+    cpg->lines_capacity = 1024;
     cpg->lines = (AK_CodePointLine**)PyMem_Malloc(
             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
     if (cpg->lines == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
