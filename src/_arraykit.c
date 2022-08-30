@@ -1913,11 +1913,15 @@ AK_line_select_keep(
         int lookup_number)
 {
     if (axis_target && (line_select != NULL)) {
+        PyObject* number = PyLong_FromLong(lookup_number);
+        if (number == NULL) return -1;
+
         PyObject* keep = PyObject_CallFunctionObjArgs(
                 line_select,
-                PyLong_FromLong(lookup_number),
+                number,
                 NULL
                 );
+        Py_DECREF(number);
         if (keep == NULL) {
             PyErr_Format(PyExc_RuntimeError,
                     "line_select callable failed for input: %d",
@@ -1925,6 +1929,7 @@ AK_line_select_keep(
                     );
             return -1;
         }
+
         int t = PyObject_IsTrue(keep); // 1 if truthy
         Py_DECREF(keep);
         if (t < 0) {
@@ -1996,11 +2001,15 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             type_parse = true;
         }
         else {
+            PyObject* line_count = PyLong_FromLong(line);
+            if (line_count == NULL) return -1;
+
             PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
                     cpg->dtypes,
-                    PyLong_FromLong(line),
+                    line_count,
                     NULL
                     );
+            Py_DECREF(line_count);
             if (dtype_specifier == NULL) {
                 // NOTE: not sure how to get the exception from the failed call...
                 PyErr_Format(PyExc_RuntimeError,
@@ -2084,11 +2093,18 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         PyArray_Descr* dtype = NULL;
 
         if (dtypes != NULL) {
-            PyObject* dtype_specifier = PyObject_CallFunctionObjArgs( // new ref
+            // NOTE: we call this with i regardless of if we skipped a line
+            PyObject* line_count = PyLong_FromLong(i);
+            if (line_count == NULL) {
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
                     dtypes,
-                    PyLong_FromLong(i),
+                    line_count,
                     NULL
                     );
+            Py_DECREF(line_count);
             if (dtype_specifier == NULL) {
                 Py_DECREF(list);
                 // NOTE: not sure how to get the exception from the failed call...
