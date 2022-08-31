@@ -1070,7 +1070,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             if (p >= end) goto exit;
         }
     }
-    goto exit;
 exit:
     if (negative_base) number = -number;
     // n will be zero if no E found
@@ -1974,7 +1973,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
-    Py_XDECREF(cpg->dtypes); // might be NULL
+    // Py_XDECREF(cpg->dtypes); // passed in arg; is this necesary?
     PyMem_Free(cpg);
 }
 //------------------------------------------------------------------------------
@@ -2799,7 +2798,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    Py_XINCREF(line_select);
+    // Py_XINCREF(line_select); // TODO: decref obbligations; maybe no incref
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
             delimiter,
@@ -2813,7 +2812,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    Py_XINCREF(dtypes);
+    // Py_XINCREF(dtypes);
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
     if (cpg == NULL) { // error will be set
         AK_DR_Free(dr);
@@ -2839,7 +2838,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select);
-    Py_XDECREF(line_select); // might be NULL
+    // Py_XDECREF(line_select); // might be NULL
 
     // NOTE: do not need to check if arrays is NULL as weill return anyway
     AK_CPG_Free(cpg); // will free reference to dtypes
