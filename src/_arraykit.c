@@ -1953,6 +1953,15 @@ typedef struct AK_CodePointGrid {
 AK_CodePointGrid*
 AK_CPG_New(PyObject *dtypes)
 {
+    // normalize dtypes to NULL or callable
+    if ((dtypes == NULL) || (dtypes == Py_None)) {
+        dtypes = NULL;
+    }
+    else if (!PyCallable_Check(dtypes)) {
+        PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
+        return NULL;
+    }
+
     AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
     if (cpg == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
@@ -1962,7 +1971,9 @@ AK_CPG_New(PyObject *dtypes)
             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
     if (cpg->lines == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
+    Py_XINCREF(dtypes);
     cpg->dtypes = dtypes;
+
     return cpg;
 }
 
@@ -1973,7 +1984,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
-    // Py_XDECREF(cpg->dtypes); // passed in arg; is this necesary?
+    Py_XDECREF(cpg->dtypes); // passed in arg; is this necesary?
     PyMem_Free(cpg);
 }
 //------------------------------------------------------------------------------
@@ -2672,7 +2683,7 @@ AK_DR_New(PyObject *iterable,
     dr->record_number = -1;
     dr->record_iter_number = -1;
 
-    dr->input_iter = PyObject_GetIter(iterable);
+    dr->input_iter = PyObject_GetIter(iterable); // new ref, decref in free
     if (dr->input_iter == NULL) {
         AK_DR_Free(dr);
         return NULL;
@@ -2776,14 +2787,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &strict))
         return NULL;
 
-    // normalize dtypes to NULL or callable
-    if ((dtypes == NULL) || (dtypes == Py_None)) {
-        dtypes = NULL;
-    }
-    else if (!PyCallable_Check(dtypes)) {
-        PyErr_SetString(PyExc_TypeError, "dtypes must be a callable or None");
-        return NULL;
-    }
     // normalize line_select to NULL or callable
     if ((line_select == NULL) || (line_select == Py_None)) {
         line_select = NULL;
@@ -2792,13 +2795,13 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "line_select must be a callable or None");
         return NULL;
     }
+    Py_XINCREF(line_select);
 
     if ((axis < 0) || (axis > 1)) {
         PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
         return NULL;
     }
 
-    // Py_XINCREF(line_select); // TODO: decref obbligations; maybe no incref
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
             delimiter,
@@ -2812,7 +2815,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    // Py_XINCREF(dtypes);
+    // dtypes inc / dec ref bound within CPG life
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
     if (cpg == NULL) { // error will be set
         AK_DR_Free(dr);
@@ -2838,9 +2841,9 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     AK_DR_Free(dr);
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select);
-    // Py_XDECREF(line_select); // might be NULL
+    // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
 
-    // NOTE: do not need to check if arrays is NULL as weill return anyway
+    Py_XDECREF(line_select); // might be NULL
     AK_CPG_Free(cpg); // will free reference to dtypes
 
     return arrays; // could be NULL
