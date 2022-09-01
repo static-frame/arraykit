@@ -2269,8 +2269,10 @@ typedef struct AK_Dialect{
 
 // check types and convert to C values
 #define AK_Dialect_CALL_SETTER(meth, name, target, src, default) \
-    if (meth(name, target, src, default)) \
-        goto error
+    do {\
+        if (meth(name, target, src, default)) \
+            goto error; \
+    } while (0) \
 
 static AK_Dialect*
 AK_Dialect_New(PyObject *delimiter,
@@ -2346,11 +2348,7 @@ AK_Dialect_New(PyObject *delimiter,
                "quotechar must be set if quoting enabled");
         goto error;
     }
-    return dialect;
-error:
-    // We may have gone to error after allocating dialect but found an error in a parameter
-    PyMem_Free(dialect);
-
+    // done with all pyobjects
     Py_CLEAR(delimiter);
     Py_CLEAR(doublequote);
     Py_CLEAR(escapechar);
@@ -2358,6 +2356,17 @@ error:
     Py_CLEAR(quoting);
     Py_CLEAR(skipinitialspace);
     Py_CLEAR(strict);
+    return dialect;
+error:
+    Py_CLEAR(delimiter);
+    Py_CLEAR(doublequote);
+    Py_CLEAR(escapechar);
+    Py_CLEAR(quotechar);
+    Py_CLEAR(quoting);
+    Py_CLEAR(skipinitialspace);
+    Py_CLEAR(strict);
+    // We may have gone to error after allocating dialect but found an error in a parameter
+    PyMem_Free(dialect);
     return NULL;
 }
 
