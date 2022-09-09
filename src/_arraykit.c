@@ -2071,7 +2071,8 @@ AK_CPG_AppendOffsetAtLine(
 // Given a fully-loaded CodePointGrid, process each CodePointLine into an array and return a new list of those arrays. Returns NULL on failure.
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         int axis,
-        PyObject* line_select)
+        PyObject* line_select,
+        char tsep)
 {
     bool ls_inactive = line_select == NULL;
     PyObject *list;
@@ -2134,7 +2135,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
-        char tsep = '\0';
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep);
         if (array == NULL) {
             Py_XDECREF(dtype); // array could not steal reference
@@ -2720,7 +2720,8 @@ AK_DR_New(PyObject *iterable,
 static inline PyObject*
 AK_IterableStrToArray1D(
         PyObject *sequence,
-        PyObject *dtype_specifier)
+        PyObject *dtype_specifier,
+        char tsep)
 {
         PyArray_Descr* dtype = NULL;
         // will set NULL for None, and propagate NULLs
@@ -2732,7 +2733,6 @@ AK_IterableStrToArray1D(
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse);
         if (cpl == NULL) return NULL;
 
-        char tsep = '\0';
         PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep);
         if (array == NULL) {
             AK_CPL_Free(cpl);
@@ -2849,7 +2849,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_DR_Free(dr);
 
-    PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select);
+    char tsep = '\0';
+    PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
 
     Py_XDECREF(line_select); // might be NULL
@@ -2870,7 +2871,8 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
     {
         return NULL;
     }
-    return AK_IterableStrToArray1D(iterable, dtype_specifier);
+    char tsep = '\0';
+    return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep);
 }
 
 //------------------------------------------------------------------------------
