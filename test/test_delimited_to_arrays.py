@@ -658,6 +658,37 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([a.tolist() for a in post2], [['a', 'b'], [10, 20], ['foo', 'c']])
 
 
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_float_a(self) -> None:
+        msg = [
+            '1.2, 5.4, 9.2',
+            ' 3.5 ,  2.3  ,  6.3   ',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=True)
+        self.assertEqual([a.round(1).tolist() for a in post1],
+                [[1.2, 3.5], [5.4, 2.3], [9.2, 6.3]]
+                )
+
+    def test_delimited_to_arrays_float_b(self) -> None:
+        msg = [
+            '1.2, inf  , 9.2',
+            ' 3.5 ,  2.3  ,  -inf   ',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=True)
+        self.assertEqual([a.round(1).tolist() for a in post1],
+                [[1.2, 3.5], [np.inf, 2.3], [9.2, -np.inf]]
+                )
+
+    def test_delimited_to_arrays_float_c(self) -> None:
+        msg = [
+            '1.2, nan  , 9.2',
+            ' 3.5 ,  2.3  ,  -nan   ',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=True)
+        self.assertEqual(
+                [str(a.round(1).tolist()) for a in post1],
+                ['[1.2, 3.5]', '[nan, 2.3]', '[9.2, nan]']
+                )
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_quoting_a(self) -> None:

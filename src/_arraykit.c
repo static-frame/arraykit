@@ -988,12 +988,12 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             p++;
             if (p >= end) goto error;
             if (AK_is_f(*p)) {
-                // not removing trailing whitespace
                 p++;
-                if (p >= end) {
-                    if (negative_base) return -NPY_INFINITY;
-                    return NPY_INFINITY;
+                while (p < end) {
+                    if (!AK_is_space(*p++)) goto error;
                 }
+                if (negative_base) return -NPY_INFINITY;
+                return NPY_INFINITY;
             }
         }
         goto error; // matched i but nothing else
@@ -1005,9 +1005,11 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             p++;
             if (p >= end) goto error;
             if (AK_is_n(*p)) {
-                // not removing trailing whitespace
                 p++;
-                if (p >= end) return NPY_NAN;
+                while (p < end) {
+                    if (!AK_is_space(*p++)) goto error;
+                }
+                return NPY_NAN;
             }
         }
         goto error; // matched n but nothing else
@@ -1017,7 +1019,7 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
             number = number * 10. + (*p - '0');
             num_digits++;
         } else {
-            ++exponent; // why do we do this?
+            ++exponent;
         }
         p++;
         if (p >= end) goto exit;
