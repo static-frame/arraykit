@@ -736,9 +736,8 @@ static char* TRUE_UPPER = "TRUE";
 
 // Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets `error` to values greater than 0 on error; never sets error on success.
 static inline npy_int64
-AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 {
-    char tsep = '\0'; // thousands seperator; if null processing is skipped
     npy_int64 int_min = NPY_MIN_INT64;
     npy_int64 int_max = NPY_MAX_INT64;
     int isneg = 0;
@@ -850,10 +849,8 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
 
 // Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets error to > 0 on error; never sets error on success.
 static inline npy_uint64
-AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
-
-    char tsep = '\0'; // thousands seperator; if null processing is skipped
-
+AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
+{
     npy_uint64 pre_max = NPY_MAX_UINT64 / 10;
     npy_uint64 number = 0;
     int dig_pre_max = NPY_MAX_UINT64 % 10;
@@ -919,7 +916,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error) {
 
 // Based on precise_xstrtod from pandas/_libs/src/parser/tokenizer.c.
 static inline npy_float64
-AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
+AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 {
     // Cache powers of 10 in memory.
     static npy_float64 e[] = {
@@ -960,7 +957,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
     bool negative_base = false;
     bool negative_e = false;
 
-    Py_UCS4 tsep = ','; // from local? can be '\0'
     // Py_UCS4 decimal = '.'; // from locale?
     int num_digits = 0;
     int max_digits = 17;
@@ -1023,7 +1019,7 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error)
         }
         p++;
         if (p >= end) goto exit;
-        if (tsep != '\0' && *p == tsep) {
+        if (tsep != '\0' && *p == (Py_UCS4)tsep) {
             ++p;
             if (p >= end) goto exit;
         }
@@ -1418,24 +1414,24 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
 
 // NOTE: using PyOS_strtol was an alternative, but needed to be passed a null-terminated char, which would require copying the data out of the CPL. This approach reads directly from the CPL without copying.
 static inline npy_int64
-AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error)
+AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error, char tsep)
 {
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index]; // size is either 4 or 5
-    return AK_UCS4_to_int64(p, end, error);
+    return AK_UCS4_to_int64(p, end, error, tsep);
 }
 
 // Provide start and end buffer positions to provide a range of bytes to read and transform into an integer. Returns 0 on error; does not set exception.
 static inline npy_uint64
-AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error)
+AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error, char tsep)
 {
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-    return AK_UCS4_to_uint64(p, end, error);
+    return AK_UCS4_to_uint64(p, end, error, tsep);
 }
 
 static inline npy_float64
-AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error)
+AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep)
 {
     // interpret an empty field as NaN
     if (cpl->offsets[cpl->offsets_current_index] == 0) {
@@ -1443,7 +1439,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error)
     }
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-    return AK_UCS4_to_float64(p, end, error);
+    return AK_UCS4_to_float64(p, end, error, tsep);
 }
 
 
@@ -1495,7 +1491,7 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
-AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1518,7 +1514,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float128 *end = array_buffer + count;
         while (array_buffer < end) {
             // NOTE: cannot cast to npy_float128 here
-            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
         # endif
@@ -1528,7 +1524,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1537,7 +1533,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl, &error);
+            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1546,7 +1542,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl, &error);
+            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1569,7 +1565,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
-AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1590,7 +1586,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_int64(cpl, &error);
+            *array_buffer++ = AK_CPL_current_to_int64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1599,7 +1595,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl, &error);
+            *array_buffer++ = (npy_int32)AK_CPL_current_to_int64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1608,7 +1604,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl, &error);
+            *array_buffer++ = (npy_int16)AK_CPL_current_to_int64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1617,7 +1613,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl, &error);
+            *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1640,7 +1636,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array. Return NULL on error.
 static inline PyObject*
-AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1661,7 +1657,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_uint64(cpl, &error);
+            *array_buffer++ = AK_CPL_current_to_uint64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1670,7 +1666,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
         npy_uint32 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl, &error);
+            *array_buffer++ = (npy_uint32)AK_CPL_current_to_uint64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1679,7 +1675,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
         npy_uint16 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl, &error);
+            *array_buffer++ = (npy_uint16)AK_CPL_current_to_uint64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1688,7 +1684,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
         npy_uint8 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl, &error);
+            *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1862,7 +1858,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
 static inline PyObject*
-AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
+AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep) {
     if (!dtype) {
         // If we have a type_parser on the CPL, we can use that to get the dtype
         if (cpl->type_parser) {
@@ -1885,13 +1881,13 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype) {
         return AK_CPL_to_array_bytes(cpl, dtype);
     }
     else if (PyDataType_ISUNSIGNED(dtype)) { // must come before integer check
-        return AK_CPL_to_array_uint(cpl, dtype);
+        return AK_CPL_to_array_uint(cpl, dtype, tsep);
     }
     else if (PyDataType_ISINTEGER(dtype)) {
-        return AK_CPL_to_array_int(cpl, dtype);
+        return AK_CPL_to_array_int(cpl, dtype, tsep);
     }
     else if (PyDataType_ISFLOAT(dtype)) {
-        return AK_CPL_to_array_float(cpl, dtype);
+        return AK_CPL_to_array_float(cpl, dtype, tsep);
     }
     else if (PyDataType_ISDATETIME(dtype)) {
         return AK_CPL_to_array_via_cast(cpl, dtype);
@@ -2138,7 +2134,8 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
-        PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype);
+        char tsep = '\0';
+        PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep);
         if (array == NULL) {
             Py_XDECREF(dtype); // array could not steal reference
             Py_DECREF(list);
@@ -2735,7 +2732,8 @@ AK_IterableStrToArray1D(
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse);
         if (cpl == NULL) return NULL;
 
-        PyObject* array = AK_CPL_ToArray(cpl, dtype);
+        char tsep = '\0';
+        PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep);
         if (array == NULL) {
             AK_CPL_Free(cpl);
             return NULL;

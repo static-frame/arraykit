@@ -691,6 +691,20 @@ class TestUnit(unittest.TestCase):
                 )
 
     #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_int_a(self) -> None:
+        msg = [
+            '12, 54, "9,200"',
+            ' 35 ,  23  ,  "6,300"   ',
+            ]
+        dtypes = lambda x: int
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=True, dtypes=dtypes)
+        # import ipdb; ipdb.set_trace()
+        # self.assertEqual([a.round(1).tolist() for a in post1],
+        #         [[1.2, 3.5], [5.4, 2.3], [9.2, 6.3]]
+        #         )
+
+
+    #---------------------------------------------------------------------------
     def test_delimited_to_arrays_quoting_a(self) -> None:
         msg  = ['a,3,True', 'b,-1,False']
         post1 = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_MINIMAL)
