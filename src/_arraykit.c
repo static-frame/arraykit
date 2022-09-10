@@ -2860,18 +2860,36 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 }
 
 
-static PyObject *
-iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args)
-{
-    PyObject *iterable, *dtype_specifier;
+static char *iterable_str_to_array_1d_kwarg_names[] = {
+    "iterable",
+    "dtype",
+    "thousands",
+    NULL
+};
 
-    if (!PyArg_ParseTuple(args, "OO:iterable_str_to_array_1d",
+static PyObject *
+iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *iterable = NULL;
+    PyObject *dtype_specifier = NULL;
+    PyObject *thousands = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|OO:iterable_str_to_array_1d",
+            iterable_str_to_array_1d_kwarg_names,
             &iterable,
-            &dtype_specifier))
-    {
+            // kwarg only
+            &dtype_specifier,
+            &thousands))
         return NULL;
-    }
-    char tsep = '\0';
+
+    Py_UCS4 tsep = '\0';
+    if (AK_Dialect_set_char(
+            "thousands",
+            &tsep,
+            thousands,
+            ',')) return NULL;
+
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep);
 }
 
@@ -3733,7 +3751,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)delimited_to_arrays,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
-    {"iterable_str_to_array_1d", iterable_str_to_array_1d, METH_VARARGS, NULL},
+    {"iterable_str_to_array_1d",
+            (PyCFunction)iterable_str_to_array_1d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {"get_new_indexers_and_screen",
