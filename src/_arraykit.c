@@ -844,6 +844,13 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
             }
         }
     }
+    while (p < end) {
+        if (!AK_is_space(*p)) {
+            *error = ERROR_INVALID_CHARS;
+            return 0;
+        }
+        p++;
+    }
     return number;
 }
 
@@ -1571,7 +1578,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (array == NULL) return NULL;
+    if (array == NULL) return NULL; // TODO: decref dtype?
 
     // initialize error code to 0; only update on error.
     int error = 0;
@@ -2136,8 +2143,10 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep);
+        // AK_DEBUG_MSG_OBJ("post AK_CPL_ToArray", dtype);
         if (array == NULL) {
-            Py_XDECREF(dtype); // array could not steal reference
+            // if array creation has been aborted due to a bad character, we will already have decrefed the array, which seems to also decref dtype
+            // Py_XDECREF(dtype); // causes segfault
             Py_DECREF(list);
             return NULL;
         }
@@ -2882,6 +2891,11 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
             &dtype_specifier,
             &thousands))
         return NULL;
+
+    if (dtype_specifier == NULL) {
+        // need to pass this on to explicitly signal that we want type evaluation
+        dtype_specifier = Py_None;
+    }
 
     Py_UCS4 tsep = '\0';
     if (AK_Dialect_set_char(

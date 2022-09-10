@@ -21,6 +21,8 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             a3 = iterable_str_to_array_1d(['1', '3', '4'], object)
 
+    #---------------------------------------------------------------------------
+
     def test_iterable_str_to_array_1d_bool_1(self) -> None:
         a1 = iterable_str_to_array_1d(['true', 'false', 'TRUE', 'FALSE'], bool)
         self.assertEqual(a1.tolist(), [True, False, True, False])
@@ -49,7 +51,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(bool))
         self.assertFalse(a1.flags.writeable)
 
-
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_int_1(self) -> None:
         # NOTE: floats will be truncated
@@ -134,6 +136,24 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = iterable_str_to_array_1d(['3', '4', 'foo'], int)
 
+    def test_iterable_str_to_array_1d_int_10(self) -> None:
+        a1 = iterable_str_to_array_1d(['3', '4', '1']) # no dtype argument
+        self.assertEqual(a1.tolist(), [3, 4, 1])
+
+    def test_iterable_str_to_array_1d_int_11(self) -> None:
+        a1 = iterable_str_to_array_1d(['3,000', '4,000', '1,000'], dtype=int)
+        self.assertEqual(a1.tolist(), [3000, 4000, 1000])
+
+    def test_iterable_str_to_array_1d_int_12(self) -> None:
+        a1 = iterable_str_to_array_1d(['3.000', '4.000', '1.000'], dtype=int, thousands='.')
+        self.assertEqual(a1.tolist(), [3000, 4000, 1000])
+
+    def test_iterable_str_to_array_1d_int_13(self) -> None:
+        # TypeError: error parsing integer
+        with self.assertRaises(TypeError):
+            a1 = iterable_str_to_array_1d(['3.000', '4.000', '1.000'], dtype=int, thousands=',')
+
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_uint_1(self) -> None:
         a1 = iterable_str_to_array_1d(['23', '54', '  1000', '23  '], np.uint64)
@@ -362,13 +382,13 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [True, True, False])
 
-    def test_iterable_str_to_array_1d_parse_2(self) -> None:
+    def test_iterable_str_to_array_1d_parse_3(self) -> None:
         a1 = iterable_str_to_array_1d(['1.5  ', '   4.5', 'inf   '], None)
         self.assertEqual(a1.dtype, np.dtype(np.float64))
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [1.5, 4.5, np.inf])
 
-    def test_iterable_str_to_array_1d_parse_2(self) -> None:
+    def test_iterable_str_to_array_1d_parse_4(self) -> None:
         a1 = iterable_str_to_array_1d(['b', 'ee', 't'], None)
         self.assertEqual(a1.dtype, np.dtype('<U2'))
         self.assertFalse(a1.flags.writeable)
@@ -697,12 +717,9 @@ class TestUnit(unittest.TestCase):
             ' 35 ,  23  ,  "6,300"   ',
             ]
         dtypes = lambda x: int
-        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=True, dtypes=dtypes)
-        # import ipdb; ipdb.set_trace()
-        # self.assertEqual([a.round(1).tolist() for a in post1],
-        #         [[1.2, 3.5], [5.4, 2.3], [9.2, 6.3]]
-        #         )
-
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, skipinitialspace=True, dtypes=dtypes, quoting=csv.QUOTE_MINIMAL)
+            # this fails until we accept the thousands character
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_quoting_a(self) -> None:
