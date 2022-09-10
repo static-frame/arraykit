@@ -200,6 +200,19 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(np.uint8))
         self.assertFalse(a1.flags.writeable)
 
+    def test_iterable_str_to_array_1d_uint_5(self) -> None:
+        a1 = iterable_str_to_array_1d(['3,000', '4,000', '1,000'], dtype=np.uint64)
+        self.assertEqual(a1.tolist(), [3000, 4000, 1000])
+
+    def test_iterable_str_to_array_1d_uint_6(self) -> None:
+        a1 = iterable_str_to_array_1d(['3.000', '4.000', '1.000'], dtype=np.uint64, thousands='.')
+        self.assertEqual(a1.tolist(), [3000, 4000, 1000])
+
+    def test_iterable_str_to_array_1d_uint_7(self) -> None:
+        # TypeError: error parsing integer
+        with self.assertRaises(TypeError):
+            a1 = iterable_str_to_array_1d(['3.000', '4.000', '1.000'], dtype=np.uint64, thousands=',')
+
 
 
     def test_iterable_str_to_array_1d_float_1(self) -> None:
