@@ -1861,14 +1861,19 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     // we cannot use this dtype in array construction as it will mutate a global
     PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
-    if (dtype_bytes_proto == NULL) return NULL;
-
+    if (dtype_bytes_proto == NULL) {
+        Py_DECREF(dtype);
+        return NULL;
+    }
     PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
     Py_DECREF(dtype_bytes_proto);
-    if (dtype_bytes == NULL) return NULL;
-
+    if (dtype_bytes == NULL) {
+        Py_DECREF(dtype);
+        return NULL;
+    }
     PyObject* array_bytes = AK_CPL_to_array_bytes(cpl, dtype_bytes);
     if (array_bytes == NULL) {
+        Py_DECREF(dtype);
         Py_DECREF(dtype_bytes); // was not stolen if array creation failed
         return NULL;
     }
