@@ -1482,7 +1482,10 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     // initialize all values to False
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (array == NULL) return NULL;
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
+        return NULL;
+    }
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA((PyArrayObject*)array);
 
@@ -1511,8 +1514,10 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (!array) return NULL;
-
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
+        return NULL;
+    }
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = false;
@@ -1585,8 +1590,10 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (array == NULL) return NULL; // TODO: decref dtype?
-
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
+        return NULL;
+    }
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = false;
@@ -1656,8 +1663,10 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (array == NULL) return NULL;
-
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
+        return NULL;
+    }
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = false;
@@ -1742,7 +1751,8 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (!array) {
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
         return NULL;
     }
 
@@ -1805,7 +1815,8 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-    if (!array) {
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
         return NULL;
     }
 
@@ -1864,8 +1875,10 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     Py_DECREF(array_bytes);
-    if (array == NULL) return NULL;
-
+    if (array == NULL) {
+        Py_DECREF(dtype); // expected array to steal reference
+        return NULL;
+    }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
     return array;
 }
