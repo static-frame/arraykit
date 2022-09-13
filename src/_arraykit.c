@@ -2793,6 +2793,8 @@ static char *delimited_to_ararys_kwarg_names[] = {
     "quoting",
     "skipinitialspace",
     "strict",
+    "thousandschar",
+    "decimalchar",
     NULL
 };
 
@@ -2811,9 +2813,11 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *quoting = NULL;
     PyObject *skipinitialspace = NULL;
     PyObject *strict = NULL;
+    PyObject *decimalchar = NULL;
+    PyObject *thousandschar = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$iOOOOOOOOO:delimited_to_arrays",
+            "O|$iOOOOOOOOOOO:delimited_to_arrays",
             delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only
@@ -2826,7 +2830,9 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &quotechar,
             &quoting,
             &skipinitialspace,
-            &strict))
+            &strict,
+            &decimalchar,
+            &thousandschar))
         return NULL;
 
     // normalize line_select to NULL or callable
@@ -2882,7 +2888,13 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_DR_Free(dr);
 
-    char tsep = '\0';
+    Py_UCS4 tsep;
+    if (AK_Dialect_set_char(
+            "thousandschar",
+            &tsep,
+            thousandschar,
+            '\0')) return NULL;
+
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
 
@@ -2896,7 +2908,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 static char *iterable_str_to_array_1d_kwarg_names[] = {
     "iterable",
     "dtype",
-    "thousands",
+    "thousandschar",
     NULL
 };
 
@@ -2905,7 +2917,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
 {
     PyObject *iterable = NULL;
     PyObject *dtype_specifier = NULL;
-    PyObject *thousands = NULL;
+    PyObject *thousandschar = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "O|OO:iterable_str_to_array_1d",
@@ -2913,7 +2925,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
             &iterable,
             // kwarg only
             &dtype_specifier,
-            &thousands))
+            &thousandschar))
         return NULL;
 
     if (dtype_specifier == NULL) {
@@ -2921,12 +2933,12 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
         dtype_specifier = Py_None;
     }
 
-    Py_UCS4 tsep = '\0';
+    Py_UCS4 tsep;
     if (AK_Dialect_set_char(
-            "thousands",
+            "thousandschar",
             &tsep,
-            thousands,
-            ',')) return NULL;
+            thousandschar,
+            '\0')) return NULL;
 
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep);
 }
