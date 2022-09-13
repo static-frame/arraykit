@@ -238,7 +238,6 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-// TypeParser: Type, New, Destructor
 
 #define AK_is_digit(c) (((unsigned)(c) - '0') < 10u)
 #define AK_is_space(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
@@ -261,6 +260,83 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 #define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
 
 //------------------------------------------------------------------------------
+// Utility setters of C types from possibly NULL PyObject*; all return -1 on error.
+
+static int
+AK_set_bool(const char *name,
+        bool *target,
+        PyObject *src,
+        bool dflt)
+{
+    if (src == NULL)
+        *target = dflt;
+    else {
+        int b = PyObject_IsTrue(src);
+        if (b < 0) return -1;
+        *target = (char)b;
+    }
+    return 0;
+}
+
+static int
+AK_set_int(const char *name,
+        int *target,
+        PyObject *src,
+        int dflt)
+{
+    if (src == NULL)
+        *target = dflt;
+    else {
+        int value;
+        if (!PyLong_CheckExact(src)) {
+            PyErr_Format(PyExc_TypeError, "\"%s\" must be an integer", name);
+            return -1;
+        }
+        value = _PyLong_AsInt(src); // TODO: what is public alternative
+        if (value == -1 && PyErr_Occurred()) {
+            return -1;
+        }
+        *target = value;
+    }
+    return 0;
+}
+
+// Set a character from `src` on `target`; if src is NULL use default. Returns -1 on error, else 0.
+static int
+AK_set_char(const char *name,
+        Py_UCS4 *target,
+        PyObject *src,
+        Py_UCS4 dflt)
+{
+    if (src == NULL)
+        *target = dflt;
+    else {
+        *target = '\0';
+        if (src != Py_None) {
+            Py_ssize_t len;
+            if (!PyUnicode_Check(src)) {
+                PyErr_Format(PyExc_TypeError,
+                        "\"%s\" must be string, not %.200s",
+                        name,
+                        Py_TYPE(src)->tp_name);
+                return -1;
+            }
+            len = PyUnicode_GetLength(src);
+            if (len > 1) {
+                PyErr_Format(PyExc_TypeError,
+                    "\"%s\" must be a 1-character string",
+                    name);
+                return -1;
+            }
+            if (len > 0)
+                *target = PyUnicode_READ_CHAR(src, 0);
+        }
+    }
+    return 0;
+}
+
+//------------------------------------------------------------------------------
+// TypeParser: Type, New, Destructor
 
 // This defines the observed type of each field, or an entire line of fields. Note that TPS_STRING serves as the last resort, the type that needs no conversion (or cannot be converted).
 typedef enum AK_TypeParserState {
@@ -2215,70 +2291,6 @@ static const AK_DialectStyleDesc AK_Dialect_quote_styles[] = {
 };
 
 static int
-AK_Dialect_set_bool(const char *name, char *target, PyObject *src, bool dflt)
-{
-    if (src == NULL)
-        *target = dflt;
-    else {
-        int b = PyObject_IsTrue(src);
-        if (b < 0) return -1;
-        *target = (char)b;
-    }
-    return 0;
-}
-
-static int
-AK_Dialect_set_int(const char *name, int *target, PyObject *src, int dflt)
-{
-    if (src == NULL)
-        *target = dflt;
-    else {
-        int value;
-        if (!PyLong_CheckExact(src)) {
-            PyErr_Format(PyExc_TypeError,
-                         "\"%s\" must be an integer", name);
-            return -1;
-        }
-        value = _PyLong_AsInt(src);
-        if (value == -1 && PyErr_Occurred()) {
-            return -1;
-        }
-        *target = value;
-    }
-    return 0;
-}
-
-// Set a character from `src` on `target`; if src is NULL use default. Returns -1 on error, else 0.
-static int
-AK_Dialect_set_char(const char *name, Py_UCS4 *target, PyObject *src, Py_UCS4 dflt)
-{
-    if (src == NULL)
-        *target = dflt;
-    else {
-        *target = '\0';
-        if (src != Py_None) {
-            Py_ssize_t len;
-            if (!PyUnicode_Check(src)) {
-                PyErr_Format(PyExc_TypeError,
-                    "\"%s\" must be string, not %.200s", name,
-                    Py_TYPE(src)->tp_name);
-                return -1;
-            }
-            len = PyUnicode_GetLength(src);
-            if (len > 1) {
-                PyErr_Format(PyExc_TypeError,
-                    "\"%s\" must be a 1-character string",
-                    name);
-                return -1;
-            }
-            if (len > 0)
-                *target = PyUnicode_READ_CHAR(src, 0);
-        }
-    }
-    return 0;
-}
-
-static int
 AK_Dialect_check_quoting(int quoting)
 {
     const AK_DialectStyleDesc *qs;
@@ -2291,9 +2303,9 @@ AK_Dialect_check_quoting(int quoting)
 }
 
 typedef struct AK_Dialect{
-    char doublequote;           // is " represented by ""?
-    char skipinitialspace;      // ignore spaces following delimiter?
-    char strict;                // raise exception on bad CSV
+    bool doublequote;           // is " represented by ""?
+    bool skipinitialspace;      // ignore spaces following delimiter?
+    bool strict;                // raise exception on bad CSV
     int quoting;                // style of quoting to write
     Py_UCS4 delimiter;          // field separator
     Py_UCS4 quotechar;          // quote character
@@ -2329,37 +2341,37 @@ AK_Dialect_New(PyObject *delimiter,
     Py_XINCREF(strict);
 
     // all goto error on error from function used in macro setting
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
+    AK_Dialect_CALL_SETTER(AK_set_char,
             "delimiter",
             &dialect->delimiter,
             delimiter,
             ',');
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
+    AK_Dialect_CALL_SETTER(AK_set_bool,
             "doublequote",
             &dialect->doublequote,
             doublequote,
             true);
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
+    AK_Dialect_CALL_SETTER(AK_set_char,
             "escapechar",
             &dialect->escapechar,
             escapechar,
             0);
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_char,
+    AK_Dialect_CALL_SETTER(AK_set_char,
             "quotechar",
             &dialect->quotechar,
             quotechar,
             '"');
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_int,
+    AK_Dialect_CALL_SETTER(AK_set_int,
             "quoting",
             &dialect->quoting,
             quoting,
             QUOTE_MINIMAL); // we set QUOTE_MINIMAL by default
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
+    AK_Dialect_CALL_SETTER(AK_set_bool,
             "skipinitialspace",
             &dialect->skipinitialspace,
             skipinitialspace,
             false);
-    AK_Dialect_CALL_SETTER(AK_Dialect_set_bool,
+    AK_Dialect_CALL_SETTER(AK_set_bool,
             "strict",
             &dialect->strict,
             strict,
@@ -2889,7 +2901,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     AK_DR_Free(dr);
 
     Py_UCS4 tsep;
-    if (AK_Dialect_set_char(
+    if (AK_set_char(
             "thousandschar",
             &tsep,
             thousandschar,
@@ -2934,7 +2946,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
     }
 
     Py_UCS4 tsep;
-    if (AK_Dialect_set_char(
+    if (AK_set_char(
             "thousandschar",
             &tsep,
             thousandschar,
