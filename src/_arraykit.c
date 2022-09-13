@@ -2783,8 +2783,8 @@ AK_IterableStrToArray1D(
 
 static char *delimited_to_ararys_kwarg_names[] = {
     "file_like",
-    "dtypes",
     "axis",
+    "dtypes",
     "line_select",
     "delimiter",
     "doublequote",
@@ -2801,9 +2801,8 @@ static PyObject*
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *file_like;
-
-    PyObject *dtypes = NULL;
     int axis = 0;
+    PyObject *dtypes = NULL;
     PyObject *line_select = NULL;
     PyObject *delimiter = NULL;
     PyObject *doublequote = NULL;
@@ -2814,12 +2813,12 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiOOOOOOOO:delimited_to_array",
+            "O|$iOOOOOOOOO:delimited_to_arrays",
             delimited_to_ararys_kwarg_names,
             &file_like,
             // kwarg only
-            &dtypes,
             &axis,
+            &dtypes,
             &line_select,
             &delimiter,
             &doublequote,
