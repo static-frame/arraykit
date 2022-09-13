@@ -2825,8 +2825,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *quoting = NULL;
     PyObject *skipinitialspace = NULL;
     PyObject *strict = NULL;
-    PyObject *decimalchar = NULL;
     PyObject *thousandschar = NULL;
+    PyObject *decimalchar = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "O|$iOOOOOOOOOOO:delimited_to_arrays",
@@ -2843,8 +2843,8 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &quoting,
             &skipinitialspace,
             &strict,
-            &decimalchar,
-            &thousandschar))
+            &thousandschar,
+            &decimalchar))
         return NULL;
 
     // normalize line_select to NULL or callable

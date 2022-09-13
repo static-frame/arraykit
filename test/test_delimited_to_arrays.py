@@ -924,6 +924,36 @@ class TestUnit(unittest.TestCase):
         post1 = delimited_to_arrays(msg, axis=1, line_select=lambda i: False)
         self.assertEqual([x.tolist() for x in post1], [])
 
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_thousandschar_a(self) -> None:
+        msg = [
+            '1.000;4',
+            '2.000;5.000',
+            '4.000;6.000',
+        ]
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg,
+                    axis=1,
+                    dtypes=lambda i: int,
+                    delimiter=';',
+                    thousandschar='foo',
+                    )
+
+    def test_delimited_to_arrays_thousandschar_b(self) -> None:
+
+        msg = [
+            '1.000;4',
+            '2.000;5.000',
+            '4.000;6.000.000',
+        ]
+        post1 = delimited_to_arrays(msg,
+                axis=1,
+                dtypes=lambda i: int,
+                delimiter=';',
+                thousandschar='.',
+                )
+        self.assertEqual([x.tolist() for x in post1],
+            [[1000, 2000, 4000], [4, 5000, 6000000]])
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
