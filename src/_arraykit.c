@@ -2921,6 +2921,7 @@ static char *iterable_str_to_array_1d_kwarg_names[] = {
     "iterable",
     "dtype",
     "thousandschar",
+    "decimalchar",
     NULL
 };
 
@@ -2930,14 +2931,16 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
     PyObject *iterable = NULL;
     PyObject *dtype_specifier = NULL;
     PyObject *thousandschar = NULL;
+    PyObject *decimalchar = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|OO:iterable_str_to_array_1d",
+            "O|OOO:iterable_str_to_array_1d",
             iterable_str_to_array_1d_kwarg_names,
             &iterable,
             // kwarg only
             &dtype_specifier,
-            &thousandschar))
+            &thousandschar,
+            &decimalchar))
         return NULL;
 
     if (dtype_specifier == NULL) {
