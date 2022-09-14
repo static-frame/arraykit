@@ -2955,6 +2955,13 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
             thousandschar,
             '\0')) return NULL;
 
+    Py_UCS4 dsep;
+    if (AK_set_char(
+            "decimalchar",
+            &dsep,
+            decimalchar,
+            '\0')) return NULL;
+
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep);
 }
 
