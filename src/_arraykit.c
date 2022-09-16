@@ -1195,7 +1195,7 @@ error:
 //------------------------------------------------------------------------------
 // CodePointLine
 
-// A AK_CodePointLine stores a contiguous buffer of Py_UCS4 without null terminators between fields. Separately, we store an array of integers, where each integer is the size of each field. The total number of fields is given by offset_count.
+// An AK_CodePointLine stores a contiguous buffer of Py_UCS4 without null terminators between fields. Separately, we store an array of integers, where each integer is the size of each field. The total number of fields is given by offset_count.
 typedef struct AK_CodePointLine{
     // NOTE: should these be unsigned int types, like Py_uintptr_t?
     Py_ssize_t buffer_count; // accumulated number of code points
