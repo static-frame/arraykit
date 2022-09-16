@@ -2863,7 +2863,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
         return NULL;
     }
-
     AK_DelimitedReader *dr = AK_DR_New(file_like,
             axis,
             delimiter,
@@ -2907,8 +2906,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             "thousandschar",
             &tsep,
             thousandschar,
-            '\0')) return NULL;
-
+            '\0')) return NULL; // default is off (skips evaluation)
     Py_UCS4 decc;
     if (AK_set_char(
             "decimalchar",
