@@ -1056,7 +1056,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
         ++p;
         if (p >= end) return number;
     }
-
     switch (*p) {
         case '-':
             negative_base = true;
@@ -1135,7 +1134,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
         *error = ERANGE;
         return 0.0;
     }
-
     if (AK_is_e(*p)) {
         ++p;
         if (p >= end) goto exit;
@@ -1148,7 +1146,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
                 p++;
                 if (p >= end) goto exit; // sign is not used
         }
-
         num_digits = 0; // reset
         while (num_digits < max_digits && AK_is_digit(*p)) {
             n = n * 10 + (*p - '0');
@@ -1157,6 +1154,11 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
             if (p >= end) goto exit;
         }
     }
+    // if we have anything but space trailing, error
+    while (p < end) {
+        if (!AK_is_space(*p++)) goto error;
+    }
+
 exit:
     if (negative_base) number = -number;
     // n will be zero if no E found

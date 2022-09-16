@@ -218,7 +218,7 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             a1 = iterable_str_to_array_1d(['3.000', '4.000', '1.000'], dtype=np.uint64, thousandschar=',')
 
-
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_float_1(self) -> None:
         a1 = iterable_str_to_array_1d(['23.1', '54.5', '1000.2', '23.'], float)
@@ -268,11 +268,23 @@ class TestUnit(unittest.TestCase):
         # negative is not ignored
         self.assertEqual(str(a1.tolist()), '[nan, nan]')
 
-
     def test_iterable_str_to_array_1d_float_9(self) -> None:
         with self.assertRaises(TypeError):
             a1 = iterable_str_to_array_1d(['+na', '-in'], float)
 
+    def test_iterable_str_to_array_1d_float_10(self) -> None:
+        a1 = iterable_str_to_array_1d(['23,1', '1000,2'], dtype=float, decimalchar=',')
+        self.assertEqual(a1.tolist(),[23.1, 1000.2])
+        self.assertEqual(a1.dtype, np.dtype(np.float64))
+        self.assertFalse(a1.flags.writeable)
+
+    def test_iterable_str_to_array_1d_float_11(self) -> None:
+        with self.assertRaises(TypeError):
+            a1 = iterable_str_to_array_1d(['23.1', '1000.2'], dtype=float, decimalchar=',')
+            self.assertEqual(a1.tolist(),[23.1, 1000.2])
+
+
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_str_1(self) -> None:
         a1 = iterable_str_to_array_1d(['    sdf  ', '  we', 'aaa', 'qqqqq '], str)
@@ -298,8 +310,6 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aaaaaaaaaa', 'bbb'])
 
-
-
     def test_iterable_str_to_array_1d_str_5(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', ' dddd '], np.dtype('<U2'))
         self.assertEqual(a1.dtype.str, '<U2')
@@ -318,7 +328,7 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), ['aa', 'bbb', 'ccccc', ' dddd ', ''])
 
-
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_bytes_1(self) -> None:
         a1 = iterable_str_to_array_1d(['aa', 'bbb', 'ccccc', 'dddddd', ''], np.dtype('|S3'))
@@ -338,7 +348,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.tolist(), [b'a', b'b', b'c', b'd', b''])
         self.assertFalse(a1.flags.writeable)
 
-
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_complex_1(self) -> None:
         a1 = iterable_str_to_array_1d(['(3+0j)', '(100+0j)'], complex)
@@ -364,6 +374,7 @@ class TestUnit(unittest.TestCase):
     #     with self.assertRaises(ValueError):
     #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
 
+    #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_dt64_1(self) -> None:
         a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], 'datetime64[D]')
@@ -383,10 +394,7 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
 
-
     #---------------------------------------------------------------------------
-
-
 
     def test_iterable_str_to_array_1d_parse_1(self) -> None:
         a1 = iterable_str_to_array_1d(['20', '30'], None)
