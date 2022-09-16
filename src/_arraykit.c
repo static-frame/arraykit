@@ -1158,7 +1158,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
     while (p < end) {
         if (!AK_is_space(*p++)) goto error;
     }
-
 exit:
     if (negative_base) number = -number;
     // n will be zero if no E found
