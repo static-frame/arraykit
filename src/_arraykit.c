@@ -2767,7 +2767,8 @@ static inline PyObject*
 AK_IterableStrToArray1D(
         PyObject *sequence,
         PyObject *dtype_specifier,
-        char tsep)
+        char tsep,
+        char decc)
 {
         PyArray_Descr* dtype = NULL;
         // will set NULL for None, and propagate NULLs
@@ -2779,7 +2780,6 @@ AK_IterableStrToArray1D(
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse);
         if (cpl == NULL) return NULL;
 
-        char decc = '.';
         PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep, decc);
         if (array == NULL) {
             AK_CPL_Free(cpl);
@@ -2963,14 +2963,14 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
             thousandschar,
             '\0')) return NULL;
 
-    Py_UCS4 dsep;
+    Py_UCS4 decc;
     if (AK_set_char(
             "decimalchar",
-            &dsep,
+            &decc,
             decimalchar,
-            '\0')) return NULL;
+            '.')) return NULL;
 
-    return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep);
+    return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep, decc);
 }
 
 //------------------------------------------------------------------------------
