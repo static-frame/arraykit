@@ -1006,7 +1006,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 
 // Based on precise_xstrtod from pandas/_libs/src/parser/tokenizer.c.
 static inline npy_float64
-AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
+AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char decc)
 {
     // Cache powers of 10 in memory.
     static npy_float64 e[] = {
@@ -1521,7 +1521,7 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error, char tsep)
 }
 
 static inline npy_float64
-AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep)
+AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep, char decc)
 {
     // interpret an empty field as NaN
     if (cpl->offsets[cpl->offsets_current_index] == 0) {
@@ -1529,7 +1529,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep)
     }
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-    return AK_UCS4_to_float64(p, end, error, tsep);
+    return AK_UCS4_to_float64(p, end, error, tsep, decc);
 }
 
 
@@ -1584,7 +1584,7 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Given a type of signed integer, return the corresponding array.
 static inline PyObject*
-AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
+AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc)
 {
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
@@ -1609,7 +1609,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         npy_float128 *end = array_buffer + count;
         while (array_buffer < end) {
             // NOTE: cannot cast to npy_float128 here
-            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
             AK_CPL_CurrentAdvance(cpl);
         }
         # endif
@@ -1619,7 +1619,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1628,7 +1628,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl, &error, tsep);
+            *array_buffer++ = (npy_float32)AK_CPL_current_to_float64(cpl, &error, tsep, decc);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1637,7 +1637,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl, &error, tsep);
+            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl, &error, tsep, decc);
             AK_CPL_CurrentAdvance(cpl);
         }
     }
@@ -1966,7 +1966,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
 static inline PyObject*
-AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep) {
+AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc) {
     if (!dtype) {
         // If we have a type_parser on the CPL, we can use that to get the dtype
         if (cpl->type_parser) {
@@ -1982,6 +1982,9 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep) {
     if (PyDataType_ISBOOL(dtype)) {
         return AK_CPL_to_array_bool(cpl, dtype);
     }
+    else if (PyDataType_ISFLOAT(dtype)) {
+        return AK_CPL_to_array_float(cpl, dtype, tsep, decc);
+    }
     else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
         return AK_CPL_to_array_unicode(cpl, dtype);
     }
@@ -1994,14 +1997,11 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep) {
     else if (PyDataType_ISINTEGER(dtype)) {
         return AK_CPL_to_array_int(cpl, dtype, tsep);
     }
-    else if (PyDataType_ISFLOAT(dtype)) {
-        return AK_CPL_to_array_float(cpl, dtype, tsep);
-    }
     else if (PyDataType_ISDATETIME(dtype)) {
         return AK_CPL_to_array_via_cast(cpl, dtype);
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
-        return AK_CPL_to_array_via_cast(cpl, dtype);
+        return AK_CPL_to_array_via_cast(cpl, dtype); // no tsep, decc as using NumPy cast
     }
 
     PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
@@ -2243,7 +2243,8 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
-        PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep);
+        char decc = '.';
+        PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep, decc);
         // AK_DEBUG_MSG_OBJ("post AK_CPL_ToArray", dtype);
         if (array == NULL) {
             // if array creation has been aborted due to a bad character, we will already have decrefed the array, which seems to also decref dtype
@@ -2779,7 +2780,8 @@ AK_IterableStrToArray1D(
         AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse);
         if (cpl == NULL) return NULL;
 
-        PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep);
+        char decc = '.';
+        PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep, decc);
         if (array == NULL) {
             AK_CPL_Free(cpl);
             return NULL;
