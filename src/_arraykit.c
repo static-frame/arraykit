@@ -1047,7 +1047,6 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
     bool negative_base = false;
     bool negative_e = false;
 
-    // Py_UCS4 decimal = '.'; // from locale?
     int num_digits = 0;
     int max_digits = 17;
     int n = 0;
@@ -1115,7 +1114,7 @@ AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char de
         }
     }
 
-    if (AK_is_decimal(*p)) {
+    if (*p == (Py_UCS4)decc) {
         p++;
         if (p >= end) goto exit;
 
