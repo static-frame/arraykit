@@ -2179,7 +2179,8 @@ AK_CPG_AppendOffsetAtLine(
 PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         int axis,
         PyObject* line_select,
-        char tsep)
+        char tsep,
+        char decc)
 {
     bool ls_inactive = line_select == NULL;
     PyObject *list;
@@ -2242,7 +2243,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
         // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
-        char decc = '.';
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep, decc);
         // AK_DEBUG_MSG_OBJ("post AK_CPL_ToArray", dtype);
         if (array == NULL) {
@@ -2908,7 +2908,14 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             thousandschar,
             '\0')) return NULL;
 
-    PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep);
+    Py_UCS4 decc;
+    if (AK_set_char(
+            "decimalchar",
+            &decc,
+            decimalchar,
+            '.')) return NULL;
+
+    PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep, decc);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
 
     Py_XDECREF(line_select); // might be NULL
