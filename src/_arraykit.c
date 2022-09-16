@@ -476,14 +476,14 @@ void AK_TP_reset_field(AK_TypeParser* tp)
 }
 
 AK_TypeParser*
-AK_TP_New()
+AK_TP_New(char tsep, char decc)
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
     if (tp == NULL) return (AK_TypeParser*)PyErr_NoMemory();
     AK_TP_reset_field(tp);
     tp->parsed_line = TPS_UNKNOWN;
-    // tp->tsep = '\0'; // do not presently try to take tsep into context for auto eval
-    tp->decc = '.';
+    tp->tsep = tsep; // take tsep into context for auto eval?
+    tp->decc = decc;
     return tp;
 }
 
@@ -1224,7 +1224,7 @@ typedef struct AK_CodePointLine{
 
 // on error return NULL
 AK_CodePointLine*
-AK_CPL_New(bool type_parse)
+AK_CPL_New(bool type_parse, char tsep, char decc)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
     if (cpl == NULL) return (AK_CodePointLine*)PyErr_NoMemory();
@@ -1251,7 +1251,7 @@ AK_CPL_New(bool type_parse)
     // optional, dynamic values
     // cpl->field = NULL;
     if (type_parse) {
-        cpl->type_parser = AK_TP_New();
+        cpl->type_parser = AK_TP_New(tsep, decc);
         if (cpl->type_parser == NULL) {
             PyMem_Free(cpl->offsets);
             PyMem_Free(cpl->buffer);
@@ -1409,12 +1409,12 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 
 // Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for iterable_str_to_array_1d. Return NULL on errror.
 AK_CodePointLine*
-AK_CPL_FromIterable(PyObject* iterable, bool type_parse)
+AK_CPL_FromIterable(PyObject* iterable, bool type_parse, char tsep, char decc)
 {
     PyObject *iter = PyObject_GetIter(iterable);
     if (iter == NULL) return NULL;
 
-    AK_CodePointLine *cpl = AK_CPL_New(type_parse);
+    AK_CodePointLine *cpl = AK_CPL_New(type_parse, tsep, decc);
     if (cpl == NULL) {
         Py_DECREF(iter);
         return NULL;
@@ -2057,11 +2057,13 @@ typedef struct AK_CodePointGrid {
     Py_ssize_t lines_capacity; // max number of lines
     AK_CodePointLine **lines;  // array of pointers
     PyObject *dtypes;          // a callable that returns None or a dtype initializer
+    char tsep;
+    char decc;
 } AK_CodePointGrid;
 
 // Create a new Code Point Grid; returns NULL on error. Missing `dtypes` has been normalized as NULL.
 AK_CodePointGrid*
-AK_CPG_New(PyObject *dtypes)
+AK_CPG_New(PyObject *dtypes, char tsep, char decc)
 {
     // normalize dtypes to NULL or callable
     if ((dtypes == NULL) || (dtypes == Py_None)) {
@@ -2075,6 +2077,8 @@ AK_CPG_New(PyObject *dtypes)
     AK_CodePointGrid *cpg = (AK_CodePointGrid*)PyMem_Malloc(sizeof(AK_CodePointGrid));
     if (cpg == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
+    cpg->tsep = tsep;
+    cpg->decc = decc;
     cpg->lines_count = 0;
     cpg->lines_capacity = 1024;
     cpg->lines = (AK_CodePointLine**)PyMem_Malloc(
@@ -2144,7 +2148,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             Py_DECREF(dtype_specifier);
         }
         // Always initialize a CPL in the new position
-        AK_CodePointLine *cpl = AK_CPL_New(type_parse);
+        AK_CodePointLine *cpl = AK_CPL_New(type_parse, cpg->tsep, cpg->decc);
         if (cpl == NULL) return -1; // memory error set
 
         cpg->lines[line] = cpl;
@@ -2782,7 +2786,7 @@ AK_IterableStrToArray1D(
         // dtype only NULL from here
         bool type_parse = dtype == NULL;
 
-        AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse);
+        AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse, tsep, decc);
         if (cpl == NULL) return NULL;
 
         PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep, decc);
@@ -2880,13 +2884,25 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    Py_UCS4 tsep;
+    if (AK_set_char(
+            "thousandschar",
+            &tsep,
+            thousandschar,
+            '\0')) return NULL; // default is off (skips evaluation)
+    Py_UCS4 decc;
+    if (AK_set_char(
+            "decimalchar",
+            &decc,
+            decimalchar,
+            '.')) return NULL;
+
     // dtypes inc / dec ref bound within CPG life
-    AK_CodePointGrid* cpg = AK_CPG_New(dtypes);
+    AK_CodePointGrid* cpg = AK_CPG_New(dtypes, tsep, decc);
     if (cpg == NULL) { // error will be set
         AK_DR_Free(dr);
         return NULL;
     }
-
     // Consume all lines from dr and load into cpg
     int status;
     while (true) {
@@ -2905,18 +2921,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_DR_Free(dr);
 
-    Py_UCS4 tsep;
-    if (AK_set_char(
-            "thousandschar",
-            &tsep,
-            thousandschar,
-            '\0')) return NULL; // default is off (skips evaluation)
-    Py_UCS4 decc;
-    if (AK_set_char(
-            "decimalchar",
-            &decc,
-            decimalchar,
-            '.')) return NULL;
 
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep, decc);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
