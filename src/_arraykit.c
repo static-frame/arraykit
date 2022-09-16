@@ -245,7 +245,6 @@ AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 #define AK_is_sign(c) (((c) == '+') || ((c) == '-'))
 #define AK_is_paren_open(c) ((c) == '(')
 #define AK_is_paren_close(c) ((c) == ')')
-#define AK_is_decimal(c) ((c) == '.') // might need to be configured by local
 
 #define AK_is_a(c) (((c) == 'a') || ((c) == 'A'))
 #define AK_is_e(c) (((c) == 'e') || ((c) == 'E'))
@@ -445,6 +444,9 @@ typedef struct AK_TypeParser {
     AK_TypeParserState parsed_field; // state of current field
     AK_TypeParserState parsed_line; // state of current resolved line type
 
+    char tsep;
+    char decc;
+
 } AK_TypeParser;
 
 // Initialize all state. This returns no error. This is called once per field for each field in a code point line: this is why parsed_field is reset, but parsed_line is not.
@@ -480,6 +482,8 @@ AK_TP_New()
     if (tp == NULL) return (AK_TypeParser*)PyErr_NoMemory();
     AK_TP_reset_field(tp);
     tp->parsed_line = TPS_UNKNOWN;
+    // tp->tsep = '\0'; // do not presently try to take tsep into context for auto eval
+    tp->decc = '.';
     return tp;
 }
 
@@ -558,7 +562,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
         digit = true;
         numeric = true;
     }
-    else if (AK_is_decimal(c)) {
+    else if (c == tp->decc) { // is decimal
         ++tp->count_decimal;
         if (tp->count_decimal > 2) { // complex can have 2
             tp->parsed_field = TPS_STRING;
