@@ -963,6 +963,40 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([x.tolist() for x in post1],
             [[1000, 2000, 4000], [4, 5000, 6000000]])
 
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_decimalchar_a(self) -> None:
+        msg = [
+            '1.000;4',
+            '2.000;5.000',
+            '4.000;6.000',
+        ]
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg,
+                    axis=1,
+                    dtypes=lambda i: int,
+                    delimiter=';',
+                    decimalchar='foo',
+                    )
+
+    def test_delimited_to_arrays_decimalchar_b(self) -> None:
+
+        msg = [
+            '1.000;4',
+            '2.000;5,055',
+            '4.000;6.000,155',
+        ]
+        post1 = delimited_to_arrays(msg,
+                axis=1,
+                dtypes=(int, float).__getitem__,
+                delimiter=';',
+                decimalchar=',',
+                thousandschar='.',
+                )
+        self.assertEqual([x.tolist() for x in post1],
+            [[1000, 2000, 4000], [4.0, 5.055, 6000.155]])
+
+
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
         # genfromtxt might translate an empty field to -1 or 0
