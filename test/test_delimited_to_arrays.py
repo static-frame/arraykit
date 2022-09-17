@@ -736,6 +736,17 @@ class TestUnit(unittest.TestCase):
                 ['[1.2, 3.5]', '[nan, 2.3]', '[9.2, nan]']
                 )
 
+    def test_delimited_to_arrays_float_d(self) -> None:
+        msg = [
+            '1,2;9,2',
+            '3,5;2,3',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, decimalchar=',', delimiter=';')
+        self.assertEqual(
+                [str(a.round(1).tolist()) for a in post1],
+                ['[1.2, 3.5]', '[9.2, 2.3]']
+                )
+
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_int_a(self) -> None:
         msg = [
