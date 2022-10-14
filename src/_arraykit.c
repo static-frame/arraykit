@@ -2714,7 +2714,6 @@ AK_DR_Free(AK_DelimitedReader *dr)
     dr->dialect = NULL;
     Py_CLEAR(dr->input_iter);
     PyMem_Free(dr);
-
 }
 
 // The arguments to this constructor are validated before this function is valled. Returns NULL on error.
