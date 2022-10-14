@@ -2087,7 +2087,6 @@ AK_CPG_New(PyObject *dtypes, char tsep, char decc)
 
     Py_XINCREF(dtypes);
     cpg->dtypes = dtypes;
-
     return cpg;
 }
 
@@ -2111,7 +2110,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     if (line >= cpg->lines_capacity) {
         // assert(line == cpg->lines_capacity);
         cpg->lines_capacity *= 2;
-        // NOTE: as we sure we are only copying pointers?
+        // NOTE: we assume this only copies the pointers, not the data in the CPLs
         cpg->lines = PyMem_Realloc(cpg->lines,
                 sizeof(AK_CodePointLine*) * cpg->lines_capacity);
         if (cpg->lines == NULL) return -1;
@@ -2134,6 +2133,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
                     NULL
                     );
             Py_DECREF(line_count);
+
             if (dtype_specifier == NULL) {
                 // NOTE: not sure how to get the exception from the failed call...
                 PyErr_Format(PyExc_RuntimeError,
@@ -2634,7 +2634,6 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
     PyObject *record;
 
     AK_DR_line_reset(dr);
-
     do {
         // get a string, representing one record, to parse
         record = PyIter_Next(dr->input_iter);
@@ -2703,7 +2702,6 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
         if (AK_DR_process_char(dr, cpg, '\0')) return -1;
 
     } while (dr->state != START_RECORD);
-
     return 1; // more lines to process
 }
 
@@ -2970,6 +2968,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
 
     if (dtype_specifier == NULL) {
         // need to pass this on to explicitly signal that we want type evaluation
+        // TODO: can we do this without increfing Py_None?
         dtype_specifier = Py_None;
     }
 
