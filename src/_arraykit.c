@@ -2098,7 +2098,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
-    Py_XDECREF(cpg->dtypes); // passed in arg; is this necesary?
+    Py_XDECREF(cpg->dtypes);
     PyMem_Free(cpg);
 }
 //------------------------------------------------------------------------------
