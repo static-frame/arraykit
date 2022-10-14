@@ -1311,7 +1311,6 @@ AK_CPL_resize_offsets(AK_CodePointLine* cpl)
         cpl->offsets = PyMem_Realloc(cpl->offsets,
                 sizeof(Py_ssize_t) * cpl->offsets_capacity);
         if (cpl->offsets == NULL) return -1;
-
     }
     return 0;
 }
@@ -2107,8 +2106,10 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
 static inline int
 AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
+    Py_ssize_t lines_count = cpg->lines_count;
+    if (line < lines_count) return 0; // most common scenario
+
     if (line >= cpg->lines_capacity) {
-        // assert(line == cpg->lines_capacity);
         cpg->lines_capacity *= 2;
         // NOTE: we assume this only copies the pointers, not the data in the CPLs
         cpg->lines = PyMem_Realloc(cpg->lines,
@@ -2116,8 +2117,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
         if (cpg->lines == NULL) return -1;
     }
     // Create the new CPL; first check if we need to set type_parse by calling into the dtypes function. For now we assume sequential growth, so should only check if equal
-    if (line >= cpg->lines_count) {
-        // assert(line == cpg->lines_count);
+    if (line >= lines_count) {
         // determine if we need to parse types
         bool type_parse = false;
         if (cpg->dtypes == NULL) {
