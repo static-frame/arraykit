@@ -2881,6 +2881,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
     if (dr == NULL) { // can happen due to validation of dialect parameters
+        Py_XDECREF(line_select);
         return NULL;
     }
 
@@ -2889,17 +2890,26 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             "thousandschar",
             &tsep,
             thousandschar,
-            '\0')) return NULL; // default is off (skips evaluation)
+            '\0')) {
+        Py_XDECREF(line_select);
+        AK_DR_Free(dr);
+        return NULL; // default is off (skips evaluation)
+    }
     Py_UCS4 decc;
     if (AK_set_char(
             "decimalchar",
             &decc,
             decimalchar,
-            '.')) return NULL;
+            '.')) {
+        Py_XDECREF(line_select);
+        AK_DR_Free(dr);
+        return NULL;
+    }
 
     // dtypes inc / dec ref bound within CPG life
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes, tsep, decc);
     if (cpg == NULL) { // error will be set
+        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL;
     }
@@ -2914,6 +2924,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             break;
         }
         else if (status == -1) {
+            Py_XDECREF(line_select);
             AK_DR_Free(dr);
             AK_CPG_Free(cpg);
             return NULL;
@@ -2925,7 +2936,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep, decc);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
 
-    Py_XDECREF(line_select); // might be NULL
+    Py_XDECREF(line_select);
     AK_CPG_Free(cpg); // will free reference to dtypes
 
     return arrays; // could be NULL
