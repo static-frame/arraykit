@@ -151,6 +151,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
         }
     }
     Py_DECREF(iterator);
+    // TODO: check if PyError ocured
     if (!resolved) {
         // this could happen if this function gets an empty tuple
         PyErr_SetString(PyExc_ValueError, "iterable passed to resolve dtypes is empty");
@@ -291,7 +292,7 @@ AK_set_int(const char *name,
             PyErr_Format(PyExc_TypeError, "\"%s\" must be an integer", name);
             return -1;
         }
-        value = _PyLong_AsInt(src); // TODO: what is public alternative
+        value = _PyLong_AsInt(src); // TODO: use PyLongasLong, then check min / max, then cast to int
         if (value == -1 && PyErr_Occurred()) {
             return -1;
         }
@@ -1217,6 +1218,8 @@ typedef struct AK_CodePointLine{
 
     // char *field;
     AK_TypeParser *type_parser;
+
+    // TODO: these can be combined in an Enum
     bool type_parser_field_active;
     bool type_parser_line_active;
 
@@ -1277,7 +1280,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
     // if (cpl->field) {
     //     PyMem_Free(cpl->field);
     // }
-    if (cpl->type_parser) {
+    if (cpl->type_parser) { // can exclude the check
         PyMem_Free(cpl->type_parser);
     }
     PyMem_Free(cpl);
@@ -1319,7 +1322,7 @@ AK_CPL_resize_offsets(AK_CodePointLine* cpl)
 static inline int
 AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
 {
-    if (!PyUnicode_Check(field)) {
+    if (!PyUnicode_Check(field)) { // NOTE: this permits subclasses, consider
         PyErr_SetString(PyExc_TypeError, "elements must be strings");
         return -1;
     }
@@ -1343,7 +1346,7 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
         for (; p < end; ++p) {
             cpl->type_parser_field_active = AK_TP_ProcessChar(
                     cpl->type_parser,
-                    (char)*p,
+                    (char)*p, // TODO: remove this cast
                     pos);
             if (!cpl->type_parser_field_active) break;
             ++pos;
@@ -1377,7 +1380,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (cpl->type_parser
             && cpl->type_parser_line_active
             && cpl->type_parser_field_active) {
-        cpl->type_parser_field_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos);
+        cpl->type_parser_field_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos); // TODO: avoid this cast, propagate Py_UCS4
     }
     *cpl->buffer_current_ptr++ = p;
     ++cpl->buffer_count;
@@ -1395,6 +1398,7 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
         cpl->type_parser_line_active = AK_TP_ResolveLineResetField(
                 cpl->type_parser,
                 offset);
+        // TODO: if line is false, field may not need to be turned back on
         cpl->type_parser_field_active = true; // turn back on for next field
     }
     // increment offset_count after assignment so we can grow if needed next time
@@ -1421,7 +1425,7 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, char tsep, char decc)
 
     PyObject *field;
     while ((field = PyIter_Next(iter))) {
-        if (field == NULL) return NULL;
+        if (field == NULL) return NULL; // TODO: remove, cannot be true
         if (AK_CPL_AppendField(cpl, field)) {
             Py_DECREF(field);
             Py_DECREF(iter);
@@ -1429,6 +1433,7 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, char tsep, char decc)
         }
         Py_DECREF(field);
     }
+    // TODO: check if pyerror raised
     Py_DECREF(iter);
     return cpl;
 }
@@ -1594,17 +1599,21 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        Py_DECREF(dtype); // expected array to steal reference: TODO: stolen reference on error
         return NULL;
     }
     // initialize error code to 0; only update on error.
     int error = 0;
+
+    // TODO: set to true, on else or case default set to false
     bool matched_elsize = false;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
+
+    // TODO: replace with switches
     if (dtype->elsize == 16) {
         # ifdef PyFloat128ArrType_Type
         matched_elsize = true;
@@ -1895,7 +1904,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        Py_DECREF(dtype); // TODO: assume stole on failure; expected array to steal reference
         return NULL;
     }
 
@@ -1918,6 +1927,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             copy_points = field_points;
         }
 
+        // TODO: replace with memcopy
         Py_UCS4 *p = cpl->buffer_current_ptr;
         Py_UCS4 *p_end = p + copy_points;
         char *field_end = array_buffer + field_points;
@@ -2304,7 +2314,7 @@ AK_Dialect_check_quoting(int quoting)
 {
     const AK_DialectStyleDesc *qs;
     for (qs = AK_Dialect_quote_styles; qs->name; qs++) {
-        if ((int)qs->style == quoting)
+        if ((int)qs->style == quoting) // can we compare to long and avoid
             return 0;
     }
     PyErr_Format(PyExc_TypeError, "bad \"quoting\" value");
@@ -2771,29 +2781,29 @@ AK_DR_New(PyObject *iterable,
 // Convert an sequence of strings to a 1D array.
 static inline PyObject*
 AK_IterableStrToArray1D(
-        PyObject *sequence,
-        PyObject *dtype_specifier,
-        char tsep,
-        char decc)
+    PyObject *sequence,
+    PyObject *dtype_specifier,
+    char tsep, // keep as Py_UCS4
+    char decc)
 {
-        PyArray_Descr* dtype = NULL;
-        // will set NULL for None, and propagate NULLs
-        if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) return NULL;
+    PyArray_Descr* dtype = NULL;
+    // will set NULL for None, and propagate NULLs
+    if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) return NULL;
 
-        // dtype only NULL from here
-        bool type_parse = dtype == NULL;
+    // dtype only NULL from here
+    bool type_parse = dtype == NULL;
 
-        AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse, tsep, decc);
-        if (cpl == NULL) return NULL;
+    AK_CodePointLine* cpl = AK_CPL_FromIterable(sequence, type_parse, tsep, decc);
+    if (cpl == NULL) return NULL;
 
-        PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep, decc);
-        if (array == NULL) {
-            AK_CPL_Free(cpl);
-            return NULL;
-        }
+    PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep, decc);
+    // if (array == NULL) {
+    //     AK_CPL_Free(cpl);
+    //     return NULL;
+    // }
 
-        AK_CPL_Free(cpl);
-        return array;
+    AK_CPL_Free(cpl);
+    return array;
 }
 
 //------------------------------------------------------------------------------
@@ -2926,6 +2936,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             AK_CPG_Free(cpg);
             return NULL;
         }
+        // TODO: use dr line count to after modulo 10_000 call py error check pneding signals
     }
     AK_DR_Free(dr);
 
@@ -2968,7 +2979,7 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
 
     if (dtype_specifier == NULL) {
         // need to pass this on to explicitly signal that we want type evaluation
-        // TODO: can we do this without increfing Py_None?
+        // NOTE: should incref
         dtype_specifier = Py_None;
     }
 
