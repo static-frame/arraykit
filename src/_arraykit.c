@@ -151,7 +151,9 @@ AK_ResolveDTypeIter(PyObject *dtypes)
         }
     }
     Py_DECREF(iterator);
-    // TODO: check if PyError ocured
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
     if (!resolved) {
         // this could happen if this function gets an empty tuple
         PyErr_SetString(PyExc_ValueError, "iterable passed to resolve dtypes is empty");
@@ -1433,7 +1435,9 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, char tsep, char decc)
         }
         Py_DECREF(field);
     }
-    // TODO: check if pyerror raised
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
     Py_DECREF(iter);
     return cpl;
 }
