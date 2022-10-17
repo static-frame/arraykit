@@ -2101,7 +2101,6 @@ AK_CPG_New(PyObject *dtypes, Py_UCS4 tsep, Py_UCS4 decc)
             sizeof(AK_CodePointLine*) * cpg->lines_capacity);
     if (cpg->lines == NULL) return (AK_CodePointGrid*)PyErr_NoMemory();
 
-    Py_XINCREF(dtypes);
     cpg->dtypes = dtypes;
     return cpg;
 }
@@ -2113,7 +2112,6 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
-    Py_XDECREF(cpg->dtypes);
     PyMem_Free(cpg);
 }
 //------------------------------------------------------------------------------
