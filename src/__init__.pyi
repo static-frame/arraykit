@@ -20,6 +20,32 @@ class ArrayGO:
     def copy(self: _T) -> _T: ...
     def extend(self, __values: tp.Iterable[object]) -> None: ...
 
+def iterable_str_to_array_1d(
+        iterable: tp.Iterable[str],
+        *,
+        dtype,
+        thousandschar,
+        decimalchar,
+        ): ...
+
+def delimited_to_arrays(
+        __file_like: tp.Iterable[str],
+        *,
+        dtypes: tp.Callable[[int], tp.Any],
+        axis: int,
+        skip_header: int,
+        skip_footer: int,
+        delimiter: str,
+        doublequote: bool,
+        escapechar: str,
+        quotechar: str,
+        quoting: int,
+        skipinitialspace: bool,
+        strict: bool,
+        thousandschar: str,
+        decimalchar: str,
+        ) -> tp.Iterable[np.array]: ...
+
 def immutable_filter(__array: np.ndarray) -> np.ndarray: ...
 def mloc(__array: np.ndarray) -> int: ...
 def name_filter(__name: tp.Hashable) -> tp.Hashable: ...

@@ -3,6 +3,7 @@ import sys
 import invoke
 
 
+
 ARTIFACTS = (
     '*.egg-info',
     '.hypothesis',
@@ -26,7 +27,8 @@ def clean(context):
 @invoke.task(clean)
 def build(context):
     context.run('pip install -r requirements.txt', echo=True, pty=True)
-    context.run(f'{sys.executable} -m pip install .', echo=True, pty=True)
+    # keep verbose to see warnings
+    context.run(f'{sys.executable} -m pip -v install .', echo=True, pty=True)
 
 
 @invoke.task(build)
@@ -46,3 +48,4 @@ def lint(context):
     '''
     cmd = 'pylint -f colorized *.py performance src test'
     context.run(cmd, echo=True, pty=True)
+
