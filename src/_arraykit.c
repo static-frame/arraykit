@@ -1571,7 +1571,7 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // initialize all values to False
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        // expected array to steal dtype reference
         return NULL;
     }
 
@@ -1603,24 +1603,20 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference: TODO: stolen reference on error
+        // expected array to steal dtype reference
         return NULL;
     }
     // initialize error code to 0; only update on error.
     int error = 0;
-
-    // TODO: set to true, on else or case default set to false
-    bool matched_elsize = false;
+    bool matched_elsize = true;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
 
-    // TODO: replace with switches
     if (dtype->elsize == 16) {
         # ifdef PyFloat128ArrType_Type
-        matched_elsize = true;
         npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
         npy_float128 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1631,7 +1627,6 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
         # endif
     }
     else if (dtype->elsize == 8) {
-        matched_elsize = true;
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1640,7 +1635,6 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
         }
     }
     else if (dtype->elsize == 4) {
-        matched_elsize = true;
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1649,7 +1643,6 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
         }
     }
     else if (dtype->elsize == 2) {
-        matched_elsize = true;
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1657,6 +1650,10 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
             AK_CPL_CurrentAdvance(cpl);
         }
     }
+    else {
+        matched_elsize = false;
+    }
+
     NPY_END_THREADS;
 
     if (!matched_elsize) {
@@ -1683,19 +1680,18 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        // expected array to steal dtype reference
         return NULL;
     }
     // initialize error code to 0; only update on error.
     int error = 0;
-    bool matched_elsize = false;
+    bool matched_elsize = true;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
     if (dtype->elsize == 8) {
-        matched_elsize = true;
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1704,7 +1700,6 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         }
     }
     else if (dtype->elsize == 4) {
-        matched_elsize = true;
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1713,7 +1708,6 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         }
     }
     else if (dtype->elsize == 2) {
-        matched_elsize = true;
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1722,13 +1716,15 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         }
     }
     else if (dtype->elsize == 1) {
-        matched_elsize = true;
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
         while (array_buffer < end) {
             *array_buffer++ = (npy_int8)AK_CPL_current_to_int64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
+    }
+    else {
+        matched_elsize = false;
     }
     NPY_END_THREADS;
 
@@ -1756,19 +1752,18 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        // expected array to steal dtype reference
         return NULL;
     }
     // initialize error code to 0; only update on error.
     int error = 0;
-    bool matched_elsize = false;
+    bool matched_elsize = true;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
     if (dtype->elsize == 8) {
-        matched_elsize = true;
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1777,7 +1772,6 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         }
     }
     else if (dtype->elsize == 4) {
-        matched_elsize = true;
         npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
         npy_uint32 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1786,7 +1780,6 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         }
     }
     else if (dtype->elsize == 2) {
-        matched_elsize = true;
         npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
         npy_uint16 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1795,13 +1788,15 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
         }
     }
     else if (dtype->elsize == 1) {
-        matched_elsize = true;
         npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
         npy_uint8 *end = array_buffer + count;
         while (array_buffer < end) {
             *array_buffer++ = (npy_uint8)AK_CPL_current_to_uint64(cpl, &error, tsep);
             AK_CPL_CurrentAdvance(cpl);
         }
+    }
+    else {
+        matched_elsize = false;
     }
     NPY_END_THREADS;
 
@@ -1844,7 +1839,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // assuming this is contiguous
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        // expected array to steal dtype reference
         return NULL;
     }
 
@@ -1908,7 +1903,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        Py_DECREF(dtype); // TODO: assume stole on failure; expected array to steal reference
+        // expected array to steal dtype reference
         return NULL;
     }
 
@@ -1974,7 +1969,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     Py_DECREF(array_bytes);
     if (array == NULL) {
-        Py_DECREF(dtype); // expected array to steal reference
+        // expected array to steal dtype reference
         return NULL;
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
@@ -2270,7 +2265,6 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         // AK_DEBUG_MSG_OBJ("post AK_CPL_ToArray", dtype);
         if (array == NULL) {
             // if array creation has been aborted due to a bad character, we will already have decrefed the array, which seems to also decref dtype
-            // Py_XDECREF(dtype); // causes segfault
             Py_DECREF(list);
             return NULL;
         }
@@ -2801,13 +2795,8 @@ AK_IterableStrToArray1D(
     if (cpl == NULL) return NULL;
 
     PyObject* array = AK_CPL_ToArray(cpl, dtype, tsep, decc);
-    // if (array == NULL) {
-    //     AK_CPL_Free(cpl);
-    //     return NULL;
-    // }
-
     AK_CPL_Free(cpl);
-    return array;
+    return array; // might be NULL
 }
 
 //------------------------------------------------------------------------------
