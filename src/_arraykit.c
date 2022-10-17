@@ -1,6 +1,7 @@
 # include "Python.h"
 # include "structmember.h"
 # include "stdbool.h"
+# include "limits.h"
 // # include "stdlib.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
@@ -289,16 +290,20 @@ AK_set_int(const char *name,
     if (src == NULL)
         *target = dflt;
     else {
-        int value;
         if (!PyLong_CheckExact(src)) {
             PyErr_Format(PyExc_TypeError, "\"%s\" must be an integer", name);
             return -1;
         }
-        value = _PyLong_AsInt(src); // TODO: use PyLongasLong, then check min / max, then cast to int
+        // TODO: use PyLongasLong, then check min / max, then cast to int
+        long value = PyLong_AsLong(src);
         if (value == -1 && PyErr_Occurred()) {
             return -1;
         }
-        *target = value;
+        if (value < INT_MIN || value > INT_MAX) {
+            PyErr_Format(PyExc_TypeError, "\"%s\" overflowed integer", name);
+            return -1;
+        }
+        *target = (int)value;
     }
     return 0;
 }
@@ -1926,7 +1931,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             copy_points = field_points;
         }
 
-        // TODO: replace with memcopy
+        // NOTE: not using memcopy as we need to cast to char to fit each point
         Py_UCS4 *p = cpl->buffer_current_ptr;
         Py_UCS4 *p_end = p + copy_points;
         char *field_end = array_buffer + field_points;
