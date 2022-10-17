@@ -220,18 +220,21 @@ error:
     return NULL;
 }
 
-// Given a dtype_specifier, which might be a dtype or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will never set dtype_returned to None. Returns a new reference.
+// Given a dtype_specifier, which might be a dtype, NULL, or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will not interpret a None dtype_specified as a float dtype. This will never set dtype_returned to None (only NULL). Returns a new reference.
 static inline int
 AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
 {
     PyArray_Descr* dtype;
-    if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
+    if (dtype_specifier == NULL) {
+        dtype = NULL; // propagate, cannot call into oncverter
+    }
+    else if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
         dtype = (PyArray_Descr* )dtype_specifier;
     }
-    else { // converter2 set NULL for None
+    else { // converter2 sets NULL for None
         PyArray_DescrConverter2(dtype_specifier, &dtype);
     }
-    // make a copy as we will give ownership to array and might mutate
+    // if not NULL, make a copy as we will give ownership to array and might mutate
     if (dtype) {
         dtype = PyArray_DescrNew(dtype);
         if (dtype == NULL) return -1;
@@ -1222,10 +1225,7 @@ typedef struct AK_CodePointLine{
     Py_UCS4 *buffer_current_ptr;
     Py_ssize_t offsets_current_index;
 
-    // char *field;
     AK_TypeParser *type_parser;
-
-    // TODO: these can be combined in an Enum
     bool type_parser_field_active;
     bool type_parser_line_active;
 
@@ -2790,7 +2790,7 @@ AK_IterableStrToArray1D(
     Py_UCS4 decc)
 {
     PyArray_Descr* dtype = NULL;
-    // will set NULL for None, and propagate NULLs
+    // will set dtype_specifier to NULL for None, and propagate NULLs
     if (AK_DTypeFromSpecifier(dtype_specifier, &dtype)) return NULL;
 
     // dtype only NULL from here
@@ -2974,12 +2974,6 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
             &thousandschar,
             &decimalchar))
         return NULL;
-
-    if (dtype_specifier == NULL) {
-        // need to pass this on to explicitly signal that we want type evaluation
-        // NOTE: should incref
-        dtype_specifier = Py_None;
-    }
 
     Py_UCS4 tsep;
     if (AK_set_char(
