@@ -1404,11 +1404,12 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
     if (AK_CPL_resize_offsets(cpl)) return -1;
 
     if (cpl->type_parser && cpl->type_parser_line_active) {
+        // when we resolve the line, we might determine that no further line processing is necessary
         cpl->type_parser_line_active = AK_TP_ResolveLineResetField(
                 cpl->type_parser,
                 offset);
-        // TODO: if line is false, field may not need to be turned back on
-        cpl->type_parser_field_active = true; // turn back on for next field
+        // NOTE: always turn on for next field; we choose not to check type_parser_line_active
+        cpl->type_parser_field_active = true;
     }
     // increment offset_count after assignment so we can grow if needed next time
     cpl->offsets[cpl->offsets_count++] = offset;
