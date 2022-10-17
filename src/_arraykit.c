@@ -452,8 +452,8 @@ typedef struct AK_TypeParser {
     AK_TypeParserState parsed_field; // state of current field
     AK_TypeParserState parsed_line; // state of current resolved line type
 
-    char tsep;
-    char decc;
+    Py_UCS4 tsep;
+    Py_UCS4 decc;
 
 } AK_TypeParser;
 
@@ -484,7 +484,7 @@ void AK_TP_reset_field(AK_TypeParser* tp)
 }
 
 AK_TypeParser*
-AK_TP_New(char tsep, char decc)
+AK_TP_New(Py_UCS4 tsep, Py_UCS4 decc)
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
     if (tp == NULL) return (AK_TypeParser*)PyErr_NoMemory();
@@ -506,7 +506,7 @@ AK_TP_Free(AK_TypeParser* tp)
 // Given a type parse, process a single character and update the type parser state in `parsed_field`. Return true when processing should continue, false when no further processing is necessary. `pos` is the raw position within the current field.
 bool
 AK_TP_ProcessChar(AK_TypeParser* tp,
-        char c,
+        Py_UCS4 c,
         Py_ssize_t pos)
 {
     if (tp->parsed_field != TPS_UNKNOWN) {
@@ -1234,7 +1234,7 @@ typedef struct AK_CodePointLine{
 
 // on error return NULL
 AK_CodePointLine*
-AK_CPL_New(bool type_parse, char tsep, char decc)
+AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
     if (cpl == NULL) return (AK_CodePointLine*)PyErr_NoMemory();
@@ -1353,7 +1353,7 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
         for (; p < end; ++p) {
             cpl->type_parser_field_active = AK_TP_ProcessChar(
                     cpl->type_parser,
-                    (char)*p, // TODO: remove this cast
+                    *p,
                     pos);
             if (!cpl->type_parser_field_active) break;
             ++pos;
@@ -1387,7 +1387,10 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
     if (cpl->type_parser
             && cpl->type_parser_line_active
             && cpl->type_parser_field_active) {
-        cpl->type_parser_field_active = AK_TP_ProcessChar(cpl->type_parser, (char)p, pos); // TODO: avoid this cast, propagate Py_UCS4
+        cpl->type_parser_field_active = AK_TP_ProcessChar(
+                cpl->type_parser,
+                p,
+                pos);
     }
     *cpl->buffer_current_ptr++ = p;
     ++cpl->buffer_count;
@@ -1419,7 +1422,7 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 
 // Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for iterable_str_to_array_1d. Return NULL on errror.
 AK_CodePointLine*
-AK_CPL_FromIterable(PyObject* iterable, bool type_parse, char tsep, char decc)
+AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
     PyObject *iter = PyObject_GetIter(iterable);
     if (iter == NULL) return NULL;
@@ -2070,13 +2073,13 @@ typedef struct AK_CodePointGrid {
     Py_ssize_t lines_capacity; // max number of lines
     AK_CodePointLine **lines;  // array of pointers
     PyObject *dtypes;          // a callable that returns None or a dtype initializer
-    char tsep;
-    char decc;
+    Py_UCS4 tsep;
+    Py_UCS4 decc;
 } AK_CodePointGrid;
 
 // Create a new Code Point Grid; returns NULL on error. Missing `dtypes` has been normalized as NULL.
 AK_CodePointGrid*
-AK_CPG_New(PyObject *dtypes, char tsep, char decc)
+AK_CPG_New(PyObject *dtypes, Py_UCS4 tsep, Py_UCS4 decc)
 {
     // normalize dtypes to NULL or callable
     if ((dtypes == NULL) || (dtypes == Py_None)) {
@@ -2786,8 +2789,8 @@ static inline PyObject*
 AK_IterableStrToArray1D(
     PyObject *sequence,
     PyObject *dtype_specifier,
-    char tsep, // keep as Py_UCS4
-    char decc)
+    Py_UCS4 tsep,
+    Py_UCS4 decc)
 {
     PyArray_Descr* dtype = NULL;
     // will set NULL for None, and propagate NULLs
