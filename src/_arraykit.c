@@ -294,7 +294,6 @@ AK_set_int(const char *name,
             PyErr_Format(PyExc_TypeError, "\"%s\" must be an integer", name);
             return -1;
         }
-        // TODO: use PyLongasLong, then check min / max, then cast to int
         long value = PyLong_AsLong(src);
         if (value == -1 && PyErr_Occurred()) {
             return -1;
@@ -1435,7 +1434,6 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 d
 
     PyObject *field;
     while ((field = PyIter_Next(iter))) {
-        if (field == NULL) return NULL; // TODO: remove, cannot be true
         if (AK_CPL_AppendField(cpl, field)) {
             Py_DECREF(field);
             Py_DECREF(iter);
@@ -2935,7 +2933,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             AK_CPG_Free(cpg);
             return NULL;
         }
-        // TODO: use dr line count to after modulo 10_000 call py error check pneding signals
+        // NOTE: could use PyErr_CheckSignals() at some number of dr->record_number
     }
     AK_DR_Free(dr);
 
