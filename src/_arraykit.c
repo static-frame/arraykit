@@ -1283,9 +1283,6 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
     PyMem_Free(cpl->offsets);
-    // if (cpl->field) {
-    //     PyMem_Free(cpl->field);
-    // }
     if (cpl->type_parser) { // can exclude the check
         PyMem_Free(cpl->type_parser);
     }
@@ -2721,9 +2718,10 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
 static void
 AK_DR_Free(AK_DelimitedReader *dr)
 {
-    AK_Dialect_Free(dr->dialect);
-    dr->dialect = NULL;
-    Py_CLEAR(dr->input_iter);
+    if (dr->dialect) {
+        AK_Dialect_Free(dr->dialect);
+    }
+    Py_XDECREF(dr->input_iter); // might already be NULL
     PyMem_Free(dr);
 }
 
@@ -2755,6 +2753,7 @@ AK_DR_New(PyObject *iterable,
 
     dr->record_number = -1;
     dr->record_iter_number = -1;
+    dr->dialect = NULL; // init in case input_iter fails to init
 
     dr->input_iter = PyObject_GetIter(iterable); // new ref, decref in free
     if (dr->input_iter == NULL) {
@@ -2770,7 +2769,6 @@ AK_DR_New(PyObject *iterable,
             quoting,
             skipinitialspace,
             strict);
-
     if (dr->dialect == NULL) {
         AK_DR_Free(dr);
         return NULL;
@@ -2870,7 +2868,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "line_select must be a callable or None");
         return NULL;
     }
-    Py_XINCREF(line_select);
 
     if ((axis < 0) || (axis > 1)) {
         PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
@@ -2886,7 +2883,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
     if (dr == NULL) { // can happen due to validation of dialect parameters
-        Py_XDECREF(line_select);
         return NULL;
     }
 
@@ -2896,7 +2892,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &tsep,
             thousandschar,
             '\0')) {
-        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL; // default is off (skips evaluation)
     }
@@ -2906,7 +2901,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &decc,
             decimalchar,
             '.')) {
-        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL;
     }
@@ -2914,7 +2908,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     // dtypes inc / dec ref bound within CPG life
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes, tsep, decc);
     if (cpg == NULL) { // error will be set
-        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL;
     }
@@ -2929,7 +2922,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             break;
         }
         else if (status == -1) {
-            Py_XDECREF(line_select);
             AK_DR_Free(dr);
             AK_CPG_Free(cpg);
             return NULL;
@@ -2938,13 +2930,9 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_DR_Free(dr);
 
-
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep, decc);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
-
-    Py_XDECREF(line_select);
     AK_CPG_Free(cpg); // will free reference to dtypes
-
     return arrays; // could be NULL
 }
 

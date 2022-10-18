@@ -1009,6 +1009,32 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_file_like_a(self) -> None:
+        def records():
+            msg = [
+                '1000;4',
+                '2000;5055',
+            ]
+            yield from msg
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(records,
+                    axis=1,
+                    delimiter=';',
+                    )
+
+    def test_delimited_to_arrays_file_like_b(self) -> None:
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(3,
+                    axis=1,
+                    delimiter=';',
+                    dtypes=lambda x: int,
+                    )
+
+
+
+    #---------------------------------------------------------------------------
     def test_delimited_to_arrays_compare_int_a(self) -> None:
         # genfromtxt might translate an empty field to -1 or 0
 
