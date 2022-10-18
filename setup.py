@@ -6,7 +6,7 @@ from setuptools import setup
 from pathlib import Path
 
 AK_VERSION = '0.2.0'
-/
+
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
 
