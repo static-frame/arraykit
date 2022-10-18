@@ -1468,32 +1468,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 }
 
 //------------------------------------------------------------------------------
-// Set the CPL field to the characters accumulated in the CPL's buffer. This is only used for field converters that need a char* as an input argument. This has to be dynamically allocated and cleaned up appropriately.
-// static inline char*
-// AK_CPL_current_to_field(AK_CodePointLine* cpl)
-// {
-//     // NOTE: we assume this is only called after offset_max is complete, and that this is only called once per CPL; we set it to the maximum size on first usage and then overwrite context on each subsequent usage.
-//     if (cpl->field == NULL) {
-//         // create a NULL-terminated string; need one more for string terminator
-//         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
-//         if (cpl->field == NULL) return (char*)PyErr_NoMemory();
-//     }
-//     Py_UCS4 *p = cpl->buffer_current_ptr;
-//     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-
-//     // get pointer to field buffer to write to
-//     char *t = cpl->field;
-//     while (p < end) {
-//         if (AK_is_space(*p)) {
-//             ++p;
-//             continue;
-//         }
-//         *t++ = (char)*p++;
-//     }
-//     *t = '\0'; // must be NULL-terminated string
-//     return cpl->field;
-// }
-
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 static inline bool
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
@@ -2064,7 +2038,7 @@ AK_line_select_keep(
 }
 
 //------------------------------------------------------------------------------
-// CodePointGrid Type, New, Destrctor
+// CodePointGrid Type, New, Destructor
 
 typedef struct AK_CodePointGrid {
     Py_ssize_t lines_count;    // accumulated number of lines
@@ -2463,11 +2437,11 @@ typedef struct AK_DelimitedReader{
     AK_Dialect *dialect;
     AK_DelimitedReaderState state;
     Py_ssize_t field_len;
-    Py_ssize_t record_number;
-    Py_ssize_t record_iter_number;
-    Py_ssize_t field_number;
+    Py_ssize_t record_number; // total records loaded
+    Py_ssize_t record_iter_number; // records iterated (counting exclusion)
+    Py_ssize_t field_number; // field in current record, reset for each record
     int axis;
-    Py_ssize_t *axis_pos;
+    Py_ssize_t *axis_pos; // points to either record_number or field_number
 } AK_DelimitedReader;
 
 // Called once at the close of each field in a line. Returns 0 on success, -1 on failure
@@ -2686,7 +2660,7 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
                 return -1;
             case 0:
                 Py_DECREF(record);
-                return 1; // skip, process more lines
+                return 1; // skip, process more records
         }
         // NOTE: record_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
         ++dr->record_number;
