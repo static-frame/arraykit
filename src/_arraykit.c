@@ -714,8 +714,10 @@ AK_TP_resolve_field(AK_TypeParser* tp,
         if (tp->count_digit == 0) return TPS_STRING;
         // int
         if (tp->count_j == 0 &&
-                tp->count_e == 0 &&
+                tp->count_sign <= 1 &&
+                tp->last_sign_pos <= 0 &&
                 tp->count_decimal == 0 &&
+                tp->count_e == 0 &&
                 tp->count_paren_close == 0 &&
                 tp->count_paren_open == 0 &&
                 tp->count_nan == 0 &&
