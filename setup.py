@@ -5,12 +5,12 @@ from setuptools import Extension  # type: ignore
 from setuptools import setup
 from pathlib import Path
 
-AK_VERSION = '0.1.13'
-
+AK_VERSION = '0.2.0'
+/
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
 
-Code: https://github.com/InvestmentSystems/arraykit
+Code: https://github.com/static-frame/arraykit
 
 Packages: https://pypi.org/project/arraykit
 '''
@@ -47,7 +47,7 @@ setup(
     long_description=get_long_description(),
     python_requires='>3.7.0',
     install_requires=['numpy>=1.18.5'],
-    url='https://github.com/InvestmentSystems/arraykit',
+    url='https://github.com/static-frame/arraykit',
     author='Christopher Ariza, Brandt Bucher, Charles Burkland',
     license='MIT',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
