@@ -254,4 +254,12 @@ def split_after_count(string: str, delimiter: str, count: int):
     *left, right = string.split(delimiter, maxsplit=count)
     return ','.join(left), right
 
+def count_iteration(iterable: tp.Iterable):
+    count = 0
+    for i in iterable:
+        count += 1
+    return count
+
+
+
 

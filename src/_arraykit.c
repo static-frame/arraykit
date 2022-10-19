@@ -1442,10 +1442,10 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 d
         }
         Py_DECREF(field);
     }
+    Py_DECREF(iter);
     if (PyErr_Occurred()) {
         return NULL;
     }
-    Py_DECREF(iter);
     return cpl;
 }
 
@@ -3059,6 +3059,30 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
 }
 
 
+
+static PyObject *
+count_iteration(PyObject *Py_UNUSED(m), PyObject *iterable)
+{
+    PyObject *iter = PyObject_GetIter(iterable);
+    if (iter == NULL) return NULL;
+
+    int count = 0;
+    PyObject *v;
+
+    while ((v = PyIter_Next(iter))) {
+        count++;
+        Py_DECREF(v);
+    }
+    Py_DECREF(iter);
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+    PyObject* result = PyLong_FromLong(count);
+    if (result == NULL) return NULL;
+    return result;
+}
+
+
 //------------------------------------------------------------------------------
 
 // Return the integer version of the pointer to underlying data-buffer of array.
@@ -3922,6 +3946,7 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"split_after_count", split_after_count, METH_VARARGS, NULL},
+    {"count_iteration", count_iteration, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {"get_new_indexers_and_screen",

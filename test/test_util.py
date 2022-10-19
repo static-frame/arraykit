@@ -3,7 +3,7 @@ import collections
 import datetime
 import unittest
 import warnings
-
+from io import StringIO
 import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
@@ -18,6 +18,7 @@ from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
 from arraykit import split_after_count
+from arraykit import count_iteration
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -483,6 +484,19 @@ class TestUnit(unittest.TestCase):
         post = split_after_count('a,b,c,d,e', '|', 5)
         self.assertEqual(post[0], 'a,b,c,d,e')
         self.assertEqual(post[1], '')
+
+
+    #---------------------------------------------------------------------------
+    def test_count_iteration_a(self) -> None:
+        post = count_iteration(('a', 'b', 'c', 'd'))
+        self.assertEqual(post, 4)
+
+    def test_count_iteration_b(self) -> None:
+        s1 = StringIO(',1,a,b\n-,1,43,54\nX,2,1,3\nY,1,8,10\n-,2,6,20')
+        post = count_iteration(s1)
+        self.assertEqual(post, 5)
+
+
 
 if __name__ == '__main__':
     unittest.main()

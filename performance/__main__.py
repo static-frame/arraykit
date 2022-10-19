@@ -26,6 +26,7 @@ from performance.reference.util import isna_element as isna_element_ref
 from performance.reference.util import get_new_indexers_and_screen_ak
 from performance.reference.util import get_new_indexers_and_screen_ref
 from performance.reference.util import split_after_count as split_after_count_ref
+from performance.reference.util import count_iteration as count_iteration_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -43,6 +44,7 @@ from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import delimited_to_arrays as delimited_to_arrays_ak
 from arraykit import isna_element as isna_element_ak
 from arraykit import split_after_count as split_after_count_ak
+from arraykit import count_iteration as count_iteration_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -714,6 +716,24 @@ class SplitAfterCountAK(SplitAfterCount):
 
 class SplitAfterCountREF(SplitAfterCount):
     entry = staticmethod(split_after_count_ref)
+
+
+#-------------------------------------------------------------------------------
+class CountIterations(Perf):
+    NUMBER = 10_000
+
+    def __init__(self):
+        self.strio = io.StringIO('\n'.join(['abcd'] * 10_000))
+
+    def main(self):
+        post = self.entry(self.strio)
+        self.strio.seek(0)
+
+class CountIterationsAK(CountIterations):
+    entry = staticmethod(count_iteration_ak)
+
+class CountIterationsREF(CountIterations):
+    entry = staticmethod(count_iteration_ref)
 
 
 #-------------------------------------------------------------------------------
