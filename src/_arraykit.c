@@ -714,8 +714,10 @@ AK_TP_resolve_field(AK_TypeParser* tp,
         if (tp->count_digit == 0) return TPS_STRING;
         // int
         if (tp->count_j == 0 &&
-                tp->count_e == 0 &&
+                tp->count_sign <= 1 &&
+                tp->last_sign_pos <= 0 &&
                 tp->count_decimal == 0 &&
+                tp->count_e == 0 &&
                 tp->count_paren_close == 0 &&
                 tp->count_paren_open == 0 &&
                 tp->count_nan == 0 &&
@@ -1283,9 +1285,6 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
     PyMem_Free(cpl->offsets);
-    // if (cpl->field) {
-    //     PyMem_Free(cpl->field);
-    // }
     if (cpl->type_parser) { // can exclude the check
         PyMem_Free(cpl->type_parser);
     }
@@ -1469,32 +1468,6 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 }
 
 //------------------------------------------------------------------------------
-// Set the CPL field to the characters accumulated in the CPL's buffer. This is only used for field converters that need a char* as an input argument. This has to be dynamically allocated and cleaned up appropriately.
-// static inline char*
-// AK_CPL_current_to_field(AK_CodePointLine* cpl)
-// {
-//     // NOTE: we assume this is only called after offset_max is complete, and that this is only called once per CPL; we set it to the maximum size on first usage and then overwrite context on each subsequent usage.
-//     if (cpl->field == NULL) {
-//         // create a NULL-terminated string; need one more for string terminator
-//         cpl->field = (char*)PyMem_Malloc(sizeof(char) * (cpl->offset_max + 1));
-//         if (cpl->field == NULL) return (char*)PyErr_NoMemory();
-//     }
-//     Py_UCS4 *p = cpl->buffer_current_ptr;
-//     Py_UCS4 *end = p + cpl->offsets[cpl->offsets_current_index];
-
-//     // get pointer to field buffer to write to
-//     char *t = cpl->field;
-//     while (p < end) {
-//         if (AK_is_space(*p)) {
-//             ++p;
-//             continue;
-//         }
-//         *t++ = (char)*p++;
-//     }
-//     *t = '\0'; // must be NULL-terminated string
-//     return cpl->field;
-// }
-
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
 static inline bool
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
@@ -2065,7 +2038,7 @@ AK_line_select_keep(
 }
 
 //------------------------------------------------------------------------------
-// CodePointGrid Type, New, Destrctor
+// CodePointGrid Type, New, Destructor
 
 typedef struct AK_CodePointGrid {
     Py_ssize_t lines_count;    // accumulated number of lines
@@ -2464,11 +2437,11 @@ typedef struct AK_DelimitedReader{
     AK_Dialect *dialect;
     AK_DelimitedReaderState state;
     Py_ssize_t field_len;
-    Py_ssize_t record_number;
-    Py_ssize_t record_iter_number;
-    Py_ssize_t field_number;
+    Py_ssize_t record_number; // total records loaded
+    Py_ssize_t record_iter_number; // records iterated (counting exclusion)
+    Py_ssize_t field_number; // field in current record, reset for each record
     int axis;
-    Py_ssize_t *axis_pos;
+    Py_ssize_t *axis_pos; // points to either record_number or field_number
 } AK_DelimitedReader;
 
 // Called once at the close of each field in a line. Returns 0 on success, -1 on failure
@@ -2687,7 +2660,7 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
                 return -1;
             case 0:
                 Py_DECREF(record);
-                return 1; // skip, process more lines
+                return 1; // skip, process more records
         }
         // NOTE: record_number should reflect the processed line count, and exlude any skipped lines. The value is initialized to -1 such the first line is number 0
         ++dr->record_number;
@@ -2721,9 +2694,10 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
 static void
 AK_DR_Free(AK_DelimitedReader *dr)
 {
-    AK_Dialect_Free(dr->dialect);
-    dr->dialect = NULL;
-    Py_CLEAR(dr->input_iter);
+    if (dr->dialect) {
+        AK_Dialect_Free(dr->dialect);
+    }
+    Py_XDECREF(dr->input_iter); // might already be NULL
     PyMem_Free(dr);
 }
 
@@ -2755,6 +2729,7 @@ AK_DR_New(PyObject *iterable,
 
     dr->record_number = -1;
     dr->record_iter_number = -1;
+    dr->dialect = NULL; // init in case input_iter fails to init
 
     dr->input_iter = PyObject_GetIter(iterable); // new ref, decref in free
     if (dr->input_iter == NULL) {
@@ -2770,7 +2745,6 @@ AK_DR_New(PyObject *iterable,
             quoting,
             skipinitialspace,
             strict);
-
     if (dr->dialect == NULL) {
         AK_DR_Free(dr);
         return NULL;
@@ -2870,7 +2844,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "line_select must be a callable or None");
         return NULL;
     }
-    Py_XINCREF(line_select);
 
     if ((axis < 0) || (axis > 1)) {
         PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
@@ -2886,7 +2859,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             skipinitialspace,
             strict);
     if (dr == NULL) { // can happen due to validation of dialect parameters
-        Py_XDECREF(line_select);
         return NULL;
     }
 
@@ -2896,7 +2868,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &tsep,
             thousandschar,
             '\0')) {
-        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL; // default is off (skips evaluation)
     }
@@ -2906,7 +2877,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &decc,
             decimalchar,
             '.')) {
-        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL;
     }
@@ -2914,7 +2884,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     // dtypes inc / dec ref bound within CPG life
     AK_CodePointGrid* cpg = AK_CPG_New(dtypes, tsep, decc);
     if (cpg == NULL) { // error will be set
-        Py_XDECREF(line_select);
         AK_DR_Free(dr);
         return NULL;
     }
@@ -2929,7 +2898,6 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             break;
         }
         else if (status == -1) {
-            Py_XDECREF(line_select);
             AK_DR_Free(dr);
             AK_CPG_Free(cpg);
             return NULL;
@@ -2938,16 +2906,11 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_DR_Free(dr);
 
-
     PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep, decc);
     // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
-
-    Py_XDECREF(line_select);
     AK_CPG_Free(cpg); // will free reference to dtypes
-
     return arrays; // could be NULL
 }
-
 
 static char *iterable_str_to_array_1d_kwarg_names[] = {
     "iterable",

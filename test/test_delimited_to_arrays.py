@@ -156,6 +156,7 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             a1 = iterable_str_to_array_1d(['3.000', '4.000', '1.000'], dtype=int, thousandschar=',')
 
+
     #---------------------------------------------------------------------------
 
     def test_iterable_str_to_array_1d_uint_1(self) -> None:
@@ -703,6 +704,42 @@ class TestUnit(unittest.TestCase):
         post2 = delimited_to_arrays(msg, axis=1, skipinitialspace=True)
         self.assertEqual([a.tolist() for a in post2], [['a', 'b'], [10, 20], ['foo', 'c']])
 
+    def test_delimited_to_arrays_parse_j(self) -> None:
+        msg = [
+            '2021,2021-04-01,4',
+            '2022,2022-05-01,3',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=False)
+        self.assertEqual([a.tolist() for a in post1], [[2021, 2022], ['2021-04-01', '2022-05-01'], [4, 3]])
+
+
+    def test_delimited_to_arrays_parse_k(self) -> None:
+        msg = [
+            '2021,2021-04,4',
+            '2022,2022-05,3',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=False)
+        self.assertEqual([a.tolist() for a in post1], [[2021, 2022], ['2021-04', '2022-05'], [4, 3]])
+
+
+    def test_delimited_to_arrays_parse_l(self) -> None:
+        msg = [
+            '1,2,3',
+            '2-,2-0,-3',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=False)
+        self.assertEqual([a.tolist() for a in post1], [['1', '2-'], ['2', '2-0'], [3, -3]])
+
+    def test_delimited_to_arrays_parse_m(self) -> None:
+        msg = [
+            '  1,   2,3',
+            ' 2-, 2-0, -3',
+            ]
+        post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=False)
+        self.assertEqual([a.tolist() for a in post1], [['  1', ' 2-'], ['   2', ' 2-0'], [3, -3]])
+
+
+        # import ipdb; ipdb.set_trace()
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_float_a(self) -> None:
@@ -1006,6 +1043,32 @@ class TestUnit(unittest.TestCase):
                 )
         self.assertEqual([x.tolist() for x in post1],
             [[1000, 2000, 4000], [4.0, 5.055, 6000.155]])
+
+
+    #---------------------------------------------------------------------------
+    def test_delimited_to_arrays_file_like_a(self) -> None:
+        def records():
+            msg = [
+                '1000;4',
+                '2000;5055',
+            ]
+            yield from msg
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(records,
+                    axis=1,
+                    delimiter=';',
+                    )
+
+    def test_delimited_to_arrays_file_like_b(self) -> None:
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(3,
+                    axis=1,
+                    delimiter=';',
+                    dtypes=lambda x: int,
+                    )
+
 
 
     #---------------------------------------------------------------------------
