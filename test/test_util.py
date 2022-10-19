@@ -17,6 +17,8 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from arraykit import split_after_count
+
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
 
@@ -441,6 +443,46 @@ class TestUnit(unittest.TestCase):
         postB = get_new_indexers_and_screen(indexersB, indexersB)
         assert tuple(map(list, postB)) == (list(indexersB), list(indexersB))
 
+
+    #---------------------------------------------------------------------------
+    def test_split_after_count_a(self) -> None:
+        post = split_after_count('a,b,c,d,e', ',', 2)
+        self.assertEqual(post[0], 'a,b')
+        self.assertEqual(post[1], 'c,d,e')
+
+    def test_split_after_count_b(self) -> None:
+        post = split_after_count('a,b,c,d,e', ',', 4)
+        self.assertEqual(post[0], 'a,b,c,d')
+        self.assertEqual(post[1], 'e')
+
+    def test_split_after_count_c(self) -> None:
+        post = split_after_count('a,b,c,d,e', ',', 5)
+        self.assertEqual(post[0], 'a,b,c,d,e')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_d(self) -> None:
+        post = split_after_count('a', ',', 5)
+        self.assertEqual(post[0], 'a')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_e(self) -> None:
+        with self.assertRaises(RuntimeError):
+            post = split_after_count('a,', ',', 0)
+
+    def test_split_after_count_f(self) -> None:
+        post = split_after_count('a,', ',', 1)
+        self.assertEqual(post[0], 'a')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_g(self) -> None:
+        post = split_after_count(',', ',', 1)
+        self.assertEqual(post[0], '')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_h(self) -> None:
+        post = split_after_count('a,b,c,d,e', '|', 5)
+        self.assertEqual(post[0], 'a,b,c,d,e')
+        self.assertEqual(post[1], '')
 
 if __name__ == '__main__':
     unittest.main()

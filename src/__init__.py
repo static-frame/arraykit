@@ -19,3 +19,4 @@ from ._arraykit import dtype_from_element as dtype_from_element
 from ._arraykit import delimited_to_arrays as delimited_to_arrays
 from ._arraykit import iterable_str_to_array_1d as iterable_str_to_array_1d
 from ._arraykit import get_new_indexers_and_screen as get_new_indexers_and_screen
+from ._arraykit import split_after_count as split_after_count

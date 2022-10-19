@@ -25,6 +25,7 @@ from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
 from performance.reference.util import get_new_indexers_and_screen_ak
 from performance.reference.util import get_new_indexers_and_screen_ref
+from performance.reference.util import split_after_count as split_after_count_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -41,6 +42,7 @@ from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
 from arraykit import delimited_to_arrays as delimited_to_arrays_ak
 from arraykit import isna_element as isna_element_ak
+from arraykit import split_after_count as split_after_count_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -693,6 +695,25 @@ class GetNewIndexersAndScreenPerfAK(GetNewIndexersAndScreenPerf):
 
 class GetNewIndexersAndScreenPerfREF(GetNewIndexersAndScreenPerf):
     entry = staticmethod(get_new_indexers_and_screen_ref)
+
+
+
+
+#-------------------------------------------------------------------------------
+class SplitAfterCount(Perf):
+    NUMBER = 200_000
+
+    def __init__(self):
+        self.string = ''.join(['abcd,'] * 1000)
+
+    def main(self):
+        post = self.entry(self.string, ',', 20)
+
+class SplitAfterCountAK(SplitAfterCount):
+    entry = staticmethod(split_after_count_ak)
+
+class SplitAfterCountREF(SplitAfterCount):
+    entry = staticmethod(split_after_count_ref)
 
 
 #-------------------------------------------------------------------------------
