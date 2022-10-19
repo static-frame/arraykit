@@ -2913,6 +2913,120 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 }
 
 
+static char *str_to_array_1d_kwarg_names[] = {
+    "record",
+    "split",
+    "dtypes",
+    "delimiter",
+    "doublequote",
+    "escapechar",
+    "quotechar",
+    "quoting",
+    "skipinitialspace",
+    "strict",
+    "thousandschar",
+    "decimalchar",
+    NULL
+};
+
+static PyObject*
+str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *record;
+    int split = -1; // index at which to select field for left partition
+    PyObject *dtypes = NULL;
+    PyObject *delimiter = NULL;
+    PyObject *doublequote = NULL;
+    PyObject *escapechar = NULL;
+    PyObject *quotechar = NULL;
+    PyObject *quoting = NULL;
+    PyObject *skipinitialspace = NULL;
+    PyObject *strict = NULL;
+    PyObject *thousandschar = NULL;
+    PyObject *decimalchar = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|$iOOOOOOOOOO:str_to_array_1d",
+            delimited_to_ararys_kwarg_names,
+            &record,
+            // kwarg only
+            &split,
+            &dtypes,
+            &delimiter,
+            &doublequote,
+            &escapechar,
+            &quotechar,
+            &quoting,
+            &skipinitialspace,
+            &strict,
+            &thousandschar,
+            &decimalchar))
+        return NULL;
+
+    // TODO: back record in a tuple of size 1, pass as file_like
+    AK_DelimitedReader *dr = AK_DR_New(record,
+            0, // will mutate dr->axis_pos after creation
+            delimiter,
+            doublequote,
+            escapechar,
+            quotechar,
+            quoting,
+            skipinitialspace,
+            strict);
+    if (dr == NULL) { // can happen due to validation of dialect parameters
+        return NULL;
+    }
+
+    // Py_UCS4 tsep;
+    // if (AK_set_char(
+    //         "thousandschar",
+    //         &tsep,
+    //         thousandschar,
+    //         '\0')) {
+    //     AK_DR_Free(dr);
+    //     return NULL; // default is off (skips evaluation)
+    // }
+    // Py_UCS4 decc;
+    // if (AK_set_char(
+    //         "decimalchar",
+    //         &decc,
+    //         decimalchar,
+    //         '.')) {
+    //     AK_DR_Free(dr);
+    //     return NULL;
+    // }
+
+    // // dtypes inc / dec ref bound within CPG life
+    // AK_CodePointGrid* cpg = AK_CPG_New(dtypes, tsep, decc);
+    // if (cpg == NULL) { // error will be set
+    //     AK_DR_Free(dr);
+    //     return NULL;
+    // }
+    // // TODO: implement AK_DR_ProcessRecord
+    // // Consume all lines from dr and load into cpg
+    // int status;
+    // status = AK_DR_ProcessRecord(dr, cpg, line_select);
+    // if (status == 1) {
+    //     continue; // more lines to process
+    // }
+    // else if (status == 0) {
+    //     break;
+    // }
+    // else if (status == -1) {
+    //     AK_DR_Free(dr);
+    //     AK_CPG_Free(cpg);
+    //     return NULL;
+    // }
+    // AK_DR_Free(dr);
+
+    // PyObject* arrays = AK_CPG_ToArrayList(cpg, axis, line_select, tsep, decc);
+    // // NOTE: do not need to check if arrays is NULL as we will return NULL anyway
+    // AK_CPG_Free(cpg); // will free reference to dtypes
+    // return arrays; // could be NULL
+    Py_RETURN_NONE;
+}
+
+
 static char *iterable_str_to_array_1d_kwarg_names[] = {
     "iterable",
     "dtype",
