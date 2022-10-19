@@ -2992,6 +2992,40 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep, decc);
 }
 
+
+static char *split_after_count_kwarg_names[] = {
+    "string",
+    "delimiter",
+    "count",
+    NULL
+};
+
+static PyObject *
+split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *string = NULL;
+    PyObject *delimiter = NULL;
+    int count = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|Oi:split_after_count",
+            split_after_count_kwarg_names,
+            &string,
+            // kwarg only
+            &delimiter,
+            &count))
+        return NULL;
+
+    Py_UCS4 delim_char;
+    if (AK_set_char(
+            "delimiter",
+            &delim_char,
+            delimiter,
+            '\0')) return NULL;
+    Py_RETURN_NONE;
+}
+
+
 //------------------------------------------------------------------------------
 
 // Return the integer version of the pointer to underlying data-buffer of array.
@@ -3852,6 +3886,10 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"iterable_str_to_array_1d",
             (PyCFunction)iterable_str_to_array_1d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
+    {"split_after_count",
+            (PyCFunction)split_after_count,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"isna_element", isna_element, METH_O, NULL},
