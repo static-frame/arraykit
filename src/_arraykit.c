@@ -397,36 +397,32 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
 PyArray_Descr*
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
-    PyArray_Descr *dtype_final;
 
     switch (state) {
         case TPS_UNKNOWN:
-            dtype = PyArray_DescrFromType(NPY_UNICODE);
+            dtype = PyArray_DescrNewFromType(NPY_UNICODE);
             break;
         case TPS_EMPTY: // all empty defaults to string
-            dtype = PyArray_DescrFromType(NPY_UNICODE);
+            dtype = PyArray_DescrNewFromType(NPY_UNICODE);
             break;
         case TPS_STRING:
-            dtype = PyArray_DescrFromType(NPY_UNICODE);
+            dtype = PyArray_DescrNewFromType(NPY_UNICODE);
             break;
         case TPS_BOOL:
-            dtype = PyArray_DescrFromType(NPY_BOOL);
+            dtype = PyArray_DescrNewFromType(NPY_BOOL);
             break;
         case TPS_INT:
-            dtype = PyArray_DescrFromType(NPY_INT64);
+            dtype = PyArray_DescrNewFromType(NPY_INT64);
             break;
         case TPS_FLOAT:
-            dtype = PyArray_DescrFromType(NPY_FLOAT64);
+            dtype = PyArray_DescrNewFromType(NPY_FLOAT64);
             break;
         case TPS_COMPLEX:
-            dtype = PyArray_DescrFromType(NPY_COMPLEX128);
+            dtype = PyArray_DescrNewFromType(NPY_COMPLEX128);
             break;
     }
     if (dtype == NULL) return NULL; // assume error is set by PyArray_DescrFromType
-    // get a fresh instance as we might mutate
-    dtype_final = PyArray_DescrNew(dtype);
-    Py_DECREF(dtype);
-    return dtype_final;
+    return dtype;
 }
 
 //------------------------------------------------------------------------------
@@ -1923,18 +1919,11 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-// If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array. This forces
+// If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array.
 static inline PyObject*
 AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
-    // we cannot use this dtype in array construction as it will mutate a global
-    PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
-    if (dtype_bytes_proto == NULL) {
-        Py_DECREF(dtype);
-        return NULL;
-    }
-    PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
-    Py_DECREF(dtype_bytes_proto);
+    PyArray_Descr *dtype_bytes = PyArray_DescrNewFromType(NPY_STRING);
     if (dtype_bytes == NULL) {
         Py_DECREF(dtype);
         return NULL;
@@ -1942,10 +1931,9 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject* array_bytes = AK_CPL_to_array_bytes(cpl, dtype_bytes);
     if (array_bytes == NULL) {
         Py_DECREF(dtype);
-        Py_DECREF(dtype_bytes); // was not stolen if array creation failed
+        // dtype_bytes stolen even if array creation failed
         return NULL;
     }
-
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     Py_DECREF(array_bytes);
     if (array == NULL) {
