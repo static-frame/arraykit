@@ -3187,29 +3187,24 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     // -------------------------------------------------------------------------
     // 1. Handle fast, exact type checks first.
-
     // None
     if (arg == Py_None) {
         return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
     }
-
     // Float
     if (PyFloat_CheckExact(arg)) {
-        return (PyObject*)PyArray_DescrFromType(NPY_DOUBLE);
+        return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
     }
-
     // Integers
     if (PyLong_CheckExact(arg)) {
-        return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+        return (PyObject*)PyArray_DescrFromType(NPY_INT64);
     }
-
     // Bool
     if (PyBool_Check(arg)) {
         return (PyObject*)PyArray_DescrFromType(NPY_BOOL);
     }
 
     PyObject* dtype = NULL;
-
     // String
     if (PyUnicode_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_UNICODE);
@@ -3218,12 +3213,10 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
         Py_DECREF(descr);
         return dtype;
     }
-
     // Bytes
     if (PyBytes_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_STRING);
         if (descr == NULL) return NULL;
-
         dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
         Py_DECREF(descr);
         return dtype;
@@ -3231,14 +3224,12 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 
     // -------------------------------------------------------------------------
     // 2. Construct dtype (slightly more complicated)
-
     // Already known
     dtype = PyObject_GetAttrString(arg, "dtype");
     if (dtype) {
         return dtype;
     }
     PyErr_Clear();
-
     // -------------------------------------------------------------------------
     // 3. Handles everything else.
     return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
