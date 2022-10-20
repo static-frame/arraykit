@@ -39,7 +39,7 @@ jobs:
         if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'Windows'
-      - uses: pypa/cibuildwheel@v2.9.0
+      - uses: pypa/cibuildwheel@v2.11.1
         with:
           output-dir: dist
         env:
@@ -69,7 +69,7 @@ jobs:
         if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'Windows'
-      - uses: pypa/cibuildwheel@v2.9.0
+      - uses: pypa/cibuildwheel@v2.11.1
         with:
           output-dir: dist
         env:
