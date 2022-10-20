@@ -326,6 +326,8 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
         self.assertFalse(isna_element(False))
 
+    #---------------------------------------------------------------------------
+
     def test_dtype_from_element_core_dtypes(self) -> None:
         dtypes = [
                 np.longlong,
@@ -392,6 +394,12 @@ class TestUnit(unittest.TestCase):
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
+
+    def test_dtype_from_element_int(self) -> None:
+        # make sure all platforms give 64 bit int
+        self.assertEqual(str(dtype_from_element(3)), 'int64')
+
+    #---------------------------------------------------------------------------
 
     def test_get_new_indexers_and_screen_a(self) -> None:
         indexersA = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1], dtype=np.int64)
