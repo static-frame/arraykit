@@ -3187,19 +3187,15 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     // -------------------------------------------------------------------------
     // 1. Handle fast, exact type checks first.
-    // None
     if (arg == Py_None) {
         return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
     }
-    // Float
     if (PyFloat_CheckExact(arg)) {
         return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
     }
-    // Integers
     if (PyLong_CheckExact(arg)) {
         return (PyObject*)PyArray_DescrFromType(NPY_INT64);
     }
-    // Bool
     if (PyBool_Check(arg)) {
         return (PyObject*)PyArray_DescrFromType(NPY_BOOL);
     }
