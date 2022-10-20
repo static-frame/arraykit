@@ -47,7 +47,6 @@ def delimited_to_arrays(
 
 def split_after_count(
         string: str,
-        *
         delimiter: str,
         count: int,
         ) -> tp.Tuple[str, str]: ...

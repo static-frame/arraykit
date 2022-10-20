@@ -37,10 +37,16 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.1
+............
+
+Implemented ``count_iteration``, ``split_after_count``.
+
+
 0.2.0
 ............
 
-Implemented ``delimited_to_arrays``, ``iterable_str_to_array_1d``
+Implemented ``delimited_to_arrays``, ``iterable_str_to_array_1d``.
 
 
 0.1.13
