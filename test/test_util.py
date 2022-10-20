@@ -369,11 +369,11 @@ class TestUnit(unittest.TestCase):
         NT = collections.namedtuple('NT', tuple('abc'))
 
         dtype_obj_pairs = [
-                (np.int_, 12),
-                (np.float_, 12.0),
+                (np.int64, 12),
+                (np.float64, 12.0),
                 (np.bool_, True),
                 (np.dtype('O'), None),
-                (np.float_, float('NaN')),
+                (np.float64, float('NaN')),
                 (np.dtype('O'), object()),
                 (np.dtype('O'), (1, 2, 3)),
                 (np.dtype('O'), NT(1, 2, 3)),
