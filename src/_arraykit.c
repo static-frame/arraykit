@@ -1441,10 +1441,10 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 d
         }
         Py_DECREF(field);
     }
+    Py_DECREF(iter);
     if (PyErr_Occurred()) {
         return NULL;
     }
-    Py_DECREF(iter);
     return cpl;
 }
 
@@ -2955,6 +2955,97 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep, decc);
 }
 
+
+static PyObject *
+split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
+{
+    PyObject *string = NULL;
+    PyObject *delimiter = NULL;
+    int count = 0;
+
+    if (!PyArg_ParseTuple(args,
+            "OOi:split_after_count",
+            &string,
+            &delimiter,
+            &count)) {
+        return NULL;
+    }
+
+    if (!PyUnicode_Check(string)) {
+        PyErr_Format(PyExc_RuntimeError,
+                "a string is required, not %.200s",
+                Py_TYPE(string)->tp_name
+                );
+        return NULL;
+    }
+
+    if (count <= 0) {
+        PyErr_Format(PyExc_RuntimeError,
+                "count must be greater than zero, not %i",
+                count
+                );
+        return NULL;
+    }
+
+    Py_UCS4 delim_char;
+    if (AK_set_char(
+            "delimiter",
+            &delim_char,
+            delimiter,
+            '\0')) return NULL;
+
+    unsigned int kind = PyUnicode_KIND(string);
+    const void *data = PyUnicode_DATA(string);
+    Py_ssize_t pos = 0;
+    Py_ssize_t delim_count = 0;
+    Py_ssize_t linelen = PyUnicode_GET_LENGTH(string);
+    Py_UCS4 c;
+
+    while (pos < linelen) {
+        c = PyUnicode_READ(kind, data, pos);
+        if (c == delim_char) {
+            delim_count++;
+            if (delim_count == count) {
+                break; // to not include delim at transition
+                // do not increment pos so as to exclude in left
+            }
+        }
+        pos++;
+    }
+
+    PyObject* left = PyUnicode_Substring(string, 0, pos);
+    PyObject* right = PyUnicode_Substring(string, pos+1, linelen);
+    PyObject *result = PyTuple_Pack(2, left, right);
+    Py_DECREF(left);
+    Py_DECREF(right);
+    return result;
+}
+
+
+
+static PyObject *
+count_iteration(PyObject *Py_UNUSED(m), PyObject *iterable)
+{
+    PyObject *iter = PyObject_GetIter(iterable);
+    if (iter == NULL) return NULL;
+
+    int count = 0;
+    PyObject *v;
+
+    while ((v = PyIter_Next(iter))) {
+        count++;
+        Py_DECREF(v);
+    }
+    Py_DECREF(iter);
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+    PyObject* result = PyLong_FromLong(count);
+    if (result == NULL) return NULL;
+    return result;
+}
+
+
 //------------------------------------------------------------------------------
 
 // Return the integer version of the pointer to underlying data-buffer of array.
@@ -3087,7 +3178,7 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
     if (!PyArg_ParseTuple(args, "O!O!:resolve_dtype",
-                          &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
+            &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
     {
         return NULL;
     }
@@ -3817,6 +3908,8 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)iterable_str_to_array_1d,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"split_after_count", split_after_count, METH_VARARGS, NULL},
+    {"count_iteration", count_iteration, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {"get_new_indexers_and_screen",
