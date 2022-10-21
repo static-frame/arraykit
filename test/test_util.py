@@ -2,6 +2,14 @@ import pytest
 import collections
 import datetime
 import unittest
+import itertools
+import typing as tp
+from contextlib import contextmanager
+import os
+from os import PathLike
+from pathlib import Path
+import tempfile
+
 import warnings
 from io import StringIO
 import numpy as np  # type: ignore
@@ -17,6 +25,7 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+from arraykit import array_bytes_to_file
 from arraykit import split_after_count
 from arraykit import count_iteration
 
@@ -24,6 +33,27 @@ from performance.reference.util import get_new_indexers_and_screen_ak as get_new
 from arraykit import get_new_indexers_and_screen
 
 from performance.reference.util import mloc as mloc_ref
+
+PathSpecifier = tp.Union[str, PathLike]
+
+@contextmanager
+def temp_file(suffix: tp.Optional[str] = None,
+        path: bool = False
+        ) -> tp.Iterator[PathSpecifier]:
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            tmp_name = f.name
+        if path:
+            yield Path(tmp_name)
+        else:
+            yield tmp_name
+    finally:
+        if os.path.exists(tmp_name):
+            try:
+                os.unlink(tmp_name)
+            except PermissionError: # happens on Windows sometimes
+                pass
+
 
 
 class TestUnit(unittest.TestCase):
@@ -395,6 +425,26 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
+
+    #---------------------------------------------------------------------------
+    def test_array_bytes_to_file_a(self) -> None:
+
+        a1 = np.array([3, 4, 5])
+        with temp_file('.npy') as fp:
+            with open(fp, 'wb') as f:
+                count = array_bytes_to_file(a1, f)
+                self.assertTrue(count > 0)
+                # import ipdb; ipdb.set_trace()
+
+            with open(fp, 'r') as f:
+                a2 = np.fromfile(f, dtype=a1.dtype)
+                self.assertTrue((a1 == a2).all())
+                # print(a2)
+                # import ipdb; ipdb.set_trace()
+                pass
+
+    #---------------------------------------------------------------------------
+
     def test_dtype_from_element_int(self) -> None:
         # make sure all platforms give 64 bit int
         self.assertEqual(str(dtype_from_element(3)), 'int64')
@@ -503,7 +553,6 @@ class TestUnit(unittest.TestCase):
         s1 = StringIO(',1,a,b\n-,1,43,54\nX,2,1,3\nY,1,8,10\n-,2,6,20')
         post = count_iteration(s1)
         self.assertEqual(post, 5)
-
 
 
 if __name__ == '__main__':

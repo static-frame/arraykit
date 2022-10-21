@@ -3158,6 +3158,96 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
     return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
+
+
+// Wites array bytes to an open, writeable file. Possibly return number of bytes written. This is similar to what tofile() does but tofile() cannot be used on a _ZipWriteFile when writing into a zip (raises io.UnsupportedOperation: fileno)
+static PyObject *
+array_bytes_to_file(PyObject *Py_UNUSED(m), PyObject *args)
+{
+
+    PyObject *array;
+    PyObject *file;
+
+    if (!PyArg_ParseTuple(args, "OO:array_bytes_to_file",
+            &array, &file)) // how to validate file type?
+    {
+        return NULL;
+    }
+    AK_CHECK_NUMPY_ARRAY(array);
+
+    PyObject *write_func = PyObject_GetAttrString(file, "write");
+    if (!write_func) {
+        goto error;
+    }
+    PyObject *mv;
+    PyObject *ret;
+    size_t elsize = PyArray_DESCR((PyArrayObject*)array)->elsize;
+
+    // this is what PyArray_ToFile to does
+    if (PyArray_ISCONTIGUOUS((PyArrayObject*)array)) {
+        npy_intp size = PyArray_SIZE((PyArrayObject*)array);
+        // might use PyMemoryView_GetContiguous
+        mv = PyMemoryView_FromMemory(PyArray_DATA((PyArrayObject*)array), size * elsize, 0);
+        ret = PyObject_CallFunctionObjArgs(write_func, mv, NULL);
+        Py_DECREF(mv);
+        Py_DECREF(ret);    }
+    else {
+        PyArrayIterObject *it = (PyArrayIterObject *) PyArray_IterNew(array);
+        if (it == NULL) {
+            return NULL;
+        }
+        while (it->index < it->size) {
+            mv = PyMemoryView_FromMemory(it->dataptr, elsize, 0);
+            ret = PyObject_CallFunctionObjArgs(write_func, mv, NULL);
+
+            PyArray_ITER_NEXT(it);
+            Py_DECREF(mv);
+            Py_DECREF(ret);
+        }
+        Py_DECREF(it);
+    }
+    Py_DECREF(write_func);
+
+    // dummy return
+    PyObject *post = PyLong_FromLong(3);
+    if (!post) {
+        return NULL;
+    }
+    return post;
+
+error:
+    return NULL;
+
+}
+
+    // can create memory view object and pass this to the write method
+    // PyObject *PyMemoryView_FromMemory(char *mem, Py_ssize_t size, int flags)
+    // PyObject *PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char order)
+
+// from PyArray_ToString: create an empty bytes object and write to it
+
+        // fwrite((const void *)it->dataptr,
+        //             (size_t) PyArray_DESCR(self)->elsize,
+        //             1, fp)
+
+
+        // ret = PyBytes_FromStringAndSize(NULL, (Py_ssize_t) numbytes);
+        // if (ret == NULL) {
+        //     Py_DECREF(it);
+        //     return NULL;
+        // }
+        // dptr = PyBytes_AS_STRING(ret);
+        // i = it->size;
+        // elsize = PyArray_DESCR(self)->elsize;
+        // while (i--) {
+        //     memcpy(dptr, it->dataptr, elsize);
+        //     dptr += elsize;
+        //     PyArray_ITER_NEXT(it);
+        // }
+        // Py_DECREF(it);
+
+
+
 //------------------------------------------------------------------------------
 // type resolution
 
@@ -3873,6 +3963,7 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"array_bytes_to_file", array_bytes_to_file, METH_VARARGS, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"delimited_to_arrays",
