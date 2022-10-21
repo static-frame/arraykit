@@ -2,7 +2,6 @@ import pytest
 import collections
 import datetime
 import unittest
-<<<<<<< HEAD
 import itertools
 import typing as tp
 from contextlib import contextmanager
@@ -11,10 +10,8 @@ from os import PathLike
 from pathlib import Path
 import tempfile
 
-=======
 import warnings
 from io import StringIO
->>>>>>> master
 import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
@@ -28,15 +25,12 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
-<<<<<<< HEAD
 from arraykit import array_bytes_to_file
-=======
 from arraykit import split_after_count
 from arraykit import count_iteration
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
->>>>>>> master
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -188,10 +182,6 @@ class TestUnit(unittest.TestCase):
             # zero dimension
             shape_filter(np.array(1))
 
-<<<<<<< HEAD
-
-=======
->>>>>>> master
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:
@@ -564,8 +554,6 @@ class TestUnit(unittest.TestCase):
         post = count_iteration(s1)
         self.assertEqual(post, 5)
 
-
->>>>>>> master
 
 if __name__ == '__main__':
     unittest.main()

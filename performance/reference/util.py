@@ -217,7 +217,6 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     return np.array(value).dtype
 
 
-<<<<<<< HEAD
 NDITER_FLAGS = ('external_loop', 'buffered', 'zerosize_ok')
 BUFFERSIZE_NUMERATOR = 16 * 1024 ** 2
 # for 8 bytes this would give 2,097,152 bytes
@@ -244,7 +243,7 @@ def array_bytes_to_file(
                 order='C',
                 ):
             file.write(chunk.tobytes('C'))
-=======
+
 def get_new_indexers_and_screen_ref(
         indexers: np.ndarray,
         positions: np.ndarray,
@@ -288,7 +287,3 @@ def count_iteration(iterable: tp.Iterable):
         count += 1
     return count
 
-
-
-
->>>>>>> master
