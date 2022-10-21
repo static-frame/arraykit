@@ -37,6 +37,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.2.2
+............
+
+Refinements to ensure typed-parsed ints are always int64 in ``delimited_to_arrays``.
+
+
 0.2.1
 ............
 
