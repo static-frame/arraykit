@@ -23,31 +23,57 @@ jobs:
         with:
           name: dist
           path: dist
-  whl:
+  whl_lt_3_9:
     name: Build / ${{ matrix.os }} / Python ${{ matrix.major }}.${{ matrix.minor }}
     strategy:
       fail-fast: false
       matrix:
         os: [macOS, Ubuntu, Windows]
         major: [3]
-        minor: [6, 7, 8]
+        minor: [7, 8]
     runs-on: ${{ matrix.os }}-latest
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
-#       - uses: docker/setup-qemu-action@v1
-#         if: matrix.os == 'Ubuntu' && github.event_name == 'release' && github.event.action == 'published'
-#         with:
-#           platforms: all
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
         if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'Windows'
-      - uses: joerick/cibuildwheel@v1.10.0
+      - uses: pypa/cibuildwheel@v2.11.1
         with:
           output-dir: dist
         env:
-#           CIBW_ARCHS: "${{ github.event_name == 'release' && github.event.action == 'published' && 'all' || 'auto' }}"
+          CIBW_ARCHS_MACOS: x86_64 universal2 arm64
+          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-backward.txt
+          CIBW_BUILD: cp${{ matrix.major }}${{ matrix.minor }}-*
+          CIBW_BUILD_VERBOSITY: 1
+          CIBW_BEFORE_TEST: pip install -r {project}/requirements-test-backward.txt
+          CIBW_TEST_COMMAND: pytest {project}/test
+      - uses: actions/upload-artifact@master
+        with:
+          name: dist
+          path: dist
+  whl_gte_3_9:
+    name: Build / ${{ matrix.os }} / Python ${{ matrix.major }}.${{ matrix.minor }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macOS, Ubuntu, Windows]
+        major: [3]
+        minor: [9, 10]
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-python@master
+      - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
+        if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
+      - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
+        if: matrix.os == 'Windows'
+      - uses: pypa/cibuildwheel@v2.11.1
+        with:
+          output-dir: dist
+        env:
+          CIBW_ARCHS_MACOS: x86_64 universal2 arm64
           CIBW_BEFORE_BUILD: pip install -r {project}/requirements.txt
           CIBW_BUILD: cp${{ matrix.major }}${{ matrix.minor }}-*
           CIBW_BUILD_VERBOSITY: 1
@@ -60,7 +86,7 @@ jobs:
   upload:
     name: Publish
     if: github.event_name == 'release' && github.event.action == 'published'
-    needs: [tar_gz, whl]
+    needs: [tar_gz, whl_lt_3_9, whl_gte_3_9]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@master

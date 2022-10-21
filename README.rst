@@ -23,18 +23,56 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 
 
+
 Dependencies
 --------------
 
 ArrayKit requires the following:
 
-- Python >= 3.6
-- NumPy >= 1.17.4
+- Python >= 3.7
+- NumPy >= 1.18.5
 
 
 
 What is New in ArrayKit
 -------------------------
+
+
+0.2.2
+............
+
+Refinements to ensure typed-parsed ints are always int64 in ``delimited_to_arrays``.
+
+
+0.2.1
+............
+
+Implemented ``count_iteration``, ``split_after_count``.
+
+
+0.2.0
+............
+
+Implemented ``delimited_to_arrays``, ``iterable_str_to_array_1d``.
+
+
+0.1.13
+............
+
+Now building Python 3.10 wheels.
+
+
+0.1.12
+............
+
+Added ``get_new_indexers_and_screen``.
+
+
+0.1.10
+............
+
+Updated minimum NumPy to 1.18.5
+
 
 0.1.9
 ............

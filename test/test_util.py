@@ -2,6 +2,7 @@ import pytest
 import collections
 import datetime
 import unittest
+<<<<<<< HEAD
 import itertools
 import typing as tp
 from contextlib import contextmanager
@@ -10,6 +11,10 @@ from os import PathLike
 from pathlib import Path
 import tempfile
 
+=======
+import warnings
+from io import StringIO
+>>>>>>> master
 import numpy as np  # type: ignore
 
 from arraykit import resolve_dtype
@@ -23,7 +28,15 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
+<<<<<<< HEAD
 from arraykit import array_bytes_to_file
+=======
+from arraykit import split_after_count
+from arraykit import count_iteration
+
+from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
+from arraykit import get_new_indexers_and_screen
+>>>>>>> master
 
 from performance.reference.util import mloc as mloc_ref
 
@@ -175,7 +188,10 @@ class TestUnit(unittest.TestCase):
             # zero dimension
             shape_filter(np.array(1))
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
     #---------------------------------------------------------------------------
 
     def test_column_2d_filter_a(self) -> None:
@@ -252,7 +268,10 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_c1(self) -> None:
         mutable = [np.nan]
         memo = {}
-        a1 = np.array((None, 'foo', True, mutable))
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
 
         self.assertIsNot(a1, a2)
@@ -263,7 +282,9 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_c2(self) -> None:
         memo = {}
         mutable = [np.nan]
-        a1 = np.array((None, 'foo', True, mutable))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo)
         self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
@@ -274,7 +295,9 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_d(self) -> None:
         memo = {}
         mutable = [3, 4, 5]
-        a1 = np.array((None, 'foo', True, mutable))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a1 = np.array((None, 'foo', True, mutable))
         a2 = array_deepcopy(a1, memo=memo)
         self.assertIsNot(a1, a2)
         self.assertTrue(id(mutable) in memo)
@@ -343,6 +366,8 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
         self.assertFalse(isna_element(False))
 
+    #---------------------------------------------------------------------------
+
     def test_dtype_from_element_core_dtypes(self) -> None:
         dtypes = [
                 np.longlong,
@@ -372,7 +397,7 @@ class TestUnit(unittest.TestCase):
                 (np.dtype('<U1'), np.str_('1')),
                 (np.dtype('<U1'), np.unicode_('1')),
                 (np.dtype('V1'), np.void(1)),
-                (np.dtype('O'), np.object()),
+                (np.dtype('O'), object),
                 (np.dtype('<M8'), np.datetime64('NaT')),
                 (np.dtype('<m8'), np.timedelta64('NaT')),
                 (np.float_, np.nan),
@@ -384,11 +409,11 @@ class TestUnit(unittest.TestCase):
         NT = collections.namedtuple('NT', tuple('abc'))
 
         dtype_obj_pairs = [
-                (np.int_, 12),
-                (np.float_, 12.0),
+                (np.int64, 12),
+                (np.float64, 12.0),
                 (np.bool_, True),
                 (np.dtype('O'), None),
-                (np.float_, float('NaN')),
+                (np.float64, float('NaN')),
                 (np.dtype('O'), object()),
                 (np.dtype('O'), (1, 2, 3)),
                 (np.dtype('O'), NT(1, 2, 3)),
@@ -410,6 +435,7 @@ class TestUnit(unittest.TestCase):
             self.assertEqual(np.dtype(f'|S{size}'), dtype_from_element(bytes(size)))
             self.assertEqual(np.dtype(f'<U{size}'), dtype_from_element('x' * size))
 
+
     #---------------------------------------------------------------------------
     def test_array_bytes_to_file_a(self) -> None:
 
@@ -426,6 +452,120 @@ class TestUnit(unittest.TestCase):
                 # print(a2)
                 # import ipdb; ipdb.set_trace()
                 pass
+
+    #---------------------------------------------------------------------------
+
+    def test_dtype_from_element_int(self) -> None:
+        # make sure all platforms give 64 bit int
+        self.assertEqual(str(dtype_from_element(3)), 'int64')
+
+    #---------------------------------------------------------------------------
+
+    def test_get_new_indexers_and_screen_a(self) -> None:
+        indexersA = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1], dtype=np.int64)
+        postA = get_new_indexers_and_screen_full(indexersA, np.arange(10, dtype=np.int64))
+        assert indexersA.flags.c_contiguous
+        assert indexersA.flags.f_contiguous
+        assert tuple(map(list, postA)) == (
+            [9, 0, 1, 4, 5],
+            [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2],
+        )
+
+        # Prove we can handle non-continuous arrays
+        indexersB = np.full((len(indexersA), 3), -1, dtype=np.int64)
+        indexersB[:,1] = indexersA.copy()
+        assert not indexersB[:,1].flags.c_contiguous
+        assert not indexersB[:,1].flags.f_contiguous
+        postB = get_new_indexers_and_screen_full(indexersB[:,1], np.arange(10, dtype=np.int64))
+        assert tuple(map(list, postA)) == tuple(map(list, postB))
+
+        indexersC = np.array([9, 9, 9, 9, 0, 0, 1, 4, 5, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.int64)
+        postC = get_new_indexers_and_screen_full(indexersC, positions=np.arange(15, dtype=np.int64))
+        assert tuple(map(list, postC)) == (
+            [9, 0, 1, 4, 5, 2, 3, 6, 7, 8, 10],
+            [0, 0, 0, 0, 1, 1, 2, 3, 4, 1, 1, 1, 2, 5, 6, 3, 4,7, 8, 9, 0, 10],
+        )
+
+        indexersD = np.array([2, 1, 0, 2, 0, 1, 1, 2, 0], dtype=np.int64)
+        postD = get_new_indexers_and_screen_full(indexers=indexersD, positions=np.arange(3, dtype=np.int64))
+        assert tuple(map(list, postD)) == (
+            [0, 1, 2],
+            [2, 1, 0, 2, 0, 1, 1, 2, 0],
+        )
+
+    def test_get_new_indexers_and_screen_b(self) -> None:
+        indexersA = np.array([5], dtype=np.int64)
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(6, dtype=np.int64))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(106, dtype=np.int64))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA.astype(np.int32), np.arange(5))
+
+        with self.assertRaises(ValueError):
+            get_new_indexers_and_screen(indexersA, np.arange(5).astype(np.int32))
+
+        indexersB = np.arange(25, dtype=np.int64)
+        postB = get_new_indexers_and_screen(indexersB, indexersB)
+        assert tuple(map(list, postB)) == (list(indexersB), list(indexersB))
+
+
+    #---------------------------------------------------------------------------
+    def test_split_after_count_a(self) -> None:
+        post = split_after_count('a,b,c,d,e', ',', 2)
+        self.assertEqual(post[0], 'a,b')
+        self.assertEqual(post[1], 'c,d,e')
+
+    def test_split_after_count_b(self) -> None:
+        post = split_after_count('a,b,c,d,e', ',', 4)
+        self.assertEqual(post[0], 'a,b,c,d')
+        self.assertEqual(post[1], 'e')
+
+    def test_split_after_count_c(self) -> None:
+        post = split_after_count('a,b,c,d,e', ',', 5)
+        self.assertEqual(post[0], 'a,b,c,d,e')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_d(self) -> None:
+        post = split_after_count('a', ',', 5)
+        self.assertEqual(post[0], 'a')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_e(self) -> None:
+        with self.assertRaises(RuntimeError):
+            post = split_after_count('a,', ',', 0)
+
+    def test_split_after_count_f(self) -> None:
+        post = split_after_count('a,', ',', 1)
+        self.assertEqual(post[0], 'a')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_g(self) -> None:
+        post = split_after_count(',', ',', 1)
+        self.assertEqual(post[0], '')
+        self.assertEqual(post[1], '')
+
+    def test_split_after_count_h(self) -> None:
+        post = split_after_count('a,b,c,d,e', '|', 5)
+        self.assertEqual(post[0], 'a,b,c,d,e')
+        self.assertEqual(post[1], '')
+
+
+    #---------------------------------------------------------------------------
+    def test_count_iteration_a(self) -> None:
+        post = count_iteration(('a', 'b', 'c', 'd'))
+        self.assertEqual(post, 4)
+
+    def test_count_iteration_b(self) -> None:
+        s1 = StringIO(',1,a,b\n-,1,43,54\nX,2,1,3\nY,1,8,10\n-,2,6,20')
+        post = count_iteration(s1)
+        self.assertEqual(post, 5)
+
+
+>>>>>>> master
 
 if __name__ == '__main__':
     unittest.main()

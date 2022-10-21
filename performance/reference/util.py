@@ -217,6 +217,7 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
     return np.array(value).dtype
 
 
+<<<<<<< HEAD
 NDITER_FLAGS = ('external_loop', 'buffered', 'zerosize_ok')
 BUFFERSIZE_NUMERATOR = 16 * 1024 ** 2
 # for 8 bytes this would give 2,097,152 bytes
@@ -243,3 +244,51 @@ def array_bytes_to_file(
                 order='C',
                 ):
             file.write(chunk.tobytes('C'))
+=======
+def get_new_indexers_and_screen_ref(
+        indexers: np.ndarray,
+        positions: np.ndarray,
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
+
+    positions = indexers.argsort()
+
+    # get the sorted indexers
+    indexers = indexers[positions]
+
+    mask = np.empty(indexers.shape, dtype=DTYPE_BOOL)
+    mask[0] = True
+    mask[1:] = indexers[1:] != indexers[:-1]
+
+    new_indexers = np.empty(mask.shape, dtype=DTYPE_INT_DEFAULT)
+    new_indexers[positions] = np.cumsum(mask) - 1
+    new_indexers.flags.writeable = False
+
+    return new_indexers, indexers[mask]
+
+
+def get_new_indexers_and_screen_ak(
+        indexers: np.ndarray,
+        positions: np.ndarray,
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
+    from arraykit import get_new_indexers_and_screen as ak_routine
+
+    if len(positions) > len(indexers):
+        return np.unique(indexers, return_inverse=True)
+
+    return ak_routine(indexers, positions)
+
+
+def split_after_count(string: str, delimiter: str, count: int):
+    *left, right = string.split(delimiter, maxsplit=count)
+    return ','.join(left), right
+
+def count_iteration(iterable: tp.Iterable):
+    count = 0
+    for i in iterable:
+        count += 1
+    return count
+
+
+
+
+>>>>>>> master

@@ -1,7 +1,13 @@
-import collections
+import sys
+import os
+import io
+from collections import namedtuple
 import datetime
 import timeit
 import argparse
+import typing as tp
+
+sys.path.append(os.getcwd())
 
 import numpy as np
 
@@ -17,6 +23,10 @@ from performance.reference.util import resolve_dtype_iter as resolve_dtype_iter_
 from performance.reference.util import dtype_from_element as dtype_from_element_ref
 from performance.reference.util import array_deepcopy as array_deepcopy_ref
 from performance.reference.util import isna_element as isna_element_ref
+from performance.reference.util import get_new_indexers_and_screen_ak
+from performance.reference.util import get_new_indexers_and_screen_ref
+from performance.reference.util import split_after_count as split_after_count_ref
+from performance.reference.util import count_iteration as count_iteration_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -31,7 +41,10 @@ from arraykit import resolve_dtype as resolve_dtype_ak
 from arraykit import resolve_dtype_iter as resolve_dtype_iter_ak
 from arraykit import dtype_from_element as dtype_from_element_ak
 from arraykit import array_deepcopy as array_deepcopy_ak
+from arraykit import delimited_to_arrays as delimited_to_arrays_ak
 from arraykit import isna_element as isna_element_ak
+from arraykit import split_after_count as split_after_count_ak
+from arraykit import count_iteration as count_iteration_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -39,6 +52,236 @@ from arraykit import ArrayGO as ArrayGOAK
 class Perf:
     FUNCTIONS = ('main',)
     NUMBER = 500_000
+
+class FixtureFileLike:
+
+    COUNT_ROW = 100_000
+    COUNT_COLUMN = 500
+    NUMBER = 1
+
+    def __init__(self):
+        records_int = [','.join(str(x) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        self.file_like_int = io.StringIO('\n'.join(records_int))
+
+        records_bool = [','.join(str(bool(x % 2)) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        self.file_like_bool = io.StringIO('\n'.join(records_bool))
+
+        records_str = [','.join('foobar' for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        self.file_like_str = io.StringIO('\n'.join(records_str))
+
+        records_float = [','.join('1.2345' for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        self.file_like_float = io.StringIO('\n'.join(records_float))
+
+        self.axis = 1
+
+# #-------------------------------------------------------------------------------
+class DelimitedToArraysTypedPandas(FixtureFileLike, Perf):
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
+class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
+    entry = staticmethod(delimited_to_arrays_ak)
+    dtypes_int = ([int] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_bool = ([bool] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_str = ([str] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_float = ([float] * FixtureFileLike.COUNT_COLUMN).__getitem__
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
+
+
+class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
+    import pandas
+    entry = staticmethod(pandas.read_csv)
+    dtypes_int = {i: int for i in range(FixtureFileLike.COUNT_COLUMN)}
+    dtypes_bool = {i: bool for i in range(FixtureFileLike.COUNT_COLUMN)}
+    dtypes_str = {i: object for i in range(FixtureFileLike.COUNT_COLUMN)}
+    dtypes_float = {i: float for i in range(FixtureFileLike.COUNT_COLUMN)}
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtype=self.dtypes_int)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtype=self.dtypes_bool)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtype=self.dtypes_str)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtype=self.dtypes_float)
+
+# #-------------------------------------------------------------------------------
+
+class DelimitedToArraysParsedPandas(FixtureFileLike, Perf):
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
+class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
+    entry = staticmethod(delimited_to_arrays_ak)
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtypes=None, axis=self.axis)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtypes=None, axis=self.axis)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtypes=None, axis=self.axis)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtypes=None, axis=self.axis)
+
+
+class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
+    import pandas
+    entry = staticmethod(pandas.read_csv)
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float)
+
+
+# #-------------------------------------------------------------------------------
+class DelimitedToArraysTypedGenft(FixtureFileLike, Perf):
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
+class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
+    entry = staticmethod(delimited_to_arrays_ak)
+
+    dtypes_int = ([int] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_bool = ([bool] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_str = ([str] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    dtypes_float = ([float] * FixtureFileLike.COUNT_COLUMN).__getitem__
+    axis = 1
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, dtypes=self.dtypes_int, axis=self.axis)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, dtypes=self.dtypes_bool, axis=self.axis)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, dtypes=self.dtypes_str, axis=self.axis)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, dtypes=self.dtypes_float, axis=self.axis)
+
+
+class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
+    entry = staticmethod(np.genfromtxt)
+
+    def int_uniform(self):
+        self.file_like_int.seek(0)
+        _ = self.entry(self.file_like_int, delimiter=',', dtype=int)
+
+    def bool_uniform(self):
+        self.file_like_bool.seek(0)
+        _ = self.entry(self.file_like_bool, delimiter=',', dtype=bool)
+
+    def str_uniform(self):
+        self.file_like_str.seek(0)
+        _ = self.entry(self.file_like_str, delimiter=',', dtype=str)
+
+    def float_uniform(self):
+        self.file_like_float.seek(0)
+        _ = self.entry(self.file_like_float, delimiter=',', dtype=float)
+
+
+# #-------------------------------------------------------------------------------
+# class DelimitedToArraysParsedGenft(FixtureFileLike, Perf):
+#     NUMBER = 10
+#     COUNT_ROW = 1_000
+
+#     def __init__(self):
+#         records_int = [','.join(str(x) for x in range(1000))] * self.COUNT_ROW
+#         self.file_like_int = io.StringIO('\n'.join(records_int))
+
+#         records_bool = [','.join(str(bool(x % 2)) for x in range(1000))] * self.COUNT_ROW
+#         self.file_like_bool = io.StringIO('\n'.join(records_bool))
+
+#         records_str = [','.join('foobar' for x in range(1000))] * self.COUNT_ROW
+#         self.file_like_str = io.StringIO('\n'.join(records_str))
+
+#         records_float = [','.join('1.2345' for x in range(1000))] * self.COUNT_ROW
+#         self.file_like_float = io.StringIO('\n'.join(records_float))
+
+# class DelimitedToArraysParsedGenftAK(DelimitedToArraysParsedGenft):
+#     entry = staticmethod(delimited_to_arrays_ak)
+
+#     def __init__(self):
+#         self.axis = 1
+
+#     def int_uniform(self):
+#         self.file_like_int.seek(0)
+#         _ = self.entry(self.file_like_int, dtypes=None, axis=self.axis)
+
+#     def bool_uniform(self):
+#         self.file_like_bool.seek(0)
+#         _ = self.entry(self.file_like_bool, dtypes=None, axis=self.axis)
+
+#     def str_uniform(self):
+#         self.file_like_str.seek(0)
+#         _ = self.entry(self.file_like_str, dtypes=None, axis=self.axis)
+
+#     def float_uniform(self):
+#         self.file_like_float.seek(0)
+#         _ = self.entry(self.file_like_float, dtypes=None, axis=self.axis)
+
+
+# class DelimitedToArraysParsedGenftREF(DelimitedToArraysParsedGenft):
+#     entry = staticmethod(np.genfromtxt)
+
+#     def int_uniform(self):
+#         self.file_like_int.seek(0)
+#         _ = self.entry(self.file_like_int, delimiter=',', dtype=None)
+
+#     def bool_uniform(self):
+#         self.file_like_bool.seek(0)
+#         _ = self.entry(self.file_like_bool, delimiter=',', dtype=None)
+
+#     def str_uniform(self):
+#         self.file_like_str.seek(0)
+#         _ = self.entry(self.file_like_str, delimiter=',', dtype=None)
+
+#     def float_uniform(self):
+#         self.file_like_float.seek(0)
+#         _ = self.entry(self.file_like_float, delimiter=',', dtype=None)
+
 
 #-------------------------------------------------------------------------------
 class MLoc(Perf):
@@ -182,7 +425,7 @@ class ResolveDTypeREF(ResolveDType):
 class ResolveDTypeIter(Perf):
 
     FUNCTIONS = ('iter10', 'iter100000')
-    NUMBER = 1000
+    NUMBER = 500
 
     def __init__(self):
         self.dtypes10 = [np.dtype(int)] * 9 + [np.dtype(float)]
@@ -234,7 +477,7 @@ class ArrayDeepcopyREF(ArrayDeepcopy):
 
 #-------------------------------------------------------------------------------
 class ArrayGOPerf(Perf):
-    NUMBER = 1000
+    NUMBER = 500
 
     def __init__(self):
         self.array = np.arange(100).astype(object)
@@ -258,7 +501,7 @@ class DtypeFromElementPerf(Perf):
     NUMBER = 1000
 
     def __init__(self):
-        NT = collections.namedtuple('NT', tuple('abc'))
+        NT = namedtuple('NT', tuple('abc'))
 
         self.values = [
                 np.longlong(-1), np.int_(-1), np.intc(-1), np.short(-1), np.byte(-1),
@@ -360,6 +603,140 @@ class IsNaElementPerfREF(IsNaElementPerf):
 
 
 #-------------------------------------------------------------------------------
+class GetNewIndexersAndScreenPerf(Perf):
+    FUNCTIONS = (
+        "ordered",
+        "unordered",
+        "tiled",
+        "repeat",
+        "quick_exit",
+        "late_exit",
+        "small",
+        "large",
+    )
+    NUMBER = 5
+
+    TILED = "tiled"
+    REPEATED = "repeated"
+    ORDERED = "ordered"
+    UNORDERED = "unordered"
+
+    class Key(tp.NamedTuple):
+        type1: str
+        type2: str
+        increment: int
+        scale: int
+
+    def __init__(self):
+        NUMBERS = np.arange(500_000, dtype=np.int64)
+        POSITIONS = np.arange(500_000, dtype=np.int64)
+
+        np.random.seed(0)
+
+        self.cases: tp.Dict[self.Key, tp.Tuple[np.ndarray, np.ndarray]] = {}
+
+        for scale in (5, 50, 500, 5_000, 50_000):
+            tiled_ordered = np.tile(NUMBERS[:scale], len(NUMBERS) // scale)
+            repeated_ordered = np.repeat(NUMBERS[:scale], len(NUMBERS) // scale)
+            tiled_unordered = tiled_ordered.copy()
+            repeated_unordered = repeated_ordered.copy()
+            np.random.shuffle(tiled_unordered)
+            np.random.shuffle(repeated_unordered)
+
+            increment = scale
+            while increment <= len(NUMBERS):
+                positions = POSITIONS[:increment]
+                key_kwargs = dict(increment=increment, scale=scale)
+                self.cases[
+                    self.Key(type1=self.TILED, type2=self.ORDERED, **key_kwargs)
+                ] = (tiled_ordered, positions)
+                self.cases[
+                    self.Key(type1=self.REPEATED, type2=self.ORDERED, **key_kwargs)
+                ] = (repeated_ordered, positions)
+                self.cases[
+                    self.Key(type1=self.TILED, type2=self.UNORDERED, **key_kwargs)
+                ] = (tiled_unordered, positions)
+                self.cases[
+                    self.Key(type1=self.REPEATED, type2=self.UNORDERED, **key_kwargs)
+                ] = (repeated_unordered, positions)
+                increment *= 10
+
+    def evaluate_cases_by_condition(self, condition):
+        for key, (indexers, positions) in self.cases.items():
+            if condition(key):
+                self.entry(indexers=indexers, positions=positions)
+
+    def ordered(self):
+        self.evaluate_cases_by_condition(lambda key: key.type2 == self.ORDERED)
+
+    def unordered(self):
+        self.evaluate_cases_by_condition(lambda key: key.type2 == self.UNORDERED)
+
+    def tiled(self):
+        self.evaluate_cases_by_condition(lambda key: key.type1 == self.TILED)
+
+    def repeat(self):
+        self.evaluate_cases_by_condition(lambda key: key.type1 == self.REPEATED)
+
+    def quick_exit(self):
+        self.evaluate_cases_by_condition(lambda key: key.increment == key.scale)
+
+    def late_exit(self):
+        self.evaluate_cases_by_condition(lambda key: key.increment > key.scale)
+
+    def small(self):
+        self.evaluate_cases_by_condition(lambda key: key.scale <= 500)
+
+    def large(self):
+        self.evaluate_cases_by_condition(lambda key: key.scale > 500)
+
+
+class GetNewIndexersAndScreenPerfAK(GetNewIndexersAndScreenPerf):
+    entry = staticmethod(get_new_indexers_and_screen_ak)
+
+
+class GetNewIndexersAndScreenPerfREF(GetNewIndexersAndScreenPerf):
+    entry = staticmethod(get_new_indexers_and_screen_ref)
+
+
+
+
+#-------------------------------------------------------------------------------
+class SplitAfterCount(Perf):
+    NUMBER = 200_000
+
+    def __init__(self):
+        self.string = ''.join(['abcd,'] * 1000)
+
+    def main(self):
+        post = self.entry(self.string, ',', 20)
+
+class SplitAfterCountAK(SplitAfterCount):
+    entry = staticmethod(split_after_count_ak)
+
+class SplitAfterCountREF(SplitAfterCount):
+    entry = staticmethod(split_after_count_ref)
+
+
+#-------------------------------------------------------------------------------
+class CountIterations(Perf):
+    NUMBER = 10_000
+
+    def __init__(self):
+        self.strio = io.StringIO('\n'.join(['abcd'] * 10_000))
+
+    def main(self):
+        post = self.entry(self.strio)
+        self.strio.seek(0)
+
+class CountIterationsAK(CountIterations):
+    entry = staticmethod(count_iteration_ak)
+
+class CountIterationsREF(CountIterations):
+    entry = staticmethod(count_iteration_ref)
+
+
+#-------------------------------------------------------------------------------
 
 def get_arg_parser():
 
@@ -370,7 +747,6 @@ def get_arg_parser():
         nargs='+',
         help='Provide one or more performance tests by name.')
     return p
-
 
 def main():
     options = get_arg_parser().parse_args()
@@ -399,11 +775,17 @@ def main():
                         number=cls_runner.NUMBER)
             records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
 
-    width = 24
-    for record in records:
-        print(''.join(
-            (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
-            ))
+    import pandas as pd # NOTE: cannot make StaticFrame a dependency
+    riter = iter(records)
+    columns = next(riter)
+    f = pd.DataFrame.from_records(riter, columns=columns)
+    print(f)
+
+    # width = 32
+    # for record in records:
+    #     print(''.join(
+    #         (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
+    #         ))
 
 if __name__ == '__main__':
     main()
