@@ -397,36 +397,32 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
 PyArray_Descr*
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
-    PyArray_Descr *dtype_final;
 
     switch (state) {
         case TPS_UNKNOWN:
-            dtype = PyArray_DescrFromType(NPY_UNICODE);
+            dtype = PyArray_DescrNewFromType(NPY_UNICODE);
             break;
         case TPS_EMPTY: // all empty defaults to string
-            dtype = PyArray_DescrFromType(NPY_UNICODE);
+            dtype = PyArray_DescrNewFromType(NPY_UNICODE);
             break;
         case TPS_STRING:
-            dtype = PyArray_DescrFromType(NPY_UNICODE);
+            dtype = PyArray_DescrNewFromType(NPY_UNICODE);
             break;
         case TPS_BOOL:
-            dtype = PyArray_DescrFromType(NPY_BOOL);
+            dtype = PyArray_DescrNewFromType(NPY_BOOL);
             break;
         case TPS_INT:
-            dtype = PyArray_DescrFromType(NPY_INT64);
+            dtype = PyArray_DescrNewFromType(NPY_INT64);
             break;
         case TPS_FLOAT:
-            dtype = PyArray_DescrFromType(NPY_FLOAT64);
+            dtype = PyArray_DescrNewFromType(NPY_FLOAT64);
             break;
         case TPS_COMPLEX:
-            dtype = PyArray_DescrFromType(NPY_COMPLEX128);
+            dtype = PyArray_DescrNewFromType(NPY_COMPLEX128);
             break;
     }
     if (dtype == NULL) return NULL; // assume error is set by PyArray_DescrFromType
-    // get a fresh instance as we might mutate
-    dtype_final = PyArray_DescrNew(dtype);
-    Py_DECREF(dtype);
-    return dtype_final;
+    return dtype;
 }
 
 //------------------------------------------------------------------------------
@@ -1297,7 +1293,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 static inline int
 AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t count)
 {
-    if ((cpl->buffer_count + count) >= cpl->buffer_capacity) {
+    if (AK_UNLIKELY((cpl->buffer_count + count) >= cpl->buffer_capacity)) {
         // realloc
         cpl->buffer_capacity *= 2; // needs to be max of this or element_length
         cpl->buffer = PyMem_Realloc(cpl->buffer,
@@ -1313,7 +1309,7 @@ static inline int
 AK_CPL_resize_offsets(AK_CodePointLine* cpl)
 {
     // increment by at most one, so only need to check if equal
-    if (cpl->offsets_count == cpl->offsets_capacity) {
+    if (AK_UNLIKELY(cpl->offsets_count == cpl->offsets_capacity)) {
         // realloc
         cpl->offsets_capacity *= 2;
         cpl->offsets = PyMem_Realloc(cpl->offsets,
@@ -1923,18 +1919,11 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-// If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array. This forces
+// If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array.
 static inline PyObject*
 AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
-    // we cannot use this dtype in array construction as it will mutate a global
-    PyArray_Descr *dtype_bytes_proto = PyArray_DescrFromType(NPY_STRING);
-    if (dtype_bytes_proto == NULL) {
-        Py_DECREF(dtype);
-        return NULL;
-    }
-    PyArray_Descr *dtype_bytes = PyArray_DescrNew(dtype_bytes_proto);
-    Py_DECREF(dtype_bytes_proto);
+    PyArray_Descr *dtype_bytes = PyArray_DescrNewFromType(NPY_STRING);
     if (dtype_bytes == NULL) {
         Py_DECREF(dtype);
         return NULL;
@@ -1942,10 +1931,9 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject* array_bytes = AK_CPL_to_array_bytes(cpl, dtype_bytes);
     if (array_bytes == NULL) {
         Py_DECREF(dtype);
-        Py_DECREF(dtype_bytes); // was not stolen if array creation failed
+        // dtype_bytes stolen even if array creation failed
         return NULL;
     }
-
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     Py_DECREF(array_bytes);
     if (array == NULL) {
@@ -2096,7 +2084,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
     Py_ssize_t lines_count = cpg->lines_count;
     if (line < lines_count) return 0; // most common scenario
 
-    if (line >= cpg->lines_capacity) {
+    if (AK_UNLIKELY(line >= cpg->lines_capacity)) {
         cpg->lines_capacity *= 2;
         // NOTE: we assume this only copies the pointers, not the data in the CPLs
         cpg->lines = PyMem_Realloc(cpg->lines,
@@ -2104,7 +2092,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
         if (cpg->lines == NULL) return -1;
     }
     // Create the new CPL; first check if we need to set type_parse by calling into the dtypes function. For now we assume sequential growth, so should only check if equal
-    if (line >= lines_count) {
+    if (AK_UNLIKELY(line >= lines_count)) {
         // determine if we need to parse types
         bool type_parse = false;
         if (cpg->dtypes == NULL) {
@@ -3199,29 +3187,20 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     // -------------------------------------------------------------------------
     // 1. Handle fast, exact type checks first.
-
-    // None
     if (arg == Py_None) {
         return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
     }
-
-    // Float
     if (PyFloat_CheckExact(arg)) {
-        return (PyObject*)PyArray_DescrFromType(NPY_DOUBLE);
+        return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
     }
-
-    // Integers
     if (PyLong_CheckExact(arg)) {
-        return (PyObject*)PyArray_DescrFromType(NPY_LONG);
+        return (PyObject*)PyArray_DescrFromType(NPY_INT64);
     }
-
-    // Bool
     if (PyBool_Check(arg)) {
         return (PyObject*)PyArray_DescrFromType(NPY_BOOL);
     }
 
     PyObject* dtype = NULL;
-
     // String
     if (PyUnicode_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_UNICODE);
@@ -3230,12 +3209,10 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
         Py_DECREF(descr);
         return dtype;
     }
-
     // Bytes
     if (PyBytes_CheckExact(arg)) {
         PyArray_Descr* descr = PyArray_DescrFromType(NPY_STRING);
         if (descr == NULL) return NULL;
-
         dtype = (PyObject*)PyArray_DescrFromObject(arg, descr);
         Py_DECREF(descr);
         return dtype;
@@ -3243,14 +3220,12 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 
     // -------------------------------------------------------------------------
     // 2. Construct dtype (slightly more complicated)
-
     // Already known
     dtype = PyObject_GetAttrString(arg, "dtype");
     if (dtype) {
         return dtype;
     }
     PyErr_Clear();
-
     // -------------------------------------------------------------------------
     // 3. Handles everything else.
     return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
@@ -3957,3 +3932,4 @@ PyInit__arraykit(void)
     }
     return m;
 }
+

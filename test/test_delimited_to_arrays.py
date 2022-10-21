@@ -738,8 +738,12 @@ class TestUnit(unittest.TestCase):
         post1 = delimited_to_arrays(msg, axis=1, skipinitialspace=False)
         self.assertEqual([a.tolist() for a in post1], [['  1', ' 2-'], ['   2', ' 2-0'], [3, -3]])
 
-
-        # import ipdb; ipdb.set_trace()
+    def test_delimited_to_arrays_parse_n(self) -> None:
+        msg = ['1,2,1', '3,4,5']
+        post1 = delimited_to_arrays(msg, axis=1)
+        # NOTE: automatic type parsing should always give an int64
+        self.assertEqual([str(a.dtype) for a in post1],
+                ['int64', 'int64', 'int64'])
 
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_float_a(self) -> None:
