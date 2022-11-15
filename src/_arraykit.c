@@ -2995,45 +2995,47 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    Py_UCS4 delimiter_c;
+    AK_Dialect dialect;
+
+    // Py_UCS4 delimiter_c;
     if (AK_set_char(
             "delimiter",
-            &delimiter_c,
+            &dialect.delimiter,
             delimiter,
-            '\0')) return NULL;
+            ',')) return NULL;
 
-    bool doublequote_c;
+    // bool doublequote_c;
     if (AK_set_bool(
             "doublequote",
-            &doublequote_c,
+            &dialect.doublequote,
             doublequote,
             true)) return NULL;
 
-    Py_UCS4 escapechar_c;
+    // Py_UCS4 escapechar_c;
     if (AK_set_char(
             "escapechar",
-            &escapechar_c,
+            &dialect.escapechar,
             escapechar,
             0)) return NULL;
 
-    Py_UCS4 quotechar_c;
+    // Py_UCS4 quotechar_c;
     if (AK_set_char(
             "quotechar",
-            &quotechar_c,
+            &dialect.quotechar,
             quotechar,
             '"')) return NULL;
 
-    int quoting_c;
+    // int quoting_c;
     if (AK_set_int(
             "quoting",
-            &quoting_c,
+            &dialect.quoting,
             quoting,
             QUOTE_MINIMAL)) return NULL;
 
-    bool strict_c;
+    // bool strict_c;
     if (AK_set_bool(
             "strict",
-            &strict_c,
+            &dialect.strict,
             strict,
             false)) return NULL;
 
@@ -3045,14 +3047,14 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     Py_UCS4 c;
     AK_DelimitedReaderState state = START_RECORD;
 
-    AK_Dialect dialect = (AK_Dialect){
-            .doublequote=doublequote_c,
-            .skipinitialspace=false, // ignored in this context
-            .strict=strict_c,
-            .quoting=quoting_c,
-            .delimiter=delimiter_c,
-            .quotechar=quotechar_c,
-            .escapechar=escapechar_c};
+    // AK_Dialect dialect = (AK_Dialect){
+    //         .doublequote=doublequote_c,
+    //         .skipinitialspace=false, // ignored in this context
+    //         .strict=strict_c,
+    //         .quoting=quoting_c,
+    //         .delimiter=delimiter_c,
+    //         .quotechar=quotechar_c,
+    //         .escapechar=escapechar_c};
 
     while (pos < linelen) {
         c = PyUnicode_READ(kind, data, pos);
