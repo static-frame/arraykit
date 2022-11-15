@@ -2948,7 +2948,8 @@ static char *split_after_count_kwarg_names[] = {
     "doublequote",
     "escapechar",
     "quotechar",
-    // "quoting",
+    "quoting",
+    "strict",
     NULL
 };
 
@@ -3158,7 +3159,7 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 }
 
 
-
+// A fast counter of unsized iterators
 static PyObject *
 count_iteration(PyObject *Py_UNUSED(m), PyObject *iterable)
 {
