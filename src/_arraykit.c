@@ -2963,9 +2963,10 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *escapechar = NULL;
     PyObject *quotechar = NULL;
     PyObject *quoting = NULL;
+    PyObject *strict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$OiOOOO:split_after_count",
+            "O|$OiOOOOO:split_after_count",
             split_after_count_kwarg_names,
             &string,
             // kwarg-only
@@ -2974,7 +2975,9 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             &doublequote,
             &escapechar,
             &quotechar,
-            &quoting)) {
+            &quoting,
+            &strict
+            )) {
         return NULL;
     }
 
@@ -3028,6 +3031,12 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             quoting,
             QUOTE_MINIMAL)) return NULL;
 
+    bool strict_c;
+    if (AK_set_bool(
+            "strict",
+            &strict_c,
+            strict,
+            false)) return NULL;
 
     unsigned int kind = PyUnicode_KIND(string);
     const void *data = PyUnicode_DATA(string);
@@ -3035,12 +3044,16 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     Py_ssize_t delim_count = 0;
     Py_ssize_t linelen = PyUnicode_GET_LENGTH(string);
     Py_UCS4 c;
-    bool strict = false;
-    AK_DelimitedReaderState state;
-    state = START_RECORD;
+    AK_DelimitedReaderState state = START_RECORD;
 
-
-    AK_Dialect dialect = (AK_Dialect){doublequote_c, false, strict, quoting_c, delimiter_c, quotechar_c, escapechar_c};
+    AK_Dialect dialect = (AK_Dialect){
+            .doublequote=doublequote_c,
+            .skipinitialspace=false, // ignored in this context
+            .strict=strict_c,
+            .quoting=quoting_c,
+            .delimiter=delimiter_c,
+            .quotechar=quotechar_c,
+            .escapechar=escapechar_c};
 
     while (pos < linelen) {
         c = PyUnicode_READ(kind, data, pos);
