@@ -49,12 +49,11 @@ def split_after_count(
         string: str,
         *,
         delimiter: str = ',',
-        count: int = 0;
+        count: int = 0,
         doublequote: bool = True,
         escapechar: str = '',
         quotechar: str = '"',
         quoting: int = 0,
-        skipinitialspace: bool = False,
         strict: bool = False,
         ) -> tp.Tuple[str, str]: ...
 
