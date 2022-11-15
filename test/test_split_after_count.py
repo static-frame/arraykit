@@ -1,5 +1,6 @@
 
 import unittest
+import csv
 
 from arraykit import split_after_count
 
@@ -42,6 +43,14 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post[0], 'a,b,c,d,e')
         self.assertEqual(post[1], '')
 
+    def test_split_after_count_i(self) -> None:
+        post = split_after_count(',,,,,,,', delimiter=',', count=4)
+        self.assertEqual(post, (',,,', ',,,'))
+
+
+    def test_split_after_count_j(self) -> None:
+        post = split_after_count(',xxxxxxxxxxxxxxx,,yyyyyyy,,,,', delimiter=',', count=4)
+        self.assertEqual(post, (',xxxxxxxxxxxxxxx,,yyyyyyy', ',,,'))
 
     #---------------------------------------------------------------------------
     def test_split_after_count_exception_a(self) -> None:
@@ -63,6 +72,51 @@ class TestUnit(unittest.TestCase):
     def test_split_after_count_exception_e(self) -> None:
         with self.assertRaises(TypeError):
             post = split_after_count('a,b,c', quoting='234', count=2)
+
+    #---------------------------------------------------------------------------
+
+    def test_split_after_count_escapechar_a(self) -> None:
+        post = split_after_count('a,b/,c,d,e', escapechar='/', count=2)
+        self.assertEqual(post, ('a,b/,c', 'd,e'))
+
+    def test_split_after_count_escapechar_b(self) -> None:
+        post = split_after_count('a,b/,c,d//,e', escapechar='/', count=2)
+        self.assertEqual(post, ('a,b/,c', 'd//,e'))
+
+    def test_split_after_count_escapechar_c(self) -> None:
+        post = split_after_count('a,b///,c,d,e', escapechar='/', count=2)
+        self.assertEqual(post, ('a,b///,c', 'd,e'))
+
+    #---------------------------------------------------------------------------
+
+    def test_split_after_count_quotechar_a(self) -> None:
+        post = split_after_count('a,b,"c,d",e', quotechar='"', count=3)
+        self.assertEqual(post, ('a,b,"c,d"', 'e'))
+
+    def test_split_after_count_quotechar_b(self) -> None:
+        post = split_after_count("a,b,'c,d',e", quotechar="'", count=3)
+        self.assertEqual(post, ("a,b,'c,d'", 'e'))
+
+
+    #---------------------------------------------------------------------------
+
+    def test_split_after_count_quoting_a(self) -> None:
+        post = split_after_count('a,b,"c,d",e', quoting=csv.QUOTE_NONE, count=3)
+        self.assertEqual(post, ('a,b,"c', 'd",e'))
+
+    def test_split_after_count_quoting_b(self) -> None:
+        post = split_after_count('a,b,"c,d",e', quoting=csv.QUOTE_ALL, count=3)
+        self.assertEqual(post, ('a,b,"c,d"', 'e'))
+
+    #---------------------------------------------------------------------------
+
+    def test_split_after_count_doublequote_a(self) -> None:
+        post = split_after_count('a,b,"c,"",d",e', doublequote=True, count=3)
+        self.assertEqual(post, ('a,b,"c,"",d"', 'e'))
+
+    def test_split_after_count_doublequote_b(self) -> None:
+        post = split_after_count('a,b,"c,"",d",e', doublequote=False, count=3)
+        self.assertEqual(post, ('a,b,"c,""', 'd",e'))
 
 
 
