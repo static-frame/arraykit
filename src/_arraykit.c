@@ -2982,14 +2982,14 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     if (!PyUnicode_Check(string)) {
-        PyErr_Format(PyExc_RuntimeError,
+        PyErr_Format(PyExc_ValueError,
                 "a string is required, not %.200s",
                 Py_TYPE(string)->tp_name
                 );
         return NULL;
     }
     if (count <= 0) {
-        PyErr_Format(PyExc_RuntimeError,
+        PyErr_Format(PyExc_ValueError,
                 "count must be greater than zero, not %i",
                 count
                 );
