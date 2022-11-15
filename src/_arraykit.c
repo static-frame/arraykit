@@ -2565,8 +2565,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         }
         else { // illegal
             PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
-                    dialect->delimiter,
-                    dialect->quotechar);
+                    dialect->delimiter, dialect->quotechar);
             return -1;
         }
         break;
@@ -3141,8 +3140,7 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             }
             else { // illegal
                 PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
-                        dialect.delimiter,
-                        dialect.quotechar);
+                        dialect.delimiter, dialect.quotechar);
                 return NULL;
             }
             break;
@@ -3163,7 +3161,6 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         // NOTE: must break before the increment when finding match
         pos++;
     }
-
 
     PyObject* left = PyUnicode_Substring(string, 0, pos);
     PyObject* right = PyUnicode_Substring(string, pos+1, linelen);
