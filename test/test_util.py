@@ -455,41 +455,41 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_split_after_count_a(self) -> None:
-        post = split_after_count('a,b,c,d,e', ',', 2)
+        post = split_after_count('a,b,c,d,e', delimiter=',', count=2)
         self.assertEqual(post[0], 'a,b')
         self.assertEqual(post[1], 'c,d,e')
 
     def test_split_after_count_b(self) -> None:
-        post = split_after_count('a,b,c,d,e', ',', 4)
+        post = split_after_count('a,b,c,d,e', delimiter=',', count=4)
         self.assertEqual(post[0], 'a,b,c,d')
         self.assertEqual(post[1], 'e')
 
     def test_split_after_count_c(self) -> None:
-        post = split_after_count('a,b,c,d,e', ',', 5)
+        post = split_after_count('a,b,c,d,e', delimiter=',', count=5)
         self.assertEqual(post[0], 'a,b,c,d,e')
         self.assertEqual(post[1], '')
 
     def test_split_after_count_d(self) -> None:
-        post = split_after_count('a', ',', 5)
+        post = split_after_count('a', delimiter=',', count=5)
         self.assertEqual(post[0], 'a')
         self.assertEqual(post[1], '')
 
     def test_split_after_count_e(self) -> None:
         with self.assertRaises(RuntimeError):
-            post = split_after_count('a,', ',', 0)
+            post = split_after_count('a,', delimiter=',', count=0)
 
     def test_split_after_count_f(self) -> None:
-        post = split_after_count('a,', ',', 1)
+        post = split_after_count('a,', delimiter=',', count=1)
         self.assertEqual(post[0], 'a')
         self.assertEqual(post[1], '')
 
     def test_split_after_count_g(self) -> None:
-        post = split_after_count(',', ',', 1)
+        post = split_after_count(',', delimiter=',', count=1)
         self.assertEqual(post[0], '')
         self.assertEqual(post[1], '')
 
     def test_split_after_count_h(self) -> None:
-        post = split_after_count('a,b,c,d,e', '|', 5)
+        post = split_after_count('a,b,c,d,e', delimiter='|', count=5)
         self.assertEqual(post[0], 'a,b,c,d,e')
         self.assertEqual(post[1], '')
 

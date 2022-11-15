@@ -2943,19 +2943,38 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep, decc);
 }
 
+static char *split_after_count_kwarg_names[] = {
+    "string",
+    "delimiter",
+    "count",
+    "doublequote",
+    "escapechar",
+    "quotechar",
+    // "quoting",
+    NULL
+};
 
 static PyObject *
-split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
+split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *string = NULL;
     PyObject *delimiter = NULL;
     int count = 0;
+    PyObject *doublequote = NULL;
+    PyObject *escapechar = NULL;
+    PyObject *quotechar = NULL;
+    // PyObject *quoting = NULL;
 
-    if (!PyArg_ParseTuple(args,
-            "OOi:split_after_count",
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|$OiOOO:split_after_count",
+            split_after_count_kwarg_names,
             &string,
+            // kwarg-only
             &delimiter,
-            &count)) {
+            &count,
+            &doublequote,
+            &escapechar,
+            &quotechar)) {
         return NULL;
     }
 
@@ -2981,6 +3000,27 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
             &delim_char,
             delimiter,
             '\0')) return NULL;
+
+    bool double_quote;
+    if (AK_set_bool(
+            "doublequote",
+            &double_quote,
+            doublequote,
+            true)) return NULL;
+
+    Py_UCS4 escape_char;
+    if (AK_set_char(
+            "escapechar",
+            &escape_char,
+            escapechar,
+            0)) return NULL;
+
+    Py_UCS4 quote_char;
+    if (AK_set_char(
+            "quotechar",
+            &quote_char,
+            quotechar,
+            '"')) return NULL;
 
     unsigned int kind = PyUnicode_KIND(string);
     const void *data = PyUnicode_DATA(string);
@@ -3883,7 +3923,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)iterable_str_to_array_1d,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
-    {"split_after_count", split_after_count, METH_VARARGS, NULL},
+    {"split_after_count",
+            (PyCFunction)split_after_count,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
