@@ -2481,14 +2481,13 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
         else if (c == dialect->quotechar && dialect->quoting != QUOTE_NONE) {
-            // start quoted field
             dr->state = IN_QUOTED_FIELD;
         }
         else if (c == dialect->escapechar) {
             dr->state = ESCAPED_CHAR;
         }
         else if (c == ' ' && dialect->skipinitialspace);
-        else if (c == dialect->delimiter) { // save empty field
+        else if (c == dialect->delimiter) { // end of a field
             if (AK_DR_close_field(dr, cpg)) return -1;
         }
         else { // begin new unquoted field
@@ -2994,38 +2993,38 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    Py_UCS4 delim_char;
+    Py_UCS4 delimiter_c;
     if (AK_set_char(
             "delimiter",
-            &delim_char,
+            &delimiter_c,
             delimiter,
             '\0')) return NULL;
 
-    bool double_quote;
+    bool doublequote_c;
     if (AK_set_bool(
             "doublequote",
-            &double_quote,
+            &doublequote_c,
             doublequote,
             true)) return NULL;
 
-    Py_UCS4 escape_char;
+    Py_UCS4 escapechar_c;
     if (AK_set_char(
             "escapechar",
-            &escape_char,
+            &escapechar_c,
             escapechar,
             0)) return NULL;
 
-    Py_UCS4 quote_char;
+    Py_UCS4 quotechar_c;
     if (AK_set_char(
             "quotechar",
-            &quote_char,
+            &quotechar_c,
             quotechar,
             '"')) return NULL;
 
-    int quoting_arg;
+    int quoting_c;
     if (AK_set_int(
             "quoting",
-            &quoting_arg,
+            &quoting_c,
             quoting,
             QUOTE_MINIMAL)) return NULL;
 
@@ -3039,6 +3038,9 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     bool strict = false;
     AK_DelimitedReaderState state;
     state = START_RECORD;
+
+
+    AK_Dialect dialect = (AK_Dialect){doublequote_c, false, strict, quoting_c, delimiter_c, quotechar_c, escapechar_c};
 
     while (pos < linelen) {
         c = PyUnicode_READ(kind, data, pos);
@@ -3057,15 +3059,14 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             if (c == '\n' || c == '\r' || c == '\0') {
                 state = (c == '\0' ? START_RECORD : EAT_CRNL);
             }
-            else if (c == quote_char && quoting_arg != QUOTE_NONE) {
+            else if (c == dialect.quotechar && dialect.quoting != QUOTE_NONE) {
                 state = IN_QUOTED_FIELD;
             }
-            else if (c == escape_char) {
+            else if (c == dialect.escapechar) {
                 state = ESCAPED_CHAR;
             }
-            else if (c == delim_char) {
+            else if (c == dialect.delimiter) { // end of a field
                 delim_count += 1;
-                break;
             }
             else {
                 state = IN_FIELD;
@@ -3087,21 +3088,21 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             if (c == '\n' || c == '\r' || c == '\0') { // end of line
                 state = (c == '\0' ? START_RECORD : EAT_CRNL);
             }
-            else if (c == escape_char) {
+            else if (c == dialect.escapechar) {
                 state = ESCAPED_CHAR;
             }
-            else if (c == delim_char) {
-                state = START_FIELD;
+            else if (c == dialect.delimiter) {
                 delim_count += 1;
+                state = START_FIELD;
             }
             break;
         case IN_QUOTED_FIELD: // in quoted field
             if (c == '\0');
-            else if (c == escape_char) {
+            else if (c == dialect.escapechar) {
                 state = ESCAPE_IN_QUOTED_FIELD;
             }
-            else if (c == quote_char && quoting_arg != QUOTE_NONE) {
-                state = (double_quote ? QUOTE_IN_QUOTED_FIELD : IN_FIELD);
+            else if (c == dialect.quotechar && dialect.quoting != QUOTE_NONE) {
+                state = (dialect.doublequote ? QUOTE_IN_QUOTED_FIELD : IN_FIELD);
             }
             break;
         case ESCAPE_IN_QUOTED_FIELD:
@@ -3112,23 +3113,23 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             break;
         case QUOTE_IN_QUOTED_FIELD:
             // doublequote - seen a quote in a quoted field
-            if (quoting_arg != QUOTE_NONE && c == quote_char) {
+            if (dialect.quoting != QUOTE_NONE && c == dialect.quotechar) {
                 state = IN_QUOTED_FIELD;
             }
-            else if (c == delim_char) {
-                state = START_FIELD;
+            else if (c == dialect.delimiter) {
                 delim_count += 1;
+                state = START_FIELD;
             }
             else if (c == '\n' || c == '\r' || c == '\0') {
                 state = (c == '\0' ? START_RECORD : EAT_CRNL);
             }
-            else if (!strict) {
+            else if (!dialect.strict) {
                 state = IN_FIELD;
             }
             else { // illegal
                 PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
-                        delim_char,
-                        quote_char);
+                        dialect.delimiter,
+                        dialect.quotechar);
                 return NULL;
             }
             break;
@@ -3146,19 +3147,10 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         if (delim_count == count) {
             break; // to not include delim at transition
         }
+        // NOTE: must break before the increment when finding match
         pos++;
     }
-            // if (c == escape_char) {
-            //     state = ESCAPED_CHAR;
-            //     continue;
-            // }
-            // if (c == delim_char) {
-            //     delim_count++;
-            //     if (delim_count == count) {
-            //         break; // to not include delim at transition
-            //         // do not increment pos so as to exclude in left
-            //     }
-            // }
+
 
     PyObject* left = PyUnicode_Substring(string, 0, pos);
     PyObject* right = PyUnicode_Substring(string, pos+1, linelen);
