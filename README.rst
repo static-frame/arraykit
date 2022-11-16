@@ -37,6 +37,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.3
+............
+
+Extended arguments to and functionality in ``split_after_count`` to support the complete CSV dialect interface.
+
+Now building wheels for 3.11.
+
 
 0.2.2
 ............
