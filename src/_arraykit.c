@@ -2481,14 +2481,13 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
         else if (c == dialect->quotechar && dialect->quoting != QUOTE_NONE) {
-            // start quoted field
             dr->state = IN_QUOTED_FIELD;
         }
-        else if (c == dialect->escapechar) { // possible escaped character
+        else if (c == dialect->escapechar) {
             dr->state = ESCAPED_CHAR;
         }
         else if (c == ' ' && dialect->skipinitialspace);
-        else if (c == dialect->delimiter) { // save empty field
+        else if (c == dialect->delimiter) { // end of a field
             if (AK_DR_close_field(dr, cpg)) return -1;
         }
         else { // begin new unquoted field
@@ -2515,7 +2514,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
             if (AK_DR_close_field(dr, cpg)) return -1;
             dr->state = (c == '\0' ? START_RECORD : EAT_CRNL);
         }
-        else if (c == dialect->escapechar) { // possible escaped character
+        else if (c == dialect->escapechar) {
             dr->state = ESCAPED_CHAR;
         }
         else if (c == dialect->delimiter) { // save field - wait for new field
@@ -2566,8 +2565,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
         }
         else { // illegal
             PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
-                    dialect->delimiter,
-                    dialect->quotechar);
+                    dialect->delimiter, dialect->quotechar);
             return -1;
         }
         break;
@@ -2943,44 +2941,98 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
     return AK_IterableStrToArray1D(iterable, dtype_specifier, tsep, decc);
 }
 
+static char *split_after_count_kwarg_names[] = {
+    "string",
+    "delimiter",
+    "count",
+    "doublequote",
+    "escapechar",
+    "quotechar",
+    "quoting",
+    "strict",
+    NULL
+};
 
 static PyObject *
-split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
+split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *string = NULL;
     PyObject *delimiter = NULL;
     int count = 0;
+    PyObject *doublequote = NULL;
+    PyObject *escapechar = NULL;
+    PyObject *quotechar = NULL;
+    PyObject *quoting = NULL;
+    PyObject *strict = NULL;
 
-    if (!PyArg_ParseTuple(args,
-            "OOi:split_after_count",
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|$OiOOOOO:split_after_count",
+            split_after_count_kwarg_names,
             &string,
+            // kwarg-only
             &delimiter,
-            &count)) {
+            &count,
+            &doublequote,
+            &escapechar,
+            &quotechar,
+            &quoting,
+            &strict
+            )) {
         return NULL;
     }
 
     if (!PyUnicode_Check(string)) {
-        PyErr_Format(PyExc_RuntimeError,
+        PyErr_Format(PyExc_ValueError,
                 "a string is required, not %.200s",
                 Py_TYPE(string)->tp_name
                 );
         return NULL;
     }
-
     if (count <= 0) {
-        PyErr_Format(PyExc_RuntimeError,
+        PyErr_Format(PyExc_ValueError,
                 "count must be greater than zero, not %i",
                 count
                 );
         return NULL;
     }
 
-    Py_UCS4 delim_char;
+    AK_Dialect dialect;
+
     if (AK_set_char(
             "delimiter",
-            &delim_char,
+            &dialect.delimiter,
             delimiter,
-            '\0')) return NULL;
+            ',')) return NULL;
+
+    if (AK_set_bool(
+            "doublequote",
+            &dialect.doublequote,
+            doublequote,
+            true)) return NULL;
+
+    if (AK_set_char(
+            "escapechar",
+            &dialect.escapechar,
+            escapechar,
+            0)) return NULL;
+
+    if (AK_set_char(
+            "quotechar",
+            &dialect.quotechar,
+            quotechar,
+            '"')) return NULL;
+
+    if (AK_set_int(
+            "quoting",
+            &dialect.quoting,
+            quoting,
+            QUOTE_MINIMAL)) return NULL;
+
+    if (AK_set_bool(
+            "strict",
+            &dialect.strict,
+            strict,
+            false)) return NULL;
 
     unsigned int kind = PyUnicode_KIND(string);
     const void *data = PyUnicode_DATA(string);
@@ -2988,16 +3040,113 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
     Py_ssize_t delim_count = 0;
     Py_ssize_t linelen = PyUnicode_GET_LENGTH(string);
     Py_UCS4 c;
+    AK_DelimitedReaderState state = START_RECORD;
 
     while (pos < linelen) {
         c = PyUnicode_READ(kind, data, pos);
-        if (c == delim_char) {
-            delim_count++;
-            if (delim_count == count) {
-                break; // to not include delim at transition
-                // do not increment pos so as to exclude in left
+
+        switch (state) {
+        case START_RECORD: // start of record
+            if (c == '\0') // empty line
+                break;
+            else if (c == '\n' || c == '\r') {
+                state = EAT_CRNL;
+                break;
             }
+            state = START_FIELD; // normal character
+            // fallthru
+        case START_FIELD: // expecting field
+            if (c == '\n' || c == '\r' || c == '\0') {
+                state = (c == '\0' ? START_RECORD : EAT_CRNL);
+            }
+            else if (c == dialect.quotechar && dialect.quoting != QUOTE_NONE) {
+                state = IN_QUOTED_FIELD;
+            }
+            else if (c == dialect.escapechar) {
+                state = ESCAPED_CHAR;
+            }
+            else if (c == dialect.delimiter) { // end of a field
+                delim_count += 1;
+            }
+            else {
+                state = IN_FIELD;
+            }
+            break;
+        case ESCAPED_CHAR:
+            if (c == '\n' || c=='\r') {
+                state = AFTER_ESCAPED_CRNL;
+                break;
+            }
+            if (c == '\0')
+                c = '\n';
+            state = IN_FIELD;
+            break;
+        case AFTER_ESCAPED_CRNL:
+            if (c == '\0') break;
+            // fallthru
+        case IN_FIELD: // in unquoted field
+            if (c == '\n' || c == '\r' || c == '\0') { // end of line
+                state = (c == '\0' ? START_RECORD : EAT_CRNL);
+            }
+            else if (c == dialect.escapechar) {
+                state = ESCAPED_CHAR;
+            }
+            else if (c == dialect.delimiter) {
+                delim_count += 1;
+                state = START_FIELD;
+            }
+            break;
+        case IN_QUOTED_FIELD: // in quoted field
+            if (c == '\0');
+            else if (c == dialect.escapechar) {
+                state = ESCAPE_IN_QUOTED_FIELD;
+            }
+            else if (c == dialect.quotechar && dialect.quoting != QUOTE_NONE) {
+                state = (dialect.doublequote ? QUOTE_IN_QUOTED_FIELD : IN_FIELD);
+            }
+            break;
+        case ESCAPE_IN_QUOTED_FIELD:
+            if (c == '\0') {
+                c = '\n';
+            }
+            state = IN_QUOTED_FIELD;
+            break;
+        case QUOTE_IN_QUOTED_FIELD:
+            // doublequote - seen a quote in a quoted field
+            if (dialect.quoting != QUOTE_NONE && c == dialect.quotechar) {
+                state = IN_QUOTED_FIELD;
+            }
+            else if (c == dialect.delimiter) {
+                delim_count += 1;
+                state = START_FIELD;
+            }
+            else if (c == '\n' || c == '\r' || c == '\0') {
+                state = (c == '\0' ? START_RECORD : EAT_CRNL);
+            }
+            else if (!dialect.strict) {
+                state = IN_FIELD;
+            }
+            else { // illegal
+                PyErr_Format(PyExc_RuntimeError, "'%c' expected after '%c'",
+                        dialect.delimiter, dialect.quotechar);
+                return NULL;
+            }
+            break;
+        case EAT_CRNL:
+            if (c == '\n' || c == '\r');
+            else if (c == '\0')
+                state = START_RECORD;
+            else {
+                PyErr_Format(PyExc_RuntimeError,
+                        "new-line character seen in unquoted field - do you need to open the file in universal-newline mode?");
+                return NULL;
+            }
+            break;
         }
+        if (delim_count == count) {
+            break; // to not include delim at transition
+        }
+        // NOTE: must break before the increment when finding match
         pos++;
     }
 
@@ -3010,7 +3159,7 @@ split_after_count(PyObject *Py_UNUSED(m), PyObject *args)
 }
 
 
-
+// A fast counter of unsized iterators
 static PyObject *
 count_iteration(PyObject *Py_UNUSED(m), PyObject *iterable)
 {
@@ -3883,7 +4032,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)iterable_str_to_array_1d,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
-    {"split_after_count", split_after_count, METH_VARARGS, NULL},
+    {"split_after_count",
+            (PyCFunction)split_after_count,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"isna_element", isna_element, METH_O, NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},

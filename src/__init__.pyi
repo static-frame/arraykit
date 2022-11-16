@@ -29,7 +29,7 @@ def iterable_str_to_array_1d(
         ) -> np.ndarray: ...
 
 def delimited_to_arrays(
-        __file_like: tp.Iterable[str],
+        file_like: tp.Iterable[str],
         *,
         axis: int = 0,
         dtypes: tp.Optional[tp.Callable[[int], tp.Any]] = None,
@@ -47,8 +47,14 @@ def delimited_to_arrays(
 
 def split_after_count(
         string: str,
-        delimiter: str,
-        count: int,
+        *,
+        delimiter: str = ',',
+        count: int = 0,
+        doublequote: bool = True,
+        escapechar: str = '',
+        quotechar: str = '"',
+        quoting: int = 0,
+        strict: bool = False,
         ) -> tp.Tuple[str, str]: ...
 
 def count_iteration(__iterable: tp.Iterable) -> int: ...
