@@ -836,7 +836,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 
     while (AK_is_space(*p)) {
         ++p;
-        if (p >= end) return number;
+        if (p >= end) return number; // NOTE: this means that all space will return zero without error
     }
     if (*p == '-') {
         isneg = 1;
