@@ -798,7 +798,7 @@ AK_TP_resolve_field(AK_TypeParser* tp,
     return TPS_STRING; // default
 }
 
-// After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. This will be called after loading each character in the field. All TypeParse field attributes are reset after this is called. Returns true if the line still needs to be evaluated.
+// After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. All TypeParse field attributes are reset after this is called. Returns true if the line still needs to be evaluated.
 bool
 AK_TP_ResolveLineResetField(AK_TypeParser* tp,
         Py_ssize_t count)
