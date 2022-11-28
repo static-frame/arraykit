@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.4
+............
+
+Set NumPy minimum version at 1.18.5.
+
+
 0.2.3
 ............
 
