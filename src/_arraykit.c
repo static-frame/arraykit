@@ -3333,7 +3333,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 
 static char *first_true_1d_kwarg_names[] = {
     "array",
-    // "find_first",
+    "forward",
     NULL
 };
 
@@ -3341,31 +3341,47 @@ static PyObject*
 first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyArrayObject *array = NULL;
-    // bool find_first;
+    int forward = true;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O!:first_true_1d",
+            "O!|$p:first_true_1d",
             first_true_1d_kwarg_names,
             &PyArray_Type,
-            &array
+            &array,
+            &forward
             )) {
         return NULL;
     }
+    if (PyArray_TYPE(array) != NPY_BOOL) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(array)) {
+        PyErr_SetString(PyExc_ValueError, "Array must be continguous");
+        return NULL;
+    }
 
+    // require 1d
+
+    npy_intp position = -1;
     npy_intp size = PyArray_SIZE(array);
-
-    // require contiguous
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
+
     npy_bool *p = array_buffer;
     npy_bool *p_end = p + size;
 
     while (p < p_end) {
-        if (*p == true) {
+        if (*p == 1) {
             break;
         }
         p++;
     }
-    npy_intp position = p - array_buffer;
+
+    if (p != p_end) { // else, return -1
+        position = p - array_buffer;
+    }
+
+
     PyObject* post = PyLong_FromLong(position);
     return post;
 }

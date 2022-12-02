@@ -465,22 +465,36 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_first_true_1d_a(self) -> None:
-
         a1 = np.arange(100) == 50
-        post = first_true_1d(a1)
+        post = first_true_1d(a1, forward=True)
         self.assertEqual(post, 50)
 
     def test_first_true_1d_b(self) -> None:
         with self.assertRaises(TypeError):
             a1 = [2, 4, 5,]
-            first_true_1d(a1, find_first=True)
-
+            first_true_1d(a1, forward=True)
 
     def test_first_true_1d_c(self) -> None:
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             a1 = np.arange(100) == 50
-            first_true_1d(a1, find_first=a1)
+            first_true_1d(a1, forward=a1)
 
+    def test_first_true_1d_d(self) -> None:
+        a1 = np.arange(100) < 0
+        post = first_true_1d(a1, forward=True)
+        self.assertEqual(post, -1)
+
+    def test_first_true_1d_e(self) -> None:
+        a1 = np.arange(100)
+        # only a Boolean array
+        with self.assertRaises(ValueError):
+            post = first_true_1d(a1, forward=True)
+
+    def test_first_true_1d_f(self) -> None:
+        a1 = (np.arange(100) == 0)[:50:2]
+        # only a contiguous array
+        with self.assertRaises(ValueError):
+            post = first_true_1d(a1, forward=True)
 
 
 if __name__ == '__main__':
