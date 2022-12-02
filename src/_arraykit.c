@@ -3331,6 +3331,47 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 //------------------------------------------------------------------------------
 // general utility
 
+static char *first_true_1d_kwarg_names[] = {
+    "array",
+    // "find_first",
+    NULL
+};
+
+static PyObject*
+first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *array = NULL;
+    // bool find_first;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!:first_true_1d",
+            first_true_1d_kwarg_names,
+            &PyArray_Type,
+            &array
+            )) {
+        return NULL;
+    }
+
+    npy_intp size = PyArray_SIZE(array);
+
+    // require contiguous
+    npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
+    npy_bool *p = array_buffer;
+    npy_bool *p_end = p + size;
+
+    while (p < p_end) {
+        if (*p == true) {
+            break;
+        }
+        p++;
+    }
+    npy_intp position = p - array_buffer;
+    PyObject* post = PyLong_FromLong(position);
+    return post;
+}
+
+
+
 static PyObject *
 dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
@@ -4024,6 +4065,10 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"first_true_1d",
+            (PyCFunction)first_true_1d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"delimited_to_arrays",
             (PyCFunction)delimited_to_arrays,
             METH_VARARGS | METH_KEYWORDS,

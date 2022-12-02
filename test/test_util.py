@@ -19,6 +19,7 @@ from arraykit import isna_element
 from arraykit import dtype_from_element
 from arraykit import split_after_count
 from arraykit import count_iteration
+from arraykit import first_true_1d
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -461,6 +462,24 @@ class TestUnit(unittest.TestCase):
         s1 = StringIO(',1,a,b\n-,1,43,54\nX,2,1,3\nY,1,8,10\n-,2,6,20')
         post = count_iteration(s1)
         self.assertEqual(post, 5)
+
+    #---------------------------------------------------------------------------
+    def test_first_true_1d_a(self) -> None:
+
+        a1 = np.arange(100) == 50
+        post = first_true_1d(a1)
+        self.assertEqual(post, 50)
+
+    def test_first_true_1d_b(self) -> None:
+        with self.assertRaises(TypeError):
+            a1 = [2, 4, 5,]
+            first_true_1d(a1, find_first=True)
+
+
+    def test_first_true_1d_c(self) -> None:
+        with self.assertRaises(TypeError):
+            a1 = np.arange(100) == 50
+            first_true_1d(a1, find_first=a1)
 
 
 
