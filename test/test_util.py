@@ -496,6 +496,13 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             post = first_true_1d(a1, forward=True)
 
+    def test_first_true_1d_g(self) -> None:
+        a1 = (np.arange(100) == 0).reshape(10, 10)
+        # only a contiguous array
+        with self.assertRaises(ValueError):
+            post = first_true_1d(a1, forward=True)
+
+
 
 if __name__ == '__main__':
     unittest.main()

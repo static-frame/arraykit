@@ -3352,6 +3352,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             )) {
         return NULL;
     }
+    if (PyArray_NDIM(array) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
     if (PyArray_TYPE(array) != NPY_BOOL) {
         PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
         return NULL;
@@ -3360,8 +3364,6 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_ValueError, "Array must be continguous");
         return NULL;
     }
-
-    // require 1d
 
     npy_intp position = -1;
     npy_intp size = PyArray_SIZE(array);
