@@ -3365,10 +3365,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    npy_intp position = -1;
     npy_intp size = PyArray_SIZE(array);
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
+    npy_intp position = -1;
     npy_bool *p = array_buffer;
     npy_bool *p_end = p + size;
 
