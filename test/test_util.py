@@ -502,6 +502,36 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             post = first_true_1d(a1, forward=True)
 
+    def test_first_true_1d_reverse_a(self) -> None:
+        a1 = np.arange(100) == 50
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, 50)
+
+    def test_first_true_1d_reverse_b(self) -> None:
+        a1 = np.arange(100) == 0
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, 0)
+
+    def test_first_true_1d_reverse_c(self) -> None:
+        a1 = np.arange(100) == -1
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, -1)
+
+    def test_first_true_1d_reverse_d(self) -> None:
+        a1 = np.arange(100) == 99
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, 99)
+
+    def test_first_true_1d_multi_a(self) -> None:
+        a1 = np.isin(np.arange(100), (50, 70, 90))
+        self.assertEqual(first_true_1d(a1, forward=True), 50)
+        self.assertEqual(first_true_1d(a1, forward=False), 90)
+
+    def test_first_true_1d_multi_b(self) -> None:
+        a1 = np.isin(np.arange(100), (10, 30, 50))
+        self.assertEqual(first_true_1d(a1, forward=True), 10)
+        self.assertEqual(first_true_1d(a1, forward=False), 50)
+
 
 
 if __name__ == '__main__':

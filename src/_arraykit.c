@@ -3341,7 +3341,7 @@ static PyObject*
 first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyArrayObject *array = NULL;
-    int forward = true;
+    int forward = 1;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "O!|$p:first_true_1d",
@@ -3368,21 +3368,37 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_intp size = PyArray_SIZE(array);
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
     npy_intp position = -1;
-    npy_bool *p = array_buffer;
-    npy_bool *p_end = p + size;
+    npy_bool *p; //= array_buffer;
+    npy_bool *p_end; // = p + size;
 
-    while (p < p_end) {
-        if (*p == 1) {
-            break;
+    if (forward) {
+        p = array_buffer;
+        p_end = p + size;
+        while (p < p_end) {
+            if (*p == 1) {
+                break;
+            }
+            p++;
         }
-        p++;
     }
-
+    else {
+        p = array_buffer + size - 1;
+        p_end = array_buffer - 1;
+        while (p > p_end) {
+            if (*p == 1) {
+                break;
+            }
+            p--;
+        }
+    }
     if (p != p_end) { // else, return -1
         position = p - array_buffer;
     }
-
+    NPY_END_THREADS;
 
     PyObject* post = PyLong_FromLong(position);
     return post;
