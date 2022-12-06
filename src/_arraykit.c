@@ -3372,8 +3372,8 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     NPY_BEGIN_THREADS;
 
     npy_intp position = -1;
-    npy_bool *p; //= array_buffer;
-    npy_bool *p_end; // = p + size;
+    npy_bool *p;
+    npy_bool *p_end;
 
     if (forward) {
         p = array_buffer;
