@@ -33,6 +33,16 @@ class AKFirstTrue(ArrayProcessor):
     def __call__(self):
         _ = first_true_1d(self.array, forward=True)
 
+class PYLoop(ArrayProcessor):
+    NAME = 'Python Loop'
+    SORT = 0
+
+    def __call__(self):
+        for i, e in enumerate(self.array):
+            if e == True:
+                break
+
+
 class NPNonZero(ArrayProcessor):
     NAME = 'np.nonzero()'
     SORT = 3
@@ -61,7 +71,6 @@ def plot_performance(frame):
     fixture_total = len(frame['fixture'].unique())
     cat_total = len(frame['size'].unique())
     processor_total = len(frame['cls_processor'].unique())
-    # import ipdb; ipdb.set_trace()
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
@@ -69,18 +78,16 @@ def plot_performance(frame):
 
     color = cmap(np.arange(processor_total) / processor_total)
 
-    # categories are read, write
+    # category is the size of the array
     for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
         for fixture_count, (fixture_label, fixture) in enumerate(
                 cat.groupby('fixture')):
             ax = axes[cat_count][fixture_count]
 
             # set order
-            # fixture = fixture.sort_values('cls', key=lambda s:s.iter_element().map_all(name_order))
             fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
             fixture = fixture.sort_values('sort')
 
-            # import ipdb; ipdb.set_trace()
             results = fixture['time'].values.tolist()
             names = [cls.NAME for cls in fixture['cls_processor']]
             # x = np.arange(len(results))
@@ -89,15 +96,16 @@ def plot_performance(frame):
 
             # ax.set_ylabel()
             density, position = fixture_label.split('-')
-            title = f'{cat_label}\n{density}\n{position}'
+            # cat_label is the size of the array
+            title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[density]}\n{FixtureFactory.POSITION_TO_DISPLAY[position]}'
 
-            ax.set_title(title, fontsize=8)
+            ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.75) # makes taller tan wide
             time_max = fixture['time'].max()
             ax.set_yticks([0, time_max * 0.5, time_max])
             ax.set_yticklabels(['',
-                    f'{time_max * 0.5:.3f} (s)',
-                    f'{time_max:.3f} (s)',
+                    f'{time_max * 500:.1f} (ms)',
+                    f'{time_max * 1000:.1f} (ms)',
                     ], fontsize=6)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
@@ -108,10 +116,10 @@ def plot_performance(frame):
                     labelbottom=False,
                     )
 
-    fig.set_size_inches(9, 3) # width, height
+    fig.set_size_inches(9, 3.5) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=8)
     # horizontal, vertical
-    fig.text(.05, .96, f'Performance: {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'first_true_1d() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
     fp = '/tmp/dta.png'
@@ -119,9 +127,9 @@ def plot_performance(frame):
             left=0.075,
             bottom=0.05,
             right=0.80,
-            top=0.75,
+            top=0.85,
             wspace=1, # width
-            hspace=0.4,
+            hspace=0.1,
             )
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
@@ -155,11 +163,21 @@ class FixtureFactory:
         a[fill] = True
         return a
 
-
     @classmethod
     def get_label_array(cls, size: int) -> tp.Tuple[str, np.ndarray]:
         array = cls.get_array(size)
         return cls.NAME, array
+
+    DENSITY_TO_DISPLAY = {
+        'single': '1 True',
+        'tenth': '10% True',
+        'third': '33% True',
+    }
+
+    POSITION_TO_DISPLAY = {
+        'first_third': 'Fill 1/3 to End',
+        'second_third': 'Fill 2/3 to End',
+    }
 
 
 class FFSingleFirstThird(FixtureFactory):
@@ -182,7 +200,7 @@ class FFSingleSecondThird(FixtureFactory):
 
 
 class FFTenthPostFirstThird(FixtureFactory):
-    NAME = 'tenth_post-first_third'
+    NAME = 'tenth-first_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -190,7 +208,7 @@ class FFTenthPostFirstThird(FixtureFactory):
 
 
 class FFTenthPostSecondThird(FixtureFactory):
-    NAME = 'tenth_post-second_third'
+    NAME = 'tenth-second_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -198,7 +216,7 @@ class FFTenthPostSecondThird(FixtureFactory):
 
 
 class FFThirdPostFirstThird(FixtureFactory):
-    NAME = 'third_post-first_third'
+    NAME = 'third-first_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -206,7 +224,7 @@ class FFThirdPostFirstThird(FixtureFactory):
 
 
 class FFThirdPostSecondThird(FixtureFactory):
-    NAME = 'third_post-second_third'
+    NAME = 'third-second_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -223,6 +241,7 @@ CLS_PROCESSOR = (
     NPNonZero,
     NPArgMax,
     NPNotAnyArgMax,
+    # PYLoop,
     )
 
 CLS_FF = (
@@ -238,7 +257,7 @@ NUMBER = 100
 
 def run_test():
     records = []
-    for size in (100_000, 10_000_000):
+    for size in (100_000, 1_000_000, 10_000_000):
         for ff in CLS_FF:
             fixture_label, fixture = ff.get_label_array(size)
             for cls in CLS_PROCESSOR:
