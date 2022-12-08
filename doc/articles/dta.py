@@ -19,38 +19,55 @@ sys.path.append(os.getcwd())
 
 
 class ArrayProcessor:
+    NAME = ''
+    SORT = -1
 
     def __init__(self, array: np.ndarray):
         self.array = array
 
 #-------------------------------------------------------------------------------
 class AKFirstTrue(ArrayProcessor):
+    NAME = 'ak.first_true_1d()'
+    SORT = 0
+
     def __call__(self):
         _ = first_true_1d(self.array, forward=True)
 
 class NPNonZero(ArrayProcessor):
+    NAME = 'np.nonzero()'
+    SORT = 3
+
     def __call__(self):
         _ = np.nonzero(self.array)[0][0]
 
 class NPArgMax(ArrayProcessor):
+    NAME = 'np.argmax()'
+    SORT = 1
+
     def __call__(self):
         _ = np.argmax(self.array)
 
+class NPNotAnyArgMax(ArrayProcessor):
+    NAME = 'np.any(), np.argmax()'
+    SORT = 2
+
+    def __call__(self):
+        _ = not np.any(self.array)
+        _ = np.argmax(self.array)
 
 #-------------------------------------------------------------------------------
-
 
 def plot_performance(frame):
     fixture_total = len(frame['fixture'].unique())
     cat_total = len(frame['size'].unique())
-    name_total = len(frame['name'].unique())
-
+    processor_total = len(frame['cls_processor'].unique())
+    # import ipdb; ipdb.set_trace()
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
     cmap = plt.get_cmap('plasma')
 
-    color = cmap(np.arange(name_total) / name_total)
+    color = cmap(np.arange(processor_total) / processor_total)
 
     # categories are read, write
     for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
@@ -59,18 +76,20 @@ def plot_performance(frame):
             ax = axes[cat_count][fixture_count]
 
             # set order
-            # fixture = fixture.sort_values('name', key=lambda s:s.iter_element().map_all(name_order))
+            # fixture = fixture.sort_values('cls', key=lambda s:s.iter_element().map_all(name_order))
+            fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
+            fixture = fixture.sort_values('sort')
+
+            # import ipdb; ipdb.set_trace()
             results = fixture['time'].values.tolist()
-            names = fixture['name'].values.tolist()
-            x = np.arange(len(results))
-            # names_display = [name_replace[l] for l in names]
+            names = [cls.NAME for cls in fixture['cls_processor']]
+            # x = np.arange(len(results))
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
             # ax.set_ylabel()
             density, position = fixture_label.split('-')
             title = f'{cat_label}\n{density}\n{position}'
-            # import ipdb; ipdb.set_trace()
 
             ax.set_title(title, fontsize=8)
             ax.set_box_aspect(0.75) # makes taller tan wide
@@ -99,7 +118,7 @@ def plot_performance(frame):
     plt.subplots_adjust(
             left=0.075,
             bottom=0.05,
-            right=0.85,
+            right=0.80,
             top=0.75,
             wspace=1, # width
             hspace=0.4,
@@ -116,7 +135,7 @@ def plot_performance(frame):
 #-------------------------------------------------------------------------------
 
 class FixtureFactory:
-    name = ''
+    NAME = ''
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -140,11 +159,11 @@ class FixtureFactory:
     @classmethod
     def get_label_array(cls, size: int) -> tp.Tuple[str, np.ndarray]:
         array = cls.get_array(size)
-        return cls.name, array
+        return cls.NAME, array
 
 
 class FFSingleFirstThird(FixtureFactory):
-    name = 'single-first_third'
+    NAME = 'single-first_third'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -153,7 +172,7 @@ class FFSingleFirstThird(FixtureFactory):
         return a
 
 class FFSingleSecondThird(FixtureFactory):
-    name = 'single-second_third'
+    NAME = 'single-second_third'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -163,7 +182,7 @@ class FFSingleSecondThird(FixtureFactory):
 
 
 class FFTenthPostFirstThird(FixtureFactory):
-    name = 'tenth_post-first_third'
+    NAME = 'tenth_post-first_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -171,7 +190,7 @@ class FFTenthPostFirstThird(FixtureFactory):
 
 
 class FFTenthPostSecondThird(FixtureFactory):
-    name = 'tenth_post-second_third'
+    NAME = 'tenth_post-second_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -179,7 +198,7 @@ class FFTenthPostSecondThird(FixtureFactory):
 
 
 class FFThirdPostFirstThird(FixtureFactory):
-    name = 'third_post-first_third'
+    NAME = 'third_post-first_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -187,7 +206,7 @@ class FFThirdPostFirstThird(FixtureFactory):
 
 
 class FFThirdPostSecondThird(FixtureFactory):
-    name = 'third_post-second_third'
+    NAME = 'third_post-second_third'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
@@ -203,6 +222,7 @@ CLS_PROCESSOR = (
     AKFirstTrue,
     NPNonZero,
     NPArgMax,
+    NPNotAnyArgMax,
     )
 
 CLS_FF = (
@@ -224,7 +244,7 @@ def run_test():
             for cls in CLS_PROCESSOR:
                 runner = cls(fixture)
 
-                record = [cls.__name__, NUMBER, fixture_label, size]
+                record = [cls, NUMBER, fixture_label, size]
                 print(record)
                 try:
                     result = timeit.timeit(
@@ -239,7 +259,7 @@ def run_test():
                 records.append(record)
 
     f = pd.DataFrame.from_records(records,
-            columns=('name', 'number', 'fixture', 'size', 'time')
+            columns=('cls_processor', 'number', 'fixture', 'size', 'time')
             )
     print(f)
     plot_performance(f)
