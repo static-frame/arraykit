@@ -3379,17 +3379,18 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p = array_buffer;
         p_end = p + size;
         while (p < p_end) {
-            if (*p == 1) {
+            if (*p) {
                 break;
             }
             p++;
         }
+
     }
     else {
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
         while (p > p_end) {
-            if (*p == 1) {
+            if (*p) {
                 break;
             }
             p--;

@@ -66,6 +66,7 @@ class NPNotAnyArgMax(ArrayProcessor):
         _ = np.argmax(self.array)
 
 #-------------------------------------------------------------------------------
+NUMBER = 200
 
 def plot_performance(frame):
     fixture_total = len(frame['fixture'].unique())
@@ -94,7 +95,6 @@ def plot_performance(frame):
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
-            # ax.set_ylabel()
             density, position = fixture_label.split('-')
             # cat_label is the size of the array
             title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[density]}\n{FixtureFactory.POSITION_TO_DISPLAY[position]}'
@@ -104,8 +104,8 @@ def plot_performance(frame):
             time_max = fixture['time'].max()
             ax.set_yticks([0, time_max * 0.5, time_max])
             ax.set_yticklabels(['',
-                    f'{time_max * 500:.1f} (ms)',
-                    f'{time_max * 1000:.1f} (ms)',
+                    f'{(time_max * 1e6 * .5) / NUMBER:.1f} (µs)',
+                    f'{(time_max * 1e6) / NUMBER:.1f} (µs)',
                     ], fontsize=6)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
@@ -122,7 +122,7 @@ def plot_performance(frame):
     fig.text(.05, .96, f'first_true_1d() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
-    fp = '/tmp/dta.png'
+    fp = '/tmp/first_true.png'
     plt.subplots_adjust(
             left=0.075,
             bottom=0.05,
@@ -253,7 +253,6 @@ CLS_FF = (
     FFThirdPostSecondThird,
 )
 
-NUMBER = 100
 
 def run_test():
     records = []
