@@ -8,6 +8,7 @@ import typing as tp
 from itertools import repeat
 
 from arraykit import first_true_1d
+import arraykit as ak
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,29 +42,10 @@ class NPArgMax(ArrayProcessor):
 
 def plot_performance(frame):
     fixture_total = len(frame['fixture'].unique())
-    cat_total = len(frame['category'].unique())
+    cat_total = len(frame['size'].unique())
     name_total = len(frame['name'].unique())
 
     fig, axes = plt.subplots(cat_total, fixture_total)
-
-    # for legend
-    name_replace = {
-        SFTypeParse.__name__: 'StaticFrame\n(type parsing)',
-        SFStr.__name__: 'StaticFrame\n(as string)',
-        SFTypeGiven.__name__: 'StaticFrame\n(type given)',
-
-    }
-
-    name_order = {
-        SFTypeParse.__name__: 0,
-        SFStr.__name__: 0,
-        SFTypeGiven.__name__: 0,
-
-        PandasTypeParse.__name__: 1,
-        PandasStr.__name__: 1,
-        PandasTypeGiven.__name__: 1,
-
-    }
 
     # cmap = plt.get_cmap('terrain')
     cmap = plt.get_cmap('plasma')
@@ -71,22 +53,25 @@ def plot_performance(frame):
     color = cmap(np.arange(name_total) / name_total)
 
     # categories are read, write
-    for cat_count, (cat_label, cat) in enumerate(frame.iter_group_items('category')):
+    for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
         for fixture_count, (fixture_label, fixture) in enumerate(
-                cat.iter_group_items('fixture')):
+                cat.groupby('fixture')):
             ax = axes[cat_count][fixture_count]
 
             # set order
-            fixture = fixture.sort_values('name', key=lambda s:s.iter_element().map_all(name_order))
+            # fixture = fixture.sort_values('name', key=lambda s:s.iter_element().map_all(name_order))
             results = fixture['time'].values.tolist()
             names = fixture['name'].values.tolist()
             x = np.arange(len(results))
-            names_display = [name_replace[l] for l in names]
+            # names_display = [name_replace[l] for l in names]
+            names_display = names
             post = ax.bar(names_display, results, color=color)
 
             # ax.set_ylabel()
-            cat_io, cat_dtype = cat_label.split(' ')
-            title = f'{cat_dtype.title()}\n{fixture_label}'
+            density, position = fixture_label.split('-')
+            title = f'{cat_label}\n{density}\n{position}'
+            # import ipdb; ipdb.set_trace()
+
             ax.set_title(title, fontsize=8)
             ax.set_box_aspect(0.75) # makes taller tan wide
             time_max = fixture['time'].max()
@@ -104,25 +89,20 @@ def plot_performance(frame):
                     labelbottom=False,
                     )
 
-    fig.set_size_inches(6, 3.5) # width, height
+    fig.set_size_inches(9, 3) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=8)
     # horizontal, vertical
-    count = ff.parse(FF_tall_uniform).size
-    fig.text(.05, .96, f'Delimited Read Performance: {count:.0e} Elements, {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
-    # get fixtures size reference
-    # shape_map = {shape: FIXTURE_SHAPE_MAP[shape] for shape in frame['fixture'].unique()}
-    # shape_msg = ' / '.join(f'{v}: {k}' for k, v in shape_map.items())
-    # fig.text(.05, .90, shape_msg, fontsize=6)
 
     fp = '/tmp/dta.png'
     plt.subplots_adjust(
-            left=0.05,
+            left=0.075,
             bottom=0.05,
-            right=0.75,
+            right=0.85,
             top=0.75,
-            wspace=-0.2, # width
-            hspace=1,
+            wspace=1, # width
+            hspace=0.4,
             )
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
@@ -198,9 +178,25 @@ class FFTenthPostSecondThird(FixtureFactory):
         return cls._get_array_filled(size, start_third=2, density=.1)
 
 
+class FFThirdPostFirstThird(FixtureFactory):
+    name = 'third_post-first_third'
+
+    @classmethod
+    def get_array(cls, size: int) -> np.ndarray:
+        return cls._get_array_filled(size, start_third=1, density=1/3)
+
+
+class FFThirdPostSecondThird(FixtureFactory):
+    name = 'third_post-second_third'
+
+    @classmethod
+    def get_array(cls, size: int) -> np.ndarray:
+        return cls._get_array_filled(size, start_third=2, density=1/3)
+
+
 def get_versions() -> str:
     import platform
-    return f'OS: {platform.system()} / StaticFrame: {sf.__version__} / NumPy: {np.__version__}\n'
+    return f'OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n'
 
 
 CLS_PROCESSOR = (
@@ -214,9 +210,11 @@ CLS_FF = (
     FFSingleSecondThird,
     FFTenthPostFirstThird,
     FFTenthPostSecondThird,
+    FFThirdPostFirstThird,
+    FFThirdPostSecondThird,
 )
 
-NUMBER = 1_000
+NUMBER = 100
 
 def run_test():
     records = []
@@ -244,8 +242,7 @@ def run_test():
             columns=('name', 'number', 'fixture', 'size', 'time')
             )
     print(f)
-
-    # plot_performance(f)
+    plot_performance(f)
 
 if __name__ == '__main__':
 
