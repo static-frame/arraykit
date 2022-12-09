@@ -68,6 +68,15 @@ class NPNotAnyArgMax(ArrayProcessor):
 #-------------------------------------------------------------------------------
 NUMBER = 200
 
+def seconds_to_display(seconds: float) -> str:
+    seconds /= NUMBER
+    if seconds < 1e-4:
+        return f'{seconds * 1e6: .1f} (µs)'
+    if seconds < 1e-1:
+        return f'{seconds * 1e3: .1f} (ms)'
+    return f'{seconds: .1f} (s)'
+
+
 def plot_performance(frame):
     fixture_total = len(frame['fixture'].unique())
     cat_total = len(frame['size'].unique())
@@ -104,8 +113,8 @@ def plot_performance(frame):
             time_max = fixture['time'].max()
             ax.set_yticks([0, time_max * 0.5, time_max])
             ax.set_yticklabels(['',
-                    f'{(time_max * 1e6 * .5) / NUMBER:.1f} (µs)',
-                    f'{(time_max * 1e6) / NUMBER:.1f} (µs)',
+                    seconds_to_display(time_max * .5),
+                    seconds_to_display(time_max),
                     ], fontsize=6)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
