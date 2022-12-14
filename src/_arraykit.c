@@ -1577,11 +1577,13 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // NOTE: empty prefered over zeros
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0);
     if (array == NULL) {
         // expected array to steal dtype reference
         return NULL;
     }
+
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
@@ -1654,7 +1656,8 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // NOTE: empty prefered over zeros
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0);
     if (array == NULL) {
         // expected array to steal dtype reference
         return NULL;
@@ -1726,7 +1729,8 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    // NOTE: empty prefered over zeros
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0);
     if (array == NULL) {
         // expected array to steal dtype reference
         return NULL;
@@ -1812,7 +1816,8 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         capped_points = true;
     }
 
-    // assuming this is contiguous
+    // NOTE: it is assumed (though not verified in some testing) that we need to get zereod array here as we might copy to the array less than the full item size width
+
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
         // expected array to steal dtype reference
@@ -1877,7 +1882,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         capped_points = true;
     }
 
-    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0);
     if (array == NULL) {
         // expected array to steal dtype reference
         return NULL;
