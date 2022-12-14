@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.5
+............
+
+Optimization to numerical array creation in ``delimited_to_arrays()``.
+
+
 0.2.4
 ............
 
@@ -46,7 +52,7 @@ Set NumPy minimum version at 1.18.5.
 0.2.3
 ............
 
-Extended arguments to and functionality in ``split_after_count`` to support the complete CSV dialect interface.
+Extended arguments to and functionality in ``split_after_count()`` to support the complete CSV dialect interface.
 
 Now building wheels for 3.11.
 
@@ -54,7 +60,7 @@ Now building wheels for 3.11.
 0.2.2
 ............
 
-Refinements to ensure typed-parsed ints are always int64 in ``delimited_to_arrays``.
+Refinements to ensure typed-parsed ints are always int64 in ``delimited_to_arrays()``.
 
 
 0.2.1
