@@ -7,11 +7,11 @@ on:
     branches:
       - master
   release:
-    types: published
+    types: [published]
 jobs:
   tar_gz:
     name: Package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
@@ -19,7 +19,7 @@ jobs:
           python-version: 3.8
       - run: pip install -r requirements-build-backward.txt
       - run: python setup.py sdist
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v3
         with:
           name: dist
           path: dist
@@ -28,17 +28,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macOS, Ubuntu, Windows]
+        os: [macos-11, ubuntu-20.04, windows-2022]
         major: [3]
         minor: [7, 8]
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
+        if: matrix.os == 'macos-11' || matrix.os == 'ubuntu-20.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: matrix.os == 'Windows'
+        if: matrix.os == 'windows-2022'
       - uses: pypa/cibuildwheel@v2.11.2
         with:
           output-dir: dist
@@ -49,7 +49,7 @@ jobs:
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-test-backward.txt
           CIBW_TEST_COMMAND: pytest {project}/test
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v3
         with:
           name: dist
           path: dist
@@ -58,17 +58,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macOS, Ubuntu, Windows]
+        os: [macos-11, ubuntu-20.04, windows-2022]
         major: [3]
         minor: [9, 10, 11]
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macOS' || matrix.os == 'Ubuntu'
+        if: matrix.os == 'macos-11' || matrix.os == 'ubuntu-20.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: matrix.os == 'Windows'
+        if: matrix.os == 'windows-2022'
       - uses: pypa/cibuildwheel@v2.11.2
         with:
           output-dir: dist
@@ -79,17 +79,17 @@ jobs:
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-test.txt
           CIBW_TEST_COMMAND: pytest {project}/test
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v3
         with:
           name: dist
           path: dist
   upload:
     name: Publish
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: github.event_name == 'release'
     needs: [tar_gz, whl_lt_3_9, whl_gte_3_9]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/download-artifact@master
+      - uses: actions/download-artifact@v3
         with:
           name: dist
           path: dist
