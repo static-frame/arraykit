@@ -9,8 +9,8 @@
 .. image:: https://img.shields.io/conda/vn/conda-forge/arraykit.svg
   :target: https://anaconda.org/conda-forge/arraykit
 
-.. image:: https://img.shields.io/github/workflow/status/InvestmentSystems/arraykit/CI?label=build&logo=Github
-  :target: https://github.com/InvestmentSystems/arraykit/actions?query=workflow%3ACI
+.. image:: https://img.shields.io/github/actions/workflow/status/static-frame/arraykit/ci.yml?branch=master&label=build&logo=Github
+  :target: https://github.com/static-frame/arraykit/actions/workflows/ci.yml
 
 
 arraykit
