@@ -9,8 +9,8 @@
 .. image:: https://img.shields.io/conda/vn/conda-forge/arraykit.svg
   :target: https://anaconda.org/conda-forge/arraykit
 
-.. image:: https://img.shields.io/github/workflow/status/InvestmentSystems/arraykit/CI?label=build&logo=Github
-  :target: https://github.com/InvestmentSystems/arraykit/actions?query=workflow%3ACI
+.. image:: https://img.shields.io/github/actions/workflow/status/static-frame/arraykit/ci.yml?branch=master&label=build&logo=Github
+  :target: https://github.com/static-frame/arraykit/actions/workflows/ci.yml
 
 
 arraykit
@@ -37,6 +37,18 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.6
+............
+
+Maintenance release.
+
+
+0.2.5
+............
+
+Optimization to numerical array creation in ``delimited_to_arrays()``.
+
+
 0.2.4
 ............
 
@@ -46,7 +58,7 @@ Set NumPy minimum version at 1.18.5.
 0.2.3
 ............
 
-Extended arguments to and functionality in ``split_after_count`` to support the complete CSV dialect interface.
+Extended arguments to and functionality in ``split_after_count()`` to support the complete CSV dialect interface.
 
 Now building wheels for 3.11.
 
@@ -54,7 +66,7 @@ Now building wheels for 3.11.
 0.2.2
 ............
 
-Refinements to ensure typed-parsed ints are always int64 in ``delimited_to_arrays``.
+Refinements to ensure typed-parsed ints are always int64 in ``delimited_to_arrays()``.
 
 
 0.2.1
