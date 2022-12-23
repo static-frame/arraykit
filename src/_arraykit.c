@@ -3371,6 +3371,8 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     npy_intp size = PyArray_SIZE(array);
+    div_t size_div = div(size, 8); // quot, rem
+
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
     NPY_BEGIN_THREADS_DEF;
@@ -3383,21 +3385,37 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     if (forward) {
         p = array_buffer;
         p_end = p + size;
-        while (p < p_end) {
-            if (*p) {
-                break;
-            }
+
+        while (p < p_end - size_div.rem) {
+            if (*p) break;
+            p++;
+            if (*p) break;
+            p++;
+            if (*p) break;
+            p++;
+            if (*p) break;
             p++;
         }
-
+        while (p < p_end) {
+            if (*p) break;
+            p++;
+        }
     }
     else {
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
+        while (p > p_end + size_div.rem) {
+            if (*p) break;
+            p--;
+            if (*p) break;
+            p--;
+            if (*p) break;
+            p--;
+            if (*p) break;
+            p--;
+        }
         while (p > p_end) {
-            if (*p) {
-                break;
-            }
+            if (*p) break;
             p--;
         }
     }
