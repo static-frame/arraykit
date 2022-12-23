@@ -20,6 +20,7 @@ from arraykit import dtype_from_element
 from arraykit import split_after_count
 from arraykit import count_iteration
 from arraykit import first_true_1d
+from arraykit import first_true_2d
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -531,6 +532,34 @@ class TestUnit(unittest.TestCase):
         a1 = np.isin(np.arange(100), (10, 30, 50))
         self.assertEqual(first_true_1d(a1, forward=True), 10)
         self.assertEqual(first_true_1d(a1, forward=False), 50)
+
+
+    #---------------------------------------------------------------------------
+    def test_first_true_2d_a(self) -> None:
+        a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
+
+        post = first_true_2d(a1, forward=True)
+
+        # NOTE: this is an axis 1 result by argmax
+        self.assertEqual(len(post), 5)
+        self.assertEqual(post.tolist(),
+                [9, 18, -1, 8, 16]
+                )
+
+    def test_first_true_2d_b(self) -> None:
+        a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
+
+        post = first_true_2d(a1, forward=False)
+
+        # NOTE: this is an axis 1 result by argmax
+        self.assertEqual(len(post), 5)
+        self.assertEqual(post.tolist(),
+                [9, 18, -1, 8, 16]
+                )
+        import ipdb; ipdb.set_trace()
+
+        # self.assertEqual(post, 50)
+
 
 
 

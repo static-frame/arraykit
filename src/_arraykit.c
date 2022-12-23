@@ -3371,7 +3371,7 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     npy_intp size = PyArray_SIZE(array);
-    div_t size_div = div(size, 8); // quot, rem
+    ldiv_t size_div = ldiv(size, 4); // quot, rem
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
@@ -3427,6 +3427,128 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject* post = PyLong_FromLong(position);
     return post;
 }
+
+
+static char *first_true_2d_kwarg_names[] = {
+    "array",
+    "forward",
+    NULL
+};
+
+static PyObject*
+first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *array = NULL;
+    int forward = 1;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!|$p:first_true_2d",
+            first_true_2d_kwarg_names,
+            &PyArray_Type,
+            &array,
+            &forward
+            )) {
+        return NULL;
+    }
+    if (PyArray_NDIM(array) != 2) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(array) != NPY_BOOL) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
+        return NULL;
+    }
+    // might take F_CONTIGUOUS?
+    if (!PyArray_IS_C_CONTIGUOUS(array)) {
+        PyErr_SetString(PyExc_ValueError, "Array must be continguous");
+        return NULL;
+    }
+    // buffer if indicators
+    npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array);
+
+    npy_intp count_row = PyArray_DIM(array, 0);
+    npy_intp count_col = PyArray_DIM(array, 1);
+
+    ldiv_t div_col = ldiv(count_col, 4); // quot, rem
+
+    npy_intp dims_post = {count_row};
+    PyArrayObject *array_pos = (PyArrayObject*)PyArray_EMPTY(
+            1,         // ndim
+            &dims_post,// shape
+            NPY_INT64, // dtype
+            0          // fortran
+            );
+    if (array_pos == NULL) {
+        return NULL;
+    }
+    npy_int64 *buffer_pos = (npy_int64*)PyArray_DATA(array_pos);
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
+    npy_intp position;
+    npy_bool *p;
+    npy_bool *p_start;
+    npy_bool *p_end;
+
+    // iterate one row at a time; short-circult when found
+    for (npy_intp r = 0; r < count_row; r++) {
+        position = -1; // update for each row
+
+        if (forward) {
+            p_start = buffer_ind + (count_col * r);
+            p = p_start;
+            p_end = p + count_col;
+
+            while (p < p_end - div_col.rem) {
+                if (*p) break;
+                p++;
+                if (*p) break;
+                p++;
+                if (*p) break;
+                p++;
+                if (*p) break;
+                p++;
+            }
+            while (p < p_end) {
+                if (*p) break;
+                p++;
+            }
+            if (p != p_end) { // else, return -1
+                position = p - p_start;
+            }
+        }
+        else {
+            p_start = buffer_ind + (count_col * (r + 1)) - 1;
+            p = p_start;
+            p_end = buffer_ind + (count_col * r) - 1;
+
+            while (p > p_end + div_col.rem) {
+                if (*p) break;
+                p--;
+                if (*p) break;
+                p--;
+                if (*p) break;
+                p--;
+                if (*p) break;
+                p--;
+            }
+            while (p > p_end) {
+                if (*p) break;
+                p--;
+            }
+            if (p != p_end) { // else, return -1
+                position = p_start - p;
+            }
+        }
+        *buffer_pos++ = position;
+    }
+
+    NPY_END_THREADS;
+
+    return (PyObject *)array_pos;
+}
+
 
 
 
@@ -4125,6 +4247,10 @@ static PyMethodDef arraykit_methods[] =  {
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"first_true_1d",
             (PyCFunction)first_true_1d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
+    {"first_true_2d",
+            (PyCFunction)first_true_2d,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"delimited_to_arrays",
