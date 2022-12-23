@@ -538,26 +538,29 @@ class TestUnit(unittest.TestCase):
     def test_first_true_2d_a(self) -> None:
         a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
 
-        post = first_true_2d(a1, forward=True)
-
+        post1 = first_true_2d(a1, forward=True)
         # NOTE: this is an axis 1 result by argmax
-        self.assertEqual(len(post), 5)
-        self.assertEqual(post.tolist(),
+        self.assertEqual(post1.tolist(),
                 [9, 18, -1, 8, 16]
                 )
+        post2 = first_true_2d(a1, forward=False)
+        # NOTE: this is an axis 1 result by argmax
+        self.assertEqual(post2.tolist(),
+                [9, 18, -1, 8, 16]
+                )
+
 
     def test_first_true_2d_b(self) -> None:
-        a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
+        a1 = np.isin(np.arange(20), (3, 7, 10, 15, 18)).reshape(5, 4)
 
-        post = first_true_2d(a1, forward=False)
-
-        # NOTE: this is an axis 1 result by argmax
-        self.assertEqual(len(post), 5)
-        self.assertEqual(post.tolist(),
-                [9, 18, -1, 8, 16]
+        post1 = first_true_2d(a1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [3, 3, 2, 3, 2]
                 )
-        import ipdb; ipdb.set_trace()
-
+        post2 = first_true_2d(a1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [3, 3, 2, 3, 2]
+                )
         # self.assertEqual(post, 50)
 
 

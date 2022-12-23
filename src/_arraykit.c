@@ -3441,6 +3441,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyArrayObject *array = NULL;
     int forward = 1;
 
+    // # TODO: add axis
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "O!|$p:first_true_2d",
             first_true_2d_kwarg_names,
@@ -3538,7 +3539,8 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
                 p--;
             }
             if (p != p_end) { // else, return -1
-                position = p_start - p;
+                // position = (npy_intp)buffer_ind - (npy_intp)p_end + (npy_intp)p ;
+                position = p - (p_end + 1);
             }
         }
         *buffer_pos++ = position;
