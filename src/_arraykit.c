@@ -3493,6 +3493,9 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_bool *p_end;
 
     // iterate one row at a time; short-circult when found
+    // for argmax, axis = 1 returns the max per row
+    // axis = 0 returns the max per col
+
     for (npy_intp r = 0; r < count_row; r++) {
         position = -1; // update for each row
 
@@ -3501,6 +3504,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             p = p_start;
             p_end = p + count_col;
 
+            // remove from the end the remainder
             while (p < p_end - div_col.rem) {
                 if (*p) break;
                 p++;
@@ -3520,8 +3524,10 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             }
         }
         else {
+            // start at the next row, then subtract one
             p_start = buffer_ind + (count_col * (r + 1)) - 1;
             p = p_start;
+            // end is 1 less than start of each row
             p_end = buffer_ind + (count_col * r) - 1;
 
             while (p > p_end + div_col.rem) {
@@ -3539,7 +3545,6 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
                 p--;
             }
             if (p != p_end) { // else, return -1
-                // position = (npy_intp)buffer_ind - (npy_intp)p_end + (npy_intp)p ;
                 position = p - (p_end + 1);
             }
         }

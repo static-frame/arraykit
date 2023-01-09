@@ -546,9 +546,8 @@ class TestUnit(unittest.TestCase):
         post2 = first_true_2d(a1, forward=False)
         # NOTE: this is an axis 1 result by argmax
         self.assertEqual(post2.tolist(),
-                [9, 18, -1, 8, 16]
+                [19, 18, -1, 8, 16]
                 )
-
 
     def test_first_true_2d_b(self) -> None:
         a1 = np.isin(np.arange(20), (3, 7, 10, 15, 18)).reshape(5, 4)
@@ -561,7 +560,42 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post2.tolist(),
                 [3, 3, 2, 3, 2]
                 )
-        # self.assertEqual(post, 50)
+
+    def test_first_true_2d_c(self) -> None:
+        a1 = np.isin(np.arange(20), ()).reshape(5, 4)
+
+        post1 = first_true_2d(a1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [-1, -1, -1, -1, -1]
+                )
+        post2 = first_true_2d(a1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [-1, -1, -1, -1, -1]
+                )
+
+    def test_first_true_2d_d(self) -> None:
+        a1 = np.isin(np.arange(20), (0, 3, 4, 7, 8, 11, 12, 15, 16, 19)).reshape(5, 4)
+
+        post1 = first_true_2d(a1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [3, 3, 3, 3, 3]
+                )
+        post2 = first_true_2d(a1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [0, 0, 0, 0, 0]
+                )
+
+    def test_first_true_2d_e(self) -> None:
+        a1 = np.isin(np.arange(15), (2, 7, 12)).reshape(3, 5)
+
+        post1 = first_true_2d(a1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [2, 2, 2]
+                )
+        post2 = first_true_2d(a1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [2, 2, 2]
+                )
 
 
 
