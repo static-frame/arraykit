@@ -597,6 +597,15 @@ class TestUnit(unittest.TestCase):
                 [2, 2, 2]
                 )
 
+    def test_first_true_2d_f(self) -> None:
+        a1 = np.isin(np.arange(15), (2, 7, 12)).reshape(3, 5)
+
+        with self.assertRaises(ValueError):
+            post1 = first_true_2d(a1, axis=-1)
+
+        with self.assertRaises(ValueError):
+            post1 = first_true_2d(a1, axis=2)
+
 
 
 

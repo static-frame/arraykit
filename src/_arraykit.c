@@ -2837,7 +2837,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     if ((axis < 0) || (axis > 1)) {
-        PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
         return NULL;
     }
     AK_DelimitedReader *dr = AK_DR_New(file_like,
@@ -3432,6 +3432,7 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 static char *first_true_2d_kwarg_names[] = {
     "array",
     "forward",
+    "axis",
     NULL
 };
 
@@ -3440,14 +3441,15 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyArrayObject *array = NULL;
     int forward = 1;
+    int axis = 0;
 
-    // # TODO: add axis
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O!|$p:first_true_2d",
+            "O!|$pi:first_true_2d",
             first_true_2d_kwarg_names,
             &PyArray_Type,
             &array,
-            &forward
+            &forward,
+            &axis
             )) {
         return NULL;
     }
@@ -3464,6 +3466,11 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_ValueError, "Array must be continguous");
         return NULL;
     }
+    if (axis < 0 || axis > 1) {
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
+        return NULL;
+    }
+
     // buffer if indicators
     npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array);
 
