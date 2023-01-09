@@ -3500,9 +3500,11 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_bool *p_end;
 
     // iterate one row at a time; short-circult when found
+
+    // TODO: implement axis 0
     // for argmax, axis = 1 returns the max per row
     // axis = 0 returns the max per col
-
+    // axis 1 implementation
     for (npy_intp r = 0; r < count_row; r++) {
         position = -1; // update for each row
 
