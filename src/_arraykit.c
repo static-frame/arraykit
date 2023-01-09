@@ -3463,7 +3463,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     // might take F_CONTIGUOUS?
     if (!PyArray_IS_C_CONTIGUOUS(array)) {
-        PyErr_SetString(PyExc_ValueError, "Array must be continguous");
+        PyErr_SetString(PyExc_ValueError, "Array must be C continguous");
         return NULL;
     }
     if (axis < 0 || axis > 1) {
