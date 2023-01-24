@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.7
+............
+
+Updated most-recent NumPy references to 1.23.5.
+
+
 0.2.6
 ............
 
