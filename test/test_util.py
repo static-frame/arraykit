@@ -330,6 +330,8 @@ class TestUnit(unittest.TestCase):
     def test_isna_element_c(self) -> None:
         self.assertFalse(isna_element(None, include_none=False))
         self.assertTrue(isna_element(None, include_none=True))
+        self.assertFalse(isna_element(None, False))
+        self.assertTrue(isna_element(None, True))
 
 
     #---------------------------------------------------------------------------
