@@ -3385,61 +3385,76 @@ dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
     return (PyObject*)PyArray_DescrFromType(NPY_OBJECT);
 }
 
+static char *isna_element_kwarg_names[] = {
+    "element",
+    "include_none",
+    NULL
+};
+
 static PyObject *
-isna_element(PyObject *Py_UNUSED(m), PyObject *arg)
+isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
 {
+    PyObject *element;
+    int include_none = 1;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|p:isna_element", isna_element_kwarg_names,
+            &element,
+            &include_none)) {
+        return NULL;
+    }
+
     // None
-    if (arg == Py_None) {
+    if (include_none && element == Py_None) {
         Py_RETURN_TRUE;
     }
 
     // NaN
-    if (PyFloat_Check(arg)) {
-        return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(arg)));
+    if (PyFloat_Check(element)) {
+        return PyBool_FromLong(isnan(PyFloat_AS_DOUBLE(element)));
     }
-    if (PyArray_IsScalar(arg, Half)) {
-        return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(arg, Half)));
+    if (PyArray_IsScalar(element, Half)) {
+        return PyBool_FromLong(npy_half_isnan(PyArrayScalar_VAL(element, Half)));
     }
-    if (PyArray_IsScalar(arg, Float32)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float32)));
+    if (PyArray_IsScalar(element, Float32)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(element, Float32)));
     }
-    if (PyArray_IsScalar(arg, Float64)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float64)));
+    if (PyArray_IsScalar(element, Float64)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(element, Float64)));
     }
     # ifdef PyFloat128ArrType_Type
-    if (PyArray_IsScalar(arg, Float128)) {
-        return PyBool_FromLong(isnan(PyArrayScalar_VAL(arg, Float128)));
+    if (PyArray_IsScalar(element, Float128)) {
+        return PyBool_FromLong(isnan(PyArrayScalar_VAL(element, Float128)));
     }
     # endif
 
     // Complex NaN
-    if (PyComplex_Check(arg)) {
-        Py_complex val = ((PyComplexObject*)arg)->cval;
+    if (PyComplex_Check(element)) {
+        Py_complex val = ((PyComplexObject*)element)->cval;
         return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
-    if (PyArray_IsScalar(arg, Complex64)) {
-        npy_cfloat val = PyArrayScalar_VAL(arg, Complex64);
+    if (PyArray_IsScalar(element, Complex64)) {
+        npy_cfloat val = PyArrayScalar_VAL(element, Complex64);
         return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
-    if (PyArray_IsScalar(arg, Complex128)) {
-        npy_cdouble val = PyArrayScalar_VAL(arg, Complex128);
+    if (PyArray_IsScalar(element, Complex128)) {
+        npy_cdouble val = PyArrayScalar_VAL(element, Complex128);
         return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
     # ifdef PyComplex256ArrType_Type
-    if (PyArray_IsScalar(arg, Complex256)) {
-        npy_clongdouble val = PyArrayScalar_VAL(arg, Complex256);
+    if (PyArray_IsScalar(element, Complex256)) {
+        npy_clongdouble val = PyArrayScalar_VAL(element, Complex256);
         return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
     # endif
 
     // NaT - Datetime
-    if (PyArray_IsScalar(arg, Datetime)) {
-        return PyBool_FromLong(PyArrayScalar_VAL(arg, Datetime) == NPY_DATETIME_NAT);
+    if (PyArray_IsScalar(element, Datetime)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(element, Datetime) == NPY_DATETIME_NAT);
     }
 
     // NaT - Timedelta
-    if (PyArray_IsScalar(arg, Timedelta)) {
-        return PyBool_FromLong(PyArrayScalar_VAL(arg, Timedelta) == NPY_DATETIME_NAT);
+    if (PyArray_IsScalar(element, Timedelta)) {
+        return PyBool_FromLong(PyArrayScalar_VAL(element, Timedelta) == NPY_DATETIME_NAT);
     }
 
     Py_RETURN_FALSE;
@@ -4042,7 +4057,10 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
-    {"isna_element", isna_element, METH_O, NULL},
+    {"isna_element",
+            (PyCFunction)isna_element,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
     {"get_new_indexers_and_screen",
             (PyCFunction)get_new_indexers_and_screen,

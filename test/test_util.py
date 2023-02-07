@@ -273,7 +273,7 @@ class TestUnit(unittest.TestCase):
         a2 = array_deepcopy(a1)
         self.assertNotEqual(id(a1), id(a2))
 
-    def test_isna_element_true(self) -> None:
+    def test_isna_element_a(self) -> None:
         class FloatSubclass(float): pass
         class ComplexSubclass(complex): pass
 
@@ -308,7 +308,7 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(isna_element(-float('NaN')))
         self.assertTrue(isna_element(None))
 
-    def test_isna_element_false(self) -> None:
+    def test_isna_element_b(self) -> None:
         # Test a wide range of float values, with different precision, across types
         for val in (
                 1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
@@ -325,6 +325,12 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(np.datetime64('2020-12-31')))
         self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
         self.assertFalse(isna_element(False))
+
+
+    def test_isna_element_c(self) -> None:
+        self.assertFalse(isna_element(None, include_none=False))
+        self.assertTrue(isna_element(None, include_none=True))
+
 
     #---------------------------------------------------------------------------
 
