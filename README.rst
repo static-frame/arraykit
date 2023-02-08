@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.2.8
+------------
+
+Added ``include_none`` argument to ``isna_element()``; implemented identification of Pandas pd.Timestamp NaT.
+
+
 0.2.7
 ............
 
