@@ -339,14 +339,11 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(isna_element(ts))
 
 
-    def test_isna_element_d(self) -> None:
+    def test_isna_element_e(self) -> None:
         from types import SimpleNamespace
         sn = SimpleNamespace()
         sn.to_numpy = None
         self.assertFalse(isna_element(sn))
-
-
-
 
     #---------------------------------------------------------------------------
 
