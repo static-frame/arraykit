@@ -3455,6 +3455,7 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
     if (PyArray_IsScalar(element, Timedelta)) {
         return PyBool_FromLong(PyArrayScalar_VAL(element, Timedelta) == NPY_DATETIME_NAT);
     }
+    // Try to identify Pandas Timestamp NATs
     if (PyObject_HasAttrString(element, "to_numpy")) {
         PyObject *to_numpy = PyObject_GetAttrString(element, "to_numpy");
         if (!PyCallable_Check(to_numpy)) {
