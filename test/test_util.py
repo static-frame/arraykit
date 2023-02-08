@@ -5,6 +5,7 @@ import unittest
 import warnings
 from io import StringIO
 import numpy as np  # type: ignore
+import pandas as pd
 
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
@@ -332,6 +333,19 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(isna_element(None, include_none=True))
         self.assertFalse(isna_element(None, False))
         self.assertTrue(isna_element(None, True))
+
+    def test_isna_element_d(self) -> None:
+        ts = pd.Timestamp('nat')
+        self.assertTrue(isna_element(ts))
+
+
+    def test_isna_element_d(self) -> None:
+        from types import SimpleNamespace
+        sn = SimpleNamespace()
+        sn.to_numpy = None
+        self.assertFalse(isna_element(sn))
+
+
 
 
     #---------------------------------------------------------------------------

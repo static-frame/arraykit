@@ -3451,12 +3451,19 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
     if (PyArray_IsScalar(element, Datetime)) {
         return PyBool_FromLong(PyArrayScalar_VAL(element, Datetime) == NPY_DATETIME_NAT);
     }
-
     // NaT - Timedelta
     if (PyArray_IsScalar(element, Timedelta)) {
         return PyBool_FromLong(PyArrayScalar_VAL(element, Timedelta) == NPY_DATETIME_NAT);
     }
-
+    if (PyObject_HasAttrString(element, "to_numpy")) {
+        PyObject *to_numpy = PyObject_GetAttrString(element, "to_numpy");
+        if (!PyCallable_Check(to_numpy)) {
+            Py_RETURN_FALSE;
+        }
+        PyObject* post = PyObject_CallFunction(to_numpy, NULL);
+        if (post == NULL) return NULL;
+        return PyBool_FromLong(PyArrayScalar_VAL(post, Datetime) == NPY_DATETIME_NAT);
+    }
     Py_RETURN_FALSE;
 }
 
