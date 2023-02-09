@@ -1944,6 +1944,21 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     // AK_DEBUG_MSG_OBJ("post cast to type", (PyObject*)array_bytes);
 
+    // Py_INCREF(dtype);
+    // PyObject* array = PyArray_NewFromDescr(Py_TYPE(array_bytes),
+    //         dtype,
+    //         PyArray_NDIM((PyArrayObject *)array_bytes),
+    //         PyArray_DIMS((PyArrayObject *)array_bytes),
+    //         NULL, NULL,
+    //         0,
+    //         array_bytes);
+    // if (array == NULL) return NULL;
+
+    // if (PyArray_CopyInto((PyArrayObject *)array, (PyArrayObject *)array_bytes) < 0) {
+    //     Py_DECREF(array);
+    //     return NULL;
+    // }
+
     Py_DECREF(array_bytes);
     if (array == NULL) {
         // expected array to steal dtype reference
