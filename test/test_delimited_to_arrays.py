@@ -370,10 +370,14 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(complex))
         self.assertEqual(a1.tolist(), [complex('-0+infj'), (0j)])
 
-    # NOTE: this causes a seg fault
-    # def test_iterable_str_to_array_1d_d4(self) -> None:
-    #     with self.assertRaises(ValueError):
-    #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
+    def test_iterable_str_to_array_1d_complex_5(self) -> None:
+        with self.assertRaises(ValueError):
+            a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
+
+    def test_iterable_str_to_array_1d_complex_6(self) -> None:
+        # NOTE: malformed complex raise Exception as expected
+        with self.assertRaises(ValueError):
+            a1 = iterable_str_to_array_1d(['-2+1.2asdfj', '1.5wer4.2j'], complex)
 
     #---------------------------------------------------------------------------
 
