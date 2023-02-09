@@ -399,8 +399,9 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
 
-    # def test_iterable_str_to_array_1d_dt64_4(self) -> None:
-    #     a1 = iterable_str_to_array_1d(['202.30', '202.20'], 'datetime64[D]')
+    def test_iterable_str_to_array_1d_dt64_4(self) -> None:
+        with self.assertRaises(ValueError):
+            _ = iterable_str_to_array_1d(['202.30', '202.20'], 'datetime64[D]')
 
     #---------------------------------------------------------------------------
 

@@ -1924,46 +1924,35 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-// If we cannot direclty convert bytes to values, create a bytes array and then use PyArray_CastToType to use numpy to interpet it as a new a array.
+// If we cannot directly convert bytes to values in a pre-loadsed array, we can create a bytes or unicode array and then use PyArray_CastToType to use numpy to interpret it as a new a array and handle conversions. Note that we can use bytes for a smaller memory load if we are confident that the values are not unicode. This is a safe assumption for complext. Fore datetim64, we have to use Unicode to get errors on malformed inputs: using bytes causes a seg fault with these interfaces (the same is not observed with astyping a byte array in Python).
 static inline PyObject*
-AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
+AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
+        PyArray_Descr* dtype,
+        int type_inter)
 {
-    PyArray_Descr *dtype_bytes = PyArray_DescrNewFromType(NPY_STRING);
-    if (dtype_bytes == NULL) {
+    PyArray_Descr* dtype_inter; // interchange array
+    PyObject* array_inter = NULL;
+
+    dtype_inter = PyArray_DescrNewFromType(type_inter);
+    if (dtype_inter == NULL) {
         Py_DECREF(dtype);
         return NULL;
     }
-    PyObject* array_bytes = AK_CPL_to_array_bytes(cpl, dtype_bytes);
-    if (array_bytes == NULL) {
-        Py_DECREF(dtype);
-        // dtype_bytes stolen even if array creation failed
+    if (type_inter == NPY_STRING) {
+        array_inter = AK_CPL_to_array_bytes(cpl, dtype_inter);
+    }
+    else if (type_inter == NPY_UNICODE) {
+        array_inter = AK_CPL_to_array_unicode(cpl, dtype_inter);
+    }
+
+    if (array_inter == NULL) {
+        Py_DECREF(dtype); // dtype_inter ref already stolen
         return NULL;
     }
-    // Py_INCREF(dtype_bytes);
-    // Py_INCREF(array_bytes);
-    // Py_INCREF(dtype);
-    // AK_DEBUG_MSG_OBJ("pre cast to type", (PyObject*)array_bytes);
-    PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
-    // AK_DEBUG_MSG_OBJ("post cast to type", (PyObject*)array_bytes);
 
-    // Py_INCREF(dtype);
-    // PyObject* array = PyArray_NewFromDescr(Py_TYPE(array_bytes),
-    //         dtype,
-    //         PyArray_NDIM((PyArrayObject *)array_bytes),
-    //         PyArray_DIMS((PyArrayObject *)array_bytes),
-    //         NULL, NULL,
-    //         0,
-    //         array_bytes);
-    // if (array == NULL) return NULL;
-
-    // if (PyArray_CopyInto((PyArrayObject *)array, (PyArrayObject *)array_bytes) < 0) {
-    //     Py_DECREF(array);
-    //     return NULL;
-    // }
-
-    Py_DECREF(array_bytes);
-    if (array == NULL) {
-        // expected array to steal dtype reference
+    PyObject *array = PyArray_CastToType((PyArrayObject*)array_inter, dtype, 0);
+    Py_DECREF(array_inter);
+    if (array == NULL) { // dtype ref already stolen
         return NULL;
     }
     PyArray_CLEARFLAGS((PyArrayObject *)array, NPY_ARRAY_WRITEABLE);
@@ -2004,10 +1993,11 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc
         return AK_CPL_to_array_int(cpl, dtype, tsep);
     }
     else if (PyDataType_ISDATETIME(dtype)) {
-        return AK_CPL_to_array_via_cast(cpl, dtype);
+        return AK_CPL_to_array_via_cast(cpl, dtype, NPY_UNICODE);
     }
     else if (PyDataType_ISCOMPLEX(dtype)) {
-        return AK_CPL_to_array_via_cast(cpl, dtype); // no tsep, decc as using NumPy cast
+        // no tsep, decc as using NumPy cast
+        return AK_CPL_to_array_via_cast(cpl, dtype, NPY_STRING);
     }
 
     PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
