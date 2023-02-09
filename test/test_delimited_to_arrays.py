@@ -389,11 +389,14 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
 
-    def test_iterable_str_to_array_1d_dt64_2(self) -> None:
+    def test_iterable_str_to_array_1d_dt64_3(self) -> None:
         a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
         self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+
+    # def test_iterable_str_to_array_1d_dt64_4(self) -> None:
+    #     a1 = iterable_str_to_array_1d(['202.30', '202.20'], 'datetime64[D]')
 
     #---------------------------------------------------------------------------
 
