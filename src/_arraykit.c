@@ -1940,7 +1940,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         return NULL;
     }
     // AK_DEBUG_MSG_OBJ("pre cast to type", (PyObject*)array_bytes);
-    // Py_INCREF(array_bytes);
+    // Py_INCREF(dtype);
     PyObject *array = PyArray_CastToType((PyArrayObject*)array_bytes, dtype, 0);
     // AK_DEBUG_MSG_OBJ("post cast to type", (PyObject*)array_bytes);
 
