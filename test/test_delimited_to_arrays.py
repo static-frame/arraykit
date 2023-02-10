@@ -370,10 +370,14 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a1.dtype, np.dtype(complex))
         self.assertEqual(a1.tolist(), [complex('-0+infj'), (0j)])
 
-    # NOTE: this causes a seg fault
-    # def test_iterable_str_to_array_1d_d4(self) -> None:
-    #     with self.assertRaises(ValueError):
-    #         a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
+    def test_iterable_str_to_array_1d_complex_5(self) -> None:
+        with self.assertRaises(ValueError):
+            a1 = iterable_str_to_array_1d(['-2+1.2j', '1.5+-4.2j'], complex)
+
+    def test_iterable_str_to_array_1d_complex_6(self) -> None:
+        # NOTE: malformed complex raise Exception as expected
+        with self.assertRaises(ValueError):
+            a1 = iterable_str_to_array_1d(['-2+1.2asdfj', '1.5wer4.2j'], complex)
 
     #---------------------------------------------------------------------------
 
@@ -389,11 +393,15 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
 
-    def test_iterable_str_to_array_1d_dt64_2(self) -> None:
+    def test_iterable_str_to_array_1d_dt64_3(self) -> None:
         a1 = iterable_str_to_array_1d(['2020-01-01', '2020-02-01'], np.datetime64)
         self.assertEqual(a1.dtype, np.dtype('<M8[D]'))
         self.assertFalse(a1.flags.writeable)
         self.assertEqual(a1.tolist(), [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)])
+
+    def test_iterable_str_to_array_1d_dt64_4(self) -> None:
+        with self.assertRaises(ValueError):
+            _ = iterable_str_to_array_1d(['202.30', '202.20'], 'datetime64[D]')
 
     #---------------------------------------------------------------------------
 
