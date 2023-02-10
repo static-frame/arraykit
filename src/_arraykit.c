@@ -1924,7 +1924,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     return array;
 }
 
-// If we cannot directly convert bytes to values in a pre-loadsed array, we can create a bytes or unicode array and then use PyArray_CastToType to use numpy to interpret it as a new a array and handle conversions. Note that we can use bytes for a smaller memory load if we are confident that the values are not unicode. This is a safe assumption for complext. Fore datetim64, we have to use Unicode to get errors on malformed inputs: using bytes causes a seg fault with these interfaces (the same is not observed with astyping a byte array in Python).
+// If we cannot directly convert bytes to values in a pre-loaded array, we can create a bytes or unicode array and then use PyArray_CastToType to use numpy to interpret it as a new a array and handle conversions. Note that we can use bytes for a smaller memory load if we are confident that the values are not unicode. This is a safe assumption for complex. For datetime64, we have to use Unicode to get errors on malformed inputs: using bytes causes a seg fault with these interfaces (the same is not observed with astyping a byte array in Python).
 static inline PyObject*
 AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
         PyArray_Descr* dtype,
@@ -1944,6 +1944,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
     else if (type_inter == NPY_UNICODE) {
         array_inter = AK_CPL_to_array_unicode(cpl, dtype_inter);
     }
+    // else array_inter is NULL and we exit without an exception set
 
     if (array_inter == NULL) {
         Py_DECREF(dtype); // dtype_inter ref already stolen
