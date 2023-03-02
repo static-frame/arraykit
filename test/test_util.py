@@ -659,7 +659,6 @@ class TestUnit(unittest.TestCase):
     def test_first_true_2d_h(self) -> None:
         # force fortran ordering, non-contiguous, non-owned
         a1 = np.isin(np.arange(15), (1, 4, 5, 7, 8, 12, 15)).reshape(3, 5).T[:4]
-        import ipdb; ipdb.set_trace()
         self.assertEqual(first_true_2d(a1, axis=0, forward=True).tolist(),
                 [1, 0, 2])
         self.assertEqual(first_true_2d(a1, axis=0, forward=False).tolist(),
