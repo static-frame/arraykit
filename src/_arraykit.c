@@ -3461,21 +3461,40 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
         return NULL;
     }
+    if (axis < 0 || axis > 1) {
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
+        return NULL;
+    }
     // might take F_CONTIGUOUS?
     if (!PyArray_IS_C_CONTIGUOUS(array)) {
         PyErr_SetString(PyExc_ValueError, "Array must be C continguous");
         return NULL;
     }
-    if (axis < 0 || axis > 1) {
-        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
-        return NULL;
+
+    // create pointer to "indicator" array; if newly allocated, it will need to be decrefed before function termination
+    PyArrayObject *array_ind = NULL;
+    bool decref_array_ind = false;
+
+    if (axis == 0) {
+        // execute a Transposition, then copy into contiguous array
+        PyArrayObject *tmp = (PyArrayObject *)PyArray_Transpose(array, NULL);
+        if (tmp == NULL) return NULL;
+
+        array_ind = (PyArrayObject *)PyArray_NewCopy(tmp, NPY_CORDER);
+        Py_DECREF((PyObject*)tmp);
+
+        if (array_ind == NULL) return NULL;
+        decref_array_ind = true;
+    }
+    else {
+        array_ind = array; // can use array, no decref needed
     }
 
-    // buffer if indicators
-    npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array);
+    // buffer of indicators
+    npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array_ind);
 
-    npy_intp count_row = PyArray_DIM(array, 0);
-    npy_intp count_col = PyArray_DIM(array, 1);
+    npy_intp count_row = PyArray_DIM(array_ind, 0);
+    npy_intp count_col = PyArray_DIM(array_ind, 1);
 
     ldiv_t div_col = ldiv(count_col, 4); // quot, rem
 
@@ -3504,15 +3523,18 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     // TODO: implement axis 0
     // for argmax, axis = 1 returns the max per row
     // axis = 0 returns the max per col
-    // axis 1 implementation
+
+    // for axis 1 rows are rows; for axis 0, rows are (post transpose) columns
     for (npy_intp r = 0; r < count_row; r++) {
         position = -1; // update for each row
 
         if (forward) {
+            // get start of each row
             p_start = buffer_ind + (count_col * r);
             p = p_start;
-            p_end = p + count_col;
+            p_end = p + count_col; // end of each row
 
+            // scan each row from the front and terminate when True
             // remove from the end the remainder
             while (p < p_end - div_col.rem) {
                 if (*p) break;
@@ -3533,7 +3555,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             }
         }
         else {
-            // start at the next row, then subtract one
+            // start at the next row, then subtract one for last elem in previous row
             p_start = buffer_ind + (count_col * (r + 1)) - 1;
             p = p_start;
             // end is 1 less than start of each row
@@ -3562,6 +3584,9 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     NPY_END_THREADS;
 
+    if (decref_array_ind) {
+        Py_DECREF(array_ind); // created in this function
+    }
     return (PyObject *)array_pos;
 }
 

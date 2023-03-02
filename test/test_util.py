@@ -538,12 +538,12 @@ class TestUnit(unittest.TestCase):
     def test_first_true_2d_a(self) -> None:
         a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
 
-        post1 = first_true_2d(a1, forward=True)
+        post1 = first_true_2d(a1, axis=1, forward=True)
         # NOTE: this is an axis 1 result by argmax
         self.assertEqual(post1.tolist(),
                 [9, 18, -1, 8, 16]
                 )
-        post2 = first_true_2d(a1, forward=False)
+        post2 = first_true_2d(a1, axis=1, forward=False)
         # NOTE: this is an axis 1 result by argmax
         self.assertEqual(post2.tolist(),
                 [19, 18, -1, 8, 16]
@@ -552,47 +552,75 @@ class TestUnit(unittest.TestCase):
     def test_first_true_2d_b(self) -> None:
         a1 = np.isin(np.arange(20), (3, 7, 10, 15, 18)).reshape(5, 4)
 
-        post1 = first_true_2d(a1, forward=False)
+        post1 = first_true_2d(a1, axis=1, forward=False)
         self.assertEqual(post1.tolist(),
                 [3, 3, 2, 3, 2]
                 )
-        post2 = first_true_2d(a1, forward=True)
+        post2 = first_true_2d(a1, axis=1, forward=True)
         self.assertEqual(post2.tolist(),
                 [3, 3, 2, 3, 2]
+                )
+
+        post3 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post3.tolist(),
+                [-1, -1, 4, 3]
+                )
+        post4 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post4.tolist(),
+                [-1, -1, 2, 0]
                 )
 
     def test_first_true_2d_c(self) -> None:
         a1 = np.isin(np.arange(20), ()).reshape(5, 4)
 
-        post1 = first_true_2d(a1, forward=False)
+        post1 = first_true_2d(a1, axis=1, forward=False)
         self.assertEqual(post1.tolist(),
                 [-1, -1, -1, -1, -1]
                 )
-        post2 = first_true_2d(a1, forward=True)
+        post2 = first_true_2d(a1, axis=1, forward=True)
         self.assertEqual(post2.tolist(),
                 [-1, -1, -1, -1, -1]
                 )
+
+        post3 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post3.tolist(),
+                [-1, -1, -1, -1]
+                )
+        post4 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post4.tolist(),
+                [-1, -1, -1, -1]
+                )
+
 
     def test_first_true_2d_d(self) -> None:
         a1 = np.isin(np.arange(20), (0, 3, 4, 7, 8, 11, 12, 15, 16, 19)).reshape(5, 4)
 
-        post1 = first_true_2d(a1, forward=False)
+        post1 = first_true_2d(a1, axis=1, forward=False)
         self.assertEqual(post1.tolist(),
                 [3, 3, 3, 3, 3]
                 )
-        post2 = first_true_2d(a1, forward=True)
+        post2 = first_true_2d(a1, axis=1, forward=True)
         self.assertEqual(post2.tolist(),
                 [0, 0, 0, 0, 0]
+                )
+
+        post3 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post3.tolist(),
+                [0, -1, -1, 0]
+                )
+        post4 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post4.tolist(),
+                [4, -1, -1, 4]
                 )
 
     def test_first_true_2d_e(self) -> None:
         a1 = np.isin(np.arange(15), (2, 7, 12)).reshape(3, 5)
 
-        post1 = first_true_2d(a1, forward=False)
+        post1 = first_true_2d(a1, axis=1, forward=False)
         self.assertEqual(post1.tolist(),
                 [2, 2, 2]
                 )
-        post2 = first_true_2d(a1, forward=True)
+        post2 = first_true_2d(a1, axis=1, forward=True)
         self.assertEqual(post2.tolist(),
                 [2, 2, 2]
                 )
@@ -606,6 +634,14 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             post1 = first_true_2d(a1, axis=2)
 
+
+    def test_first_true_2d_f(self) -> None:
+        a1 = np.isin(np.arange(15), (1, 7, 14)).reshape(3, 5)
+        post1 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post1.tolist(), [-1, 0, 1, -1, 2])
+
+        post2 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post2.tolist(), [-1, 0, 1, -1, 2])
 
 
 
