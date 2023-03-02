@@ -644,6 +644,35 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post2.tolist(), [-1, 0, 1, -1, 2])
 
 
+    def test_first_true_2d_g(self) -> None:
+        a1 = np.isin(np.arange(15), (1, 7, 14)).reshape(3, 5).T # force fortran ordering
+        self.assertEqual(first_true_2d(a1, axis=0, forward=True).tolist(),
+                [1, 2, 4])
+        self.assertEqual(first_true_2d(a1, axis=0, forward=False).tolist(),
+                [1, 2, 4])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=True).tolist(),
+                [-1, 0, 1, -1, 2])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
+                [-1, 0, 1, -1, 2])
+
+
+    def test_first_true_2d_h(self) -> None:
+        # force fortran ordering, non-contiguous, non-owned
+        a1 = np.isin(np.arange(15), (1, 4, 5, 7, 8, 12, 15)).reshape(3, 5).T[:4]
+        import ipdb; ipdb.set_trace()
+        self.assertEqual(first_true_2d(a1, axis=0, forward=True).tolist(),
+                [1, 0, 2])
+        self.assertEqual(first_true_2d(a1, axis=0, forward=False).tolist(),
+                [1, 3, 2])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=True).tolist(),
+                [1, 0, 1, 1])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
+                [1, 0, 2, 1])
+
+
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

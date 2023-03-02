@@ -3467,7 +3467,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     // axis = 0 returns the pos per col
-    // axis = 1 returns the pos per row, or contiguous bytes by row
+    // axis = 1 returns the pos per row (as contiguous bytes)
     // if c contiguous:
     //      axis == 0: transpose, copy to C
     //      axis == 1: keep
