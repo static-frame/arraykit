@@ -3471,6 +3471,22 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+/*
+    axis = 0 returns the pos per col
+    axis = 1 returns the pos per row, or contiguous bytes by row
+
+    if c contiguous:
+         axis == 0: transpose, copy to C
+         axis == 1: keep
+    if f contiguous:
+         axis == 0: transpose, keep
+         axis == 1: copy to C
+    else
+        axis == 0: transpose, copy to C
+        axis == 1: copy to C
+*/
+    bool transpose = (axis == 0) ? false : true;
+
     // create pointer to "indicator" array; if newly allocated, it will need to be decrefed before function termination
     PyArrayObject *array_ind = NULL;
     bool decref_array_ind = false;
@@ -3519,11 +3535,6 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_bool *p_end;
 
     // iterate one row at a time; short-circult when found
-
-    // TODO: implement axis 0
-    // for argmax, axis = 1 returns the max per row
-    // axis = 0 returns the max per col
-
     // for axis 1 rows are rows; for axis 0, rows are (post transpose) columns
     for (npy_intp r = 0; r < count_row; r++) {
         position = -1; // update for each row
