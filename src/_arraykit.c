@@ -3465,40 +3465,45 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
         return NULL;
     }
-    // might take F_CONTIGUOUS?
-    if (!PyArray_IS_C_CONTIGUOUS(array)) {
-        PyErr_SetString(PyExc_ValueError, "Array must be C continguous");
-        return NULL;
+
+    // axis = 0 returns the pos per col
+    // axis = 1 returns the pos per row, or contiguous bytes by row
+    // if c contiguous:
+    //      axis == 0: transpose, copy to C
+    //      axis == 1: keep
+    // if f contiguous:
+    //      axis == 0: transpose, keep
+    //      axis == 1: copy to C
+    // else
+    //     axis == 0: transpose, copy to C
+    //     axis == 1: copy to C
+
+    bool transpose = !axis; // if 1, false
+    bool corder = true;
+    if ((PyArray_IS_C_CONTIGUOUS(array) && axis == 1) ||
+        (PyArray_IS_F_CONTIGUOUS(array) && axis == 0)) {
+        corder = false;
     }
-
-/*
-    axis = 0 returns the pos per col
-    axis = 1 returns the pos per row, or contiguous bytes by row
-
-    if c contiguous:
-         axis == 0: transpose, copy to C
-         axis == 1: keep
-    if f contiguous:
-         axis == 0: transpose, keep
-         axis == 1: copy to C
-    else
-        axis == 0: transpose, copy to C
-        axis == 1: copy to C
-*/
-    bool transpose = (axis == 0) ? false : true;
-
     // create pointer to "indicator" array; if newly allocated, it will need to be decrefed before function termination
     PyArrayObject *array_ind = NULL;
     bool decref_array_ind = false;
 
-    if (axis == 0) {
-        // execute a Transposition, then copy into contiguous array
+    if (transpose && !corder) {
+        array_ind = (PyArrayObject *)PyArray_Transpose(array, NULL);
+        if (array_ind == NULL) return NULL;
+        decref_array_ind = true;
+    }
+    else if (!transpose && corder) {
+        array_ind = (PyArrayObject *)PyArray_NewCopy(array, NPY_CORDER);
+        if (array_ind == NULL) return NULL;
+        decref_array_ind = true;
+    }
+    else if (transpose && corder) {
         PyArrayObject *tmp = (PyArrayObject *)PyArray_Transpose(array, NULL);
         if (tmp == NULL) return NULL;
 
         array_ind = (PyArrayObject *)PyArray_NewCopy(tmp, NPY_CORDER);
         Py_DECREF((PyObject*)tmp);
-
         if (array_ind == NULL) return NULL;
         decref_array_ind = true;
     }
