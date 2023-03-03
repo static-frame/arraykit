@@ -3454,7 +3454,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
     if (PyArray_NDIM(array) != 2) {
-        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        PyErr_SetString(PyExc_ValueError, "Array must be 2-dimensional");
         return NULL;
     }
     if (PyArray_TYPE(array) != NPY_BOOL) {
