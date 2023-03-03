@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.3.0
+------------
+
+Added ``first_true_1d()``, ``first_true_2d()``. Added tools for performance graphing.
+
+
 0.2.9
 ------------
 
