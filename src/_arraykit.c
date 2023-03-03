@@ -3466,6 +3466,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    // NOTE: we copy the entire array into contiguous memory when necessary.
     // axis = 0 returns the pos per col
     // axis = 1 returns the pos per row (as contiguous bytes)
     // if c contiguous:
