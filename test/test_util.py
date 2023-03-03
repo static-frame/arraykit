@@ -20,6 +20,8 @@ from arraykit import isna_element
 from arraykit import dtype_from_element
 from arraykit import split_after_count
 from arraykit import count_iteration
+from arraykit import first_true_1d
+from arraykit import first_true_2d
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -480,6 +482,213 @@ class TestUnit(unittest.TestCase):
         s1 = StringIO(',1,a,b\n-,1,43,54\nX,2,1,3\nY,1,8,10\n-,2,6,20')
         post = count_iteration(s1)
         self.assertEqual(post, 5)
+
+    #---------------------------------------------------------------------------
+    def test_first_true_1d_a(self) -> None:
+        a1 = np.arange(100) == 50
+        post = first_true_1d(a1, forward=True)
+        self.assertEqual(post, 50)
+
+    def test_first_true_1d_b(self) -> None:
+        with self.assertRaises(TypeError):
+            a1 = [2, 4, 5,]
+            first_true_1d(a1, forward=True)
+
+    def test_first_true_1d_c(self) -> None:
+        with self.assertRaises(ValueError):
+            a1 = np.arange(100) == 50
+            first_true_1d(a1, forward=a1)
+
+    def test_first_true_1d_d(self) -> None:
+        a1 = np.arange(100) < 0
+        post = first_true_1d(a1, forward=True)
+        self.assertEqual(post, -1)
+
+    def test_first_true_1d_e(self) -> None:
+        a1 = np.arange(100)
+        # only a Boolean array
+        with self.assertRaises(ValueError):
+            post = first_true_1d(a1, forward=True)
+
+    def test_first_true_1d_f(self) -> None:
+        a1 = (np.arange(100) == 0)[:50:2]
+        # only a contiguous array
+        with self.assertRaises(ValueError):
+            post = first_true_1d(a1, forward=True)
+
+    def test_first_true_1d_g(self) -> None:
+        a1 = (np.arange(100) == 0).reshape(10, 10)
+        # only a contiguous array
+        with self.assertRaises(ValueError):
+            post = first_true_1d(a1, forward=True)
+
+    def test_first_true_1d_reverse_a(self) -> None:
+        a1 = np.arange(100) == 50
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, 50)
+
+    def test_first_true_1d_reverse_b(self) -> None:
+        a1 = np.arange(100) == 0
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, 0)
+
+    def test_first_true_1d_reverse_c(self) -> None:
+        a1 = np.arange(100) == -1
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, -1)
+
+    def test_first_true_1d_reverse_d(self) -> None:
+        a1 = np.arange(100) == 99
+        post = first_true_1d(a1, forward=False)
+        self.assertEqual(post, 99)
+
+    def test_first_true_1d_multi_a(self) -> None:
+        a1 = np.isin(np.arange(100), (50, 70, 90))
+        self.assertEqual(first_true_1d(a1, forward=True), 50)
+        self.assertEqual(first_true_1d(a1, forward=False), 90)
+
+    def test_first_true_1d_multi_b(self) -> None:
+        a1 = np.isin(np.arange(100), (10, 30, 50))
+        self.assertEqual(first_true_1d(a1, forward=True), 10)
+        self.assertEqual(first_true_1d(a1, forward=False), 50)
+
+
+    #---------------------------------------------------------------------------
+    def test_first_true_2d_a(self) -> None:
+        a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
+
+        post1 = first_true_2d(a1, axis=1, forward=True)
+        # NOTE: this is an axis 1 result by argmax
+        self.assertEqual(post1.tolist(),
+                [9, 18, -1, 8, 16]
+                )
+        post2 = first_true_2d(a1, axis=1, forward=False)
+        # NOTE: this is an axis 1 result by argmax
+        self.assertEqual(post2.tolist(),
+                [19, 18, -1, 8, 16]
+                )
+
+    def test_first_true_2d_b(self) -> None:
+        a1 = np.isin(np.arange(20), (3, 7, 10, 15, 18)).reshape(5, 4)
+
+        post1 = first_true_2d(a1, axis=1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [3, 3, 2, 3, 2]
+                )
+        post2 = first_true_2d(a1, axis=1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [3, 3, 2, 3, 2]
+                )
+
+        post3 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post3.tolist(),
+                [-1, -1, 4, 3]
+                )
+        post4 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post4.tolist(),
+                [-1, -1, 2, 0]
+                )
+
+    def test_first_true_2d_c(self) -> None:
+        a1 = np.isin(np.arange(20), ()).reshape(5, 4)
+
+        post1 = first_true_2d(a1, axis=1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [-1, -1, -1, -1, -1]
+                )
+        post2 = first_true_2d(a1, axis=1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [-1, -1, -1, -1, -1]
+                )
+
+        post3 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post3.tolist(),
+                [-1, -1, -1, -1]
+                )
+        post4 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post4.tolist(),
+                [-1, -1, -1, -1]
+                )
+
+
+    def test_first_true_2d_d(self) -> None:
+        a1 = np.isin(np.arange(20), (0, 3, 4, 7, 8, 11, 12, 15, 16, 19)).reshape(5, 4)
+
+        post1 = first_true_2d(a1, axis=1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [3, 3, 3, 3, 3]
+                )
+        post2 = first_true_2d(a1, axis=1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [0, 0, 0, 0, 0]
+                )
+
+        post3 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post3.tolist(),
+                [0, -1, -1, 0]
+                )
+        post4 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post4.tolist(),
+                [4, -1, -1, 4]
+                )
+
+    def test_first_true_2d_e(self) -> None:
+        a1 = np.isin(np.arange(15), (2, 7, 12)).reshape(3, 5)
+
+        post1 = first_true_2d(a1, axis=1, forward=False)
+        self.assertEqual(post1.tolist(),
+                [2, 2, 2]
+                )
+        post2 = first_true_2d(a1, axis=1, forward=True)
+        self.assertEqual(post2.tolist(),
+                [2, 2, 2]
+                )
+
+    def test_first_true_2d_f(self) -> None:
+        a1 = np.isin(np.arange(15), (2, 7, 12)).reshape(3, 5)
+
+        with self.assertRaises(ValueError):
+            post1 = first_true_2d(a1, axis=-1)
+
+        with self.assertRaises(ValueError):
+            post1 = first_true_2d(a1, axis=2)
+
+
+    def test_first_true_2d_f(self) -> None:
+        a1 = np.isin(np.arange(15), (1, 7, 14)).reshape(3, 5)
+        post1 = first_true_2d(a1, axis=0, forward=True)
+        self.assertEqual(post1.tolist(), [-1, 0, 1, -1, 2])
+
+        post2 = first_true_2d(a1, axis=0, forward=False)
+        self.assertEqual(post2.tolist(), [-1, 0, 1, -1, 2])
+
+
+    def test_first_true_2d_g(self) -> None:
+        a1 = np.isin(np.arange(15), (1, 7, 14)).reshape(3, 5).T # force fortran ordering
+        self.assertEqual(first_true_2d(a1, axis=0, forward=True).tolist(),
+                [1, 2, 4])
+        self.assertEqual(first_true_2d(a1, axis=0, forward=False).tolist(),
+                [1, 2, 4])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=True).tolist(),
+                [-1, 0, 1, -1, 2])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
+                [-1, 0, 1, -1, 2])
+
+
+    def test_first_true_2d_h(self) -> None:
+        # force fortran ordering, non-contiguous, non-owned
+        a1 = np.isin(np.arange(15), (1, 4, 5, 7, 8, 12, 15)).reshape(3, 5).T[:4]
+        self.assertEqual(first_true_2d(a1, axis=0, forward=True).tolist(),
+                [1, 0, 2])
+        self.assertEqual(first_true_2d(a1, axis=0, forward=False).tolist(),
+                [1, 3, 2])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=True).tolist(),
+                [1, 0, 1, 1])
+        self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
+                [1, 0, 2, 1])
+
+
+
 
 
 

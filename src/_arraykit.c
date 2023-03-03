@@ -2849,7 +2849,7 @@ delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     if ((axis < 0) || (axis > 1)) {
-        PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
         return NULL;
     }
     AK_DelimitedReader *dr = AK_DR_New(file_like,
@@ -3347,6 +3347,280 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
 
 //------------------------------------------------------------------------------
 // general utility
+
+static char *first_true_1d_kwarg_names[] = {
+    "array",
+    "forward",
+    NULL
+};
+
+static PyObject*
+first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *array = NULL;
+    int forward = 1;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!|$p:first_true_1d",
+            first_true_1d_kwarg_names,
+            &PyArray_Type,
+            &array,
+            &forward
+            )) {
+        return NULL;
+    }
+    if (PyArray_NDIM(array) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(array) != NPY_BOOL) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(array)) {
+        PyErr_SetString(PyExc_ValueError, "Array must be continguous");
+        return NULL;
+    }
+
+    npy_intp size = PyArray_SIZE(array);
+    ldiv_t size_div = ldiv(size, 4); // quot, rem
+
+    npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
+    npy_intp position = -1;
+    npy_bool *p;
+    npy_bool *p_end;
+
+    if (forward) {
+        p = array_buffer;
+        p_end = p + size;
+
+        while (p < p_end - size_div.rem) {
+            if (*p) break;
+            p++;
+            if (*p) break;
+            p++;
+            if (*p) break;
+            p++;
+            if (*p) break;
+            p++;
+        }
+        while (p < p_end) {
+            if (*p) break;
+            p++;
+        }
+    }
+    else {
+        p = array_buffer + size - 1;
+        p_end = array_buffer - 1;
+        while (p > p_end + size_div.rem) {
+            if (*p) break;
+            p--;
+            if (*p) break;
+            p--;
+            if (*p) break;
+            p--;
+            if (*p) break;
+            p--;
+        }
+        while (p > p_end) {
+            if (*p) break;
+            p--;
+        }
+    }
+    if (p != p_end) { // else, return -1
+        position = p - array_buffer;
+    }
+    NPY_END_THREADS;
+
+    PyObject* post = PyLong_FromLong(position);
+    return post;
+}
+
+
+static char *first_true_2d_kwarg_names[] = {
+    "array",
+    "forward",
+    "axis",
+    NULL
+};
+
+static PyObject*
+first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *array = NULL;
+    int forward = 1;
+    int axis = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!|$pi:first_true_2d",
+            first_true_2d_kwarg_names,
+            &PyArray_Type,
+            &array,
+            &forward,
+            &axis
+            )) {
+        return NULL;
+    }
+    if (PyArray_NDIM(array) != 2) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 2-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(array) != NPY_BOOL) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
+        return NULL;
+    }
+    if (axis < 0 || axis > 1) {
+        PyErr_SetString(PyExc_ValueError, "Axis must be 0 or 1");
+        return NULL;
+    }
+
+    // NOTE: we copy the entire array into contiguous memory when necessary.
+    // axis = 0 returns the pos per col
+    // axis = 1 returns the pos per row (as contiguous bytes)
+    // if c contiguous:
+    //      axis == 0: transpose, copy to C
+    //      axis == 1: keep
+    // if f contiguous:
+    //      axis == 0: transpose, keep
+    //      axis == 1: copy to C
+    // else
+    //     axis == 0: transpose, copy to C
+    //     axis == 1: copy to C
+
+    bool transpose = !axis; // if 1, false
+    bool corder = true;
+    if ((PyArray_IS_C_CONTIGUOUS(array) && axis == 1) ||
+        (PyArray_IS_F_CONTIGUOUS(array) && axis == 0)) {
+        corder = false;
+    }
+    // create pointer to "indicator" array; if newly allocated, it will need to be decrefed before function termination
+    PyArrayObject *array_ind = NULL;
+    bool decref_array_ind = false;
+
+    if (transpose && !corder) {
+        array_ind = (PyArrayObject *)PyArray_Transpose(array, NULL);
+        if (array_ind == NULL) return NULL;
+        decref_array_ind = true;
+    }
+    else if (!transpose && corder) {
+        array_ind = (PyArrayObject *)PyArray_NewCopy(array, NPY_CORDER);
+        if (array_ind == NULL) return NULL;
+        decref_array_ind = true;
+    }
+    else if (transpose && corder) {
+        PyArrayObject *tmp = (PyArrayObject *)PyArray_Transpose(array, NULL);
+        if (tmp == NULL) return NULL;
+
+        array_ind = (PyArrayObject *)PyArray_NewCopy(tmp, NPY_CORDER);
+        Py_DECREF((PyObject*)tmp);
+        if (array_ind == NULL) return NULL;
+        decref_array_ind = true;
+    }
+    else {
+        array_ind = array; // can use array, no decref needed
+    }
+
+    // buffer of indicators
+    npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array_ind);
+
+    npy_intp count_row = PyArray_DIM(array_ind, 0);
+    npy_intp count_col = PyArray_DIM(array_ind, 1);
+
+    ldiv_t div_col = ldiv(count_col, 4); // quot, rem
+
+    npy_intp dims_post = {count_row};
+    PyArrayObject *array_pos = (PyArrayObject*)PyArray_EMPTY(
+            1,         // ndim
+            &dims_post,// shape
+            NPY_INT64, // dtype
+            0          // fortran
+            );
+    if (array_pos == NULL) {
+        return NULL;
+    }
+    npy_int64 *buffer_pos = (npy_int64*)PyArray_DATA(array_pos);
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
+    npy_intp position;
+    npy_bool *p;
+    npy_bool *p_start;
+    npy_bool *p_end;
+
+    // iterate one row at a time; short-circult when found
+    // for axis 1 rows are rows; for axis 0, rows are (post transpose) columns
+    for (npy_intp r = 0; r < count_row; r++) {
+        position = -1; // update for each row
+
+        if (forward) {
+            // get start of each row
+            p_start = buffer_ind + (count_col * r);
+            p = p_start;
+            p_end = p + count_col; // end of each row
+
+            // scan each row from the front and terminate when True
+            // remove from the end the remainder
+            while (p < p_end - div_col.rem) {
+                if (*p) break;
+                p++;
+                if (*p) break;
+                p++;
+                if (*p) break;
+                p++;
+                if (*p) break;
+                p++;
+            }
+            while (p < p_end) {
+                if (*p) break;
+                p++;
+            }
+            if (p != p_end) { // else, return -1
+                position = p - p_start;
+            }
+        }
+        else {
+            // start at the next row, then subtract one for last elem in previous row
+            p_start = buffer_ind + (count_col * (r + 1)) - 1;
+            p = p_start;
+            // end is 1 less than start of each row
+            p_end = buffer_ind + (count_col * r) - 1;
+
+            while (p > p_end + div_col.rem) {
+                if (*p) break;
+                p--;
+                if (*p) break;
+                p--;
+                if (*p) break;
+                p--;
+                if (*p) break;
+                p--;
+            }
+            while (p > p_end) {
+                if (*p) break;
+                p--;
+            }
+            if (p != p_end) { // else, return -1
+                position = p - (p_end + 1);
+            }
+        }
+        *buffer_pos++ = position;
+    }
+
+    NPY_END_THREADS;
+
+    if (decref_array_ind) {
+        Py_DECREF(array_ind); // created in this function
+    }
+    return (PyObject *)array_pos;
+}
+
+
+
 
 static PyObject *
 dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
@@ -4064,6 +4338,14 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
+    {"first_true_1d",
+            (PyCFunction)first_true_1d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
+    {"first_true_2d",
+            (PyCFunction)first_true_2d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"delimited_to_arrays",
             (PyCFunction)delimited_to_arrays,
             METH_VARARGS | METH_KEYWORDS,
