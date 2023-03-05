@@ -1575,6 +1575,7 @@ static inline PyObject*
 AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc)
 {
     Py_ssize_t count = cpl->offsets_count;
+    ldiv_t count_div = ldiv(count, 4); // quot, rem
     npy_intp dims[] = {count};
 
     // NOTE: empty prefered over zeros
@@ -1607,6 +1608,17 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
     else if (dtype->elsize == 8) {
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
+
+        while (array_buffer < end - count_div.rem) {
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
+            AK_CPL_CurrentAdvance(cpl);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
+            AK_CPL_CurrentAdvance(cpl);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
+            AK_CPL_CurrentAdvance(cpl);
+            *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
+            AK_CPL_CurrentAdvance(cpl);
+        }
         while (array_buffer < end) {
             *array_buffer++ = AK_CPL_current_to_float64(cpl, &error, tsep, decc);
             AK_CPL_CurrentAdvance(cpl);
