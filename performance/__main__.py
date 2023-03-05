@@ -51,12 +51,12 @@ from arraykit import ArrayGO as ArrayGOAK
 
 class Perf:
     FUNCTIONS = ('main',)
-    NUMBER = 500_000
+    NUMBER = 2_000
 
 class FixtureFileLike:
 
-    COUNT_ROW = 100_000
-    COUNT_COLUMN = 500
+    COUNT_ROW = 2_000
+    COUNT_COLUMN = 2_000
     NUMBER = 1
 
     def __init__(self):
