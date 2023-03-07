@@ -51,13 +51,12 @@ from arraykit import ArrayGO as ArrayGOAK
 
 class Perf:
     FUNCTIONS = ('main',)
-    NUMBER = 500_000
+    NUMBER = 10
 
 class FixtureFileLike:
 
-    COUNT_ROW = 100_000
-    COUNT_COLUMN = 500
-    NUMBER = 1
+    COUNT_ROW = 1_000_000
+    COUNT_COLUMN = 10
 
     def __init__(self):
         records_int = [','.join(str(x) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW

@@ -1465,11 +1465,11 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 
 //------------------------------------------------------------------------------
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
-static inline bool
+static inline npy_int8
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     // must have at least 4 characters
     if (cpl->offsets[cpl->offsets_current_index] < 4) {
-        return false;
+        return 0;
     }
     Py_UCS4 *p = cpl->buffer_current_ptr;
     Py_UCS4 *end = p + 4; // we must have at least 4 characters for True
@@ -1484,10 +1484,10 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
             ++i;
         }
         else {
-            return false;
+            return 0;
         }
     }
-    return true; //matched all characters
+    return 1; //matched all characters
 }
 
 // NOTE: using PyOS_strtol was an alternative, but needed to be passed a null-terminated char, which would require copying the data out of the CPL. This approach reads directly from the CPL without copying.
