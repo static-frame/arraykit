@@ -86,6 +86,10 @@ Extended arguments to and functionality in ``split_after_count()`` to support th
 
 Now building wheels for 3.11.
 
+0.1.12
+............
+
+Implemented ``is_sorted``.
 
 0.2.2
 ............

@@ -4058,6 +4058,185 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
 }
 
+# define AK_IS_SORTED_SIMPLE(npy_type, ctype) \
+    if (np_dtype == npy_type) { \
+        NPY_BEGIN_THREADS_DEF; \
+        NPY_BEGIN_THREADS; \
+        do { \
+            char* data = *dataptr; \
+            npy_intp stride = *strideptr; \
+            npy_intp inner_size = *innersizeptr;\
+            ctype prev = *((ctype *)data); \
+            data += stride; \
+            inner_size--; \
+            while (inner_size--) { \
+                ctype element = *((ctype *)data); \
+                if (element < prev) { \
+                    NPY_END_THREADS; \
+                    goto fail; \
+                } \
+                prev = element; \
+                data += stride; \
+            } \
+        } while(arr_iternext(arr_iter)); \
+        NPY_END_THREADS; \
+    } \
+
+# define AK_IS_SORTED_COMPLEX(npy_type, ctype) \
+    if (np_dtype == npy_type) { \
+        NPY_BEGIN_THREADS_DEF; \
+        NPY_BEGIN_THREADS; \
+        do { \
+            char* data = *dataptr; \
+            npy_intp stride = *strideptr; \
+            npy_intp inner_size = *innersizeptr;\
+            ctype prev = *((ctype *)data); \
+            data += stride; \
+            inner_size--; \
+            while (inner_size--) { \
+                ctype element = *((ctype *)data); \
+                if (element.real < prev.real || element.imag < prev.imag) { \
+                    NPY_END_THREADS; \
+                    goto fail; \
+                } \
+                prev = element; \
+                data += stride; \
+            } \
+        } while(arr_iternext(arr_iter)); \
+        NPY_END_THREADS; \
+    } \
+
+static bool
+AK_is_sorted_string(NpyIter_IterNextFunc *arr_iternext, NpyIter *arr_iter, char **dataptr, npy_intp *strideptr, npy_intp *innersizeptr)
+{
+    int maxlen = NpyIter_GetDescrArray(arr_iter)[0]->elsize;
+    char *prev = PyArray_malloc(maxlen+1);
+    if (prev == NULL) {
+        NpyIter_Deallocate(arr_iter);
+        PyErr_NoMemory();
+        return NULL;
+    }
+
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
+    do {
+        char* data = *dataptr;
+        npy_intp stride = *strideptr;
+        npy_intp inner_size = *innersizeptr;
+
+        memcpy(prev, data, maxlen);
+        data += stride;
+        inner_size--;
+        while (inner_size--) {
+            if (strncmp(data, prev, maxlen) < 0) {
+                NPY_END_THREADS
+                return false;
+            }
+            memcpy(prev, data, maxlen);
+            data += stride;
+        }
+    } while(arr_iternext(arr_iter));
+
+    NPY_END_THREADS
+    return true;
+}
+
+
+static PyObject *
+is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    PyArrayObject *arr = (PyArrayObject*)arg;
+    int np_dtype = PyArray_TYPE(arr);
+
+    // Now, implement the core algorithm by looping over the ``arr``.
+    // We need to use numpy's iteration API, as the ``arr`` could be
+    // C-contiguous, F-contiguous, both, or neither.
+    // See https://numpy.org/doc/stable/reference/c-api/iterator.html#simple-iteration-example
+    NpyIter *arr_iter = NpyIter_New(
+            arr,                                                           // array
+            NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK, // iter flags
+            NPY_CORDER,                                                    // order
+            NPY_NO_CASTING,                                                // casting
+            NULL                                                           // dtype
+            );
+    if (arr_iter == NULL) {
+        return NULL;
+    }
+
+    // The iternext function gets stored in a local variable so it can be called repeatedly in an efficient manner.
+    NpyIter_IterNextFunc *arr_iternext = NpyIter_GetIterNext(arr_iter, NULL);
+    if (arr_iternext == NULL) {
+        NpyIter_Deallocate(arr_iter);
+        return NULL;
+    }
+
+    // All of these will be updated by the iterator
+    char **dataptr = NpyIter_GetDataPtrArray(arr_iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(arr_iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(arr_iter);
+
+    // ------------------------------------------------------------------------
+    AK_IS_SORTED_SIMPLE(NPY_BYTE, npy_byte)
+    else AK_IS_SORTED_SIMPLE(NPY_UBYTE, npy_ubyte)
+    else AK_IS_SORTED_SIMPLE(NPY_SHORT, npy_short)
+    else AK_IS_SORTED_SIMPLE(NPY_USHORT, npy_ushort)
+    else AK_IS_SORTED_SIMPLE(NPY_INT, npy_int)
+    else AK_IS_SORTED_SIMPLE(NPY_UINT, npy_uint)
+    else AK_IS_SORTED_SIMPLE(NPY_LONG, npy_long)
+    else AK_IS_SORTED_SIMPLE(NPY_ULONG, npy_ulong)
+    else AK_IS_SORTED_SIMPLE(NPY_LONGLONG, npy_longlong)
+    else AK_IS_SORTED_SIMPLE(NPY_ULONGLONG, npy_ulonglong)
+    else AK_IS_SORTED_SIMPLE(NPY_FLOAT, npy_float)
+    else AK_IS_SORTED_SIMPLE(NPY_DOUBLE, npy_double)
+    else AK_IS_SORTED_SIMPLE(NPY_LONGDOUBLE, npy_longdouble)
+    else AK_IS_SORTED_SIMPLE(NPY_DATETIME, npy_datetime)
+    else AK_IS_SORTED_SIMPLE(NPY_TIMEDELTA, npy_timedelta)
+    else AK_IS_SORTED_SIMPLE(NPY_HALF, npy_half)
+    // ------------------------------------------------------------------------
+    else AK_IS_SORTED_COMPLEX(NPY_CFLOAT, npy_complex64)
+    else AK_IS_SORTED_COMPLEX(NPY_CDOUBLE, npy_complex128)
+    else AK_IS_SORTED_COMPLEX(NPY_CLONGDOUBLE, npy_complex256)
+    // ------------------------------------------------------------------------
+    else if (np_dtype == NPY_STRING || np_dtype == NPY_UNICODE) {
+        if (!AK_is_sorted_string(arr_iternext, arr_iter, dataptr, strideptr, innersizeptr)) {
+            goto fail;
+        }
+    }
+    // ------------------------------------------------------------------------
+    // perf is not good here - maybe drop support?
+    else if (np_dtype == NPY_OBJECT) {
+        do {
+            char* data = *dataptr;
+            npy_intp stride = *strideptr;
+            npy_intp inner_size = *innersizeptr;
+
+            PyObject* prev = *((PyObject **)data);
+            data += stride;
+            inner_size--;
+            while (inner_size--) {
+                PyObject* element = *((PyObject **)data);
+                if (PyObject_RichCompareBool(element, prev, Py_LT) == 1) {
+                    goto fail;
+                }
+                prev = element;
+                data += stride;
+            }
+        } while(arr_iternext(arr_iter));
+    }
+    else {
+        PyErr_SetString(PyExc_NotImplementedError, "not support for this dtype");
+        return NULL;
+    }
+
+    NpyIter_Deallocate(arr_iter);
+    Py_RETURN_TRUE;
+
+fail:
+    NpyIter_Deallocate(arr_iter);
+    Py_RETURN_FALSE;
+}
+
 //------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
@@ -4364,6 +4543,7 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"is_sorted", is_sorted, METH_O, NULL},
     {"get_new_indexers_and_screen",
             (PyCFunction)get_new_indexers_and_screen,
             METH_VARARGS | METH_KEYWORDS,
