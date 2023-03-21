@@ -4058,25 +4058,33 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
 }
 
-# define AK_IS_SORTED_SIMPLE(ctype) \
-    ctype* data_##ctype##_ = (ctype*)PyArray_DATA(arr);     \
-    for (size_t i = 0; i < size - 1; ++i) {          \
-        if (data_##ctype##_[i] > data_##ctype##_[i + 1]) {         \
-            Py_RETURN_FALSE;                         \
-        }                                            \
-    }                                                \
-    Py_RETURN_TRUE;                                  \
+//------------------------------------------------------------------------------
 
-# define AK_IS_SORTED_COMPLEX(ctype)               \
-    ctype* data_##ctype##_ = (ctype*)PyArray_DATA(arr);                    \
-    for (size_t i = 0; i < size - 1; ++i) {                         \
-        ctype element = data_##ctype##_[i];                                \
-        ctype next = data_##ctype##_[i + 1];                               \
-        if (element.real > next.real || element.imag > next.imag) { \
-            Py_RETURN_FALSE;                                        \
-        }                                                           \
-    }                                                               \
-    Py_RETURN_TRUE;                                                 \
+# define AK_COMPARE_SIMPLE(a, b) a > b
+# define AK_COMPARE_COMPLEX(a, b) a.real > b.real || (a.real == b.real && a.imag > b.imag)
+
+# define AK_IS_SORTED(ctype, comp_macro)                        \
+    if (contiguous) {                                           \
+        ctype* data_##ctype##_ = (ctype*)PyArray_DATA(arr);     \
+        for (size_t i = 0; i < size - 1; ++i) {                 \
+            ctype element = data_##ctype##_[i];                 \
+            ctype next = data_##ctype##_[i + 1];                \
+            if (comp_macro(element, next)) {                    \
+                Py_RETURN_FALSE;                                \
+            }                                                   \
+        }                                                       \
+    }                                                           \
+    else {                                                      \
+        for (size_t i = 0; i < size - 1; ++i) {                 \
+            ctype element = *(ctype*)PyArray_GETPTR1(arr, i);   \
+            ctype next = *(ctype*)PyArray_GETPTR1(arr, i + 1);  \
+            if (comp_macro(element, next)) {                    \
+                Py_RETURN_FALSE;                                \
+            }                                                   \
+        }                                                       \
+    }                                                           \
+    Py_RETURN_TRUE;                                             \
+
 
 // static bool
 // AK_is_sorted_string(NpyIter_IterNextFunc *arr_iternext, NpyIter *arr_iter, char **dataptr, npy_intp *strideptr, npy_intp *innersizeptr)
@@ -4128,7 +4136,7 @@ is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
     //     return NULL;
     // }
 
-    // int contiguous = PyArray_IS_C_CONTIGUOUS(arr);
+    int contiguous = PyArray_IS_C_CONTIGUOUS(arr);
     size_t size = (size_t)PyArray_SIZE(arr);
 
     // ------------------------------------------------------------------------
@@ -4136,46 +4144,46 @@ is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
     // ------------------------------------------------------------------------
     switch (np_dtype) {
         case NPY_BYTE:;
-            AK_IS_SORTED_SIMPLE(npy_byte)
+            AK_IS_SORTED(npy_byte, AK_COMPARE_SIMPLE)
         case NPY_UBYTE:;
-            AK_IS_SORTED_SIMPLE(npy_ubyte)
+            AK_IS_SORTED(npy_ubyte, AK_COMPARE_SIMPLE)
         case NPY_SHORT:;
-            AK_IS_SORTED_SIMPLE(npy_short)
+            AK_IS_SORTED(npy_short, AK_COMPARE_SIMPLE)
         case NPY_USHORT:;
-            AK_IS_SORTED_SIMPLE(npy_ushort)
+            AK_IS_SORTED(npy_ushort, AK_COMPARE_SIMPLE)
         case NPY_INT:;
-            AK_IS_SORTED_SIMPLE(npy_int)
+            AK_IS_SORTED(npy_int, AK_COMPARE_SIMPLE)
         case NPY_UINT:;
-            AK_IS_SORTED_SIMPLE(npy_uint)
+            AK_IS_SORTED(npy_uint, AK_COMPARE_SIMPLE)
         case NPY_LONG:;
-            AK_IS_SORTED_SIMPLE(npy_long)
+            AK_IS_SORTED(npy_long, AK_COMPARE_SIMPLE)
         case NPY_ULONG:;
-            AK_IS_SORTED_SIMPLE(npy_ulong)
+            AK_IS_SORTED(npy_ulong, AK_COMPARE_SIMPLE)
         case NPY_LONGLONG:;
-            AK_IS_SORTED_SIMPLE(npy_longlong)
+            AK_IS_SORTED(npy_longlong, AK_COMPARE_SIMPLE)
         case NPY_ULONGLONG:;
-            AK_IS_SORTED_SIMPLE(npy_ulonglong)
+            AK_IS_SORTED(npy_ulonglong, AK_COMPARE_SIMPLE)
         case NPY_FLOAT:;
-            AK_IS_SORTED_SIMPLE(npy_float)
+            AK_IS_SORTED(npy_float, AK_COMPARE_SIMPLE)
         case NPY_DOUBLE:;
-            AK_IS_SORTED_SIMPLE(npy_double)
+            AK_IS_SORTED(npy_double, AK_COMPARE_SIMPLE)
         # ifdef PyFloat128ArrType_Type
         case NPY_LONGDOUBLE:;
-            AK_IS_SORTED_SIMPLE(npy_longdouble)
+            AK_IS_SORTED(npy_longdouble, AK_COMPARE_SIMPLE)
         # endif
         case NPY_DATETIME:;
-            AK_IS_SORTED_SIMPLE(npy_datetime)
+            AK_IS_SORTED(npy_datetime, AK_COMPARE_SIMPLE)
         case NPY_TIMEDELTA:;
-            AK_IS_SORTED_SIMPLE(npy_timedelta)
+            AK_IS_SORTED(npy_timedelta, AK_COMPARE_SIMPLE)
         case NPY_HALF:;
-            AK_IS_SORTED_SIMPLE(npy_half)
+            AK_IS_SORTED(npy_half, AK_COMPARE_SIMPLE)
         case NPY_CFLOAT:;
-            AK_IS_SORTED_COMPLEX(npy_complex64)
+            AK_IS_SORTED(npy_complex64, AK_COMPARE_COMPLEX)
         case NPY_CDOUBLE:;
-            AK_IS_SORTED_COMPLEX(npy_complex128)
+            AK_IS_SORTED(npy_complex128, AK_COMPARE_COMPLEX)
         # ifdef PyComplex256ArrType_Type
         case NPY_CLONGDOUBLE:;
-            AK_IS_SORTED_COMPLEX(npy_complex256)
+            AK_IS_SORTED(npy_complex256, AK_COMPARE_COMPLEX)
         # endif
         // case NPY_STRING:
         // case NPY_UNICODE:
