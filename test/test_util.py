@@ -679,8 +679,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
                 [1, 0, 2, 1])
 
-    def test_is_sorted_success(self) -> None:
-        arr_non_contiguous = np.arange(25).reshape(5,5)[:, 3]
+    def test_is_sorted_a(self) -> None:
+        arr_non_contiguous = np.arange(25).reshape(5,5)[:, 0]
         arr_contiguous = arr_non_contiguous.copy()
 
         assert not arr_non_contiguous.flags.c_contiguous
@@ -709,8 +709,18 @@ class TestUnit(unittest.TestCase):
             "S",
         ]
         for dtype in dtypes:
-            self.assertTrue(is_sorted(arr_contiguous.astype(dtype)), dtype)
-            self.assertTrue(is_sorted(arr_non_contiguous.astype(dtype)), dtype)
+            arr1 = arr_contiguous.astype(dtype)
+            arr2 = arr_non_contiguous.astype(dtype)
+            assert (arr1 == arr2).all()
+
+            assert is_sorted(arr1)
+            assert is_sorted(arr2)
+
+            # Investigate why these report success, but are not sorted
+            if dtype in ("U", "S"):
+                continue
+            assert not is_sorted(arr1[::-1])
+            assert not is_sorted(arr2[::-1])
 
     def test_is_sorted_disallowed_inputs(self) -> None:
         arr_2d = np.arange(25).reshape(5,5)
