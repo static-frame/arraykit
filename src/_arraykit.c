@@ -4063,86 +4063,92 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 # define AK_COMPARE_SIMPLE(a, b) a > b
 # define AK_COMPARE_COMPLEX(a, b) a.real > b.real || (a.real == b.real && a.imag > b.imag)
 
-# define AK_IS_SORTED(ctype, comp_macro)                        \
+# define AK_IS_SORTED(ctype, compare_macro)                     \
     if (contiguous) {                                           \
+        NPY_BEGIN_THREADS_DEF;                                  \
+        NPY_BEGIN_THREADS;                                      \
         ctype* data_##ctype##_ = (ctype*)PyArray_DATA(arr);     \
-        for (size_t i = 0; i < size - 1; ++i) {                 \
+        for (size_t i = 0; i < arr_size - 1; ++i) {             \
             ctype element = data_##ctype##_[i];                 \
             ctype next = data_##ctype##_[i + 1];                \
-            if (comp_macro(element, next)) {                    \
+            if (compare_macro(element, next)) {                 \
+                NPY_END_THREADS;                                \
                 Py_RETURN_FALSE;                                \
             }                                                   \
         }                                                       \
+        NPY_END_THREADS;                                        \
     }                                                           \
     else {                                                      \
-        for (size_t i = 0; i < size - 1; ++i) {                 \
+        NPY_BEGIN_THREADS_DEF;                                  \
+        NPY_BEGIN_THREADS;                                      \
+        for (size_t i = 0; i < arr_size - 1; ++i) {             \
             ctype element = *(ctype*)PyArray_GETPTR1(arr, i);   \
             ctype next = *(ctype*)PyArray_GETPTR1(arr, i + 1);  \
-            if (comp_macro(element, next)) {                    \
+            if (compare_macro(element, next)) {                 \
+                NPY_END_THREADS;                                \
                 Py_RETURN_FALSE;                                \
             }                                                   \
         }                                                       \
+        NPY_END_THREADS;                                        \
     }                                                           \
     Py_RETURN_TRUE;                                             \
 
 
-// static bool
-// AK_is_sorted_string(NpyIter_IterNextFunc *arr_iternext, NpyIter *arr_iter, char **dataptr, npy_intp *strideptr, npy_intp *innersizeptr)
-// {
-//     int maxlen = NpyIter_GetDescrArray(arr_iter)[0]->elsize;
-//     char *prev = PyArray_malloc(maxlen+1);
-//     if (prev == NULL) {
-//         NpyIter_Deallocate(arr_iter);
-//         PyErr_NoMemory();
-//         return NULL;
-//     }
+static bool
+AK_is_sorted_string(PyArrayObject* arr, bool contiguous, size_t arr_size)
+{
+    size_t item_size = (size_t)PyArray_ITEMSIZE(arr);
 
-//     NPY_BEGIN_THREADS_DEF;
-//     NPY_BEGIN_THREADS;
-
-//     do {
-//         char* data = *dataptr;
-//         npy_intp stride = *strideptr;
-//         npy_intp inner_size = *innersizeptr;
-
-//         memcpy(prev, data, maxlen);
-//         data += stride;
-//         inner_size--;
-//         while (inner_size--) {
-//             if (strncmp(data, prev, maxlen) < 0) {
-//                 NPY_END_THREADS
-//                 return false;
-//             }
-//             memcpy(prev, data, maxlen);
-//             data += stride;
-//         }
-//     } while(arr_iternext(arr_iter));
-
-//     NPY_END_THREADS
-//     return true;
-// }
+    if (contiguous) {
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
+        char* data = (char*)PyArray_DATA(arr);
+        size_t i = 0;
+        while (i < (arr_size - 1) * item_size) {
+            if (strncmp(&data[i], &data[i + item_size], item_size) > 0) {
+                NPY_END_THREADS;
+                Py_RETURN_FALSE;
+            }
+            i += item_size;
+        }
+        NPY_END_THREADS;
+    }
+    else {
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
+        size_t i = 0;
+        while (i < (arr_size - 1) * item_size) {
+            char *element = PyArray_GETPTR1(arr, i);
+            char *next = PyArray_GETPTR1(arr, i + 1);
+            if (strncmp(element, next, item_size) > 0) {
+                NPY_END_THREADS;
+                Py_RETURN_FALSE;
+            }
+            i += item_size;
+        }
+        NPY_END_THREADS;
+    }
+    Py_RETURN_TRUE;
+}
 
 
 static PyObject *
 is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
 {
     AK_CHECK_NUMPY_ARRAY(arg);
-
     PyArrayObject *arr = (PyArrayObject*)arg;
-    int np_dtype = PyArray_TYPE(arr);
 
-    // if (PyArray_NDIM(arr) != 1) {
-    //     PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
-    //     return NULL;
-    // }
+    if (PyArray_NDIM(arr) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
 
-    int contiguous = PyArray_IS_C_CONTIGUOUS(arr);
-    size_t size = (size_t)PyArray_SIZE(arr);
+    bool contiguous = (bool)PyArray_IS_C_CONTIGUOUS(arr);
+    size_t arr_size = (size_t)PyArray_SIZE(arr);
 
-    // ------------------------------------------------------------------------
-    // Switch based on np_dtype
-    // ------------------------------------------------------------------------
-    switch (np_dtype) {
+    switch (PyArray_TYPE(arr)) {
+        case NPY_BOOL:;
+            AK_IS_SORTED(npy_bool, AK_COMPARE_SIMPLE)
         case NPY_BYTE:;
             AK_IS_SORTED(npy_byte, AK_COMPARE_SIMPLE)
         case NPY_UBYTE:;
@@ -4185,12 +4191,12 @@ is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
         case NPY_CLONGDOUBLE:;
             AK_IS_SORTED(npy_complex256, AK_COMPARE_COMPLEX)
         # endif
-        // case NPY_STRING:
-        // case NPY_UNICODE:
-        //     if (!AK_is_sorted_string(arr, contiguous)) {
-        //         Py_RETURN_FALSE
-        //     }
-        //     Py_RETURN_TRUE;
+        case NPY_STRING:
+        case NPY_UNICODE:
+            if (!AK_is_sorted_string(arr, contiguous, arr_size)) {
+                Py_RETURN_FALSE;
+            }
+            Py_RETURN_TRUE;
         default:;
             PyErr_SetString(PyExc_ValueError, "Unsupported dtype");
             return NULL;

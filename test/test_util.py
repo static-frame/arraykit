@@ -18,10 +18,10 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
-from arraykit import split_after_count
 from arraykit import count_iteration
 from arraykit import first_true_1d
 from arraykit import first_true_2d
+from arraykit import is_sorted
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -84,7 +84,6 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(resolve_dtype(a1.dtype, a4.dtype),
                 np.dtype('O'))
 
-
     def test_resolve_dtype_d(self) -> None:
         dt1 = np.array(1).dtype
         dt2 = np.array(2.3).dtype
@@ -95,7 +94,6 @@ class TestUnit(unittest.TestCase):
         dt2 = np.array(2, dtype='timedelta64[Y]').dtype
         assert resolve_dtype(dt1, dt2) == np.dtype(object)
         assert resolve_dtype(dt1, dt1) == dt1
-
 
     #---------------------------------------------------------------------------
     def test_resolve_dtype_iter_a(self) -> None:
@@ -167,7 +165,6 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             column_2d_filter(a1.reshape(1,2,5))
 
-
     #---------------------------------------------------------------------------
 
     def test_column_1d_filter_a(self) -> None:
@@ -219,14 +216,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(memo[id(a1)].tolist(), a2.tolist())
         self.assertFalse(a2.flags.writeable)
 
-
     def test_array_deepcopy_b(self) -> None:
         a1 = np.arange(10)
         memo = {id(a1): a1}
         a2 = array_deepcopy(a1, memo)
 
         self.assertEqual(mloc(a1), mloc(a2))
-
 
     def test_array_deepcopy_c1(self) -> None:
         mutable = [np.nan]
@@ -328,7 +323,6 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(np.datetime64('2020-12-31')))
         self.assertFalse(isna_element(datetime.date(2020, 12, 31)))
         self.assertFalse(isna_element(False))
-
 
     def test_isna_element_c(self) -> None:
         self.assertFalse(isna_element(None, include_none=False))
@@ -474,6 +468,7 @@ class TestUnit(unittest.TestCase):
         assert tuple(map(list, postB)) == (list(indexersB), list(indexersB))
 
     #---------------------------------------------------------------------------
+
     def test_count_iteration_a(self) -> None:
         post = count_iteration(('a', 'b', 'c', 'd'))
         self.assertEqual(post, 4)
@@ -484,6 +479,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post, 5)
 
     #---------------------------------------------------------------------------
+
     def test_first_true_1d_a(self) -> None:
         a1 = np.arange(100) == 50
         post = first_true_1d(a1, forward=True)
@@ -552,8 +548,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(first_true_1d(a1, forward=True), 10)
         self.assertEqual(first_true_1d(a1, forward=False), 50)
 
-
     #---------------------------------------------------------------------------
+
     def test_first_true_2d_a(self) -> None:
         a1 = np.isin(np.arange(100), (9, 19, 38, 68, 96)).reshape(5, 20)
 
@@ -610,7 +606,6 @@ class TestUnit(unittest.TestCase):
                 [-1, -1, -1, -1]
                 )
 
-
     def test_first_true_2d_d(self) -> None:
         a1 = np.isin(np.arange(20), (0, 3, 4, 7, 8, 11, 12, 15, 16, 19)).reshape(5, 4)
 
@@ -653,7 +648,6 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             post1 = first_true_2d(a1, axis=2)
 
-
     def test_first_true_2d_f(self) -> None:
         a1 = np.isin(np.arange(15), (1, 7, 14)).reshape(3, 5)
         post1 = first_true_2d(a1, axis=0, forward=True)
@@ -661,7 +655,6 @@ class TestUnit(unittest.TestCase):
 
         post2 = first_true_2d(a1, axis=0, forward=False)
         self.assertEqual(post2.tolist(), [-1, 0, 1, -1, 2])
-
 
     def test_first_true_2d_g(self) -> None:
         a1 = np.isin(np.arange(15), (1, 7, 14)).reshape(3, 5).T # force fortran ordering
@@ -673,7 +666,6 @@ class TestUnit(unittest.TestCase):
                 [-1, 0, 1, -1, 2])
         self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
                 [-1, 0, 1, -1, 2])
-
 
     def test_first_true_2d_h(self) -> None:
         # force fortran ordering, non-contiguous, non-owned
@@ -687,9 +679,52 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(first_true_2d(a1, axis=1, forward=False).tolist(),
                 [1, 0, 2, 1])
 
+    def test_is_sorted_success(self) -> None:
+        arr_non_contiguous = np.arange(25).reshape(5,5)[:, 3]
+        arr_contiguous = arr_non_contiguous.copy()
 
+        assert not arr_non_contiguous.flags.c_contiguous
+        assert arr_contiguous.flags.c_contiguous
 
+        dtypes = [
+            np.bool_,
+            np.longlong,
+            np.int_,
+            np.intc,
+            np.short,
+            np.byte,
+            np.ubyte,
+            np.ushort,
+            np.uintc,
+            np.uint,
+            np.ulonglong,
+            np.half,
+            np.single,
+            np.float_,
+            np.longfloat,
+            np.csingle,
+            np.complex_,
+            np.clongfloat,
+            "U",
+            "S",
+        ]
+        for dtype in dtypes:
+            self.assertTrue(is_sorted(arr_contiguous.astype(dtype)), dtype)
+            self.assertTrue(is_sorted(arr_non_contiguous.astype(dtype)), dtype)
 
+    def test_is_sorted_disallowed_inputs(self) -> None:
+        arr_2d = np.arange(25).reshape(5,5)
+        arr_list = list(range(10))
+        arr_obj = np.arange(10).astype(object)
+
+        with self.assertRaises(ValueError):
+            is_sorted(arr_2d)
+
+        with self.assertRaises(TypeError):
+            is_sorted(arr_list)
+
+        with self.assertRaises(ValueError):
+            is_sorted(arr_obj)
 
 
 if __name__ == '__main__':
