@@ -4031,7 +4031,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     Py_DECREF(element_locations);
 
     // new_positions = order_found[:num_unique]
-    PyObject *new_positions = PySequence_GetSlice((PyObject*)order_found, 0, num_found);
+    PyObject *new_positions = PySequence_GetSlice((PyObject*)order_found, 0, (Py_ssize_t)num_found);
     Py_DECREF(order_found);
     if (new_positions == NULL) {
         return NULL;
@@ -4056,6 +4056,181 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         Py_DECREF(element_locations);
         Py_DECREF(order_found);
         return NULL;
+}
+
+//------------------------------------------------------------------------------
+
+# define AK_COMPARE_SIMPLE(a, b) a > b
+# define AK_COMPARE_COMPLEX(a, b) a.real > b.real || (a.real == b.real && a.imag > b.imag)
+
+/*Note: Data array needs a unique name for each case inside the switch*/
+# define AK_IS_SORTED(ctype, compare_macro)                     \
+    if (contiguous) {                                           \
+        NPY_BEGIN_THREADS_DEF;                                  \
+        NPY_BEGIN_THREADS;                                      \
+        ctype* data_##ctype##_ = (ctype*)PyArray_DATA(arr);     \
+        for (size_t i = 0; i < arr_size - 1; ++i) {             \
+            ctype element = data_##ctype##_[i];                 \
+            ctype next = data_##ctype##_[i + 1];                \
+            if (compare_macro(element, next)) {                 \
+                NPY_END_THREADS;                                \
+                Py_RETURN_FALSE;                                \
+            }                                                   \
+        }                                                       \
+        NPY_END_THREADS;                                        \
+    }                                                           \
+    else {                                                      \
+        NPY_BEGIN_THREADS_DEF;                                  \
+        NPY_BEGIN_THREADS;                                      \
+        for (size_t i = 0; i < arr_size - 1; ++i) {             \
+            ctype element = *(ctype*)PyArray_GETPTR1(arr, i);   \
+            ctype next = *(ctype*)PyArray_GETPTR1(arr, i + 1);  \
+            if (compare_macro(element, next)) {                 \
+                NPY_END_THREADS;                                \
+                Py_RETURN_FALSE;                                \
+            }                                                   \
+        }                                                       \
+        NPY_END_THREADS;                                        \
+    }                                                           \
+    Py_RETURN_TRUE;                                             \
+
+
+static bool
+AK_is_sorted_string(PyArrayObject* arr, bool contiguous, size_t arr_size)
+{
+    size_t item_size = (size_t)PyArray_ITEMSIZE(arr);
+
+    if (contiguous) {
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
+        char* data = (char*)PyArray_DATA(arr);
+        size_t i = 0;
+        while (i < (arr_size - 1) * item_size) {
+            if (strncmp(&data[i], &data[i + item_size], item_size) > 0) {
+                NPY_END_THREADS;
+                Py_RETURN_FALSE;
+            }
+            i += item_size;
+        }
+        NPY_END_THREADS;
+    }
+    else {
+        NPY_BEGIN_THREADS_DEF;
+        NPY_BEGIN_THREADS;
+        size_t i = 0;
+        while (i < (arr_size - 1) * item_size) {
+            char *element = PyArray_GETPTR1(arr, i);
+            char *next = PyArray_GETPTR1(arr, i + 1);
+            if (strncmp(element, next, item_size) > 0) {
+                NPY_END_THREADS;
+                Py_RETURN_FALSE;
+            }
+            i += item_size;
+        }
+        NPY_END_THREADS;
+    }
+    Py_RETURN_TRUE;
+}
+
+
+static PyObject *
+is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
+{
+    AK_CHECK_NUMPY_ARRAY(arg);
+    PyArrayObject *arr = (PyArrayObject*)arg;
+
+    if (PyArray_NDIM(arr) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
+
+    bool contiguous = (bool)PyArray_IS_C_CONTIGUOUS(arr);
+    size_t arr_size = (size_t)PyArray_SIZE(arr);
+
+    switch (PyArray_TYPE(arr)) {
+        case NPY_BOOL:;
+            AK_IS_SORTED(npy_bool, AK_COMPARE_SIMPLE)
+        case NPY_BYTE:;
+            AK_IS_SORTED(npy_byte, AK_COMPARE_SIMPLE)
+        case NPY_UBYTE:;
+            AK_IS_SORTED(npy_ubyte, AK_COMPARE_SIMPLE)
+        case NPY_SHORT:;
+            AK_IS_SORTED(npy_short, AK_COMPARE_SIMPLE)
+        case NPY_USHORT:;
+            AK_IS_SORTED(npy_ushort, AK_COMPARE_SIMPLE)
+        case NPY_INT:;
+            AK_IS_SORTED(npy_int, AK_COMPARE_SIMPLE)
+        case NPY_UINT:;
+            AK_IS_SORTED(npy_uint, AK_COMPARE_SIMPLE)
+        case NPY_LONG:;
+            AK_IS_SORTED(npy_long, AK_COMPARE_SIMPLE)
+        case NPY_ULONG:;
+            AK_IS_SORTED(npy_ulong, AK_COMPARE_SIMPLE)
+        case NPY_LONGLONG:;
+            AK_IS_SORTED(npy_longlong, AK_COMPARE_SIMPLE)
+        case NPY_ULONGLONG:;
+            AK_IS_SORTED(npy_ulonglong, AK_COMPARE_SIMPLE)
+        case NPY_FLOAT:;
+            AK_IS_SORTED(npy_float, AK_COMPARE_SIMPLE)
+        case NPY_DOUBLE:;
+            AK_IS_SORTED(npy_double, AK_COMPARE_SIMPLE)
+
+        # ifdef PyFloat128ArrType_Type
+        case NPY_LONGDOUBLE:;
+            AK_IS_SORTED(npy_longdouble, AK_COMPARE_SIMPLE)
+        # endif
+
+        case NPY_DATETIME:;
+            AK_IS_SORTED(npy_datetime, AK_COMPARE_SIMPLE)
+        case NPY_TIMEDELTA:;
+            AK_IS_SORTED(npy_timedelta, AK_COMPARE_SIMPLE)
+        case NPY_HALF:;
+            AK_IS_SORTED(npy_half, AK_COMPARE_SIMPLE)
+        case NPY_CFLOAT:;
+            AK_IS_SORTED(npy_complex64, AK_COMPARE_COMPLEX)
+        case NPY_CDOUBLE:;
+            AK_IS_SORTED(npy_complex128, AK_COMPARE_COMPLEX)
+
+        # ifdef PyComplex256ArrType_Type
+        case NPY_CLONGDOUBLE:;
+            AK_IS_SORTED(npy_complex256, AK_COMPARE_COMPLEX)
+        # endif
+
+        case NPY_STRING:
+        case NPY_UNICODE:
+            if (!AK_is_sorted_string(arr, contiguous, arr_size)) {
+                Py_RETURN_FALSE;
+            }
+            Py_RETURN_TRUE;
+        default:;
+            PyErr_Format(PyExc_ValueError,
+                    "Unsupported dtype: %s",
+                    PyArray_DESCR(arr)->typeobj->tp_name
+                    );
+            return NULL;
+    }
+    // // ------------------------------------------------------------------------
+    // // perf is not good here - maybe drop support?
+    // else if (np_dtype == NPY_OBJECT) {
+    //     do {
+    //         char* data = *dataptr;
+    //         npy_intp stride = *strideptr;
+    //         npy_intp inner_size = *innersizeptr;
+
+    //         PyObject* prev = *((PyObject **)data);
+    //         data += stride;
+    //         inner_size--;
+    //         while (inner_size--) {
+    //             PyObject* element = *((PyObject **)data);
+    //             if (PyObject_RichCompareBool(element, prev, Py_LT) == 1) {
+    //                 goto fail;
+    //             }
+    //             prev = element;
+    //             data += stride;
+    //         }
+    //     } while(arr_iternext(arr_iter));
+    // }
+    Py_UNREACHABLE();
 }
 
 //------------------------------------------------------------------------------
@@ -4364,6 +4539,7 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"dtype_from_element", dtype_from_element, METH_O, NULL},
+    {"is_sorted", is_sorted, METH_O, NULL},
     {"get_new_indexers_and_screen",
             (PyCFunction)get_new_indexers_and_screen,
             METH_VARARGS | METH_KEYWORDS,
