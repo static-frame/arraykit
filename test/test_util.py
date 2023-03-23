@@ -713,12 +713,18 @@ class TestUnit(unittest.TestCase):
             arr2 = arr_non_contiguous.astype(dtype)
             assert (arr1 == arr2).all()
 
-            assert is_sorted(arr1)
-            assert is_sorted(arr2)
+            try:
+                assert is_sorted(arr1)
+            except ValueError:
+                assert dtype in (np.longfloat, np.clongfloat)
+                continue
+            else:
+                assert is_sorted(arr2)
 
             # Investigate why these report success, but are not sorted
             if dtype in ("U", "S"):
                 continue
+
             assert not is_sorted(arr1[::-1])
             assert not is_sorted(arr2[::-1])
 

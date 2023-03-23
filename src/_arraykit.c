@@ -4031,7 +4031,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     Py_DECREF(element_locations);
 
     // new_positions = order_found[:num_unique]
-    PyObject *new_positions = PySequence_GetSlice((PyObject*)order_found, 0, num_found);
+    PyObject *new_positions = PySequence_GetSlice((PyObject*)order_found, 0, (Py_ssize_t)num_found);
     Py_DECREF(order_found);
     if (new_positions == NULL) {
         return NULL;
@@ -4063,6 +4063,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 # define AK_COMPARE_SIMPLE(a, b) a > b
 # define AK_COMPARE_COMPLEX(a, b) a.real > b.real || (a.real == b.real && a.imag > b.imag)
 
+/*Note: Data array needs a unique name for each case inside the switch*/
 # define AK_IS_SORTED(ctype, compare_macro)                     \
     if (contiguous) {                                           \
         NPY_BEGIN_THREADS_DEF;                                  \
@@ -4173,10 +4174,12 @@ is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
             AK_IS_SORTED(npy_float, AK_COMPARE_SIMPLE)
         case NPY_DOUBLE:;
             AK_IS_SORTED(npy_double, AK_COMPARE_SIMPLE)
+
         # ifdef PyFloat128ArrType_Type
         case NPY_LONGDOUBLE:;
             AK_IS_SORTED(npy_longdouble, AK_COMPARE_SIMPLE)
         # endif
+
         case NPY_DATETIME:;
             AK_IS_SORTED(npy_datetime, AK_COMPARE_SIMPLE)
         case NPY_TIMEDELTA:;
@@ -4187,10 +4190,12 @@ is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
             AK_IS_SORTED(npy_complex64, AK_COMPARE_COMPLEX)
         case NPY_CDOUBLE:;
             AK_IS_SORTED(npy_complex128, AK_COMPARE_COMPLEX)
+
         # ifdef PyComplex256ArrType_Type
         case NPY_CLONGDOUBLE:;
             AK_IS_SORTED(npy_complex256, AK_COMPARE_COMPLEX)
         # endif
+
         case NPY_STRING:
         case NPY_UNICODE:
             if (!AK_is_sorted_string(arr, contiguous, arr_size)) {
@@ -4198,7 +4203,10 @@ is_sorted(PyObject *Py_UNUSED(m), PyObject *arg)
             }
             Py_RETURN_TRUE;
         default:;
-            PyErr_SetString(PyExc_ValueError, "Unsupported dtype");
+            PyErr_Format(PyExc_ValueError,
+                    "Unsupported dtype: %s",
+                    PyArray_DESCR(arr)->typeobj->tp_name
+                    );
             return NULL;
     }
     // // ------------------------------------------------------------------------
