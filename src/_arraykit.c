@@ -1963,7 +1963,11 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
 
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
 static inline PyObject*
-AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc) {
+AK_CPL_ToArray(AK_CodePointLine* cpl,
+        PyArray_Descr* dtype,
+        char tsep,
+        char decc)
+{
     if (!dtype) {
         // If we have a type_parser on the CPL, we can use that to get the dtype
         if (cpl->type_parser) {
@@ -1975,33 +1979,24 @@ AK_CPL_ToArray(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc
             AK_NOT_IMPLEMENTED("dtype not passed to AK_CPL_ToArray, and CodePointLine has no type_parser");
         }
     }
-
-    if (PyDataType_ISBOOL(dtype)) {
-        return AK_CPL_to_array_bool(cpl, dtype);
+    switch (dtype->kind) {
+        case 'b':
+            return AK_CPL_to_array_bool(cpl, dtype);
+        case 'f':
+            return AK_CPL_to_array_float(cpl, dtype, tsep, decc);
+        case 'U':
+            return AK_CPL_to_array_unicode(cpl, dtype);
+        case 'S':
+            return AK_CPL_to_array_bytes(cpl, dtype);
+        case 'u':
+            return AK_CPL_to_array_uint(cpl, dtype, tsep);
+        case 'i':
+            return AK_CPL_to_array_int(cpl, dtype, tsep);
+        case 'M':
+            return AK_CPL_to_array_via_cast(cpl, dtype, NPY_UNICODE);
+        case 'c': // cannot pass tsep, decc as using NumPy cast
+            return AK_CPL_to_array_via_cast(cpl, dtype, NPY_STRING);
     }
-    else if (PyDataType_ISFLOAT(dtype)) {
-        return AK_CPL_to_array_float(cpl, dtype, tsep, decc);
-    }
-    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'U') {
-        return AK_CPL_to_array_unicode(cpl, dtype);
-    }
-    else if (PyDataType_ISSTRING(dtype) && dtype->kind == 'S') {
-        return AK_CPL_to_array_bytes(cpl, dtype);
-    }
-    else if (PyDataType_ISUNSIGNED(dtype)) { // must come before integer check
-        return AK_CPL_to_array_uint(cpl, dtype, tsep);
-    }
-    else if (PyDataType_ISINTEGER(dtype)) {
-        return AK_CPL_to_array_int(cpl, dtype, tsep);
-    }
-    else if (PyDataType_ISDATETIME(dtype)) {
-        return AK_CPL_to_array_via_cast(cpl, dtype, NPY_UNICODE);
-    }
-    else if (PyDataType_ISCOMPLEX(dtype)) {
-        // no tsep, decc as using NumPy cast
-        return AK_CPL_to_array_via_cast(cpl, dtype, NPY_STRING);
-    }
-
     PyErr_Format(PyExc_NotImplementedError, "No handling for %R", dtype);
     // caller will decref the passed dtype on error
     return NULL;
