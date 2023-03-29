@@ -1289,6 +1289,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 //------------------------------------------------------------------------------
 // CodePointLine: Mutation
 
+// Returns 0 on success, -1 on failure.
 static inline int
 AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t count)
 {
@@ -1980,20 +1981,20 @@ AK_CPL_ToArray(AK_CodePointLine* cpl,
         }
     }
     switch (dtype->kind) {
-        case 'b':
-            return AK_CPL_to_array_bool(cpl, dtype);
+        case 'i':
+            return AK_CPL_to_array_int(cpl, dtype, tsep);
         case 'f':
             return AK_CPL_to_array_float(cpl, dtype, tsep, decc);
         case 'U':
             return AK_CPL_to_array_unicode(cpl, dtype);
+        case 'M':
+            return AK_CPL_to_array_via_cast(cpl, dtype, NPY_UNICODE);
+        case 'b':
+            return AK_CPL_to_array_bool(cpl, dtype);
         case 'S':
             return AK_CPL_to_array_bytes(cpl, dtype);
         case 'u':
             return AK_CPL_to_array_uint(cpl, dtype, tsep);
-        case 'i':
-            return AK_CPL_to_array_int(cpl, dtype, tsep);
-        case 'M':
-            return AK_CPL_to_array_via_cast(cpl, dtype, NPY_UNICODE);
         case 'c': // cannot pass tsep, decc as using NumPy cast
             return AK_CPL_to_array_via_cast(cpl, dtype, NPY_STRING);
     }
@@ -2008,7 +2009,7 @@ static inline int
 AK_line_select_keep(
         PyObject *line_select,
         bool axis_target,
-        int lookup_number)
+        Py_ssize_t lookup_number)
 {
     if (axis_target && (line_select != NULL)) {
         PyObject* number = PyLong_FromLong(lookup_number);
@@ -2081,7 +2082,7 @@ AK_CPG_New(PyObject *dtypes, Py_UCS4 tsep, Py_UCS4 decc)
 void
 AK_CPG_Free(AK_CodePointGrid* cpg)
 {
-    for (int i=0; i < cpg->lines_count; ++i) {
+    for (Py_ssize_t i=0; i < cpg->lines_count; ++i) {
         AK_CPL_Free(cpg->lines[i]);
     }
     PyMem_Free(cpg->lines);
@@ -2194,7 +2195,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
     PyObject* dtypes = cpg->dtypes;
 
     // Iterate over lines in the code point grid
-    for (int i = 0; i < cpg->lines_count; ++i) {
+    for (Py_ssize_t i = 0; i < cpg->lines_count; ++i) {
         // if axis is axis 1, apply keep
         switch (AK_line_select_keep(line_select, 1 == axis, i)) {
             case -1:
@@ -2239,11 +2240,10 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
             Py_DECREF(dtype_specifier);
         }
         // This function will observe if dtype is NULL and read dtype from the CPL's type_parser if necessary
-        // NOTE: this creating might be multi-threadable for dtypes that permit C-only buffer transfers
+        // NOTE: this might be multi-threadable for dtypes that permit C-only buffer transfers
         PyObject* array = AK_CPL_ToArray(cpg->lines[i], dtype, tsep, decc);
-        // AK_DEBUG_MSG_OBJ("post AK_CPL_ToArray", dtype);
         if (array == NULL) {
-            // if array creation has been aborted due to a bad character, we will already have decrefed the array, which seems to also decref dtype
+            // if array creation has been aborted due to a bad character, we will already have decrefed the array
             Py_DECREF(list);
             return NULL;
         }
@@ -2291,7 +2291,7 @@ AK_Dialect_check_quoting(int quoting)
 {
     const AK_DialectStyleDesc *qs;
     for (qs = AK_Dialect_quote_styles; qs->name; qs++) {
-        if ((int)qs->style == quoting) // can we compare to long and avoid
+        if ((int)qs->style == quoting)
             return 0;
     }
     PyErr_Format(PyExc_TypeError, "bad \"quoting\" value");
@@ -2310,10 +2310,10 @@ typedef struct AK_Dialect{
 
 // check types and convert to C values
 #define AK_Dialect_CALL_SETTER(meth, name, target, src, default) \
-    do {\
-        if (meth(name, target, src, default)) \
-            goto error; \
-    } while (0) \
+    do {                                         \
+        if (meth(name, target, src, default))    \
+            goto error;                          \
+    } while (0)                                  \
 
 static AK_Dialect*
 AK_Dialect_New(PyObject *delimiter,
@@ -2463,7 +2463,6 @@ static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     // NOTE: ideally we could use line_select here; however, we would need to cache the lookup in another container as this is called once per char and line_select is a Python function; further, we would need to increment the field_number separately from another counter, which is done in AK_DR_close_field
-
     if (AK_CPG_AppendPointAtLine(cpg,
             *(dr->axis_pos),
             dr->field_len,
