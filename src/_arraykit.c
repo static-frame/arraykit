@@ -1625,7 +1625,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         while (array_buffer < end) {
-            *array_buffer++ = (npy_float16)AK_CPL_current_to_float64(cpl, &error, tsep, decc);
+            *array_buffer++ = npy_double_to_half(AK_CPL_current_to_float64(cpl, &error, tsep, decc));
             AK_CPL_CurrentAdvance(cpl);
         }
     }
