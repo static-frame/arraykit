@@ -162,7 +162,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
     return resolved;
 }
 
-// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays. This depends on the module object to get the deepcopy method.
+// Perform a deepcopy on an array, using an optional memo dictionary, and specialized to depend on immutable arrays. This depends on the module object to get the deepcopy method. The `memo` object can be None.
 PyObject*
 AK_ArrayDeepCopy(PyObject* m, PyArrayObject *array, PyObject *memo)
 {
@@ -186,6 +186,7 @@ AK_ArrayDeepCopy(PyObject* m, PyArrayObject *array, PyObject *memo)
     PyArray_Descr *dtype = PyArray_DESCR(array); // borrowed ref
 
     if (PyDataType_ISOBJECT(dtype)) {
+        // we store the deepcopy function on this module for faster lookup here
         PyObject *deepcopy = PyObject_GetAttrString(m, "deepcopy");
         if (!deepcopy) {
             goto error;
@@ -3315,10 +3316,19 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
     PyObject *array;
     PyObject *memo = NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|O!:array_deepcopy", array_deepcopy_kwarg_names,
+            "O|O:array_deepcopy", array_deepcopy_kwarg_names,
             &array,
-            &PyDict_Type, &memo)) {
+            &memo)) {
         return NULL;
+    }
+    if ((memo == NULL) || (memo == Py_None)) {
+        memo = NULL;
+    }
+    else {
+        if (!PyDict_Check(memo)) {
+            PyErr_SetString(PyExc_TypeError, "memo must be a dict or None");
+            return NULL;
+        }
     }
     AK_CHECK_NUMPY_ARRAY(array);
     return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);

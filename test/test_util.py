@@ -268,13 +268,24 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_e(self) -> None:
         a1 = np.array((3, 4, 5))
         with self.assertRaises(TypeError):
-            # memo argument must be a dictionary
-            a2 = array_deepcopy(a1, memo=None)
+            a2 = array_deepcopy(a1, memo='')
 
     def test_array_deepcopy_f(self) -> None:
         a1 = np.array((3, 4, 5))
         a2 = array_deepcopy(a1)
         self.assertNotEqual(id(a1), id(a2))
+
+    def test_array_deepcopy_g(self) -> None:
+        a1 = np.arange(10)
+        a2 = array_deepcopy(a1, None)
+        self.assertNotEqual(mloc(a1), mloc(a2))
+
+    def test_array_deepcopy_h(self) -> None:
+        a1 = np.arange(10)
+        with self.assertRaises(TypeError):
+            a2 = array_deepcopy(a1, ())
+
+    #---------------------------------------------------------------------------
 
     def test_isna_element_a(self) -> None:
         class FloatSubclass(float): pass
