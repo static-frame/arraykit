@@ -23,22 +23,22 @@
     }
 
 // Given a PyObject, raise if not an array or is not one or two dimensional.
-# define AK_CHECK_NUMPY_ARRAY_1D_2D(O) \
-    do {\
-        AK_CHECK_NUMPY_ARRAY(O)\
-        int ndim = PyArray_NDIM((PyArrayObject *)O);\
-        if (ndim != 1 && ndim != 2) {\
+# define AK_CHECK_NUMPY_ARRAY_1D_2D(O)                    \
+    do {                                                  \
+        AK_CHECK_NUMPY_ARRAY(O)                           \
+        int ndim = PyArray_NDIM((PyArrayObject *)O);      \
+        if (ndim != 1 && ndim != 2) {                     \
             return PyErr_Format(PyExc_NotImplementedError,\
-                    "expected 1D or 2D array (got %i)",\
-                    ndim);\
-        }\
+                    "expected 1D or 2D array (got %i)",   \
+                    ndim);                                \
+        }                                                 \
     } while (0)
 
 // Placeholder of not implemented pathways / debugging.
-# define AK_NOT_IMPLEMENTED(msg)\
-    do {\
+# define AK_NOT_IMPLEMENTED(msg)                        \
+    do {                                                \
         PyErr_SetString(PyExc_NotImplementedError, msg);\
-        return NULL;\
+        return NULL;                                    \
     } while (0)
 
 # define _AK_DEBUG_BEGIN() \
@@ -1256,7 +1256,6 @@ AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
     cpl->offset_max = 0;
 
     // optional, dynamic values
-    // cpl->field = NULL;
     if (type_parse) {
         cpl->type_parser = AK_TP_New(tsep, decc);
         if (cpl->type_parser == NULL) {
@@ -1281,7 +1280,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
     PyMem_Free(cpl->offsets);
-    if (cpl->type_parser) { // can exclude the check
+    if (cpl->type_parser) {
         PyMem_Free(cpl->type_parser);
     }
     PyMem_Free(cpl);
@@ -1332,7 +1331,7 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
     // if we cannot fit field length, resize
     if (AK_CPL_resize_buffer(cpl, element_length)) return -1;
 
-    // we write teh field direclty into the CPL buffer
+    // we write the field directly into the CPL buffer
     if(PyUnicode_AsUCS4(field,
             cpl->buffer_current_ptr,
             cpl->buffer + cpl->buffer_capacity - cpl->buffer_current_ptr,
@@ -1368,7 +1367,7 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
     return 0;
 }
 
-// Add a single point (or chacter) to a line. This does not update offsets. This is valid when updating a character. Returns 0 on success, -1 on error.
+// Add a single point (or character) to a line. This does not update offsets. This is valid when updating a character. Returns 0 on success, -1 on error.
 static inline int
 AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         Py_UCS4 p,
@@ -1408,14 +1407,16 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
     }
     // increment offset_count after assignment so we can grow if needed next time
     cpl->offsets[cpl->offsets_count++] = offset;
-    if (offset > cpl->offset_max) {cpl->offset_max = offset;}
+    if (offset > cpl->offset_max) {
+        cpl->offset_max = offset;
+    }
     return 0;
 }
 
 //------------------------------------------------------------------------------
 // CodePointLine: Constructors
 
-// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for iterable_str_to_array_1d. Return NULL on errror.
+// Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for iterable_str_to_array_1d. Return NULL on error.
 AK_CodePointLine*
 AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
@@ -1557,7 +1558,7 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
-    for (int i=0; i < cpl->offsets_count; ++i) {
+    for (Py_ssize_t i=0; i < cpl->offsets_count; ++i) {
         // this is forgiving in that invalid strings remain false
         if (AK_CPL_current_to_bool(cpl)) {
             array_buffer[i] = 1;
@@ -1801,6 +1802,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     npy_intp dims[] = {count};
 
     Py_ssize_t field_points;
+    // If `capped_points` is True, we have been given a dtype with specific elsize, and we will only load that many code points; if `capper_points` is False, we set the dtype elsize to the max observed code opints via the CPL offset.
     bool capped_points;
 
     // mutate the passed dtype as it is new and will be stolen in array construction
@@ -1811,13 +1813,12 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     }
     else {
         // assume that elsize is already given in units of 4
-        assert(dtype->elsize % sizeof(Py_UCS4) == 0);
+        // assert(dtype->elsize % sizeof(Py_UCS4) == 0);
         field_points = dtype->elsize / sizeof(Py_UCS4);
         capped_points = true;
     }
 
-    // NOTE: it is assumed (though not verified in some testing) that we need to get zereod array here as we might copy to the array less than the full item size width
-
+    // NOTE: it is assumed (though not verified in some testing) that we need to get zeroed array here as we might copy to the array with less than the full item size width
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
         // expected array to steal dtype reference
@@ -1832,7 +1833,6 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     AK_CPL_CurrentReset(cpl);
     if (capped_points) {
-        // NOTE: is it worth branching for this special case?
         Py_ssize_t copy_bytes;
         while (array_buffer < end) {
             if (cpl->offsets[cpl->offsets_current_index] >= field_points) {
@@ -1847,7 +1847,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else { // faster we always know the offset will fit
+    else { // faster if we always know the offset will fit
         while (array_buffer < end) {
             memcpy(array_buffer,
                     cpl->buffer_current_ptr,
@@ -1890,8 +1890,11 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     char *array_buffer = (char*)PyArray_DATA((PyArrayObject*)array);
     char *end = array_buffer + count * field_points;
+    char *field_end;
 
     Py_ssize_t copy_points;
+    Py_UCS4 *p;
+    Py_UCS4 *p_end;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -1903,19 +1906,18 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
             copy_points = cpl->offsets[cpl->offsets_current_index];
         }
         else {
-            // if capped and offset is greater than feild points, use field points
+            // if capped and offset is greater than field points, use field points
             copy_points = field_points;
         }
-
         // NOTE: not using memcopy as we need to cast to char to fit each point
-        Py_UCS4 *p = cpl->buffer_current_ptr;
-        Py_UCS4 *p_end = p + copy_points;
-        char *field_end = array_buffer + field_points;
+        p = cpl->buffer_current_ptr;
+        p_end = p + copy_points;
+        field_end = array_buffer + field_points;
 
         while (p < p_end) {
             *array_buffer++ = (char)*p++; // truncate
         }
-        array_buffer = field_end;
+        array_buffer = field_end; // jump to end regardless of how many chars written
         AK_CPL_CurrentAdvance(cpl);
     }
     NPY_END_THREADS;
@@ -1945,7 +1947,6 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
         array_inter = AK_CPL_to_array_unicode(cpl, dtype_inter);
     }
     // else array_inter is NULL and we exit without an exception set
-
     if (array_inter == NULL) {
         Py_DECREF(dtype); // dtype_inter ref already stolen
         return NULL;
