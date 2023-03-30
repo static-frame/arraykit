@@ -3535,7 +3535,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_intp count_row = PyArray_DIM(array_ind, 0);
     npy_intp count_col = PyArray_DIM(array_ind, 1);
 
-    ldiv_t div_col = ldiv(count_col, 4); // quot, rem
+    ldiv_t div_col = ldiv((long)count_col, 4); // quot, rem
 
     npy_intp dims_post = {count_row};
     PyArrayObject *array_pos = (PyArrayObject*)PyArray_EMPTY(
@@ -3926,7 +3926,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
         return NULL;
     }
 
-    PyObject *num_unique_pyint = PyLong_FromLong(num_unique);
+    PyObject *num_unique_pyint = PyLong_FromLong((long)num_unique);
     if (num_unique_pyint == NULL) {
         goto fail;
     }
