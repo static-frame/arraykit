@@ -284,6 +284,12 @@ class TestUnit(unittest.TestCase):
             a1 = iterable_str_to_array_1d(['23.1', '1000.2'], dtype=float, decimalchar=',')
             self.assertEqual(a1.tolist(),[23.1, 1000.2])
 
+    def test_iterable_str_to_array_1d_float_12(self) -> None:
+        a1 = iterable_str_to_array_1d(['23.1', '54.5', '1000.2', '23.'], np.float16)
+        self.assertEqual(a1.tolist(),[23.09375, 54.5, 1000.0, 23.0])
+        self.assertEqual(a1.dtype, np.dtype(np.float16))
+        self.assertFalse(a1.flags.writeable)
+
 
     #---------------------------------------------------------------------------
 
