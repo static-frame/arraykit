@@ -1810,7 +1810,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // mutate the passed dtype as it is new and will be stolen in array construction
     if (dtype->elsize == 0) {
         field_points = cpl->offset_max;
-        dtype->elsize = field_points * sizeof(Py_UCS4);
+        dtype->elsize = (int)(field_points * sizeof(Py_UCS4));
         capped_points = false;
     }
     else {
@@ -1876,7 +1876,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 
     if (dtype->elsize == 0) {
         field_points = cpl->offset_max;
-        dtype->elsize = field_points;
+        dtype->elsize = (int)field_points;
         capped_points = false;
     }
     else {
@@ -2013,7 +2013,7 @@ AK_line_select_keep(
         Py_ssize_t lookup_number)
 {
     if (axis_target && (line_select != NULL)) {
-        PyObject* number = PyLong_FromLong(lookup_number);
+        PyObject* number = PyLong_FromSsize_t(lookup_number);
         if (number == NULL) return -1;
 
         PyObject* keep = PyObject_CallFunctionObjArgs(
@@ -2114,7 +2114,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
             type_parse = true;
         }
         else {
-            PyObject* line_count = PyLong_FromLong(line);
+            PyObject* line_count = PyLong_FromSsize_t(line);
             if (line_count == NULL) return -1;
 
             PyObject* dtype_specifier = PyObject_CallFunctionObjArgs(
@@ -2210,7 +2210,7 @@ PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
 
         if (dtypes != NULL) {
             // NOTE: we call this with i regardless of if we skipped a line
-            PyObject* line_count = PyLong_FromLong(i);
+            PyObject* line_count = PyLong_FromSsize_t(i);
             if (line_count == NULL) {
                 Py_DECREF(list);
                 return NULL;
@@ -3236,9 +3236,9 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
-    int size0 = PyArray_DIM(array, 0);
+    npy_intp size0 = PyArray_DIM(array, 0);
     // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
-    int size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    npy_intp size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
     return Py_BuildValue("ii", size0, size1);
 }
 
@@ -3388,14 +3388,14 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     npy_intp size = PyArray_SIZE(array);
-    ldiv_t size_div = ldiv(size, 4); // quot, rem
+    ldiv_t size_div = ldiv((long)size, 4); // quot, rem
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
-    npy_intp position = -1;
+    Py_ssize_t position = -1;
     npy_bool *p;
     npy_bool *p_end;
 
@@ -3441,7 +3441,7 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     NPY_END_THREADS;
 
-    PyObject* post = PyLong_FromLong(position);
+    PyObject* post = PyLong_FromSsize_t(position);
     return post;
 }
 
@@ -3996,7 +3996,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     NPY_BEGIN_THREADS;
 
     size_t i = 0;
-    npy_int64 num_found = 0;
+    Py_ssize_t num_found = 0;
     do {
         // Get the inner loop data/stride/inner_size values
         char* data = *dataptr;
@@ -4036,7 +4036,10 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     Py_DECREF(element_locations);
 
     // new_positions = order_found[:num_unique]
-    PyObject *new_positions = PySequence_GetSlice((PyObject*)order_found, 0, num_found);
+    PyObject *new_positions = PySequence_GetSlice(
+            (PyObject*)order_found,
+            0,
+            num_found);
     Py_DECREF(order_found);
     if (new_positions == NULL) {
         return NULL;
