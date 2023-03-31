@@ -37,20 +37,30 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.3.1
+............
+
+Improvements to ``delimited_to_arrays()``, including proper loading of ``float16`` types.
+
+Extended ``deepcopy_array()`` to permit ``memo`` as None.
+
+Corrected all compiler warnings on Windows.
+
+
 0.3.0
-------------
+............
 
 Added ``first_true_1d()``, ``first_true_2d()``. Added tools for performance graphing.
 
 
 0.2.9
-------------
+............
 
 Corrected segmentation fault resulting from attempting to parse invalid ``datetime64`` strings in ``AK_CPL_to_array_via_cast``.
 
 
 0.2.8
-------------
+............
 
 Added ``include_none`` argument to ``isna_element()``; implemented identification of Pandas pd.Timestamp NaT.
 
