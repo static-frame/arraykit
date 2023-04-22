@@ -2669,34 +2669,39 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
         linelen = PyUnicode_GET_LENGTH(record);
 
         // NOTE: we used to check that the read character was not \0; this seems rare enough to not be necessary to handle explicit, as AK_DR_process_char will treat it as an end of record
-        if (kind == PyUnicode_1BYTE_KIND) {
-            Py_UCS1* uc = (Py_UCS1*)data;
-            Py_UCS1* uc_end = uc + linelen;
-            while (uc < uc_end) {
-                if (AK_DR_process_char(dr, cpg, *uc++)) {
-                    Py_DECREF(record);
-                    return -1;
+        switch (kind) {
+            case PyUnicode_1BYTE_KIND: {
+                Py_UCS1* uc = (Py_UCS1*)data;
+                Py_UCS1* uc_end = uc + linelen;
+                while (uc < uc_end) {
+                    if (AK_DR_process_char(dr, cpg, *uc++)) {
+                        Py_DECREF(record);
+                        return -1;
+                    }
                 }
+                break;
             }
-        }
-        else if (kind == PyUnicode_1BYTE_KIND) {
-            Py_UCS2* uc = (Py_UCS2*)data;
-            Py_UCS2* uc_end = uc + linelen;
-            while (uc < uc_end) {
-                if (AK_DR_process_char(dr, cpg, *uc++)) {
-                    Py_DECREF(record);
-                    return -1;
+            case PyUnicode_2BYTE_KIND: {
+                Py_UCS2* uc = (Py_UCS2*)data;
+                Py_UCS2* uc_end = uc + linelen;
+                while (uc < uc_end) {
+                    if (AK_DR_process_char(dr, cpg, *uc++)) {
+                        Py_DECREF(record);
+                        return -1;
+                    }
                 }
+                break;
             }
-        }
-        else {
-            Py_UCS4* uc = (Py_UCS4*)data;
-            Py_UCS4* uc_end = uc + linelen;
-            while (uc < uc_end) {
-                if (AK_DR_process_char(dr, cpg, *uc++)) {
-                    Py_DECREF(record);
-                    return -1;
+            case PyUnicode_4BYTE_KIND: {
+                Py_UCS4* uc = (Py_UCS4*)data;
+                Py_UCS4* uc_end = uc + linelen;
+                while (uc < uc_end) {
+                    if (AK_DR_process_char(dr, cpg, *uc++)) {
+                        Py_DECREF(record);
+                        return -1;
+                    }
                 }
+                break;
             }
         }
         Py_DECREF(record);
