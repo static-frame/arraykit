@@ -2612,8 +2612,7 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
         PyObject *line_select
         )
 {
-    Py_UCS4 c;
-    Py_ssize_t pos, linelen;
+    Py_ssize_t linelen;
     unsigned int kind;
     const void *data;
     PyObject *record;
@@ -2667,21 +2666,38 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
 
         kind = PyUnicode_KIND(record);
         data = PyUnicode_DATA(record);
-        pos = 0;
-        // PERF: can we branch based on kind, cast ddata, and do pointer arrithmatic to iterate through the line?
         linelen = PyUnicode_GET_LENGTH(record);
-        while (linelen--) {
-            c = PyUnicode_READ(kind, data, pos);
-            if (c == '\0') {
-                Py_DECREF(record);
-                PyErr_Format(PyExc_RuntimeError, "line contains NUL");
-                return -1;
+
+        // NOTE: we used to check that the read character was not \0; this seems rare enough to not be necessary to handle explicit, as AK_DR_process_char will treat it as an end of record
+        if (kind == PyUnicode_1BYTE_KIND) {
+            Py_UCS1* uc = (Py_UCS1*)data;
+            Py_UCS1* uc_end = uc + linelen;
+            while (uc < uc_end) {
+                if (AK_DR_process_char(dr, cpg, *uc++)) {
+                    Py_DECREF(record);
+                    return -1;
+                }
             }
-            if (AK_DR_process_char(dr, cpg, c)) {
-                Py_DECREF(record);
-                return -1;
+        }
+        else if (kind == PyUnicode_1BYTE_KIND) {
+            Py_UCS2* uc = (Py_UCS2*)data;
+            Py_UCS2* uc_end = uc + linelen;
+            while (uc < uc_end) {
+                if (AK_DR_process_char(dr, cpg, *uc++)) {
+                    Py_DECREF(record);
+                    return -1;
+                }
             }
-            pos++;
+        }
+        else {
+            Py_UCS4* uc = (Py_UCS4*)data;
+            Py_UCS4* uc_end = uc + linelen;
+            while (uc < uc_end) {
+                if (AK_DR_process_char(dr, cpg, *uc++)) {
+                    Py_DECREF(record);
+                    return -1;
+                }
+            }
         }
         Py_DECREF(record);
         // force signaling we are at the end of a line
