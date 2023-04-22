@@ -2668,6 +2668,7 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
         kind = PyUnicode_KIND(record);
         data = PyUnicode_DATA(record);
         pos = 0;
+        // PERF: can we branch based on kind, cast ddata, and do pointer arrithmatic to iterate through the line?
         linelen = PyUnicode_GET_LENGTH(record);
         while (linelen--) {
             c = PyUnicode_READ(kind, data, pos);
