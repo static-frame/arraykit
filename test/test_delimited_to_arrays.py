@@ -688,13 +688,14 @@ class TestUnit(unittest.TestCase):
 
     def test_delimited_to_arrays_parse_g(self) -> None:
         msg = [
-            'a, 10, foo',
-            'b,  20, \0',
+            'a,10,foo',
+            'b,20,\0',
             ]
-        # if a null character is encountered
-        with self.assertRaises(RuntimeError):
-            _ = delimited_to_arrays(msg, axis=1)
-
+        # if a null character is encountered it used to raise; this seemed unnecessary
+        post = delimited_to_arrays(msg, axis=1)
+        self.assertEqual( [a.tolist() for a in post],
+                [['a', 'b'], [10, 20], ['foo', '']]
+                )
 
     def test_delimited_to_arrays_parse_h(self) -> None:
         msg = [',0', 'False,1']
