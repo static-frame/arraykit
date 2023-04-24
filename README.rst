@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.3.2
+............
+
+Optimization to ``delimited_to_arrays()`` character reading pre line.
+
+
 0.3.1
 ............
 
