@@ -3771,10 +3771,14 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
     // Try to identify Pandas Timestamp NATs
     if (PyObject_HasAttrString(element, "to_numpy")) {
         PyObject *to_numpy = PyObject_GetAttrString(element, "to_numpy");
+        if (to_numpy == NULL) {
+            return NULL;
+        }
         if (!PyCallable_Check(to_numpy)) {
             Py_RETURN_FALSE;
         }
         PyObject* post = PyObject_CallFunction(to_numpy, NULL);
+        Py_DECREF(to_numpy);
         if (post == NULL) return NULL;
         return PyBool_FromLong(PyArrayScalar_VAL(post, Datetime) == NPY_DATETIME_NAT);
     }
