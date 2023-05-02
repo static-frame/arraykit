@@ -37,10 +37,16 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.3.3
+............
+
+Corrected potential memory leak in ``isna_element()``.
+
+
 0.3.2
 ............
 
-Optimization to ``delimited_to_arrays()`` character reading pre line.
+Optimization to ``delimited_to_arrays()`` character reading per line.
 
 
 0.3.1
