@@ -3770,17 +3770,29 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
     }
     // Try to identify Pandas Timestamp NATs
     if (PyObject_HasAttrString(element, "to_numpy")) {
-        PyObject *to_numpy = PyObject_GetAttrString(element, "to_numpy");
-        if (to_numpy == NULL) {
-            return NULL;
-        }
-        if (!PyCallable_Check(to_numpy)) {
-            Py_RETURN_FALSE;
-        }
-        PyObject* post = PyObject_CallFunction(to_numpy, NULL);
-        Py_DECREF(to_numpy);
-        if (post == NULL) return NULL;
-        return PyBool_FromLong(PyArrayScalar_VAL(post, Datetime) == NPY_DATETIME_NAT);
+        // strcmp returns 0 on match
+        return PyBool_FromLong(strcmp(element->ob_type->tp_name, "NaTType") == 0);
+        // the long way
+        // PyObject *to_numpy = PyObject_GetAttrString(element, "to_numpy");
+        // if (to_numpy == NULL) {
+        //     return NULL;
+        // }
+        // if (!PyCallable_Check(to_numpy)) {
+        //     Py_DECREF(to_numpy);
+        //     Py_RETURN_FALSE;
+        // }
+        // PyObject* scalar = PyObject_CallFunction(to_numpy, NULL);
+        // Py_DECREF(to_numpy);
+        // if (scalar == NULL) {
+        //     return NULL;
+        // }
+        // if (!PyArray_IsScalar(scalar, Datetime)) {
+        //     Py_DECREF(scalar);
+        //     Py_RETURN_FALSE;
+        // }
+        // PyObject* pb = PyBool_FromLong(PyArrayScalar_VAL(scalar, Datetime) == NPY_DATETIME_NAT);
+        // Py_DECREF(scalar);
+        // return pb;
     }
     Py_RETURN_FALSE;
 }
