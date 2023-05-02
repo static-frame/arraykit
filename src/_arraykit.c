@@ -3770,14 +3770,16 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
     }
     // Try to identify Pandas Timestamp NATs
     if (PyObject_HasAttrString(element, "to_numpy")) {
+        // can we match the class name NaTType?
+
         PyObject *to_numpy = PyObject_GetAttrString(element, "to_numpy");
         if (to_numpy == NULL) {
             return NULL;
         }
         if (!PyCallable_Check(to_numpy)) {
+            Py_DECREF(to_numpy);
             Py_RETURN_FALSE;
         }
-
         PyObject* scalar = PyObject_CallFunction(to_numpy, NULL);
         Py_DECREF(to_numpy);
         if (scalar == NULL) {
