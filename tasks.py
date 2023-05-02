@@ -17,7 +17,7 @@ ARTIFACTS = (
 def clean(context):
     '''Clean doc and build artifacts
     '''
-    cmd = f'{sys.executable} -m pip uninstall --yes arraykit'
+    cmd = f'{sys.executable} -m pip --disable-pip-version-check uninstall --yes arraykit'
     context.run(cmd, echo=True, pty=True)
 
     for artifact in sorted(ARTIFACTS):
@@ -28,7 +28,7 @@ def clean(context):
 def build(context):
     # context.run('pip install -r requirements-test.txt', echo=True, pty=True)
     # keep verbose to see warnings
-    context.run(f'{sys.executable} -m pip -v install .', echo=True, pty=True)
+    context.run(f'{sys.executable} -m pip --disable-pip-version-check -v install .', echo=True, pty=True)
 
 
 @invoke.task(build)
