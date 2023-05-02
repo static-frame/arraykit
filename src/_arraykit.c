@@ -3777,10 +3777,19 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
         if (!PyCallable_Check(to_numpy)) {
             Py_RETURN_FALSE;
         }
-        PyObject* post = PyObject_CallFunction(to_numpy, NULL);
+
+        PyObject* scalar = PyObject_CallFunction(to_numpy, NULL);
         Py_DECREF(to_numpy);
-        if (post == NULL) return NULL;
-        return PyBool_FromLong(PyArrayScalar_VAL(post, Datetime) == NPY_DATETIME_NAT);
+        if (scalar == NULL) {
+            return NULL;
+        }
+        if (!PyArray_IsScalar(scalar, Datetime)) {
+            Py_DECREF(scalar);
+            Py_RETURN_FALSE;
+        }
+        PyObject* pb = PyBool_FromLong(PyArrayScalar_VAL(scalar, Datetime) == NPY_DATETIME_NAT);
+        Py_DECREF(scalar);
+        return pb;
     }
     Py_RETURN_FALSE;
 }

@@ -351,6 +351,10 @@ class TestUnit(unittest.TestCase):
         ts = pd.Timestamp('nat')
         self.assertTrue(isna_element(ts))
 
+        s1 = pd.Series((0,))
+        self.assertFalse(isna_element(s1))
+
+
 
     def test_isna_element_e(self) -> None:
         from types import SimpleNamespace
