@@ -37,6 +37,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.3.4
+............
+
+Simplified implementation of NaTType identification in ``isna_element()``.
+
 
 0.3.3
 ............
