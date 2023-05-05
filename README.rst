@@ -40,7 +40,7 @@ What is New in ArrayKit
 0.3.4
 ............
 
-Simplified identification of ``pd.NaTType`` in ``isna_element()``.
+Simplified implementation of ``NaTType`` identification in ``isna_element()``.
 
 
 0.3.3
