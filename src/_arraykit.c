@@ -1292,9 +1292,9 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 
 // Returns 0 on success, -1 on failure.
 static inline int
-AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t count)
+AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment)
 {
-    if (AK_UNLIKELY((cpl->buffer_count + count) >= cpl->buffer_capacity)) {
+    if (AK_UNLIKELY((cpl->buffer_count + increment) >= cpl->buffer_capacity)) {
         // realloc
         cpl->buffer_capacity *= 2; // needs to be max of this or element_length
         cpl->buffer = PyMem_Realloc(cpl->buffer,
@@ -4121,18 +4121,32 @@ typedef struct BlockIndexObject {
     Py_ssize_t bir_capacity;
 } BlockIndexObject;
 
-// Returns NULL on error.
-AK_BlockIndexRecord*
-AK_BIR_new(Py_ssize_t capacity)
+// Returns 0 on succes, -1 on error.
+int
+AK_BI_BIR_new(BlockIndexObject* bi)
 {
     AK_BlockIndexRecord* bir = (AK_BlockIndexRecord*)PyMem_Malloc(
-            sizeof(AK_BlockIndexRecord) * capacity);
+            sizeof(AK_BlockIndexRecord) * bi->bir_capacity);
     if (bir == NULL) {
-        PyMem_Free(bir);
-        return (AK_BlockIndexRecord*)PyErr_NoMemory();
+        return -1;
     }
-    return bir;
+    bi->bir = bir;
+    return 0;
 }
+
+static inline int
+AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
+    if (AK_UNLIKELY((bi->bir_count + increment) >= bi->bir_capacity)) {
+        bi->bir_capacity *= 2;
+        bi->bir = PyMem_Realloc(bi->bir,
+                sizeof(AK_BlockIndexRecord) * bi->bir_capacity);
+        if (bi->bir == NULL) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 
 static PyTypeObject BlockIndexType;
 
@@ -4165,11 +4179,10 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
     bi->block_count = 0;
     bi->bir_count = 0;
     bi->bir_capacity = 8;
-    AK_BlockIndexRecord* bir = AK_BIR_new(bi->bir_capacity);
-    if (bir == NULL) {
+    bi->bir = NULL;
+    if (AK_BI_BIR_new(bi)) {
         return -1;
     }
-    bi->bir = bir;
     return 0;
 }
 
@@ -4204,27 +4217,62 @@ BlockIndex_append(BlockIndexObject *self, PyObject *value)
         return NULL;
     }
 
-    Py_ssize_t increment;
-    if (ndim == 1) {
-        increment = PyArray_DIM(a, 0);
-    }
-    else {
-        increment = PyArray_DIM(a, 1);
-    }
+    Py_ssize_t increment = ndim == 1 ? 1 : PyArray_DIM(a, 1);
 
+    // checks if we have bir_count + increment space
+    if (AK_BI_BIR_resize(self, increment)) {
+        return NULL;
+    };
+
+    AK_BlockIndexRecord* bir = self->bir;
+    for (Py_ssize_t i = 0; i < increment; i++) {
+        bir[self->bir_count] = (AK_BlockIndexRecord){
+                self->block_count, i};
+        self->bir_count++;
+    }
     self->block_count++;
-    self->bir_count += increment;
-
-    while (increment) {
-        // AK_DEBUG_MSG_OBJ("got increment", PyLong_FromLong(increment));
-        increment--;
-    }
     Py_RETURN_NONE;
+}
+
+
+static PyObject*
+BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
+{
+    PyObject* list = PyList_New(self->bir_count);
+    if (list == NULL) {
+        return NULL;
+    }
+    AK_BlockIndexRecord* bir = self->bir;
+
+    for (Py_ssize_t i = 0; i < self->bir_count; i++) {
+        PyObject* item = Py_BuildValue("ii", bir[i].block, bir[i].column);
+        if (item == NULL) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        // set_item steals reference
+        PyList_SET_ITEM(list, i, item);
+    }
+    return list;
+}
+
+
+static PyObject*
+BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
+{
+    Py_ssize_t size = self->bir_count * sizeof(AK_BlockIndexRecord);
+    PyObject* bytes = PyBytes_FromStringAndSize((const char*)self->bir, size);
+    if (bytes == NULL) {
+        return NULL;
+    }
+    return bytes;
 }
 
 
 static PyMethodDef BlockIndex_methods[] = {
     {"append", (PyCFunction)BlockIndex_append, METH_O, NULL},
+    {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
+    {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
     // {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, BlockIndex_copy_doc},
     // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
     {NULL},
