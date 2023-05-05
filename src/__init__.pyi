@@ -22,8 +22,8 @@ class ArrayGO:
 
 class BlockIndex:
     values: np.ndarray
-    def __init__(
-    ) -> None: ...
+    def __init__() -> None: ...
+    def append(self, __value: object) -> None: ...
 
 
 def iterable_str_to_array_1d(

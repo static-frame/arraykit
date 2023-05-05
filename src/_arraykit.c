@@ -1230,7 +1230,7 @@ typedef struct AK_CodePointLine{
 
 } AK_CodePointLine;
 
-// on error return NULL
+// Returns NULL on error.
 AK_CodePointLine*
 AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
@@ -4115,10 +4115,24 @@ typedef struct AK_BlockIndexRecord {
 
 typedef struct BlockIndexObject {
     PyObject_VAR_HEAD
-    AK_BlockIndexRecord* records;
-    Py_ssize_t count_block;
-    Py_ssize_t count_columns;
+    AK_BlockIndexRecord* bir;
+    Py_ssize_t block_count;
+    Py_ssize_t bir_count;
+    Py_ssize_t bir_capacity;
 } BlockIndexObject;
+
+// Returns NULL on error.
+AK_BlockIndexRecord*
+AK_BIR_new(Py_ssize_t capacity)
+{
+    AK_BlockIndexRecord* bir = (AK_BlockIndexRecord*)PyMem_Malloc(
+            sizeof(AK_BlockIndexRecord) * capacity);
+    if (bir == NULL) {
+        PyMem_Free(bir);
+        return (AK_BlockIndexRecord*)PyErr_NoMemory();
+    }
+    return bir;
+}
 
 static PyTypeObject BlockIndexType;
 
@@ -4141,14 +4155,80 @@ BlockIndex_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
     return (PyObject *)self;
 }
 
+// Returns 0 on success, -1 on error.
+int
+BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    // PyTypeObject* cls = Py_TYPE(self); // borrowed ref
+    // const char *name = cls->tp_name;
+    BlockIndexObject* bi = (BlockIndexObject*)self;
+    bi->block_count = 0;
+    bi->bir_count = 0;
+    bi->bir_capacity = 8;
+    AK_BlockIndexRecord* bir = AK_BIR_new(bi->bir_capacity);
+    if (bir == NULL) {
+        return -1;
+    }
+    bi->bir = bir;
+    return 0;
+}
+
 static void
 BlockIndex_dealloc(BlockIndexObject *self)
 {
-    // Py_XDECREF(self->array);
-    // NOTE: need to remove records pointer
+    if (self->bir) {
+        PyMem_Free(self->bir);
+    }
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+static PyObject *
+BlockIndex_repr(BlockIndexObject *self)
+{
+    return PyUnicode_FromFormat("<%s(blocks: %i, columns: %i)>", Py_TYPE(self)->tp_name, self->block_count, self->bir_count);
+}
+
+// Returns NULL on error, None otherwise. This checks and raises on non-array inputs, dimensions other than 1 or 2.
+static PyObject *
+BlockIndex_append(BlockIndexObject *self, PyObject *value)
+{
+    if (!PyArray_Check(value)) {
+        PyErr_Format(PyExc_TypeError, "Found non-array block: %R", value);
+        return NULL;
+    }
+    PyArrayObject *a = (PyArrayObject *)value;
+    int ndim = PyArray_NDIM(a);
+
+    if (ndim < 1 || ndim > 2) {
+        PyErr_Format(PyExc_TypeError, "Array block has invalid dimensions: %i", ndim);
+        return NULL;
+    }
+
+    Py_ssize_t increment;
+    if (ndim == 1) {
+        increment = PyArray_DIM(a, 0);
+    }
+    else {
+        increment = PyArray_DIM(a, 1);
+    }
+
+    self->block_count++;
+    self->bir_count += increment;
+
+    while (increment) {
+        // AK_DEBUG_MSG_OBJ("got increment", PyLong_FromLong(increment));
+        increment--;
+    }
+    Py_RETURN_NONE;
+}
+
+
+static PyMethodDef BlockIndex_methods[] = {
+    {"append", (PyCFunction)BlockIndex_append, METH_O, NULL},
+    // {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, BlockIndex_copy_doc},
+    // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
+    {NULL},
+};
 
 static PyTypeObject BlockIndexType = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -4157,12 +4237,14 @@ static PyTypeObject BlockIndexType = {
     // .tp_clear = (inquiry)BlockIndex_clear,
     .tp_dealloc = (destructor)BlockIndex_dealloc,
     .tp_doc = BlockIndex_doc,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     // .tp_getset = BlockIndex_getset,
     // .tp_iter = (getiterfunc)BlockIndex_iter,
-    // .tp_methods = BlockIndex_methods,
+    .tp_methods = BlockIndex_methods,
     .tp_name = "arraykit.BlockIndex",
     .tp_new = BlockIndex_new,
+    .tp_init = BlockIndex_init,
+    .tp_repr = (reprfunc) BlockIndex_repr,
     // .tp_traverse = (traverseproc)BlockIndex_traverse,
 };
 
