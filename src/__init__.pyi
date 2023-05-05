@@ -20,6 +20,12 @@ class ArrayGO:
     def copy(self: _T) -> _T: ...
     def extend(self, __values: tp.Iterable[object]) -> None: ...
 
+class BlockIndex:
+    values: np.ndarray
+    def __init__(
+    ) -> None: ...
+
+
 def iterable_str_to_array_1d(
         iterable: tp.Iterable[str],
         *,
