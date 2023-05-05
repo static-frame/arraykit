@@ -4105,6 +4105,69 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 }
 
 //------------------------------------------------------------------------------
+// BlockIndex
+//------------------------------------------------------------------------------
+
+typedef struct AK_BlockIndexRecord {
+    Py_ssize_t block; // signed
+    Py_ssize_t column;
+} AK_BlockIndexRecord;
+
+typedef struct BlockIndexObject {
+    PyObject_VAR_HEAD
+    AK_BlockIndexRecord* records;
+    Py_ssize_t count_block;
+    Py_ssize_t count_columns;
+} BlockIndexObject;
+
+static PyTypeObject BlockIndexType;
+
+PyDoc_STRVAR(
+    BlockIndex_doc,
+    "\n"
+    "A grow only, refernce lookup of realized columns to block, block columns."
+    "\n"
+    "Args:\n"
+    "    bytes: Raw byte data for the underlying data model.\n"
+);
+
+static PyObject *
+BlockIndex_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
+{
+    BlockIndexObject *self = (BlockIndexObject *)cls->tp_alloc(cls, 0);
+    if (!self) {
+        return NULL;
+    }
+    return (PyObject *)self;
+}
+
+static void
+BlockIndex_dealloc(BlockIndexObject *self)
+{
+    // Py_XDECREF(self->array);
+    // NOTE: need to remove records pointer
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+
+static PyTypeObject BlockIndexType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    // .tp_as_mapping = &BlockIndex_as_mapping,
+    .tp_basicsize = sizeof(BlockIndexObject), // this does not get size of struct
+    // .tp_clear = (inquiry)BlockIndex_clear,
+    .tp_dealloc = (destructor)BlockIndex_dealloc,
+    .tp_doc = BlockIndex_doc,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    // .tp_getset = BlockIndex_getset,
+    // .tp_iter = (getiterfunc)BlockIndex_iter,
+    // .tp_methods = BlockIndex_methods,
+    .tp_name = "arraykit.BlockIndex",
+    .tp_new = BlockIndex_new,
+    // .tp_traverse = (traverseproc)BlockIndex_traverse,
+};
+
+
+//------------------------------------------------------------------------------
 // ArrayGO
 //------------------------------------------------------------------------------
 
@@ -4445,7 +4508,9 @@ PyInit__arraykit(void)
 
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
+        PyType_Ready(&BlockIndexType) ||
         PyType_Ready(&ArrayGOType) ||
+        PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
         PyModule_AddObject(m, "deepcopy", deepcopy))
     {
