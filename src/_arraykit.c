@@ -4203,7 +4203,7 @@ BlockIndex_repr(BlockIndexObject *self)
 
 // Returns NULL on error, None otherwise. This checks and raises on non-array inputs, dimensions other than 1 or 2.
 static PyObject *
-BlockIndex_append(BlockIndexObject *self, PyObject *value)
+BlockIndex_register(BlockIndexObject *self, PyObject *value)
 {
     if (!PyArray_Check(value)) {
         PyErr_Format(PyExc_TypeError, "Found non-array block: %R", value);
@@ -4216,6 +4216,7 @@ BlockIndex_append(BlockIndexObject *self, PyObject *value)
         PyErr_Format(PyExc_TypeError, "Array block has invalid dimensions: %i", ndim);
         return NULL;
     }
+    // NOTE: shold we check vertical / row count alignment?
 
     Py_ssize_t increment = ndim == 1 ? 1 : PyArray_DIM(a, 1);
 
@@ -4269,18 +4270,66 @@ BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
 }
 
 
+static PyObject *
+BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
+{
+    PyTypeObject* cls = Py_TYPE(self); // borrowed ref
+    BlockIndexObject *bi = (BlockIndexObject *)cls->tp_alloc(cls, 0);
+    if (bi == NULL) {
+        return NULL;
+    }
+    bi->block_count = self->block_count;
+    bi->bir_count = self->bir_count;
+    bi->bir_capacity = self->bir_capacity;
+    bi->bir = NULL;
+    AK_BI_BIR_new(bi); // do initial alloc to self->bir_capacity
+    memcpy(bi->bir,
+            self->bir,
+            self->bir_count * sizeof(AK_BlockIndexRecord));
+    return (PyObject *)bi;
+}
+
+static Py_ssize_t
+BlockIndex_length(BlockIndexObject *self){
+    return self->bir_count;
+}
+
+static PyObject *
+BlockIndex_subscript(BlockIndexObject *self, PyObject *key){
+    if (PyLong_Check(key)) {
+        Py_ssize_t i = PyLong_AsSsize_t(key);
+        if (i >= self->bir_count) {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return NULL;
+        }
+        // TODO: handle negative
+        AK_BlockIndexRecord* biri = &self->bir[i];
+        PyObject* item = Py_BuildValue("ii", biri->block, biri->column);
+        return item; // maybe NULL, exception will be set
+    }
+    // NOTE: might need to handle array scalars
+    PyErr_SetString(PyExc_TypeError, "An integer is required.");
+    return NULL;
+}
+
+static PyMappingMethods BlockIndex_as_mapping = {
+    .mp_length = (lenfunc) BlockIndex_length,
+    .mp_subscript = (binaryfunc) BlockIndex_subscript,
+};
+
+
 static PyMethodDef BlockIndex_methods[] = {
-    {"append", (PyCFunction)BlockIndex_append, METH_O, NULL},
+    {"register", (PyCFunction)BlockIndex_register, METH_O, NULL},
     {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
     {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
-    // {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, BlockIndex_copy_doc},
+    {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},
     // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
     {NULL},
 };
 
 static PyTypeObject BlockIndexType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    // .tp_as_mapping = &BlockIndex_as_mapping,
+    .tp_as_mapping = &BlockIndex_as_mapping,
     .tp_basicsize = sizeof(BlockIndexObject), // this does not get size of struct
     // .tp_clear = (inquiry)BlockIndex_clear,
     .tp_dealloc = (destructor)BlockIndex_dealloc,
