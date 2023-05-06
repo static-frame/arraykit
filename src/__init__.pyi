@@ -6,6 +6,11 @@ _T = tp.TypeVar('_T')
 
 __version__: str
 
+class ErrorInitBlocks:
+    def __init__(self, *args: tp.Any, **kwargs: tp.Any) -> None: ...
+    def with_traceback(self, tb: Exception) -> Exception: ...
+    def __setstate__(self) -> None: ...
+
 class ArrayGO:
 
     values: np.ndarray

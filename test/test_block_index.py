@@ -5,6 +5,7 @@ import sys
 import numpy as np
 
 from arraykit import BlockIndex
+from arraykit import ErrorInitBlocks
 
 
 class TestUnit(unittest.TestCase):
@@ -14,33 +15,34 @@ class TestUnit(unittest.TestCase):
         # print(bi1)
 
 
-    def test_block_index_append_a(self) -> None:
+    def test_block_index_register_a(self) -> None:
         bi1 = BlockIndex()
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ErrorInitBlocks):
             bi1.register('foo')
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ErrorInitBlocks):
             bi1.register(3.5)
 
-    def test_block_index_append_b(self) -> None:
+    def test_block_index_register_b(self) -> None:
 
         bi1 = BlockIndex()
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ErrorInitBlocks):
             bi1.register(np.array(0))
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ErrorInitBlocks):
             bi1.register(np.arange(12).reshape(2,3,2))
 
 
-    def test_block_index_append_c(self) -> None:
+    def test_block_index_register_c(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.array((3, 4, 5)))
         bi1.register(np.array((3, 4, 5)))
         bi1.register(np.arange(6).reshape(3,2))
         self.assertEqual(bi1.to_list(),
             [(0, 0), (1, 0), (2, 0), (2, 1)])
+        self.assertEqual(bi1.shape, (3, 4))
 
-    def test_block_index_append_d(self) -> None:
+    def test_block_index_register_d(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(2))
         bi1.register(np.arange(12).reshape(2,6))
@@ -49,7 +51,16 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(bi1.to_list(),
             [(0, 0), (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (3, 5)]
             )
+        self.assertEqual(bi1.shape, (2, 14))
 
+    def test_block_index_register_e(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        with self.assertRaises(ErrorInitBlocks):
+            bi1.register(np.arange(12).reshape(3,4))
+
+
+    #---------------------------------------------------------------------------
 
     def test_block_index_to_bytes_a(self) -> None:
         bi1 = BlockIndex()
@@ -66,6 +77,8 @@ class TestUnit(unittest.TestCase):
             ]
         self.assertEqual(post, [0, 0, 0, 1, 0, 2, 1, 0, 1, 1])
 
+
+    #---------------------------------------------------------------------------
 
     def test_block_index_copy_a(self) -> None:
         bi1 = BlockIndex()
@@ -97,10 +110,7 @@ class TestUnit(unittest.TestCase):
     def test_block_index_getitem_a(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
+        self.assertEqual(bi1.shape, (2, 6))
+
         bi1.register(np.arange(4).reshape(2,2))
-
-        self.assertEqual(bi1.shape, (0, 8))
-
-
-
-
+        self.assertEqual(bi1.shape, (2, 8))

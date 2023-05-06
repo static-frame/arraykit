@@ -4108,6 +4108,8 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 // BlockIndex
 //------------------------------------------------------------------------------
 
+static PyObject *ErrorInitBlocks;
+
 typedef struct AK_BlockIndexRecord {
     Py_ssize_t block; // signed
     Py_ssize_t column;
@@ -4179,7 +4181,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
     BlockIndexObject* bi = (BlockIndexObject*)self;
 
     bi->block_count = 0;
-    bi->row_count = 0;
+    bi->row_count = -1; // mark as unset
     bi->bir_count = 0;
     bi->bir_capacity = 8;
     bi->bir = NULL;
@@ -4209,29 +4211,40 @@ static PyObject *
 BlockIndex_register(BlockIndexObject *self, PyObject *value)
 {
     if (!PyArray_Check(value)) {
-        PyErr_Format(PyExc_TypeError, "Found non-array block: %R", value);
+        PyErr_Format(ErrorInitBlocks, "Found non-array block: %R", value);
         return NULL;
     }
     PyArrayObject *a = (PyArrayObject *)value;
     int ndim = PyArray_NDIM(a);
 
     if (ndim < 1 || ndim > 2) {
-        PyErr_Format(PyExc_TypeError, "Array block has invalid dimensions: %i", ndim);
+        PyErr_Format(ErrorInitBlocks, "Array block has invalid dimensions: %i", ndim);
         return NULL;
     }
-    // NOTE: shold we check vertical / row count alignment?
-
     Py_ssize_t increment = ndim == 1 ? 1 : PyArray_DIM(a, 1);
 
-    // checks if we have bir_count + increment space
+    // assign alignment on first observation; otherwise take
+    Py_ssize_t alignment = PyArray_DIM(a, 0);
+    if (self->row_count == -1) {
+        self->row_count = alignment;
+    }
+    else if (self->row_count != alignment) {
+        PyErr_Format(ErrorInitBlocks,
+                "Array block has unaligned row count: found %i, expected %i",
+                alignment,
+                self->row_count);
+        return NULL;
+    }
+    // create space for increment new records
     if (AK_BI_BIR_resize(self, increment)) {
         return NULL;
     };
 
     AK_BlockIndexRecord* bir = self->bir;
+    Py_ssize_t bc = self->block_count;
+
     for (Py_ssize_t i = 0; i < increment; i++) {
-        bir[self->bir_count] = (AK_BlockIndexRecord){
-                self->block_count, i};
+        bir[self->bir_count] = (AK_BlockIndexRecord){bc, i};
         self->bir_count++;
     }
     self->block_count++;
@@ -4282,6 +4295,7 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
         return NULL;
     }
     bi->block_count = self->block_count;
+    bi->row_count = self->row_count;
     bi->bir_count = self->bir_count;
     bi->bir_capacity = self->bir_capacity;
     bi->bir = NULL;
@@ -4687,28 +4701,36 @@ PyObject *
 PyInit__arraykit(void)
 {
     import_array();
-    PyObject *m = PyModule_Create(&arraykit_module);
+
+    ErrorInitBlocks = PyErr_NewExceptionWithDoc(
+            "arraykit.ErrorInitBlocks",
+            "RuntimeError error in block initialization.",
+            PyExc_RuntimeError,
+            NULL);
+    if (ErrorInitBlocks == NULL) {
+        return NULL;
+    }
 
     PyObject *copy = PyImport_ImportModule("copy");
-    if (!copy) {
-        Py_XDECREF(m);
+    if (copy == NULL) {
         return NULL;
     }
     PyObject *deepcopy = PyObject_GetAttrString(copy, "deepcopy");
     Py_DECREF(copy);
-    if (!deepcopy) {
-        Py_XDECREF(m);
+    if (deepcopy == NULL) {
         return NULL;
     }
 
+    PyObject *m = PyModule_Create(&arraykit_module);
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&BlockIndexType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
-        PyModule_AddObject(m, "deepcopy", deepcopy))
-    {
+        PyModule_AddObject(m, "deepcopy", deepcopy) ||
+        PyModule_AddObject(m, "ErrorInitBlocks", ErrorInitBlocks)
+    ){
         Py_DECREF(deepcopy);
         Py_XDECREF(m);
         return NULL;
