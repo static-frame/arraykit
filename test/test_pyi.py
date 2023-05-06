@@ -30,6 +30,9 @@ class Interface(tp.NamedTuple):
                 continue
             obj = getattr(module, name)
             if isinstance(obj, type): # a class
+                if name == ak.ErrorInitBlocks.__name__:
+                    # skip as there is Python version variability
+                    continue
                 classes[name] = []
                 for part_name in dir(obj):
                     if not cls._valid_name(part_name):
