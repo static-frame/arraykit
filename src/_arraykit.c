@@ -4115,10 +4115,11 @@ typedef struct AK_BlockIndexRecord {
 
 typedef struct BlockIndexObject {
     PyObject_VAR_HEAD
-    AK_BlockIndexRecord* bir;
     Py_ssize_t block_count;
+    Py_ssize_t row_count;
     Py_ssize_t bir_count;
     Py_ssize_t bir_capacity;
+    AK_BlockIndexRecord* bir;
 } BlockIndexObject;
 
 // Returns 0 on succes, -1 on error.
@@ -4176,7 +4177,9 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
     // PyTypeObject* cls = Py_TYPE(self); // borrowed ref
     // const char *name = cls->tp_name;
     BlockIndexObject* bi = (BlockIndexObject*)self;
+
     bi->block_count = 0;
+    bi->row_count = 0;
     bi->bir_count = 0;
     bi->bir_capacity = 8;
     bi->bir = NULL;
@@ -4246,7 +4249,7 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
     AK_BlockIndexRecord* bir = self->bir;
 
     for (Py_ssize_t i = 0; i < self->bir_count; i++) {
-        PyObject* item = Py_BuildValue("ii", bir[i].block, bir[i].column);
+        PyObject* item = Py_BuildValue("nn", bir[i].block, bir[i].column);
         if (item == NULL) {
             Py_DECREF(list);
             return NULL;
@@ -4289,6 +4292,19 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
     return (PyObject *)bi;
 }
 
+
+static PyObject *
+BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    return Py_BuildValue("nn", self->row_count, self->bir_count);
+}
+
+
+static struct PyGetSetDef BlockIndex_getset[] = {
+    {"shape", (getter)BlockIndex_shape_getter, NULL, NULL, NULL},
+    {NULL},
+};
+
+
 static Py_ssize_t
 BlockIndex_length(BlockIndexObject *self){
     return self->bir_count;
@@ -4304,7 +4320,7 @@ BlockIndex_subscript(BlockIndexObject *self, PyObject *key){
         }
         // TODO: handle negative
         AK_BlockIndexRecord* biri = &self->bir[i];
-        PyObject* item = Py_BuildValue("ii", biri->block, biri->column);
+        PyObject* item = Py_BuildValue("nn", biri->block, biri->column);
         return item; // maybe NULL, exception will be set
     }
     // NOTE: might need to handle array scalars
@@ -4335,7 +4351,7 @@ static PyTypeObject BlockIndexType = {
     .tp_dealloc = (destructor)BlockIndex_dealloc,
     .tp_doc = BlockIndex_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
-    // .tp_getset = BlockIndex_getset,
+    .tp_getset = BlockIndex_getset,
     // .tp_iter = (getiterfunc)BlockIndex_iter,
     .tp_methods = BlockIndex_methods,
     .tp_name = "arraykit.BlockIndex",

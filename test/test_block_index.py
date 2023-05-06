@@ -93,3 +93,14 @@ class TestUnit(unittest.TestCase):
             bi1[8]
 
 
+    #---------------------------------------------------------------------------
+    def test_block_index_getitem_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        self.assertEqual(bi1.shape, (0, 8))
+
+
+
+
