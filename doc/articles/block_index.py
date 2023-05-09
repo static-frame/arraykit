@@ -43,40 +43,81 @@ def from_blocks(
             index.append((block_count, i))
         column_count += c
         block_count += 1
-    return row_count, column_count
+    return (row_count, column_count), index
 
 class ArrayProcessor:
     NAME = ''
     SORT = -1
 
-    def __init__(self, array_iter: tp.Iterator[np.ndarray]):
-        self.array_iter = array_iter
+    def __init__(self, arrays: tp.Iterable[np.ndarray]):
+        self.arrays = arrays
+
+        bi = BlockIndex()
+        for a in self.arrays:
+            bi.register(a)
+        self.bi = bi
+
+        # tuple index
+        _, self.ti = from_blocks(self.arrays)
+        assert len(self.bi) == len(self.ti)
 
 #-------------------------------------------------------------------------------
-class BlockIndexRegister(ArrayProcessor):
-    NAME = 'ak.BlockIUndex.register()'
+class BlockIndexLoad(ArrayProcessor):
+    NAME = 'BlockIndex: load'
     SORT = 0
 
     def __call__(self):
         bi = BlockIndex()
-        import ipdb; ipdb.set_trace()
-        for a in self.array_iter:
+        for a in self.arrays:
             bi.register(a)
         assert bi.shape[0] == ROW_COUNT
 
 
-class FromBlocks(ArrayProcessor):
-    NAME = 'sf.TypeBlocks.from_blocks()'
-    SORT = 0
+class TupleIndexLoad(ArrayProcessor):
+    NAME = 'TupleIndex: load'
+    SORT = 10
 
     def __call__(self):
-        shape = from_blocks(self.array_iter)
+        shape, index = from_blocks(self.arrays)
         assert shape[0] == ROW_COUNT
 
 
+class BlockIndexCopy(ArrayProcessor):
+    NAME = 'BlockIndex: copy'
+    SORT = 1
+
+    def __call__(self):
+        for _ in range(len(self.bi) // 10_000):
+            _ = self.bi.copy()
+
+class TupleIndexCopy(ArrayProcessor):
+    NAME = 'TupleIndex: copy'
+    SORT = 11
+
+    def __call__(self):
+        for _ in range(len(self.ti) // 10_000):
+            _ = self.ti.copy()
+
+
+# class BlockIndexPickle(ArrayProcessor):
+#     NAME = 'BlockIndex: pickle'
+#     SORT = 2
+
+#     def __call__(self):
+#         for _ in range(len(self.bi) // 10_000):
+#             _ = self.bi.copy()
+
+# class TupleIndexPickle(ArrayProcessor):
+#     NAME = 'TupleIndex: pickle'
+#     SORT = 12
+
+#     def __call__(self):
+#         for _ in range(len(self.ti) // 10_000):
+#             _ = self.ti.copy()
+
 
 #-------------------------------------------------------------------------------
-NUMBER = 1
+NUMBER = 10
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -114,41 +155,54 @@ def plot_performance(frame):
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
-            density, position = fixture_label.split('-')
-            # cat_label is the size of the array
-            title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[density]}\n{FixtureFactory.POSITION_TO_DISPLAY[position]}'
-
+            title = f'{cat_label:.0e}\n{fixture_label}'
             ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.75) # makes taller tan wide
-            time_max = fixture['time'].max()
-            ax.set_yticks([0, time_max * 0.5, time_max])
-            ax.set_yticklabels(['',
-                    seconds_to_display(time_max * .5),
-                    seconds_to_display(time_max),
-                    ], fontsize=6)
+
+            time_max = fixture["time"].max()
+            time_min = fixture["time"].min()
+            y_ticks = [0, time_min, time_max * 0.5, time_max]
+            y_labels = [
+                "",
+                seconds_to_display(time_min),
+                seconds_to_display(time_max * 0.5),
+                seconds_to_display(time_max),
+            ]
+            if time_min > time_max * 0.25:
+                # remove the min if it is greater than quarter
+                y_ticks.pop(1)
+                y_labels.pop(1)
+
+            ax.set_yticks(y_ticks)
+            ax.set_yticklabels(y_labels, fontsize=4)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
-                    axis='x',
-                    which='both',
-                    bottom=False,
-                    top=False,
-                    labelbottom=False,
-                    )
+                axis="x",
+                bottom=False,
+                labelbottom=False,
+            )
+            ax.tick_params(
+                axis="y",
+                length=2,
+                width=0.5,
+                pad=1,
+            )
+            ax.set_yscale('log')
 
     fig.set_size_inches(9, 3.5) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=8)
     # horizontal, vertical
-    fig.text(.05, .96, f'first_true_1d() Performance: {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'BlockIndex Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
-    fp = '/tmp/first_true.png'
+    fp = '/tmp/block_index.png'
     plt.subplots_adjust(
             left=0.075,
             bottom=0.05,
             right=0.80,
-            top=0.85,
+            top=0.80,
             wspace=1, # width
-            hspace=0.1,
+            hspace=0.6,
             )
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
@@ -181,12 +235,25 @@ class FFColumnar(FixtureFactory):
 
     @staticmethod
     def get_arrays(size: int) -> tp.Iterator[np.ndarray]:
-        while size:
+        while size > 0:
             a = np.arange(ROW_COUNT)
             a.flags.writeable = False
             yield a
             size -= 1
 
+from itertools import cycle
+class FFMixed(FixtureFactory):
+    NAME = 'mixed'
+
+    @staticmethod
+    def get_arrays(size: int) -> tp.Iterator[np.ndarray]:
+        widths = cycle((8, 16, 4))
+        while size > 0:
+            w = next(widths)
+            a = np.arange(ROW_COUNT * w).reshape(ROW_COUNT, w)
+            a.flags.writeable = False
+            yield a
+            size -= w
 
 class FFUniform(FixtureFactory):
     NAME = 'uniform'
@@ -204,12 +271,15 @@ def get_versions() -> str:
 
 
 CLS_PROCESSOR = (
-    BlockIndexRegister,
-    FromBlocks,
+    BlockIndexLoad,
+    TupleIndexLoad,
+    BlockIndexCopy,
+    TupleIndexCopy,
     )
 
 CLS_FF = (
     FFColumnar,
+    FFMixed,
     FFUniform,
 )
 
