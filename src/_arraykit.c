@@ -4186,13 +4186,41 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
     // const char *name = cls->tp_name;
     BlockIndexObject* bi = (BlockIndexObject*)self;
 
-    bi->block_count = 0;
-    bi->row_count = -1; // mark as unset
-    bi->bir_count = 0;
-    bi->bir_capacity = 8;
+    Py_ssize_t block_count = 0;
+    Py_ssize_t bir_count = 0;
+    Py_ssize_t row_count = -1;
+    Py_ssize_t bir_capacity = 8;
+    PyObject* bir_bytes = NULL;
+
+    if (!PyArg_ParseTuple(args, "|nnnnO!:__init__",
+            &block_count,
+            &row_count,
+            &bir_count,
+            &bir_capacity,
+            &PyBytes_Type, &bir_bytes)) {
+        return -1;
+    }
+
+    bi->block_count = block_count;
+    bi->row_count = row_count; // mark as unset
+    bi->bir_count = bir_count;
+    bi->bir_capacity = bir_capacity;
+
+    // always set bi to capacity defined at this point
     bi->bir = NULL;
     if (AK_BI_BIR_new(bi)) {
         return -1;
+    }
+
+    if (bir_bytes != NULL) {
+        if (bi->bir_count > bi->bir_capacity) {
+            PyErr_SetString(PyExc_ValueError, "record count exceeds capacity");
+            return -1;
+        }
+        // already know bir is a bytes object
+        char* data = PyBytes_AS_STRING(bir_bytes);
+        memcpy(bi->bir, data, bi->bir_count * sizeof(AK_BlockIndexRecord));
+        // bir_bytes is a borrowed ref
     }
     return 0;
 }
@@ -4278,16 +4306,61 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
 }
 
 
+// Returns NULL on error
 static PyObject*
-BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
-{
+BI_to_bytes(BlockIndexObject *self) {
     Py_ssize_t size = self->bir_count * sizeof(AK_BlockIndexRecord);
+    // bytes might be null on error
     PyObject* bytes = PyBytes_FromStringAndSize((const char*)self->bir, size);
-    if (bytes == NULL) {
-        return NULL;
-    }
     return bytes;
 }
+
+
+// Returns NULL on error
+static PyObject*
+BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
+    return BI_to_bytes(self);
+}
+
+// Returns NULL on error, PyObject* otherwise.
+static PyObject*
+BlockIndex___getstate__(BlockIndexObject *self) {
+    PyObject* bi = BI_to_bytes(self);
+    if (bi == NULL) {
+        return NULL;
+    }
+
+    // state might be NULL on failure
+    PyObject* state = Py_BuildValue("nnnnO",
+            self->block_count,
+            self->row_count,
+            self->bir_count,
+            self->bir_capacity,
+            bi);
+
+    Py_DECREF(bi);
+    return state;
+}
+
+
+// State returned here is a tuple of keys, suitable for usage as an `args` argument.
+// static PyObject*
+// BlockIndex___setstate__(FAMObject *self, PyObject *state)
+// {
+//     if (!PyTuple_CheckExact(state) || !PyTuple_GET_SIZE(state)) {
+//         PyErr_SetString(PyExc_ValueError, "Unexpected pickled object.");
+//         return NULL;
+//     }
+
+//     PyObject *keys = PyTuple_GetItem(state, 0);
+//     if (PyArray_Check(keys)) {
+//         // if we an array, make it immutable
+//         PyArray_CLEARFLAGS((PyArrayObject*)keys, NPY_ARRAY_WRITEABLE);
+//     }
+
+//     fam_init((PyObject*)self, state, NULL);
+//     Py_RETURN_NONE;
+// }
 
 
 static PyObject *
@@ -4354,6 +4427,8 @@ static PyMappingMethods BlockIndex_as_mapping = {
 
 static PyMethodDef BlockIndex_methods[] = {
     {"register", (PyCFunction)BlockIndex_register, METH_O, NULL},
+    {"__getstate__", (PyCFunction) BlockIndex___getstate__, METH_NOARGS, NULL},
+    // {"__setstate__", (PyCFunction) BlockIndex___setstate__, METH_O, NULL},
     {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
     {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
     {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},

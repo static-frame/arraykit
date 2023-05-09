@@ -120,3 +120,18 @@ class TestUnit(unittest.TestCase):
 
         bi1.register(np.arange(4).reshape(2,2))
         self.assertEqual(bi1.shape, (2, 8))
+
+
+    #---------------------------------------------------------------------------
+    def test_block_index_get_state_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+
+        block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
+        self.assertEqual((block, row, bir_count, bir_capacity), (3, 2, 9, 16))
+        self.assertTrue(isinstance(bi, bytes))
+
+        bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi)
+        self.assertEqual(repr(bi1), repr(bi2))
