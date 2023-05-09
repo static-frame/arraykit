@@ -4111,6 +4111,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
 static PyObject *ErrorInitBlocks;
 
+// NOTE: we use platform size types here, which are appropriate for the values, but might pose issues if trying to pass pickles between 32 and 64 bit machines.
 typedef struct AK_BlockIndexRecord {
     Py_ssize_t block; // signed
     Py_ssize_t column;
