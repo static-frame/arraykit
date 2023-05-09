@@ -59,6 +59,7 @@ class BlockIndexRegister(ArrayProcessor):
 
     def __call__(self):
         bi = BlockIndex()
+        import ipdb; ipdb.set_trace()
         for a in self.array_iter:
             bi.register(a)
         assert bi.shape[0] == ROW_COUNT
@@ -75,7 +76,7 @@ class FromBlocks(ArrayProcessor):
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 200
+NUMBER = 1
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER

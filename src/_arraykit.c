@@ -1294,6 +1294,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 static inline int
 AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment)
 {
+    // TODO: this does ensure that there is increment sized data! must loop
     if (AK_UNLIKELY((cpl->buffer_count + increment) >= cpl->buffer_capacity)) {
         // realloc
         cpl->buffer_capacity *= 2; // needs to be max of this or element_length
@@ -4139,13 +4140,17 @@ AK_BI_BIR_new(BlockIndexObject* bi)
 
 static inline int
 AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
-    if (AK_UNLIKELY((bi->bir_count + increment) >= bi->bir_capacity)) {
-        bi->bir_capacity *= 2;
+    Py_ssize_t target = bi->bir_count + increment;
+    if (AK_UNLIKELY(target >= bi->bir_capacity)) {
+        while (bi->bir_capacity < target) {
+            bi->bir_capacity <<= 1;
+        }
         bi->bir = PyMem_Realloc(bi->bir,
                 sizeof(AK_BlockIndexRecord) * bi->bir_capacity);
         if (bi->bir == NULL) {
             return -1;
         }
+        // AK_DEBUG_MSG_OBJ("post resize capacity", PyLong_FromLongLong(bi->bir_capacity));
     }
     return 0;
 }
@@ -4192,8 +4197,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 static void
-BlockIndex_dealloc(BlockIndexObject *self)
-{
+BlockIndex_dealloc(BlockIndexObject *self) {
     if (self->bir) {
         PyMem_Free(self->bir);
     }
@@ -4201,9 +4205,8 @@ BlockIndex_dealloc(BlockIndexObject *self)
 }
 
 static PyObject *
-BlockIndex_repr(BlockIndexObject *self)
-{
-    return PyUnicode_FromFormat("<%s(blocks: %i, columns: %i)>", Py_TYPE(self)->tp_name, self->block_count, self->bir_count);
+BlockIndex_repr(BlockIndexObject *self) {
+    return PyUnicode_FromFormat("<%s(blocks: %i, rows: %i, columns: %i)>", Py_TYPE(self)->tp_name, self->block_count, self->row_count, self->bir_count);
 }
 
 // Returns NULL on error, None otherwise. This checks and raises on non-array inputs, dimensions other than 1 or 2.

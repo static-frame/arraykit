@@ -60,6 +60,12 @@ class TestUnit(unittest.TestCase):
             bi1.register(np.arange(12).reshape(3,4))
 
 
+    def test_block_index_register_f(self) -> None:
+        bi1 = BlockIndex()
+        a1 = np.arange(20000).reshape(2, 10_000) #.reshape(2, 10_000)
+        bi1.register(a1)
+
+
     #---------------------------------------------------------------------------
 
     def test_block_index_to_bytes_a(self) -> None:
