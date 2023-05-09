@@ -4187,8 +4187,8 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
     BlockIndexObject* bi = (BlockIndexObject*)self;
 
     Py_ssize_t block_count = 0;
-    Py_ssize_t bir_count = 0;
     Py_ssize_t row_count = -1;
+    Py_ssize_t bir_count = 0;
     Py_ssize_t bir_capacity = 8;
     PyObject* bir_bytes = NULL;
 
@@ -4198,6 +4198,10 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
             &bir_count,
             &bir_capacity,
             &PyBytes_Type, &bir_bytes)) {
+        return -1;
+    }
+    if (bir_count > bir_capacity) {
+        PyErr_SetString(PyExc_ValueError, "record count exceeds capacity");
         return -1;
     }
 
@@ -4211,12 +4215,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
     if (AK_BI_BIR_new(bi)) {
         return -1;
     }
-
     if (bir_bytes != NULL) {
-        if (bi->bir_count > bi->bir_capacity) {
-            PyErr_SetString(PyExc_ValueError, "record count exceeds capacity");
-            return -1;
-        }
         // already know bir is a bytes object
         char* data = PyBytes_AS_STRING(bir_bytes);
         memcpy(bi->bir, data, bi->bir_count * sizeof(AK_BlockIndexRecord));

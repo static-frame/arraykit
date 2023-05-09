@@ -10,10 +10,15 @@ from arraykit import ErrorInitBlocks
 
 class TestUnit(unittest.TestCase):
 
-    def test_block_index_a(self) -> None:
+    def test_block_index_init_a(self) -> None:
         bi1 = BlockIndex()
         # print(bi1)
 
+    def test_block_index_init_b(self) -> None:
+        with self.assertRaises(ValueError):
+            _ = BlockIndex(3, 2, 10, 2)
+
+    #---------------------------------------------------------------------------
 
     def test_block_index_register_a(self) -> None:
         bi1 = BlockIndex()
