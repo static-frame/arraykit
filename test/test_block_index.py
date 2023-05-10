@@ -29,7 +29,8 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(2))
         block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
 
-        bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, np.dtype(int))
+        bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, np.dtype(np.int64))
+        assert "dtype('int64')" in bi2.__repr__()
 
     def test_block_index_init_c2(self) -> None:
         bi1 = BlockIndex()
@@ -39,8 +40,6 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, 'a')
-
-
 
     #---------------------------------------------------------------------------
 
