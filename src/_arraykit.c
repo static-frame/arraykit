@@ -4245,14 +4245,6 @@ BlockIndex_dealloc(BlockIndexObject *self) {
 static PyObject *
 BlockIndex_repr(BlockIndexObject *self) {
     PyObject* dt = self->dtype == NULL ? Py_None : (PyObject*) self->dtype;
-
-    // if (self->dtype == NULL) {
-    //     dt = Py_None;
-    // }
-    // else {
-    //     dt = (PyObject*) self->dtype;
-    // }
-
     return PyUnicode_FromFormat("<%s(blocks: %i, rows: %i, columns: %i, dtype: %R)>",
             Py_TYPE(self)->tp_name,
             self->block_count,
