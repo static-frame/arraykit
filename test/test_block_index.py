@@ -1,6 +1,7 @@
 import unittest
 import ctypes
 import sys
+import pickle
 
 import numpy as np
 
@@ -140,3 +141,18 @@ class TestUnit(unittest.TestCase):
 
         bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi)
         self.assertEqual(repr(bi1), repr(bi2))
+
+    #---------------------------------------------------------------------------
+    def test_block_index_pickle_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+
+        msg = pickle.dumps(bi1)
+        bi2 = pickle.loads(msg)
+
+        self.assertEqual(repr(bi1), repr(bi2))
+        self.assertEqual(bi1.to_list(), bi2.to_list())
+
+

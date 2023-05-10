@@ -4180,8 +4180,7 @@ BlockIndex_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
 
 // Returns 0 on success, -1 on error.
 int
-BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs)
-{
+BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     // PyTypeObject* cls = Py_TYPE(self); // borrowed ref
     // const char *name = cls->tp_name;
     BlockIndexObject* bi = (BlockIndexObject*)self;
@@ -4323,7 +4322,7 @@ BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
 
 // Returns NULL on error, PyObject* otherwise.
 static PyObject*
-BlockIndex___getstate__(BlockIndexObject *self) {
+BlockIndex_getstate(BlockIndexObject *self) {
     PyObject* bi = BI_to_bytes(self);
     if (bi == NULL) {
         return NULL;
@@ -4343,23 +4342,16 @@ BlockIndex___getstate__(BlockIndexObject *self) {
 
 
 // State returned here is a tuple of keys, suitable for usage as an `args` argument.
-// static PyObject*
-// BlockIndex___setstate__(FAMObject *self, PyObject *state)
-// {
-//     if (!PyTuple_CheckExact(state) || !PyTuple_GET_SIZE(state)) {
-//         PyErr_SetString(PyExc_ValueError, "Unexpected pickled object.");
-//         return NULL;
-//     }
-
-//     PyObject *keys = PyTuple_GetItem(state, 0);
-//     if (PyArray_Check(keys)) {
-//         // if we an array, make it immutable
-//         PyArray_CLEARFLAGS((PyArrayObject*)keys, NPY_ARRAY_WRITEABLE);
-//     }
-
-//     fam_init((PyObject*)self, state, NULL);
-//     Py_RETURN_NONE;
-// }
+static PyObject*
+BlockIndex_setstate(BlockIndexObject *self, PyObject *state)
+{
+    if (!PyTuple_CheckExact(state) || !PyTuple_GET_SIZE(state)) {
+        PyErr_SetString(PyExc_ValueError, "Unexpected pickled object.");
+        return NULL;
+    }
+    BlockIndex_init((PyObject*)self, state, NULL);
+    Py_RETURN_NONE;
+}
 
 
 static PyObject *
@@ -4426,8 +4418,8 @@ static PyMappingMethods BlockIndex_as_mapping = {
 
 static PyMethodDef BlockIndex_methods[] = {
     {"register", (PyCFunction)BlockIndex_register, METH_O, NULL},
-    {"__getstate__", (PyCFunction) BlockIndex___getstate__, METH_NOARGS, NULL},
-    // {"__setstate__", (PyCFunction) BlockIndex___setstate__, METH_O, NULL},
+    {"__getstate__", (PyCFunction) BlockIndex_getstate, METH_NOARGS, NULL},
+    {"__setstate__", (PyCFunction) BlockIndex_setstate, METH_O, NULL},
     {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
     {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
     {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},
