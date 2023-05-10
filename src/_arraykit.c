@@ -3359,17 +3359,17 @@ static PyObject *
 resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
 {
     PyArray_Descr *d1, *d2;
-    if (!PyArg_ParseTuple(args, "O!O!:resolve_dtype",
-            &PyArrayDescr_Type, &d1, &PyArrayDescr_Type, &d2))
-    {
+    if (!PyArg_ParseTuple(args,
+            "O!O!:resolve_dtype",
+            &PyArrayDescr_Type, &d1,
+            &PyArrayDescr_Type, &d2)) {
         return NULL;
     }
     return (PyObject *)AK_ResolveDTypes(d1, d2);
 }
 
 static PyObject *
-resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg)
-{
+resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
     return (PyObject *)AK_ResolveDTypeIter(arg);
 }
 
@@ -4124,6 +4124,7 @@ typedef struct BlockIndexObject {
     Py_ssize_t bir_count;
     Py_ssize_t bir_capacity;
     AK_BlockIndexRecord* bir;
+    PyArray_Descr* dtype;
 } BlockIndexObject;
 
 // Returns 0 on succes, -1 on error.
@@ -4169,8 +4170,7 @@ PyDoc_STRVAR(
 );
 
 static PyObject *
-BlockIndex_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
-{
+BlockIndex_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs) {
     BlockIndexObject *self = (BlockIndexObject *)cls->tp_alloc(cls, 0);
     if (!self) {
         return NULL;
@@ -4186,31 +4186,35 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     BlockIndexObject* bi = (BlockIndexObject*)self;
 
     Py_ssize_t block_count = 0;
-    Py_ssize_t row_count = -1;
+    Py_ssize_t row_count = -1; // mark as unset
     Py_ssize_t bir_count = 0;
     Py_ssize_t bir_capacity = 8;
     PyObject* bir_bytes = NULL;
+    PyObject* dtype = NULL;
 
-    if (!PyArg_ParseTuple(args, "|nnnnO!:__init__",
+    if (!PyArg_ParseTuple(args,
+            "|nnnnO!O!:__init__",
             &block_count,
             &row_count,
             &bir_count,
             &bir_capacity,
-            &PyBytes_Type, &bir_bytes)) {
+            &PyBytes_Type, &bir_bytes,
+            &PyArrayDescr_Type, &dtype)) {
         return -1;
     }
     if (bir_count > bir_capacity) {
         PyErr_SetString(PyExc_ValueError, "record count exceeds capacity");
         return -1;
     }
-
+    // handle all Py_ssize_t
     bi->block_count = block_count;
-    bi->row_count = row_count; // mark as unset
+    bi->row_count = row_count;
     bi->bir_count = bir_count;
     bi->bir_capacity = bir_capacity;
 
-    // always set bi to capacity defined at this point
+    // Load the bi->bir struct array, if defined
     bi->bir = NULL;
+    // always set bi to capacity defined at this point
     if (AK_BI_BIR_new(bi)) {
         return -1;
     }
@@ -4220,13 +4224,20 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         memcpy(bi->bir, data, bi->bir_count * sizeof(AK_BlockIndexRecord));
         // bir_bytes is a borrowed ref
     }
+    if (dtype != NULL) {
+        Py_INCREF(dtype); // dtype is a PyObject* at this point
+        bi->dtype = (PyArray_Descr*)dtype;
+    }
     return 0;
 }
 
 static void
 BlockIndex_dealloc(BlockIndexObject *self) {
-    if (self->bir) {
+    if (self->bir != NULL) {
         PyMem_Free(self->bir);
+    }
+    if (self->dtype != NULL) {
+        Py_DECREF((PyObject*)self->dtype);
     }
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -4306,7 +4317,7 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
 
 // Returns NULL on error
 static PyObject*
-BI_to_bytes(BlockIndexObject *self) {
+AK_BI_to_bytes(BlockIndexObject *self) {
     Py_ssize_t size = self->bir_count * sizeof(AK_BlockIndexRecord);
     // bytes might be null on error
     PyObject* bytes = PyBytes_FromStringAndSize((const char*)self->bir, size);
@@ -4317,13 +4328,13 @@ BI_to_bytes(BlockIndexObject *self) {
 // Returns NULL on error
 static PyObject*
 BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
-    return BI_to_bytes(self);
+    return AK_BI_to_bytes(self);
 }
 
 // Returns NULL on error, PyObject* otherwise.
 static PyObject*
 BlockIndex_getstate(BlockIndexObject *self) {
-    PyObject* bi = BI_to_bytes(self);
+    PyObject* bi = AK_BI_to_bytes(self);
     if (bi == NULL) {
         return NULL;
     }

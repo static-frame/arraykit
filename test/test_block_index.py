@@ -15,9 +15,32 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         # print(bi1)
 
-    def test_block_index_init_b(self) -> None:
+    def test_block_index_init_b1(self) -> None:
         with self.assertRaises(ValueError):
             _ = BlockIndex(3, 2, 10, 2)
+
+    def test_block_index_init_b1(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = BlockIndex(3, 2, 10, 2, 'a')
+
+    def test_block_index_init_c1(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(2))
+        block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
+
+        bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, np.dtype(int))
+
+    def test_block_index_init_c2(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(2))
+        block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
+
+        with self.assertRaises(TypeError):
+            bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, 'a')
+
+
 
     #---------------------------------------------------------------------------
 
