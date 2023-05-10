@@ -6,6 +6,7 @@ import sys
 import timeit
 import typing as tp
 from itertools import repeat
+import pickle
 
 from arraykit import BlockIndex
 from arraykit import ErrorInitBlocks
@@ -87,7 +88,7 @@ class BlockIndexCopy(ArrayProcessor):
     SORT = 1
 
     def __call__(self):
-        for _ in range(len(self.bi) // 10_000):
+        for _ in range(10):
             _ = self.bi.copy()
 
 class TupleIndexCopy(ArrayProcessor):
@@ -95,26 +96,46 @@ class TupleIndexCopy(ArrayProcessor):
     SORT = 11
 
     def __call__(self):
-        for _ in range(len(self.ti) // 10_000):
+        for _ in range(10):
             _ = self.ti.copy()
 
 
-# class BlockIndexPickle(ArrayProcessor):
-#     NAME = 'BlockIndex: pickle'
-#     SORT = 2
+class BlockIndexPickle(ArrayProcessor):
+    NAME = 'BlockIndex: pickle'
+    SORT = 2
 
-#     def __call__(self):
-#         for _ in range(len(self.bi) // 10_000):
-#             _ = self.bi.copy()
+    def __call__(self):
+        msg = pickle.dumps(self.bi)
+        bi2 = pickle.loads(msg)
 
-# class TupleIndexPickle(ArrayProcessor):
-#     NAME = 'TupleIndex: pickle'
-#     SORT = 12
+class TupleIndexPickle(ArrayProcessor):
+    NAME = 'TupleIndex: pickle'
+    SORT = 12
 
-#     def __call__(self):
-#         for _ in range(len(self.ti) // 10_000):
-#             _ = self.ti.copy()
+    def __call__(self):
+        msg = pickle.dumps(self.ti)
+        ti2 = pickle.loads(msg)
 
+
+
+class BlockIndexLookup(ArrayProcessor):
+    NAME = 'BlockIndex: lookup'
+    SORT = 3
+
+    def __call__(self):
+        bi = self.bi
+        for i in range(len(bi)):
+            _ = bi[i]
+
+
+class TupleIndexLookup(ArrayProcessor):
+    NAME = 'TupleIndex: lookup'
+    SORT = 13
+
+    def __call__(self):
+        ti = self.ti
+        for i in range(len(ti)):
+            _ = ti[i]
 
 #-------------------------------------------------------------------------------
 NUMBER = 10
@@ -187,7 +208,7 @@ def plot_performance(frame):
                 width=0.5,
                 pad=1,
             )
-            ax.set_yscale('log')
+            # ax.set_yscale('log')
 
     fig.set_size_inches(9, 3.5) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=8)
@@ -275,6 +296,10 @@ CLS_PROCESSOR = (
     TupleIndexLoad,
     BlockIndexCopy,
     TupleIndexCopy,
+    BlockIndexPickle,
+    TupleIndexPickle,
+    BlockIndexLookup,
+    TupleIndexLookup,
     )
 
 CLS_FF = (
