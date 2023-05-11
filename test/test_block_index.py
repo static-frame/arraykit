@@ -203,7 +203,17 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         bi1.register(np.arange(2))
         self.assertEqual(bi1.dtype, np.dtype(int))
+
         bi1.register(np.arange(2).astype(float))
         self.assertEqual(bi1.dtype, np.dtype(float))
+
+        bi1.register(np.arange(2).astype(bool))
+        self.assertEqual(bi1.dtype, np.dtype(object))
+
+    def test_block_index_dtype_b(self) -> None:
+        bi1 = BlockIndex()
+        self.assertEqual(bi1.dtype, None)
+
+        bi1.register(np.arange(2))
         bi1.register(np.arange(2).astype(bool))
         self.assertEqual(bi1.dtype, np.dtype(object))
