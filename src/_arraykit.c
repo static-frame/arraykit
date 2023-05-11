@@ -4446,46 +4446,84 @@ BlockIndex_length(BlockIndexObject *self){
     return self->bir_count;
 }
 
-static PyObject *
-BlockIndex_subscript(BlockIndexObject *self, PyObject *key){
-    if (PyLong_Check(key)) {
-        Py_ssize_t i = PyLong_AsSsize_t(key);
-        if (i >= self->bir_count) {
+
+static PyObject*
+AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
+    if (!((size_t)i < (size_t)self->bir_count)) {
+        PyErr_SetString(PyExc_IndexError, "index out of range");
+        return NULL;
+    }
+    AK_BlockIndexRecord* biri = &self->bir[i];
+    return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL, exception will be set
+}
+
+// static PyObject *
+// BlockIndex_subscript(BlockIndexObject *self, PyObject *key){
+//     if (PyNumber_Check(key)) {
+//         // the null here forces clipping at size_t boundaries
+//         Py_ssize_t i = PyNumber_AsSsize_t(key, NULL);
+//         return AK_BI_item(self, i);
+//     }
+//     // NOTE: might need to handle array scalars
+//     PyErr_SetString(PyExc_TypeError, "An integer is required.");
+//     return NULL;
+// }
+
+// Given an index, return just the block index.
+static PyObject*
+BlockIndex_get_block(BlockIndexObject *self, PyObject *key){
+    if (PyNumber_Check(key)) {
+        Py_ssize_t i = PyNumber_AsSsize_t(key, NULL);
+        if (!((size_t)i < (size_t)self->bir_count)) {
             PyErr_SetString(PyExc_IndexError, "index out of range");
             return NULL;
         }
-        // TODO: handle negative
-        AK_BlockIndexRecord* biri = &self->bir[i];
-        PyObject* item = Py_BuildValue("nn", biri->block, biri->column);
-        return item; // maybe NULL, exception will be set
+        return PyLong_FromSsize_t(self->bir[i].block); // maybe NULL, exception will be set
     }
-    // NOTE: might need to handle array scalars
     PyErr_SetString(PyExc_TypeError, "An integer is required.");
     return NULL;
 }
 
-static PyMappingMethods BlockIndex_as_mapping = {
-    .mp_length = (lenfunc) BlockIndex_length,
-    .mp_subscript = (binaryfunc) BlockIndex_subscript,
+// Given an index, return just the column index.
+static PyObject*
+BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
+    if (PyNumber_Check(key)) {
+        Py_ssize_t i = PyNumber_AsSsize_t(key, NULL);
+        if (!((size_t)i < (size_t)self->bir_count)) {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return NULL;
+        }
+        return PyLong_FromSsize_t(self->bir[i].column); // maybe NULL, exception will be set
+    }
+    PyErr_SetString(PyExc_TypeError, "An integer is required.");
+    return NULL;
+}
+
+
+static PySequenceMethods BlockIndex_as_sequece = {
+    .sq_length = (lenfunc)BlockIndex_length,
+    .sq_item = (ssizeargfunc)AK_BI_item,
 };
 
-
 static PyMethodDef BlockIndex_methods[] = {
+    // {"__getitem__", (PyCFunction)BlockIndex_subscript, METH_O, NULL},
     {"register", (PyCFunction)BlockIndex_register, METH_O, NULL},
     {"__getstate__", (PyCFunction) BlockIndex_getstate, METH_NOARGS, NULL},
     {"__setstate__", (PyCFunction) BlockIndex_setstate, METH_O, NULL},
     {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
     {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
     {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},
+    {"get_block", (PyCFunction) BlockIndex_get_block, METH_O, NULL},
+    {"get_column", (PyCFunction) BlockIndex_get_column, METH_O, NULL},
     // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
     {NULL},
 };
 
 static PyTypeObject BlockIndexType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_as_mapping = &BlockIndex_as_mapping,
+    // .tp_as_mapping = &BlockIndex_as_mapping,
+    .tp_as_sequence = &BlockIndex_as_sequece,
     .tp_basicsize = sizeof(BlockIndexObject), // this does not get size of struct
-    // .tp_clear = (inquiry)BlockIndex_clear,
     .tp_dealloc = (destructor)BlockIndex_dealloc,
     .tp_doc = BlockIndex_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,

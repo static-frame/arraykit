@@ -76,7 +76,7 @@ class ArrayProcessor:
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
     NAME = 'BlockIndex: load'
-    SORT = 2
+    SORT = 3
 
     def __call__(self):
         bi = BlockIndex()
@@ -87,7 +87,7 @@ class BlockIndexLoad(ArrayProcessor):
 
 class TupleIndexLoad(ArrayProcessor):
     NAME = 'TupleIndex: load'
-    SORT = 12
+    SORT = 13
 
     def __call__(self):
         shape, index = from_blocks(self.arrays)
@@ -96,7 +96,7 @@ class TupleIndexLoad(ArrayProcessor):
 
 class BlockIndexCopy(ArrayProcessor):
     NAME = 'BlockIndex: copy'
-    SORT = 1
+    SORT = 2
 
     def __call__(self):
         for _ in range(10):
@@ -104,7 +104,7 @@ class BlockIndexCopy(ArrayProcessor):
 
 class TupleIndexCopy(ArrayProcessor):
     NAME = 'TupleIndex: copy'
-    SORT = 11
+    SORT = 13
 
     def __call__(self):
         for _ in range(10):
@@ -113,7 +113,7 @@ class TupleIndexCopy(ArrayProcessor):
 
 class BlockIndexPickle(ArrayProcessor):
     NAME = 'BlockIndex: pickle'
-    SORT = 3
+    SORT = 4
 
     def __call__(self):
         msg = pickle.dumps(self.bi)
@@ -121,11 +121,12 @@ class BlockIndexPickle(ArrayProcessor):
 
 class TupleIndexPickle(ArrayProcessor):
     NAME = 'TupleIndex: pickle'
-    SORT = 13
+    SORT = 14
 
     def __call__(self):
         msg = pickle.dumps(self.ti)
         ti2 = pickle.loads(msg)
+
 
 
 class BlockIndexLookup(ArrayProcessor):
@@ -137,6 +138,14 @@ class BlockIndexLookup(ArrayProcessor):
         for i in range(len(bi)):
             _ = bi[i]
 
+class BlockIndexLookupParts(ArrayProcessor):
+    NAME = 'BlockIndex: lookup block'
+    SORT = 1
+
+    def __call__(self):
+        bi = self.bi
+        for i in range(len(bi)):
+            _ = bi.get_block(i)
 
 class TupleIndexLookup(ArrayProcessor):
     NAME = 'TupleIndex: lookup'
@@ -148,7 +157,7 @@ class TupleIndexLookup(ArrayProcessor):
             _ = ti[i]
 
 #-------------------------------------------------------------------------------
-NUMBER = 10
+NUMBER = 2
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -310,6 +319,7 @@ CLS_PROCESSOR = (
     TupleIndexPickle,
     BlockIndexLookup,
     TupleIndexLookup,
+    BlockIndexLookupParts,
     )
 
 CLS_FF = (

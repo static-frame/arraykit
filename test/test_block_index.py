@@ -149,6 +149,13 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(4).reshape(2,2))
         self.assertEqual(len(bi1), 8)
 
+    def test_block_index_len_b(self) -> None:
+        bi1 = BlockIndex()
+        self.assertEqual(len(bi1), 0)
+
+    #---------------------------------------------------------------------------
+
+
     def test_block_index_getitem_a(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
@@ -159,6 +166,16 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(IndexError):
             bi1[8]
 
+
+    def test_block_index_getitem_b(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        # lookup by scalar
+        a1 = np.array([3, 7])
+        self.assertEqual(bi1[a1[0]], (0, 3))
+        self.assertEqual(bi1[a1[1]], (1, 1))
 
     #---------------------------------------------------------------------------
     def test_block_index_getitem_a(self) -> None:
@@ -217,3 +234,27 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(2))
         bi1.register(np.arange(2).astype(bool))
         self.assertEqual(bi1.dtype, np.dtype(object))
+
+
+    #---------------------------------------------------------------------------
+    def test_block_index_get_block_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+        bi1.register(np.arange(2))
+
+        self.assertEqual(bi1.get_block(6), 2)
+        self.assertEqual(bi1.get_block(5), 1)
+        self.assertEqual(bi1.get_block(1), 1)
+        self.assertEqual(bi1.get_block(0), 0)
+
+    def test_block_index_get_column_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+        bi1.register(np.arange(2))
+
+        self.assertEqual(bi1.get_column(6), 0)
+        self.assertEqual(bi1.get_column(5), 4)
+        self.assertEqual(bi1.get_column(1), 0)
+        self.assertEqual(bi1.get_column(0), 0)
