@@ -76,7 +76,7 @@ class ArrayProcessor:
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
     NAME = 'BlockIndex: load'
-    SORT = 0
+    SORT = 2
 
     def __call__(self):
         bi = BlockIndex()
@@ -87,7 +87,7 @@ class BlockIndexLoad(ArrayProcessor):
 
 class TupleIndexLoad(ArrayProcessor):
     NAME = 'TupleIndex: load'
-    SORT = 10
+    SORT = 12
 
     def __call__(self):
         shape, index = from_blocks(self.arrays)
@@ -113,7 +113,7 @@ class TupleIndexCopy(ArrayProcessor):
 
 class BlockIndexPickle(ArrayProcessor):
     NAME = 'BlockIndex: pickle'
-    SORT = 2
+    SORT = 3
 
     def __call__(self):
         msg = pickle.dumps(self.bi)
@@ -121,17 +121,16 @@ class BlockIndexPickle(ArrayProcessor):
 
 class TupleIndexPickle(ArrayProcessor):
     NAME = 'TupleIndex: pickle'
-    SORT = 12
+    SORT = 13
 
     def __call__(self):
         msg = pickle.dumps(self.ti)
         ti2 = pickle.loads(msg)
 
 
-
 class BlockIndexLookup(ArrayProcessor):
     NAME = 'BlockIndex: lookup'
-    SORT = 3
+    SORT = 0
 
     def __call__(self):
         bi = self.bi
@@ -141,7 +140,7 @@ class BlockIndexLookup(ArrayProcessor):
 
 class TupleIndexLookup(ArrayProcessor):
     NAME = 'TupleIndex: lookup'
-    SORT = 13
+    SORT = 10
 
     def __call__(self):
         ti = self.ti
