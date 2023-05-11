@@ -4296,7 +4296,7 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value)
         Py_INCREF((PyObject*)dt);
         self->dtype = dt;
     }
-    else {
+    else if (!PyDataType_ISOBJECT(self->dtype)) {
         PyArray_Descr* dtr = AK_ResolveDTypes(self->dtype, dt); // new ref
         Py_DECREF((PyObject*)self->dtype);
         self->dtype = dtr;

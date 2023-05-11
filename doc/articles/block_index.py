@@ -9,8 +9,10 @@ from itertools import repeat
 import pickle
 
 from arraykit import BlockIndex
-from arraykit import ErrorInitBlocks
+# from arraykit import ErrorInitBlocks
 from arraykit import shape_filter
+from arraykit import resolve_dtype
+
 import arraykit as ak
 
 import matplotlib.pyplot as plt
@@ -27,19 +29,28 @@ def from_blocks(
     block_count = 0
     row_count = None
     column_count = 0
+    dtype = None
 
     for block in raw_blocks:
         if not block.__class__ is np.ndarray:
             raise ErrorInitTypeBlocks(f'found non array block: {block}')
         if block.ndim > 2:
             raise ErrorInitTypeBlocks(f'cannot include array with {block.ndim} dimensions')
+
         r, c = shape_filter(block)
+
         if row_count is not None and r != row_count: #type: ignore [unreachable]
             raise ErrorInitTypeBlocks(f'mismatched row count: {r}: {row_count}')
         else:
             row_count = r
         if c == 0:
             continue
+
+        if dtype is None:
+            dtype = block.dtype
+        else:
+            dtype = resolve_dtype(dtype, block.dtype)
+
         for i in range(c):
             index.append((block_count, i))
         column_count += c
