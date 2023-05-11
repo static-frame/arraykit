@@ -4192,14 +4192,16 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject* bir_bytes = NULL;
     PyObject* dtype = NULL;
 
+    // AK_DEBUG_MSG_OBJ("input args", args);
+
     if (!PyArg_ParseTuple(args,
-            "|nnnnO!O!:__init__",
+            "|nnnnO!O:__init__",
             &block_count,
             &row_count,
             &bir_count,
             &bir_capacity,
             &PyBytes_Type, &bir_bytes,
-            &PyArrayDescr_Type, &dtype)) {
+            &dtype)) {
         return -1;
     }
     if (bir_count > bir_capacity) {
@@ -4224,9 +4226,17 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         memcpy(bi->bir, data, bi->bir_count * sizeof(AK_BlockIndexRecord));
         // bir_bytes is a borrowed ref
     }
-    if (dtype != NULL) {
-        Py_INCREF(dtype); // dtype is a PyObject* at this point
-        bi->dtype = (PyArray_Descr*)dtype;
+
+    bi->dtype = NULL;
+    if (dtype != NULL && dtype != Py_None) {
+        if (PyObject_TypeCheck(dtype, &PyArrayDescr_Type)) {
+            Py_INCREF(dtype);
+            bi->dtype = (PyArray_Descr*)dtype;
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, "dtype argument must be a dtype");
+            return -1;
+        }
     }
     return 0;
 }
@@ -4345,13 +4355,16 @@ BlockIndex_getstate(BlockIndexObject *self) {
         return NULL;
     }
 
-    // state might be NULL on failure
-    PyObject* state = Py_BuildValue("nnnnO",
+    PyObject* dt = self->dtype == NULL ? Py_None : (PyObject*) self->dtype;
+
+    // state might be NULL on failure; assume exception set
+    PyObject* state = Py_BuildValue("nnnnOO",
             self->block_count,
             self->row_count,
             self->bir_count,
             self->bir_capacity,
-            bi);
+            bi,
+            dt); // increfs
 
     Py_DECREF(bi);
     return state;
@@ -4383,11 +4396,18 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
     bi->row_count = self->row_count;
     bi->bir_count = self->bir_count;
     bi->bir_capacity = self->bir_capacity;
+
     bi->bir = NULL;
     AK_BI_BIR_new(bi); // do initial alloc to self->bir_capacity
     memcpy(bi->bir,
             self->bir,
             self->bir_count * sizeof(AK_BlockIndexRecord));
+
+    bi->dtype = NULL;
+    if (self->dtype != NULL) {
+        bi->dtype = self->dtype;
+        Py_INCREF((PyObject*)bi->dtype);
+    }
     return (PyObject *)bi;
 }
 

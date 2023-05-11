@@ -27,7 +27,7 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
         bi1.register(np.arange(2))
-        block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
+        block, row, bir_count, bir_capacity, bi, dt = bi1.__getstate__()
 
         bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, np.dtype(np.int64))
         self.assertTrue("dtype('int64')" in bi2.__repr__())
@@ -36,7 +36,7 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
         bi1.register(np.arange(2))
-        block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
+        block, row, bir_count, bir_capacity, bi, dt = bi1.__getstate__()
 
         with self.assertRaises(TypeError):
             bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, 'a')
@@ -128,6 +128,16 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(bi1.to_list(), bi2.to_list())
 
 
+    def test_block_index_copy_b(self) -> None:
+        dt = np.dtype(np.float64)
+        bi1 = BlockIndex(0, 2, 0, 8, b"", dt)
+        bi2 = bi1.copy()
+        del dt
+        del bi1
+        self.assertTrue('float64' in repr(bi2))
+
+    #---------------------------------------------------------------------------
+
     def test_block_index_len_a(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
@@ -162,9 +172,10 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(4).reshape(2,2))
         bi1.register(np.arange(2))
 
-        block, row, bir_count, bir_capacity, bi = bi1.__getstate__()
+        block, row, bir_count, bir_capacity, bi, dt = bi1.__getstate__()
         self.assertEqual((block, row, bir_count, bir_capacity), (3, 2, 9, 16))
         self.assertTrue(isinstance(bi, bytes))
+        self.assertIs(dt, None)
 
         bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi)
         self.assertEqual(repr(bi1), repr(bi2))
