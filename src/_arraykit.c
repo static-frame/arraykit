@@ -4291,14 +4291,16 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value)
         return NULL;
     }
 
-    // PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
-    // if (self->dtype == NULL) {
-    //     Py_INCREF(dt);
-    //     self->dtype = dt;
-    // }
-    // else {
-    //     Py_DECREF(self->dtype);
-    // }
+    PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
+    if (self->dtype == NULL) {
+        Py_INCREF((PyObject*)dt);
+        self->dtype = dt;
+    }
+    else {
+        PyArray_Descr* dtr = AK_ResolveDTypes(self->dtype, dt); // new ref
+        Py_DECREF((PyObject*)self->dtype);
+        self->dtype = dtr;
+    }
 
     // create space for increment new records
     if (AK_BI_BIR_resize(self, increment)) {

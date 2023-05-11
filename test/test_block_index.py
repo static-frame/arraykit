@@ -1,3 +1,4 @@
+
 import unittest
 import ctypes
 import sys
@@ -179,9 +180,9 @@ class TestUnit(unittest.TestCase):
         block, row, bir_count, bir_capacity, bi, dt = bi1.__getstate__()
         self.assertEqual((block, row, bir_count, bir_capacity), (3, 2, 9, 16))
         self.assertTrue(isinstance(bi, bytes))
-        self.assertIs(dt, None)
+        self.assertIs(dt, np.dtype(int))
 
-        bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi)
+        bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, dt)
         self.assertEqual(repr(bi1), repr(bi2))
 
     #---------------------------------------------------------------------------
