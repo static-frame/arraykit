@@ -198,4 +198,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(repr(bi1), repr(bi2))
         self.assertEqual(bi1.to_list(), bi2.to_list())
 
-
+    #---------------------------------------------------------------------------
+    def test_block_index_dtype_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        self.assertEqual(bi1.dtype, np.dtype(int))
+        bi1.register(np.arange(2).astype(float))
+        self.assertEqual(bi1.dtype, np.dtype(float))
+        bi1.register(np.arange(2).astype(bool))
+        self.assertEqual(bi1.dtype, np.dtype(object))
