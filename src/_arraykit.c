@@ -3233,19 +3233,18 @@ mloc(PyObject *Py_UNUSED(m), PyObject *a)
 // filter functions
 
 static PyObject *
-immutable_filter(PyObject *Py_UNUSED(m), PyObject *a)
-{
+immutable_filter(PyObject *Py_UNUSED(m), PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
     return (PyObject *)AK_ImmutableFilter((PyArrayObject *)a);
 }
 
 
 static PyObject *
-name_filter(PyObject *Py_UNUSED(m), PyObject *n)
-{
+name_filter(PyObject *Py_UNUSED(m), PyObject *n) {
     if (AK_UNLIKELY(PyObject_Hash(n) == -1)) {
-        return PyErr_Format(PyExc_TypeError, "unhashable name (type '%s')",
-                            Py_TYPE(n)->tp_name);
+        return PyErr_Format(PyExc_TypeError,
+                "unhashable name (type '%s')",
+                Py_TYPE(n)->tp_name);
     }
     Py_INCREF(n);
     return n;
@@ -3254,8 +3253,7 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n)
 // Represent a 1D array as a 2D array with length as rows of a single-column array.
 // https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
 static PyObject *
-shape_filter(PyObject *Py_UNUSED(m), PyObject *a)
-{
+shape_filter(PyObject *Py_UNUSED(m), PyObject *a) {
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
 
@@ -4354,7 +4352,6 @@ BlockIndex_getstate(BlockIndexObject *self) {
     if (bi == NULL) {
         return NULL;
     }
-
     PyObject* dt = self->dtype == NULL ? Py_None : (PyObject*) self->dtype;
 
     // state might be NULL on failure; assume exception set
@@ -4364,7 +4361,7 @@ BlockIndex_getstate(BlockIndexObject *self) {
             self->bir_count,
             self->bir_capacity,
             bi,
-            dt); // increfs
+            dt); // increfs passed object
 
     Py_DECREF(bi);
     return state;
@@ -4417,9 +4414,18 @@ BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
     return Py_BuildValue("nn", self->row_count, self->bir_count);
 }
 
+static PyObject *
+BlockIndex_dtype_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    if (self->dtype != NULL) {
+        Py_INCREF(self->dtype);
+        return (PyObject*)self->dtype;
+    }
+    Py_RETURN_NONE;
+}
 
 static struct PyGetSetDef BlockIndex_getset[] = {
     {"shape", (getter)BlockIndex_shape_getter, NULL, NULL, NULL},
+    {"dtype", (getter)BlockIndex_dtype_getter, NULL, NULL, NULL},
     {NULL},
 };
 

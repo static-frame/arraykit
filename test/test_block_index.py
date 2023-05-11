@@ -31,6 +31,7 @@ class TestUnit(unittest.TestCase):
 
         bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, np.dtype(np.int64))
         self.assertTrue("dtype('int64')" in bi2.__repr__())
+        self.assertEqual(bi2.dtype, np.dtype(np.int64))
 
     def test_block_index_init_c2(self) -> None:
         bi1 = BlockIndex()
@@ -129,12 +130,15 @@ class TestUnit(unittest.TestCase):
 
 
     def test_block_index_copy_b(self) -> None:
-        dt = np.dtype(np.float64)
-        bi1 = BlockIndex(0, 2, 0, 8, b"", dt)
+        dt1 = np.dtype(np.float64)
+        bi1 = BlockIndex(0, 2, 0, 8, b"", dt1)
         bi2 = bi1.copy()
-        del dt
+        dt2 = bi1.dtype
+        del dt1
         del bi1
         self.assertTrue('float64' in repr(bi2))
+        del bi2
+        self.assertEqual(dt2, np.dtype(np.float64))
 
     #---------------------------------------------------------------------------
 
