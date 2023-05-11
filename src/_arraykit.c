@@ -4227,7 +4227,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
     bi->dtype = NULL;
     if (dtype != NULL && dtype != Py_None) {
-        if (PyObject_TypeCheck(dtype, &PyArrayDescr_Type)) {
+        if (PyArray_DescrCheck(dtype)) {
             Py_INCREF(dtype);
             bi->dtype = (PyArray_Descr*)dtype;
         }
@@ -4290,11 +4290,20 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value)
                 self->row_count);
         return NULL;
     }
+
+    // PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
+    // if (self->dtype == NULL) {
+    //     Py_INCREF(dt);
+    //     self->dtype = dt;
+    // }
+    // else {
+    //     Py_DECREF(self->dtype);
+    // }
+
     // create space for increment new records
     if (AK_BI_BIR_resize(self, increment)) {
         return NULL;
     };
-
     AK_BlockIndexRecord* bir = self->bir;
     Py_ssize_t bc = self->block_count;
 
