@@ -4127,8 +4127,7 @@ typedef struct BlockIndexObject {
 
 // Returns 0 on succes, -1 on error.
 int
-AK_BI_BIR_new(BlockIndexObject* bi)
-{
+AK_BI_BIR_new(BlockIndexObject* bi) {
     AK_BlockIndexRecord* bir = (AK_BlockIndexRecord*)PyMem_Malloc(
             sizeof(AK_BlockIndexRecord) * bi->bir_capacity);
     if (bir == NULL) {
@@ -4141,16 +4140,17 @@ AK_BI_BIR_new(BlockIndexObject* bi)
 static inline int
 AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
     Py_ssize_t target = bi->bir_count + increment;
-    if (AK_UNLIKELY(target >= bi->bir_capacity)) {
-        while (bi->bir_capacity < target) {
-            bi->bir_capacity <<= 1;
+    Py_ssize_t capacity = bi->bir_capacity;
+    if (AK_UNLIKELY(target >= capacity)) {
+        while (capacity < target) {
+            capacity <<= 1; // get 2x the size
         }
         bi->bir = PyMem_Realloc(bi->bir,
-                sizeof(AK_BlockIndexRecord) * bi->bir_capacity);
+                sizeof(AK_BlockIndexRecord) * capacity);
         if (bi->bir == NULL) {
             return -1;
         }
-        // AK_DEBUG_MSG_OBJ("post resize capacity", PyLong_FromLongLong(bi->bir_capacity));
+        bi->bir_capacity = capacity;
     }
     return 0;
 }
@@ -4161,10 +4161,7 @@ static PyTypeObject BlockIndexType;
 PyDoc_STRVAR(
     BlockIndex_doc,
     "\n"
-    "A grow only, refernce lookup of realized columns to block, block columns."
-    "\n"
-    "Args:\n"
-    "    bytes: Raw byte data for the underlying data model.\n"
+    "A grow only, reference lookup of realized columns to block, block columns."
 );
 
 static PyObject *
