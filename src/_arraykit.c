@@ -4220,6 +4220,7 @@ static PyTypeObject BIIterType = {
     .tp_name = "arraykit.BlockIndexIterator",
 };
 
+
 //------------------------------------------------------------------------------
 // BI Iterator sequence selection
 static PyTypeObject BIIterSeqType;
@@ -4371,6 +4372,88 @@ static PyTypeObject BIIterSeqType = {
     .tp_methods = BIiterSeq_methods,
     .tp_name = "arraykit.BlockIndexIteratorSequence",
 };
+
+
+//------------------------------------------------------------------------------
+// BI Iterator slice selection
+static PyTypeObject BIIterSliceType;
+
+typedef struct BIIterSliceObject {
+    PyObject_VAR_HEAD
+    BlockIndexObject *bi;
+    int8_t reversed;
+    PyObject* slice;
+    Py_ssize_t index; // current index state, mutated in-place
+    Py_ssize_t slice_len;
+    int8_t slice_is_array;
+} BIIterSliceObject;
+
+static PyObject *
+BIIterSlice_new(BlockIndexObject *bi, PyObject* slice, int8_t reversed) {
+    BIIterSliceObject *bii = PyObject_New(BIIterSliceObject, &BIIterSliceType);
+    if (!bii) {
+        return NULL;
+    }
+    Py_INCREF(bi);
+    bii->bi = bi;
+    bii->reversed = reversed;
+    bii->index = 0;
+
+    if (PyArray_Check(slice)) {
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "Input type not supported");
+        return NULL;
+    }
+    return (PyObject *)bii;
+}
+
+static void
+BIIterSlice_dealloc(BIIterSliceObject *self) {
+    Py_DECREF(self->bi);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static BIIterSliceObject *
+BIIterSlice_iter(BIIterSliceObject *self) {
+    Py_INCREF(self);
+    return self;
+}
+
+static PyObject *
+BIIterSlice_iternext(BIIterSliceObject *self) {
+    Py_ssize_t t = 0;
+    return AK_BI_item(self->bi, t); // return new ref
+}
+
+static PyObject *
+BIIterSlice_reversed(BIIterSliceObject *self) {
+    return BIIterSlice_new(self->bi, self->slice, !self->reversed);
+}
+
+// static PyObject *
+// BIIterSlice_length_hint(BIIterSliceObject *self) {
+//     // this works for reversed as we use self-> index to subtract from length
+//     Py_ssize_t len = Py_MAX(0, self->selector_len - self->index);
+//     return PyLong_FromSsize_t(len);
+// }
+
+static PyMethodDef BIiterSlice_methods[] = {
+    // {"__length_hint__", (PyCFunction)BIIterSlice_length_hint, METH_NOARGS, NULL},
+    {"__reversed__", (PyCFunction)BIIterSlice_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+static PyTypeObject BIIterSliceType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(BIIterSliceObject),
+    .tp_dealloc = (destructor) BIIterSlice_dealloc,
+    .tp_iter = (getiterfunc) BIIterSlice_iter,
+    .tp_iternext = (iternextfunc) BIIterSlice_iternext,
+    .tp_methods = BIiterSlice_methods,
+    .tp_name = "arraykit.BlockIndexIteratorSlice",
+};
+
 
 //------------------------------------------------------------------------------
 
@@ -5122,6 +5205,7 @@ PyInit__arraykit(void)
         PyType_Ready(&BlockIndexType) ||
         PyType_Ready(&BIIterType) ||
         PyType_Ready(&BIIterSeqType) ||
+        PyType_Ready(&BIIterSliceType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
