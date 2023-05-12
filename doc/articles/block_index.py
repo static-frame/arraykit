@@ -73,10 +73,12 @@ class ArrayProcessor:
         _, self.ti = from_blocks(self.arrays)
         assert len(self.bi) == len(self.ti)
 
+        self.selector_int_array = np.arange(0, len(self.bi), 2)
+
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
     NAME = 'BlockIndex: load'
-    SORT = 3
+    SORT = 0
 
     def __call__(self):
         bi = BlockIndex()
@@ -84,10 +86,9 @@ class BlockIndexLoad(ArrayProcessor):
             bi.register(a)
         assert bi.shape[0] == ROW_COUNT
 
-
 class TupleIndexLoad(ArrayProcessor):
     NAME = 'TupleIndex: load'
-    SORT = 13
+    SORT = 10
 
     def __call__(self):
         shape, index = from_blocks(self.arrays)
@@ -104,7 +105,7 @@ class BlockIndexCopy(ArrayProcessor):
 
 class TupleIndexCopy(ArrayProcessor):
     NAME = 'TupleIndex: copy'
-    SORT = 13
+    SORT = 12
 
     def __call__(self):
         for _ in range(10):
@@ -128,19 +129,18 @@ class TupleIndexPickle(ArrayProcessor):
         ti2 = pickle.loads(msg)
 
 
-
 class BlockIndexLookup(ArrayProcessor):
     NAME = 'BlockIndex: lookup'
-    SORT = 0
+    SORT = 1
 
     def __call__(self):
         bi = self.bi
         for i in range(len(bi)):
             _ = bi[i]
 
-class BlockIndexLookupParts(ArrayProcessor):
+class BlockIndexLookupBlock(ArrayProcessor):
     NAME = 'BlockIndex: lookup block'
-    SORT = 1
+    SORT = 1.1
 
     def __call__(self):
         bi = self.bi
@@ -149,12 +149,29 @@ class BlockIndexLookupParts(ArrayProcessor):
 
 class TupleIndexLookup(ArrayProcessor):
     NAME = 'TupleIndex: lookup'
-    SORT = 10
+    SORT = 11
 
     def __call__(self):
         ti = self.ti
         for i in range(len(ti)):
             _ = ti[i]
+
+
+class BlockIndexIterInt(ArrayProcessor):
+    NAME = 'BlockIndex: iter by int array'
+    SORT = 5
+
+    def __call__(self):
+        _ = list(self.bi.iter_select(self.selector_int_array))
+
+class TupleIndexIterInt(ArrayProcessor):
+    NAME = 'TupleIndex: iter by int array'
+    SORT = 15
+
+    def __call__(self):
+        ti = self.ti
+        _ = [ti[i] for i in self.selector_int_array]
+
 
 #-------------------------------------------------------------------------------
 NUMBER = 2
@@ -315,11 +332,13 @@ CLS_PROCESSOR = (
     TupleIndexLoad,
     BlockIndexCopy,
     TupleIndexCopy,
-    BlockIndexPickle,
-    TupleIndexPickle,
+    # BlockIndexPickle,
+    # TupleIndexPickle,
     BlockIndexLookup,
     TupleIndexLookup,
-    BlockIndexLookupParts,
+    # BlockIndexLookupBlock,
+    BlockIndexIterInt,
+    TupleIndexIterInt,
     )
 
 CLS_FF = (

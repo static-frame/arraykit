@@ -306,6 +306,10 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(2))
         bi1.register(np.arange(4).reshape(2,2))
 
-        biit = bi1.iter_select(np.array([0,3,4]))
-        self.assertEqual(list(biit), [(0, 0), (2, 0), (2, 1)])
-        self.assertEqual(list(reversed(biit)), [(2, 1), (2, 0), (0, 0)])
+        biit1 = bi1.iter_select(np.array([0,3,4]))
+        self.assertEqual(list(biit1), [(0, 0), (2, 0), (2, 1)])
+        self.assertEqual(list(reversed(biit1)), [(2, 1), (2, 0), (0, 0)])
+
+        biit2 = bi1.iter_select(np.array([0,3,4], dtype=np.uint8))
+        self.assertEqual(list(biit2), [(0, 0), (2, 0), (2, 1)])
+        self.assertEqual(list(reversed(biit2)), [(2, 1), (2, 0), (0, 0)])

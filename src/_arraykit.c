@@ -4253,12 +4253,17 @@ BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
             PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
             return NULL;
         }
-        if (PyArray_DESCR(a)->kind != 'i') {
+        char kind = PyArray_DESCR(a)->kind;
+        if (kind != 'i' && kind != 'u') {
             PyErr_SetString(PyExc_TypeError, "Arrays must integer kind");
             return NULL;
         }
         bii->selector_len = PyArray_SIZE(a);
         bii->selector_is_array = 1;
+    }
+    else if (PyList_CheckExact(selector)) {
+        bii->selector_len = PyList_GET_SIZE(selector);
+        bii->selector_is_array = 0;
     }
     else {
         PyErr_SetString(PyExc_TypeError, "Input type not supported");
@@ -4324,6 +4329,16 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
             case NPY_UINT8:
                 t = *(npy_uint8*)PyArray_GETPTR1(a, i);
                 break;
+        }
+    }
+    else { // is a list
+        PyObject* o = PyList_GET_ITEM(self->selector, i); // borrow
+        if (PyNumber_Check(o)) {
+            t = PyNumber_AsSsize_t(o, NULL);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, "elemnt type not suitable for indexing");
+            return NULL;
         }
     }
     return AK_BI_item(self->bi, t); // return new ref
