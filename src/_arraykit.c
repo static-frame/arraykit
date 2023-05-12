@@ -4108,8 +4108,6 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 //------------------------------------------------------------------------------
 
 static PyTypeObject BlockIndexType;
-static PyTypeObject BIIterType;
-
 static PyObject *ErrorInitBlocks;
 
 // NOTE: we use platform size types here, which are appropriate for the values, but might pose issues if trying to pass pickles between 32 and 64 bit machines.
@@ -4142,33 +4140,25 @@ AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
 
 //------------------------------------------------------------------------------
 // BI Iterator
-
-typedef enum BIIterKind{
-    FULL, // might define selector, slice as well
-} BIIterKind;
+static PyTypeObject BIIterType;
 
 typedef struct BIIterObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
-    BIIterKind kind;
-    int reversed;
+    int8_t reversed;
     Py_ssize_t index; // current index state, mutated in-place
 } BIIterObject;
 
-
 static PyObject *
-BIIter_new(BlockIndexObject *bi, BIIterKind kind, int reversed) {
+BIIter_new(BlockIndexObject *bi, int8_t reversed) {
     BIIterObject *bii = PyObject_New(BIIterObject, &BIIterType);
     if (!bii) {
         return NULL;
     }
     Py_INCREF(bi);
     bii->bi = bi;
-
-    bii->kind = kind;
     bii->reversed = reversed;
     bii->index = 0;
-
     return (PyObject *)bii;
 }
 
@@ -4183,7 +4173,6 @@ BIIter_iter(BIIterObject *self) {
     Py_INCREF(self);
     return self;
 }
-
 
 static PyObject *
 BIIter_iternext(BIIterObject *self) {
@@ -4200,22 +4189,13 @@ BIIter_iternext(BIIterObject *self) {
     if (self->bi->bir_count <= i) {
         return NULL;
     }
-
-    switch (self->kind) {
-        case FULL: {
-            return AK_BI_item(self->bi, i); // return new ref
-        }
-    }
-    Py_UNREACHABLE();
+    return AK_BI_item(self->bi, i); // return new ref
 }
-
-
 
 static PyObject *
 BIIter_reversed(BIIterObject *self) {
-    return BIIter_new(self->bi, self->kind, !self->reversed);
+    return BIIter_new(self->bi, !self->reversed);
 }
-
 
 static PyObject *
 BIIter_length_hint(BIIterObject *self) {
@@ -4224,13 +4204,11 @@ BIIter_length_hint(BIIterObject *self) {
     return PyLong_FromSsize_t(len);
 }
 
-
-static PyMethodDef biiter_methods[] = {
+static PyMethodDef BIIter_methods[] = {
     {"__length_hint__", (PyCFunction)BIIter_length_hint, METH_NOARGS, NULL},
     {"__reversed__", (PyCFunction)BIIter_reversed, METH_NOARGS, NULL},
     {NULL},
 };
-
 
 static PyTypeObject BIIterType = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -4238,13 +4216,97 @@ static PyTypeObject BIIterType = {
     .tp_dealloc = (destructor) BIIter_dealloc,
     .tp_iter = (getiterfunc) BIIter_iter,
     .tp_iternext = (iternextfunc) BIIter_iternext,
-    .tp_methods = biiter_methods,
+    .tp_methods = BIIter_methods,
     .tp_name = "arraykit.BlockIndexIterator",
 };
 
+//------------------------------------------------------------------------------
+// BI Iterator sequence selection
+static PyTypeObject BIIterSeqType;
+
+typedef struct BIIterSeqObject {
+    PyObject_VAR_HEAD
+    BlockIndexObject *bi;
+    int8_t reversed;
+    PyObject* selector;
+    Py_ssize_t index; // current index state, mutated in-place
+} BIIterSeqObject;
+
+static PyObject *
+BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
+    BIIterSeqObject *bii = PyObject_New(BIIterSeqObject, &BIIterSeqType);
+    if (!bii) {
+        return NULL;
+    }
+    Py_INCREF(bi);
+    bii->bi = bi;
+    bii->reversed = reversed;
+    Py_INCREF(selector);
+    bii->selector = selector;
+    bii->index = 0;
+    return (PyObject *)bii;
+}
+
+static void
+BIIterSeq_dealloc(BIIterSeqObject *self) {
+    Py_DECREF(self->bi);
+    Py_DECREF(self->selector);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static BIIterSeqObject *
+BIIterSeq_iter(BIIterSeqObject *self) {
+    Py_INCREF(self);
+    return self;
+}
+
+static PyObject *
+BIIterSeq_iternext(BIIterSeqObject *self) {
+    Py_ssize_t i;
+    if (self->reversed) {
+        i = self->bi->bir_count - ++self->index;
+        if (i < 0) {
+            return NULL;
+        }
+    }
+    else {
+        i = self->index++;
+    }
+    if (self->bi->bir_count <= i) {
+        return NULL;
+    }
+    return AK_BI_item(self->bi, i); // return new ref
+}
+
+static PyObject *
+BIIterSeq_reversed(BIIterSeqObject *self) {
+    return BIIterSeq_new(self->bi, self->selector, !self->reversed);
+}
+
+static PyObject *
+BIIterSeq_length_hint(BIIterSeqObject *self) {
+    // this works for reversed as we use self-> index to subtract from length
+    Py_ssize_t len = Py_MAX(0, self->bi->bir_count - self->index);
+    return PyLong_FromSsize_t(len);
+}
+
+static PyMethodDef BIiterSeq_methods[] = {
+    {"__length_hint__", (PyCFunction)BIIterSeq_length_hint, METH_NOARGS, NULL},
+    {"__reversed__", (PyCFunction)BIIterSeq_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+static PyTypeObject BIIterSeqType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(BIIterSeqObject),
+    .tp_dealloc = (destructor) BIIterSeq_dealloc,
+    .tp_iter = (getiterfunc) BIIterSeq_iter,
+    .tp_iternext = (iternextfunc) BIIterSeq_iternext,
+    .tp_methods = BIiterSeq_methods,
+    .tp_name = "arraykit.BlockIndexIteratorSequence",
+};
 
 //------------------------------------------------------------------------------
-
 
 // Returns 0 on succes, -1 on error.
 int
@@ -4468,6 +4530,7 @@ BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     return AK_BI_to_bytes(self);
 }
 
+
 // Returns NULL on error, PyObject* otherwise.
 static PyObject*
 BlockIndex_getstate(BlockIndexObject *self) {
@@ -4533,7 +4596,7 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
 
 static PyObject*
 BlockIndex_iter(BlockIndexObject* self) {
-    return BIIter_new(self, FULL, 0);
+    return BIIter_new(self, 0);
 }
 
 
@@ -4596,6 +4659,13 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
 }
 
 
+// Given key, return an iterator of a selection.
+static PyObject*
+BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
+    return BIIterSeq_new(self, selector, 0);
+}
+
+
 static PySequenceMethods BlockIndex_as_sequece = {
     .sq_length = (lenfunc)BlockIndex_length,
     .sq_item = (ssizeargfunc)AK_BI_item,
@@ -4611,6 +4681,7 @@ static PyMethodDef BlockIndex_methods[] = {
     {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},
     {"get_block", (PyCFunction) BlockIndex_get_block, METH_O, NULL},
     {"get_column", (PyCFunction) BlockIndex_get_column, METH_O, NULL},
+    {"iter_select", (PyCFunction) BlockIndex_iter_select, METH_O, NULL},
     // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
     {NULL},
 };
@@ -4984,6 +5055,7 @@ PyInit__arraykit(void)
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&BlockIndexType) ||
         PyType_Ready(&BIIterType) ||
+        PyType_Ready(&BIIterSeqType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
