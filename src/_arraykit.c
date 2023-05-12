@@ -1,8 +1,8 @@
+
 # include "Python.h"
 # include "structmember.h"
 # include "stdbool.h"
 # include "limits.h"
-// # include "stdlib.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -4107,13 +4107,16 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 // BlockIndex
 //------------------------------------------------------------------------------
 
+static PyTypeObject BlockIndexType;
+static PyTypeObject BIIterType;
+
 static PyObject *ErrorInitBlocks;
 
 // NOTE: we use platform size types here, which are appropriate for the values, but might pose issues if trying to pass pickles between 32 and 64 bit machines.
-typedef struct AK_BlockIndexRecord {
+typedef struct BlockIndexRecord {
     Py_ssize_t block; // signed
     Py_ssize_t column;
-} AK_BlockIndexRecord;
+} BlockIndexRecord;
 
 typedef struct BlockIndexObject {
     PyObject_VAR_HEAD
@@ -4121,15 +4124,133 @@ typedef struct BlockIndexObject {
     Py_ssize_t row_count;
     Py_ssize_t bir_count;
     Py_ssize_t bir_capacity;
-    AK_BlockIndexRecord* bir;
+    BlockIndexRecord* bir;
     PyArray_Descr* dtype;
 } BlockIndexObject;
+
+
+// Returns a new reference to tuple. Returns NULL on error.
+static PyObject*
+AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
+    if (!((size_t)i < (size_t)self->bir_count)) {
+        PyErr_SetString(PyExc_IndexError, "index out of range");
+        return NULL;
+    }
+    BlockIndexRecord* biri = &self->bir[i];
+    return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL
+}
+
+//------------------------------------------------------------------------------
+// BI Iterator
+
+typedef enum BIIterKind{
+    FULL, // might define selector, slice as well
+} BIIterKind;
+
+typedef struct BIIterObject {
+    PyObject_VAR_HEAD
+    BlockIndexObject *bi;
+    BIIterKind kind;
+    int reversed;
+    Py_ssize_t index; // current index state, mutated in-place
+} BIIterObject;
+
+
+static PyObject *
+BIIter_new(BlockIndexObject *bi, BIIterKind kind, int reversed) {
+    BIIterObject *bii = PyObject_New(BIIterObject, &BIIterType);
+    if (!bii) {
+        return NULL;
+    }
+    Py_INCREF(bi);
+    bii->bi = bi;
+
+    bii->kind = kind;
+    bii->reversed = reversed;
+    bii->index = 0;
+
+    return (PyObject *)bii;
+}
+
+static void
+BIIter_dealloc(BIIterObject *self) {
+    Py_DECREF(self->bi);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static BIIterObject *
+BIIter_iter(BIIterObject *self) {
+    Py_INCREF(self);
+    return self;
+}
+
+
+static PyObject *
+BIIter_iternext(BIIterObject *self) {
+    Py_ssize_t i;
+    if (self->reversed) {
+        i = self->bi->bir_count - ++self->index;
+        if (i < 0) {
+            return NULL;
+        }
+    }
+    else {
+        i = self->index++;
+    }
+    if (self->bi->bir_count <= i) {
+        return NULL;
+    }
+
+    switch (self->kind) {
+        case FULL: {
+            return AK_BI_item(self->bi, i); // return new ref
+        }
+    }
+    Py_UNREACHABLE();
+}
+
+
+
+static PyObject *
+BIIter_reversed(BIIterObject *self) {
+    return BIIter_new(self->bi, self->kind, !self->reversed);
+}
+
+
+static PyObject *
+BIIter_length_hint(BIIterObject *self) {
+    // this works for reversed as we use self-> index to subtract from length
+    Py_ssize_t len = Py_MAX(0, self->bi->bir_count - self->index);
+    return PyLong_FromSsize_t(len);
+}
+
+
+static PyMethodDef biiter_methods[] = {
+    {"__length_hint__", (PyCFunction)BIIter_length_hint, METH_NOARGS, NULL},
+    {"__reversed__", (PyCFunction)BIIter_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+
+static PyTypeObject BIIterType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(BIIterObject),
+    .tp_dealloc = (destructor) BIIter_dealloc,
+    .tp_iter = (getiterfunc) BIIter_iter,
+    .tp_iternext = (iternextfunc) BIIter_iternext,
+    .tp_methods = biiter_methods,
+    .tp_name = "arraykit.BlockIndexIterator",
+};
+
+
+//------------------------------------------------------------------------------
+
 
 // Returns 0 on succes, -1 on error.
 int
 AK_BI_BIR_new(BlockIndexObject* bi) {
-    AK_BlockIndexRecord* bir = (AK_BlockIndexRecord*)PyMem_Malloc(
-            sizeof(AK_BlockIndexRecord) * bi->bir_capacity);
+    BlockIndexRecord* bir = (BlockIndexRecord*)PyMem_Malloc(
+            sizeof(BlockIndexRecord) * bi->bir_capacity);
     if (bir == NULL) {
         return -1;
     }
@@ -4146,7 +4267,7 @@ AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
             capacity <<= 1; // get 2x the size
         }
         bi->bir = PyMem_Realloc(bi->bir,
-                sizeof(AK_BlockIndexRecord) * capacity);
+                sizeof(BlockIndexRecord) * capacity);
         if (bi->bir == NULL) {
             return -1;
         }
@@ -4155,8 +4276,6 @@ AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
     return 0;
 }
 
-
-static PyTypeObject BlockIndexType;
 
 PyDoc_STRVAR(
     BlockIndex_doc,
@@ -4187,8 +4306,6 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject* bir_bytes = NULL;
     PyObject* dtype = NULL;
 
-    // AK_DEBUG_MSG_OBJ("input args", args);
-
     if (!PyArg_ParseTuple(args,
             "|nnnnO!O:__init__",
             &block_count,
@@ -4218,7 +4335,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     if (bir_bytes != NULL) {
         // already know bir is a bytes object
         char* data = PyBytes_AS_STRING(bir_bytes);
-        memcpy(bi->bir, data, bi->bir_count * sizeof(AK_BlockIndexRecord));
+        memcpy(bi->bir, data, bi->bir_count * sizeof(BlockIndexRecord));
         // bir_bytes is a borrowed ref
     }
 
@@ -4260,8 +4377,7 @@ BlockIndex_repr(BlockIndexObject *self) {
 
 // Returns NULL on error, None otherwise. This checks and raises on non-array inputs, dimensions other than 1 or 2.
 static PyObject *
-BlockIndex_register(BlockIndexObject *self, PyObject *value)
-{
+BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     if (!PyArray_Check(value)) {
         PyErr_Format(ErrorInitBlocks, "Found non-array block: %R", value);
         return NULL;
@@ -4303,11 +4419,11 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value)
     if (AK_BI_BIR_resize(self, increment)) {
         return NULL;
     };
-    AK_BlockIndexRecord* bir = self->bir;
+    BlockIndexRecord* bir = self->bir;
     Py_ssize_t bc = self->block_count;
 
     for (Py_ssize_t i = 0; i < increment; i++) {
-        bir[self->bir_count] = (AK_BlockIndexRecord){bc, i};
+        bir[self->bir_count] = (BlockIndexRecord){bc, i};
         self->bir_count++;
     }
     self->block_count++;
@@ -4316,13 +4432,12 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value)
 
 
 static PyObject*
-BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
-{
+BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     PyObject* list = PyList_New(self->bir_count);
     if (list == NULL) {
         return NULL;
     }
-    AK_BlockIndexRecord* bir = self->bir;
+    BlockIndexRecord* bir = self->bir;
 
     for (Py_ssize_t i = 0; i < self->bir_count; i++) {
         PyObject* item = Py_BuildValue("nn", bir[i].block, bir[i].column);
@@ -4340,7 +4455,7 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
 // Returns NULL on error
 static PyObject*
 AK_BI_to_bytes(BlockIndexObject *self) {
-    Py_ssize_t size = self->bir_count * sizeof(AK_BlockIndexRecord);
+    Py_ssize_t size = self->bir_count * sizeof(BlockIndexRecord);
     // bytes might be null on error
     PyObject* bytes = PyBytes_FromStringAndSize((const char*)self->bir, size);
     return bytes;
@@ -4406,7 +4521,7 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
     AK_BI_BIR_new(bi); // do initial alloc to self->bir_capacity
     memcpy(bi->bir,
             self->bir,
-            self->bir_count * sizeof(AK_BlockIndexRecord));
+            self->bir_count * sizeof(BlockIndexRecord));
 
     bi->dtype = NULL;
     if (self->dtype != NULL) {
@@ -4414,6 +4529,11 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
         Py_INCREF((PyObject*)bi->dtype);
     }
     return (PyObject *)bi;
+}
+
+static PyObject*
+BlockIndex_iter(BlockIndexObject* self) {
+    return BIIter_new(self, FULL, 0);
 }
 
 
@@ -4443,16 +4563,6 @@ BlockIndex_length(BlockIndexObject *self){
     return self->bir_count;
 }
 
-
-static PyObject*
-AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
-    if (!((size_t)i < (size_t)self->bir_count)) {
-        PyErr_SetString(PyExc_IndexError, "index out of range");
-        return NULL;
-    }
-    AK_BlockIndexRecord* biri = &self->bir[i];
-    return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL
-}
 
 
 // Given an index, return just the block index.
@@ -4514,7 +4624,7 @@ static PyTypeObject BlockIndexType = {
     .tp_doc = BlockIndex_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_getset = BlockIndex_getset,
-    // .tp_iter = (getiterfunc)BlockIndex_iter,
+    .tp_iter = (getiterfunc)BlockIndex_iter,
     .tp_methods = BlockIndex_methods,
     .tp_name = "arraykit.BlockIndex",
     .tp_new = BlockIndex_new,
@@ -4873,6 +4983,7 @@ PyInit__arraykit(void)
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
         PyType_Ready(&BlockIndexType) ||
+        PyType_Ready(&BIIterType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
