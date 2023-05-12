@@ -4454,20 +4454,9 @@ AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
         return NULL;
     }
     AK_BlockIndexRecord* biri = &self->bir[i];
-    return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL, exception will be set
+    return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL
 }
 
-// static PyObject *
-// BlockIndex_subscript(BlockIndexObject *self, PyObject *key){
-//     if (PyNumber_Check(key)) {
-//         // the null here forces clipping at size_t boundaries
-//         Py_ssize_t i = PyNumber_AsSsize_t(key, NULL);
-//         return AK_BI_item(self, i);
-//     }
-//     // NOTE: might need to handle array scalars
-//     PyErr_SetString(PyExc_TypeError, "An integer is required.");
-//     return NULL;
-// }
 
 // Given an index, return just the block index.
 static PyObject*

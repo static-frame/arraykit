@@ -187,6 +187,16 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(bi1.shape, (2, 8))
 
 
+    def test_block_index_getitem_b(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        with self.assertRaises(TypeError):
+            bi1['a']
+        with self.assertRaises(TypeError):
+            bi1[3:5]
+
     #---------------------------------------------------------------------------
     def test_block_index_get_state_a(self) -> None:
         bi1 = BlockIndex()
