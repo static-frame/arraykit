@@ -4230,6 +4230,8 @@ typedef struct BIIterSeqObject {
     int8_t reversed;
     PyObject* selector;
     Py_ssize_t index; // current index state, mutated in-place
+    Py_ssize_t selector_len;
+    int8_t selector_is_array;
 } BIIterSeqObject;
 
 static PyObject *
@@ -4244,6 +4246,24 @@ BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
     Py_INCREF(selector);
     bii->selector = selector;
     bii->index = 0;
+
+    if (PyArray_Check(selector)) {
+        PyArrayObject *a = (PyArrayObject *)selector;
+        if (PyArray_NDIM(a) != 1) {
+            PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
+            return NULL;
+        }
+        if (PyArray_DESCR(a)->kind != 'i') {
+            PyErr_SetString(PyExc_TypeError, "Arrays must integer kind");
+            return NULL;
+        }
+        bii->selector_len = PyArray_SIZE(a);
+        bii->selector_is_array = 1;
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "Input type not supported");
+        return NULL;
+    }
     return (PyObject *)bii;
 }
 
@@ -4264,7 +4284,7 @@ static PyObject *
 BIIterSeq_iternext(BIIterSeqObject *self) {
     Py_ssize_t i;
     if (self->reversed) {
-        i = self->bi->bir_count - ++self->index;
+        i = self->selector_len - ++self->index;
         if (i < 0) {
             return NULL;
         }
@@ -4272,10 +4292,41 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
     else {
         i = self->index++;
     }
-    if (self->bi->bir_count <= i) {
+    if (self->selector_len <= i) {
         return NULL;
     }
-    return AK_BI_item(self->bi, i); // return new ref
+    // use i to get index from selector
+    Py_ssize_t t = 0;
+    if (self->selector_is_array) {
+        PyArrayObject *a = (PyArrayObject *)self->selector;
+        switch (PyArray_TYPE(a)) { // type of passed in array
+            case NPY_INT64:
+                t = *(npy_int64*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_INT32:
+                t = *(npy_int32*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_INT16:
+                t = *(npy_int16*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_INT8:
+                t = *(npy_int8*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_UINT64:
+                t = *(npy_uint64*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_UINT32:
+                t = *(npy_uint32*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_UINT16:
+                t = *(npy_uint16*)PyArray_GETPTR1(a, i);
+                break;
+            case NPY_UINT8:
+                t = *(npy_uint8*)PyArray_GETPTR1(a, i);
+                break;
+        }
+    }
+    return AK_BI_item(self->bi, t); // return new ref
 }
 
 static PyObject *
@@ -4286,7 +4337,7 @@ BIIterSeq_reversed(BIIterSeqObject *self) {
 static PyObject *
 BIIterSeq_length_hint(BIIterSeqObject *self) {
     // this works for reversed as we use self-> index to subtract from length
-    Py_ssize_t len = Py_MAX(0, self->bi->bir_count - self->index);
+    Py_ssize_t len = Py_MAX(0, self->selector_len - self->index);
     return PyLong_FromSsize_t(len);
 }
 

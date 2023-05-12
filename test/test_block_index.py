@@ -291,5 +291,21 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(2))
         bi1.register(np.arange(4).reshape(2,2))
 
-        post = bi1.iter_select(None)
-        import ipdb; ipdb.set_trace()
+        with self.assertRaises(TypeError):
+            _ = bi1.iter_select(None)
+
+        with self.assertRaises(TypeError):
+            _ = bi1.iter_select(np.array(['a', 'b']))
+
+        with self.assertRaises(TypeError):
+            _ = bi1.iter_select(np.arange(4).reshape(2,2))
+
+    def test_block_index_iter_b(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        biit = bi1.iter_select(np.array([0,3,4]))
+        self.assertEqual(list(biit), [(0, 0), (2, 0), (2, 1)])
+        self.assertEqual(list(reversed(biit)), [(2, 1), (2, 0), (0, 0)])
