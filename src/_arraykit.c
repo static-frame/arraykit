@@ -4333,11 +4333,11 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
     }
     else { // is a list
         PyObject* o = PyList_GET_ITEM(self->selector, i); // borrow
-        if (PyNumber_Check(o)) {
+        if (PyNumber_Check(o)) { // handles scalars
             t = PyNumber_AsSsize_t(o, NULL);
         }
         else {
-            PyErr_SetString(PyExc_TypeError, "elemnt type not suitable for indexing");
+            PyErr_SetString(PyExc_TypeError, "element type not suitable for indexing");
             return NULL;
         }
     }

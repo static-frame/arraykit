@@ -74,6 +74,7 @@ class ArrayProcessor:
         assert len(self.bi) == len(self.ti)
 
         self.selector_int_array = np.arange(0, len(self.bi), 2)
+        self.selector_int_list = list(range(0, len(self.bi), 2))
 
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
@@ -157,20 +158,38 @@ class TupleIndexLookup(ArrayProcessor):
             _ = ti[i]
 
 
-class BlockIndexIterInt(ArrayProcessor):
+class BlockIndexIterIntArray(ArrayProcessor):
     NAME = 'BlockIndex: iter by int array'
     SORT = 5
 
     def __call__(self):
         _ = list(self.bi.iter_select(self.selector_int_array))
 
-class TupleIndexIterInt(ArrayProcessor):
+class TupleIndexIterIntArray(ArrayProcessor):
     NAME = 'TupleIndex: iter by int array'
     SORT = 15
 
     def __call__(self):
         ti = self.ti
         _ = [ti[i] for i in self.selector_int_array]
+
+
+class BlockIndexIterIntList(ArrayProcessor):
+    NAME = 'BlockIndex: iter by int list'
+    SORT = 6
+
+    def __call__(self):
+        _ = list(self.bi.iter_select(self.selector_int_list))
+
+class TupleIndexIterIntList(ArrayProcessor):
+    NAME = 'TupleIndex: iter by int list'
+    SORT = 16
+
+    def __call__(self):
+        ti = self.ti
+        _ = [ti[i] for i in self.selector_int_list]
+
+
 
 
 #-------------------------------------------------------------------------------
@@ -337,8 +356,10 @@ CLS_PROCESSOR = (
     BlockIndexLookup,
     TupleIndexLookup,
     # BlockIndexLookupBlock,
-    BlockIndexIterInt,
-    TupleIndexIterInt,
+    BlockIndexIterIntArray,
+    TupleIndexIterIntArray,
+    BlockIndexIterIntList,
+    TupleIndexIterIntList,
     )
 
 CLS_FF = (

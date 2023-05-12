@@ -300,7 +300,7 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = bi1.iter_select(np.arange(4).reshape(2,2))
 
-    def test_block_index_iter_b(self) -> None:
+    def test_block_index_iter_b1(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(4).reshape(2,2))
         bi1.register(np.arange(2))
@@ -313,3 +313,37 @@ class TestUnit(unittest.TestCase):
         biit2 = bi1.iter_select(np.array([0,3,4], dtype=np.uint8))
         self.assertEqual(list(biit2), [(0, 0), (2, 0), (2, 1)])
         self.assertEqual(list(reversed(biit2)), [(2, 1), (2, 0), (0, 0)])
+
+    def test_block_index_iter_b2(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        biit1 = bi1.iter_select(list(np.array([0,3,4])))
+        self.assertEqual(list(biit1), [(0, 0), (2, 0), (2, 1)])
+        self.assertEqual(list(reversed(biit1)), [(2, 1), (2, 0), (0, 0)])
+
+    def test_block_index_iter_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        biit1 = bi1.iter_select([0,3,4])
+        self.assertEqual(list(biit1), [(0, 0), (2, 0), (2, 1)])
+        self.assertEqual(list(reversed(biit1)), [(2, 1), (2, 0), (0, 0)])
+
+        biit2 = bi1.iter_select([0,3,4])
+        self.assertEqual(list(biit2), [(0, 0), (2, 0), (2, 1)])
+        self.assertEqual(list(reversed(biit2)), [(2, 1), (2, 0), (0, 0)])
+
+
+    def test_block_index_iter_d(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        with self.assertRaises(TypeError):
+            _ = list(bi1.iter_select([0,3,'b']))
