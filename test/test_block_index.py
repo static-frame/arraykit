@@ -381,3 +381,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(list(bi1.iter_select((slice(7, 3, -1)))),
             [(2, 4), (2, 3), (2, 2), (2, 1)]
             )
+
+        self.assertEqual(list(bi1.iter_select((slice(None, None, -1)))),
+            [(2, 4), (2, 3), (2, 2), (2, 1)]
+            )
