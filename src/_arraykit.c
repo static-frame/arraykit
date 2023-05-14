@@ -4230,7 +4230,7 @@ typedef struct BIIterSeqObject {
     BlockIndexObject *bi;
     int8_t reversed;
     PyObject* selector;
-    Py_ssize_t index; // current index state, mutated in-place
+    Py_ssize_t index; // current pos in sequence, mutated in-place
     Py_ssize_t selector_len;
     int8_t selector_is_array;
 } BIIterSeqObject;
@@ -4244,6 +4244,7 @@ BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
     Py_INCREF(bi);
     bii->bi = bi;
     bii->reversed = reversed;
+
     Py_INCREF(selector);
     bii->selector = selector;
     bii->index = 0;
@@ -4383,9 +4384,12 @@ typedef struct BIIterSliceObject {
     BlockIndexObject *bi;
     int8_t reversed;
     PyObject* slice;
-    Py_ssize_t index; // current index state, mutated in-place
-    Py_ssize_t slice_len;
-    int8_t slice_is_array;
+    Py_ssize_t count; // count of , mutated in-place
+    // these are the normalized values truncated to the span of the bir_count; len is the realized length after extraction; step is always set to 1 if missing; len is 0 if no realized values
+    Py_ssize_t start;
+    Py_ssize_t stop;
+    Py_ssize_t step;
+    Py_ssize_t len;
 } BIIterSliceObject;
 
 static PyObject *
@@ -4394,23 +4398,43 @@ BIIterSlice_new(BlockIndexObject *bi, PyObject* slice, int8_t reversed) {
     if (!bii) {
         return NULL;
     }
+
     Py_INCREF(bi);
     bii->bi = bi;
-    bii->reversed = reversed;
-    bii->index = 0;
+    // we store the slice in case we need to delegate to a different iterator
+    Py_INCREF(slice);
+    bii->slice = slice;
 
-    if (PyArray_Check(slice)) {
+    bii->reversed = reversed;
+    bii->count = 0;
+
+    if (PySlice_Check(slice)) {
+        if (PySlice_GetIndicesEx(slice,
+                bi->bir_count,
+                &bii->start,
+                &bii->stop,
+                &bii->step,
+                &bii->len)) {
+            goto error;
+        }
+        // PyObject* v = Py_BuildValue("nnnn", bii->start, bii->stop, bii->step, bii->len);
+        // AK_DEBUG_MSG_OBJ("slice", v);
     }
     else {
         PyErr_SetString(PyExc_TypeError, "Input type not supported");
-        return NULL;
+        goto error;
     }
     return (PyObject *)bii;
+error:
+    Py_DECREF(bii->bi);
+    Py_DECREF(bii->slice);
+    return NULL;
 }
 
 static void
 BIIterSlice_dealloc(BIIterSliceObject *self) {
     Py_DECREF(self->bi);
+    Py_DECREF(self->slice);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -4422,8 +4446,13 @@ BIIterSlice_iter(BIIterSliceObject *self) {
 
 static PyObject *
 BIIterSlice_iternext(BIIterSliceObject *self) {
-    Py_ssize_t t = 0;
-    return AK_BI_item(self->bi, t); // return new ref
+    if (self->len == 0 || self->count >= self->len) {
+        return NULL;
+    }
+    Py_ssize_t i = self->start;
+    self->start += self->step;
+    self->count++; // by counting index we we do not need to compare to stop
+    return AK_BI_item(self->bi, i); // return new ref
 }
 
 static PyObject *
@@ -4431,15 +4460,15 @@ BIIterSlice_reversed(BIIterSliceObject *self) {
     return BIIterSlice_new(self->bi, self->slice, !self->reversed);
 }
 
-// static PyObject *
-// BIIterSlice_length_hint(BIIterSliceObject *self) {
-//     // this works for reversed as we use self-> index to subtract from length
-//     Py_ssize_t len = Py_MAX(0, self->selector_len - self->index);
-//     return PyLong_FromSsize_t(len);
-// }
+static PyObject *
+BIIterSlice_length_hint(BIIterSliceObject *self) {
+    // this works for reversed as we use self-> index to subtract from length
+    Py_ssize_t len = Py_MAX(0, self->len - self->count);
+    return PyLong_FromSsize_t(len);
+}
 
 static PyMethodDef BIiterSlice_methods[] = {
-    // {"__length_hint__", (PyCFunction)BIIterSlice_length_hint, METH_NOARGS, NULL},
+    {"__length_hint__", (PyCFunction)BIIterSlice_length_hint, METH_NOARGS, NULL},
     {"__reversed__", (PyCFunction)BIIterSlice_reversed, METH_NOARGS, NULL},
     {NULL},
 };
@@ -4811,6 +4840,9 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
 // Given key, return an iterator of a selection.
 static PyObject*
 BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
+    if (PySlice_Check(selector)) {
+        return BIIterSlice_new(self, selector, 0);
+    }
     return BIIterSeq_new(self, selector, 0);
 }
 

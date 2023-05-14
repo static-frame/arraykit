@@ -347,3 +347,37 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             _ = list(bi1.iter_select([0,3,'b']))
+
+
+    #---------------------------------------------------------------------------
+    def test_block_index_iter_select_slice_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+
+        self.assertEqual(list(bi1.iter_select((slice(None)))),
+            [(0, 0), (0, 1), (1, 0), (2, 0), (2, 1), (2, 2), (2, 3), (2, 4)]
+            )
+
+        self.assertEqual(list(bi1.iter_select((slice(4, None)))),
+            [(2, 1), (2, 2), (2, 3), (2, 4)]
+            )
+
+        self.assertEqual(list(bi1.iter_select((slice(None)))),
+            [(0, 0), (0, 1), (1, 0), (2, 0), (2, 1), (2, 2), (2, 3), (2, 4)]
+            )
+
+        self.assertEqual(list(bi1.iter_select((slice(1, 8, 2)))),
+            [(0, 1), (2, 0), (2, 2), (2, 4)]
+            )
+
+    def test_block_index_iter_select_slice_b(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+
+        self.assertEqual(list(bi1.iter_select((slice(7, 3, -1)))),
+            [(2, 4), (2, 3), (2, 2), (2, 1)]
+            )
