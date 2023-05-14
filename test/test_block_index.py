@@ -383,5 +383,19 @@ class TestUnit(unittest.TestCase):
             )
 
         self.assertEqual(list(bi1.iter_select((slice(None, None, -1)))),
-            [(2, 4), (2, 3), (2, 2), (2, 1)]
+            [(2, 4), (2, 3), (2, 2), (2, 1), (2, 0), (1, 0), (0, 1), (0, 0)]
+            )
+
+    def test_block_index_iter_select_slice_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        self.assertEqual(list(bi1.iter_select(slice(1,5))),
+            [(0, 1), (1, 0), (2, 0), (2, 1)]
+            )
+
+        self.assertEqual(list(reversed(bi1.iter_select(slice(1,5)))),
+            [(2, 1), (2, 0), (1, 0), (0, 1)]
             )

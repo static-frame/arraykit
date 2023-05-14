@@ -4253,12 +4253,12 @@ BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
         PyArrayObject *a = (PyArrayObject *)selector;
         if (PyArray_NDIM(a) != 1) {
             PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
-            return NULL;
+            goto error;
         }
         char kind = PyArray_DESCR(a)->kind;
         if (kind != 'i' && kind != 'u') {
             PyErr_SetString(PyExc_TypeError, "Arrays must integer kind");
-            return NULL;
+            goto error;
         }
         bii->selector_len = PyArray_SIZE(a);
         bii->selector_is_array = 1;
@@ -4269,9 +4269,13 @@ BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
     }
     else {
         PyErr_SetString(PyExc_TypeError, "Input type not supported");
-        return NULL;
+        goto error;
     }
     return (PyObject *)bii;
+error:
+    Py_DECREF(bii->bi);
+    Py_DECREF(bii->selector);
+    return NULL;
 }
 
 static void
@@ -4387,7 +4391,6 @@ typedef struct BIIterSliceObject {
     Py_ssize_t count; // count of , mutated in-place
     // these are the normalized values truncated to the span of the bir_count; len is the realized length after extraction; step is always set to 1 if missing; len is 0 if no realized values
     Py_ssize_t start;
-    Py_ssize_t stop;
     Py_ssize_t step;
     Py_ssize_t len;
 } BIIterSliceObject;
@@ -4405,14 +4408,14 @@ BIIterSlice_new(BlockIndexObject *bi, PyObject* slice, int8_t reversed) {
     Py_INCREF(slice);
     bii->slice = slice;
 
-    bii->reversed = reversed;
     bii->count = 0;
+    Py_ssize_t stop; // not needed
 
     if (PySlice_Check(slice)) {
         if (PySlice_GetIndicesEx(slice,
                 bi->bir_count,
                 &bii->start,
-                &bii->stop,
+                &stop,
                 &bii->step,
                 &bii->len)) {
             goto error;
@@ -4423,6 +4426,10 @@ BIIterSlice_new(BlockIndexObject *bi, PyObject* slice, int8_t reversed) {
     else {
         PyErr_SetString(PyExc_TypeError, "Input type not supported");
         goto error;
+    }
+    if ((bii->reversed = reversed)) {
+        bii->start += (bii->step * (bii->len - 1));
+        bii->step *= -1;
     }
     return (PyObject *)bii;
 error:
