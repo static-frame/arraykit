@@ -141,6 +141,15 @@ class TestUnit(unittest.TestCase):
         del bi2
         self.assertEqual(dt2, np.dtype(np.float64))
 
+
+    #---------------------------------------------------------------------------
+    def test_block_index_sizeof_a(self) -> None:
+        bi1 = BlockIndex()
+        so1 = sys.getsizeof(bi1)
+        bi1.register(np.arange(100).reshape(2,50))
+        so2 = sys.getsizeof(bi1)
+        self.assertTrue(so1 < so2)
+
     #---------------------------------------------------------------------------
 
     def test_block_index_len_a(self) -> None:

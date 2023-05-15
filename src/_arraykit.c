@@ -4812,6 +4812,14 @@ BlockIndex_length(BlockIndexObject *self){
 }
 
 
+static PyObject *
+BlockIndex_sizeof(BlockIndexObject *self) {
+    return PyLong_FromSsize_t(
+        Py_TYPE(self)->tp_basicsize
+        + (self->bir_capacity) * sizeof(BlockIndexRecord)
+    );
+}
+
 
 // Given an index, return just the block index.
 static PyObject*
@@ -4864,6 +4872,7 @@ static PyMethodDef BlockIndex_methods[] = {
     {"register", (PyCFunction)BlockIndex_register, METH_O, NULL},
     {"__getstate__", (PyCFunction) BlockIndex_getstate, METH_NOARGS, NULL},
     {"__setstate__", (PyCFunction) BlockIndex_setstate, METH_O, NULL},
+    {"__sizeof__", (PyCFunction) BlockIndex_sizeof, METH_NOARGS, NULL},
     {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
     {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
     {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},
