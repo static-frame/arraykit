@@ -4401,7 +4401,6 @@ BIIterSlice_new(BlockIndexObject *bi, PyObject* slice, int8_t reversed) {
     if (!bii) {
         return NULL;
     }
-
     Py_INCREF(bi);
     bii->bi = bi;
     // we store the slice in case we need to delegate to a different iterator
@@ -4488,6 +4487,135 @@ static PyTypeObject BIIterSliceType = {
     .tp_iternext = (iternextfunc) BIIterSlice_iternext,
     .tp_methods = BIiterSlice_methods,
     .tp_name = "arraykit.BlockIndexIteratorSlice",
+};
+
+
+//------------------------------------------------------------------------------
+// BI Iterator Boolean array selection
+static PyTypeObject BIIterBooleanType;
+
+typedef struct BIIterBooleanObject {
+    PyObject_VAR_HEAD
+    BlockIndexObject *bi;
+    int8_t reversed;
+    PyObject* array;
+    Py_ssize_t pos; // current index, mutated in-place
+    Py_ssize_t len;
+} BIIterBooleanObject;
+
+static PyObject *
+BIIterBoolean_new(BlockIndexObject *bi, PyObject* array, int8_t reversed) {
+    BIIterBooleanObject *bii = PyObject_New(BIIterBooleanObject, &BIIterBooleanType);
+    if (!bii) {
+        return NULL;
+    }
+    Py_INCREF(bi);
+    bii->bi = bi;
+    // we store the slice in case we need to delegate to a different iterator
+    Py_INCREF(array);
+    bii->array = array;
+
+    if (PyArray_Check(array)) {
+        PyArrayObject *a = (PyArrayObject *)array;
+        if (PyArray_NDIM(a) != 1) {
+            PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
+            goto error;
+        }
+        if (PyArray_TYPE(a) != NPY_BOOL) {
+            PyErr_SetString(PyExc_TypeError, "Arrays must be Boolean");
+            goto error;
+        }
+        if ((bii->len = PyArray_SIZE(a)) != bi->bir_count ) {
+            PyErr_SetString(PyExc_TypeError, "Arrays must match length");
+            goto error;
+        }
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "Input type not supported");
+        goto error;
+    }
+
+    // always initialize bii->pos to a valid index
+    if ((bii->reversed = reversed)) {
+        bii->pos = bii->len - 1;
+    }
+    else {
+        bii->pos = 0;
+    }
+    return (PyObject *)bii;
+error:
+    Py_DECREF(bii->bi);
+    Py_DECREF(bii->array);
+    return NULL;
+}
+
+static void
+BIIterBoolean_dealloc(BIIterBooleanObject *self) {
+    Py_DECREF(self->bi);
+    Py_DECREF(self->array);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static BIIterBooleanObject *
+BIIterBoolean_iter(BIIterBooleanObject *self) {
+    Py_INCREF(self);
+    return self;
+}
+
+static PyObject *
+BIIterBoolean_iternext(BIIterBooleanObject *self) {
+    npy_bool v = 0;
+    Py_ssize_t i = -1;
+    PyArrayObject* a = (PyArrayObject*) self->array;
+
+    if (!self->reversed) {
+        while (self->pos < self->len) {
+            v = *(npy_bool*)PyArray_GETPTR1(a, self->pos);
+            if (v) {
+                i = self->pos;
+                self->pos++;
+                break;
+            }
+            self->pos++;
+        }
+    }
+    else { // reversed
+        while (self->pos >= 0) {
+            v = *(npy_bool*)PyArray_GETPTR1(a, self->pos);
+            if (v) {
+                i = self->pos;
+                self->pos--;
+                break;
+            }
+            self->pos--;
+        }
+    }
+    if (i != -1) {
+        return AK_BI_item(self->bi, i); // return new ref
+    }
+    return NULL; // no True remain
+}
+
+static PyObject *
+BIIterBoolean_reversed(BIIterBooleanObject *self) {
+    return BIIterBoolean_new(self->bi, self->array, !self->reversed);
+}
+
+// NOTE: no length hint given as we would have to traverse whole array and count True... not sure it is worht it.
+static PyMethodDef BIiterBoolean_methods[] = {
+    // {"__length_hint__", (PyCFunction)BIIterBoolean_length_hint, METH_NOARGS, NULL},
+    {"__reversed__", (PyCFunction)BIIterBoolean_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+static PyTypeObject BIIterBooleanType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(BIIterBooleanObject),
+    .tp_dealloc = (destructor) BIIterBoolean_dealloc,
+    .tp_iter = (getiterfunc) BIIterBoolean_iter,
+    .tp_iternext = (iternextfunc) BIIterBoolean_iternext,
+    .tp_methods = BIiterBoolean_methods,
+    .tp_name = "arraykit.BlockIndexIteratorBoolean",
 };
 
 
@@ -5254,6 +5382,7 @@ PyInit__arraykit(void)
         PyType_Ready(&BIIterType) ||
         PyType_Ready(&BIIterSeqType) ||
         PyType_Ready(&BIIterSliceType) ||
+        PyType_Ready(&BIIterBooleanType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
