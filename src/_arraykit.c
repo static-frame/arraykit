@@ -4146,7 +4146,7 @@ typedef struct BIIterObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
     int8_t reversed;
-    Py_ssize_t index; // current index state, mutated in-place
+    Py_ssize_t pos; // current index state, mutated in-place
 } BIIterObject;
 
 static PyObject *
@@ -4158,7 +4158,7 @@ BIIter_new(BlockIndexObject *bi, int8_t reversed) {
     Py_INCREF(bi);
     bii->bi = bi;
     bii->reversed = reversed;
-    bii->index = 0;
+    bii->pos = 0;
     return (PyObject *)bii;
 }
 
@@ -4178,13 +4178,13 @@ static PyObject *
 BIIter_iternext(BIIterObject *self) {
     Py_ssize_t i;
     if (self->reversed) {
-        i = self->bi->bir_count - ++self->index;
+        i = self->bi->bir_count - ++self->pos;
         if (i < 0) {
             return NULL;
         }
     }
     else {
-        i = self->index++;
+        i = self->pos++;
     }
     if (self->bi->bir_count <= i) {
         return NULL;
@@ -4199,8 +4199,8 @@ BIIter_reversed(BIIterObject *self) {
 
 static PyObject *
 BIIter_length_hint(BIIterObject *self) {
-    // this works for reversed as we use self-> index to subtract from length
-    Py_ssize_t len = Py_MAX(0, self->bi->bir_count - self->index);
+    // this works for reversed as we use self->pos to subtract from length
+    Py_ssize_t len = Py_MAX(0, self->bi->bir_count - self->pos);
     return PyLong_FromSsize_t(len);
 }
 
@@ -4564,13 +4564,15 @@ BIIterSelector_new(BlockIndexObject *bi,
             PyErr_SetString(PyExc_TypeError, "Slices cannot be used as selectors for this type of iterator");
             return NULL;
         }
-        if (PySlice_GetIndicesEx(selector, bi->bir_count, &pos, &stop, &step, &len)) {
+        if (PySlice_Unpack(selector, &pos, &stop, &step)) {
             return NULL;
         }
+        len = PySlice_AdjustIndices(bi->bir_count, &pos, &stop, step);
         if (reversed) {
             pos += (step * (len - 1));
             step *= -1;
         }
+        // AK_DEBUG_MSG_OBJ("resolved slice", Py_BuildValue("nnnn", pos, stop, step, len));
     }
     else if (PyList_CheckExact(selector)) {
         if (kind == BIIS_UNKNOWN) {

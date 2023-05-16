@@ -409,8 +409,40 @@ class TestUnit(unittest.TestCase):
             [(2, 1), (2, 0), (1, 0), (0, 1)]
             )
 
+
+    def test_block_index_iter_select_slice_d(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(2))
+
+        self.assertEqual(list(bi1.iter_select(slice(None))),
+            [(0, 0), (0, 1), (0, 2), (1, 0)]
+            )
+        self.assertEqual(list(bi1.iter_select(slice(20, 24))),
+            []
+            )
+        self.assertEqual(list(bi1.iter_select(slice(0, 100, 10))),
+            [(0, 0)]
+            )
+        self.assertEqual(list(bi1.iter_select(slice(0, 100, 3))),
+            [(0, 0), (1, 0)]
+            )
+
+    def test_block_index_iter_select_slice_e(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(12).reshape(2,6))
+        bi1.register(np.arange(12).reshape(2,6))
+
+        self.assertEqual(list(bi1.iter_select(slice(11, None, -3))),
+            [(1, 5), (1, 2), (0, 5), (0, 2)]
+            )
+        self.assertEqual(list(bi1.iter_select(slice(11, None, -4))),
+            [(1, 5), (1, 1), (0, 3)]
+            )
+
+
     #---------------------------------------------------------------------------
-    def test_block_index_iter_select_slice_a(self) -> None:
+    def test_block_index_iter_select_boolean_a(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(4).reshape(2,2))
         bi1.register(np.arange(2))
@@ -428,10 +460,25 @@ class TestUnit(unittest.TestCase):
                 [(0, 0), (2, 4)]
                 )
 
-    def test_block_index_iter_select_slice_b(self) -> None:
+    def test_block_index_iter_select_boolean_b(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(4).reshape(2,2))
         bi1.register(np.arange(2))
 
         with self.assertRaises(TypeError):
             bi1.iter_select(np.array([False, True]))
+
+        with self.assertRaises(TypeError):
+            bi1.iter_select(np.full(20, True))
+
+
+    def test_block_index_iter_select_boolean_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        self.assertEqual(list(bi1.iter_select(np.full(len(bi1), False))),
+                []
+                )
+        self.assertEqual(list(bi1.iter_select(np.full(len(bi1), True))),
+                [(0, 0), (0, 1), (1, 0)]
+                )

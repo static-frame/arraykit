@@ -75,6 +75,7 @@ class ArrayProcessor:
 
         self.selector_int_array = np.arange(0, len(self.bi), 2)
         self.selector_int_list = list(range(0, len(self.bi), 2))
+        self.selector_bool_array = (np.arange(len(self.bi)) % 2) == 0
 
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
@@ -188,6 +189,23 @@ class TupleIndexIterIntList(ArrayProcessor):
     def __call__(self):
         ti = self.ti
         _ = [ti[i] for i in self.selector_int_list]
+
+
+
+class BlockIndexIterBoolArray(ArrayProcessor):
+    NAME = 'BlockIndex: iter by bool array'
+    SORT = 7
+
+    def __call__(self):
+        _ = list(self.bi.iter_select(self.selector_bool_array))
+
+class TupleIndexIterBoolArray(ArrayProcessor):
+    NAME = 'TupleIndex: iter by bool array'
+    SORT = 17
+
+    def __call__(self):
+        ti = self.ti
+        _ = [ti[i] for i in self.selector_bool_array if i]
 
 
 
@@ -360,6 +378,9 @@ CLS_PROCESSOR = (
     TupleIndexIterIntArray,
     BlockIndexIterIntList,
     TupleIndexIterIntList,
+    BlockIndexIterBoolArray,
+    TupleIndexIterBoolArray,
+
     )
 
 CLS_FF = (
