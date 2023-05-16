@@ -37,6 +37,15 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.4.0
+............
+
+Added ``BlockIndex``, a tool to be used by ``TypeBlocks`` for mapping realized column positions to arrays.
+
+Corrected poetential issue in
+
+
 0.3.4
 ............
 
