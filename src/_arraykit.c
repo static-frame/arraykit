@@ -18,7 +18,7 @@
 // Given a PyObject, raise if not an array.
 # define AK_CHECK_NUMPY_ARRAY(O)                                              \
     if (!PyArray_Check(O)) {                                                  \
-        return PyErr_Format(PyExc_TypeError, "expected numpy array (got %s)", \
+        return PyErr_Format(PyExc_TypeError, "Expected NumPy array (got %s)", \
                             Py_TYPE(O)->tp_name);                             \
     }
 
@@ -4224,59 +4224,34 @@ static PyTypeObject BIIterType = {
 //------------------------------------------------------------------------------
 // BI Iterator sequence selection
 static PyTypeObject BIIterSeqType;
+static PyTypeObject BIIterSliceType;
+static PyTypeObject BIIterBooleanType;
+
+
+typedef enum BIIterSelectorKind {
+    BIIS_SEQUENCE, // BIIterSeqType
+    BIIS_SLICE,
+    BIIS_BOOLEAN, // BIIterBooleanType
+    BIIS_UNKNOWN
+} BIIterSelectorKind;
+
+
+static PyObject *
+BIIterSelector_new(BlockIndexObject *bi,
+        PyObject* selector,
+        int8_t reversed,
+        BIIterSelectorKind kind
+        );
 
 typedef struct BIIterSeqObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
     int8_t reversed;
     PyObject* selector;
-    Py_ssize_t index; // current pos in sequence, mutated in-place
-    Py_ssize_t selector_len;
-    int8_t selector_is_array;
+    Py_ssize_t pos; // current pos in sequence, mutated in-place
+    Py_ssize_t len;
+    int8_t is_array;
 } BIIterSeqObject;
-
-static PyObject *
-BIIterSeq_new(BlockIndexObject *bi, PyObject* selector, int8_t reversed) {
-    BIIterSeqObject *bii = PyObject_New(BIIterSeqObject, &BIIterSeqType);
-    if (!bii) {
-        return NULL;
-    }
-    Py_INCREF(bi);
-    bii->bi = bi;
-    bii->reversed = reversed;
-
-    Py_INCREF(selector);
-    bii->selector = selector;
-    bii->index = 0;
-
-    if (PyArray_Check(selector)) {
-        PyArrayObject *a = (PyArrayObject *)selector;
-        if (PyArray_NDIM(a) != 1) {
-            PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
-            goto error;
-        }
-        char kind = PyArray_DESCR(a)->kind;
-        if (kind != 'i' && kind != 'u') {
-            PyErr_SetString(PyExc_TypeError, "Arrays must integer kind");
-            goto error;
-        }
-        bii->selector_len = PyArray_SIZE(a);
-        bii->selector_is_array = 1;
-    }
-    else if (PyList_CheckExact(selector)) {
-        bii->selector_len = PyList_GET_SIZE(selector);
-        bii->selector_is_array = 0;
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError, "Input type not supported");
-        goto error;
-    }
-    return (PyObject *)bii;
-error:
-    Py_DECREF(bii->bi);
-    Py_DECREF(bii->selector);
-    return NULL;
-}
 
 static void
 BIIterSeq_dealloc(BIIterSeqObject *self) {
@@ -4295,20 +4270,20 @@ static PyObject *
 BIIterSeq_iternext(BIIterSeqObject *self) {
     Py_ssize_t i;
     if (self->reversed) {
-        i = self->selector_len - ++self->index;
+        i = self->len - ++self->pos;
         if (i < 0) {
             return NULL;
         }
     }
     else {
-        i = self->index++;
+        i = self->pos++;
     }
-    if (self->selector_len <= i) {
+    if (self->len <= i) {
         return NULL;
     }
     // use i to get index from selector
     Py_ssize_t t = 0;
-    if (self->selector_is_array) {
+    if (self->is_array) {
         PyArrayObject *a = (PyArrayObject *)self->selector;
         switch (PyArray_TYPE(a)) { // type of passed in array
             case NPY_INT64:
@@ -4352,13 +4327,13 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
 
 static PyObject *
 BIIterSeq_reversed(BIIterSeqObject *self) {
-    return BIIterSeq_new(self->bi, self->selector, !self->reversed);
+    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SEQUENCE);
 }
 
 static PyObject *
 BIIterSeq_length_hint(BIIterSeqObject *self) {
     // this works for reversed as we use self-> index to subtract from length
-    Py_ssize_t len = Py_MAX(0, self->selector_len - self->index);
+    Py_ssize_t len = Py_MAX(0, self->len - self->pos);
     return PyLong_FromSsize_t(len);
 }
 
@@ -4378,69 +4353,25 @@ static PyTypeObject BIIterSeqType = {
     .tp_name = "arraykit.BlockIndexIteratorSequence",
 };
 
-
 //------------------------------------------------------------------------------
 // BI Iterator slice selection
-static PyTypeObject BIIterSliceType;
 
 typedef struct BIIterSliceObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
     int8_t reversed;
-    PyObject* slice;
+    PyObject* selector; // slice
     Py_ssize_t count; // count of , mutated in-place
     // these are the normalized values truncated to the span of the bir_count; len is the realized length after extraction; step is always set to 1 if missing; len is 0 if no realized values
-    Py_ssize_t start;
+    Py_ssize_t pos;
     Py_ssize_t step;
     Py_ssize_t len;
 } BIIterSliceObject;
 
-static PyObject *
-BIIterSlice_new(BlockIndexObject *bi, PyObject* slice, int8_t reversed) {
-    BIIterSliceObject *bii = PyObject_New(BIIterSliceObject, &BIIterSliceType);
-    if (!bii) {
-        return NULL;
-    }
-    Py_INCREF(bi);
-    bii->bi = bi;
-    // we store the slice in case we need to delegate to a different iterator
-    Py_INCREF(slice);
-    bii->slice = slice;
-
-    bii->count = 0;
-    Py_ssize_t stop; // not needed
-
-    if (PySlice_Check(slice)) {
-        if (PySlice_GetIndicesEx(slice,
-                bi->bir_count,
-                &bii->start,
-                &stop,
-                &bii->step,
-                &bii->len)) {
-            goto error;
-        }
-        // PyObject* v = Py_BuildValue("nnnn", bii->start, bii->stop, bii->step, bii->len);
-        // AK_DEBUG_MSG_OBJ("slice", v);
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError, "Input type not supported");
-        goto error;
-    }
-    if ((bii->reversed = reversed)) {
-        bii->start += (bii->step * (bii->len - 1));
-        bii->step *= -1;
-    }
-    return (PyObject *)bii;
-error:
-    Py_DECREF(bii->bi);
-    Py_DECREF(bii->slice);
-    return NULL;
-}
-
 static void
 BIIterSlice_dealloc(BIIterSliceObject *self) {
     Py_DECREF(self->bi);
-    Py_DECREF(self->slice);
+    Py_DECREF(self->selector);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -4455,15 +4386,15 @@ BIIterSlice_iternext(BIIterSliceObject *self) {
     if (self->len == 0 || self->count >= self->len) {
         return NULL;
     }
-    Py_ssize_t i = self->start;
-    self->start += self->step;
+    Py_ssize_t i = self->pos;
+    self->pos += self->step;
     self->count++; // by counting index we we do not need to compare to stop
     return AK_BI_item(self->bi, i); // return new ref
 }
 
 static PyObject *
 BIIterSlice_reversed(BIIterSliceObject *self) {
-    return BIIterSlice_new(self->bi, self->slice, !self->reversed);
+    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SLICE);
 }
 
 static PyObject *
@@ -4489,70 +4420,22 @@ static PyTypeObject BIIterSliceType = {
     .tp_name = "arraykit.BlockIndexIteratorSlice",
 };
 
-
 //------------------------------------------------------------------------------
 // BI Iterator Boolean array selection
-static PyTypeObject BIIterBooleanType;
 
 typedef struct BIIterBooleanObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
     int8_t reversed;
-    PyObject* array;
+    PyObject* selector;
     Py_ssize_t pos; // current index, mutated in-place
     Py_ssize_t len;
 } BIIterBooleanObject;
 
-static PyObject *
-BIIterBoolean_new(BlockIndexObject *bi, PyObject* array, int8_t reversed) {
-    BIIterBooleanObject *bii = PyObject_New(BIIterBooleanObject, &BIIterBooleanType);
-    if (!bii) {
-        return NULL;
-    }
-    Py_INCREF(bi);
-    bii->bi = bi;
-    // we store the slice in case we need to delegate to a different iterator
-    Py_INCREF(array);
-    bii->array = array;
-
-    if (PyArray_Check(array)) {
-        PyArrayObject *a = (PyArrayObject *)array;
-        if (PyArray_NDIM(a) != 1) {
-            PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
-            goto error;
-        }
-        if (PyArray_TYPE(a) != NPY_BOOL) {
-            PyErr_SetString(PyExc_TypeError, "Arrays must be Boolean");
-            goto error;
-        }
-        if ((bii->len = PyArray_SIZE(a)) != bi->bir_count ) {
-            PyErr_SetString(PyExc_TypeError, "Arrays must match length");
-            goto error;
-        }
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError, "Input type not supported");
-        goto error;
-    }
-
-    // always initialize bii->pos to a valid index
-    if ((bii->reversed = reversed)) {
-        bii->pos = bii->len - 1;
-    }
-    else {
-        bii->pos = 0;
-    }
-    return (PyObject *)bii;
-error:
-    Py_DECREF(bii->bi);
-    Py_DECREF(bii->array);
-    return NULL;
-}
-
 static void
 BIIterBoolean_dealloc(BIIterBooleanObject *self) {
     Py_DECREF(self->bi);
-    Py_DECREF(self->array);
+    Py_DECREF(self->selector);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -4566,7 +4449,7 @@ static PyObject *
 BIIterBoolean_iternext(BIIterBooleanObject *self) {
     npy_bool v = 0;
     Py_ssize_t i = -1;
-    PyArrayObject* a = (PyArrayObject*) self->array;
+    PyArrayObject* a = (PyArrayObject*) self->selector;
 
     if (!self->reversed) {
         while (self->pos < self->len) {
@@ -4598,7 +4481,7 @@ BIIterBoolean_iternext(BIIterBooleanObject *self) {
 
 static PyObject *
 BIIterBoolean_reversed(BIIterBooleanObject *self) {
-    return BIIterBoolean_new(self->bi, self->array, !self->reversed);
+    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_BOOLEAN);
 }
 
 // NOTE: no length hint given as we would have to traverse whole array and count True... not sure it is worht it.
@@ -4617,6 +4500,142 @@ static PyTypeObject BIIterBooleanType = {
     .tp_methods = BIiterBoolean_methods,
     .tp_name = "arraykit.BlockIndexIteratorBoolean",
 };
+
+
+//------------------------------------------------------------------------------
+
+// NOTE: this constructor returns one of three different PyObject types. We do this to consolidate error reporting and type checks.
+static PyObject *
+BIIterSelector_new(BlockIndexObject *bi,
+        PyObject* selector,
+        int8_t reversed,
+        BIIterSelectorKind kind
+        ) {
+
+    int8_t is_array = 0;
+    Py_ssize_t len = -1;
+    Py_ssize_t pos = 0;
+    Py_ssize_t stop = 0;
+    Py_ssize_t step = 0;
+
+    if (PyArray_Check(selector)) {
+        if (kind == BIIS_SLICE) {
+            PyErr_SetString(PyExc_TypeError, "Arrays cannot be used as selectors for slice iterators");
+            return NULL;
+        }
+        is_array = 1;
+        PyArrayObject *a = (PyArrayObject *)selector;
+        if (PyArray_NDIM(a) != 1) {
+            PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
+            return NULL;
+        }
+        len = PyArray_SIZE(a);
+        char k = PyArray_DESCR(a)->kind;
+        if (kind == BIIS_UNKNOWN) {
+            if (k == 'i' || k == 'u') {
+                kind = BIIS_SEQUENCE;
+            }
+            else if (k == 'b') {
+                kind = BIIS_BOOLEAN;
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError, "Arrays kind not supported");
+                return NULL;
+            }
+        }
+        else if (kind == BIIS_SEQUENCE && k != 'i' && k != 'u') {
+            PyErr_SetString(PyExc_TypeError, "Arrays must integer kind");
+            return NULL;
+        }
+        else if (kind == BIIS_BOOLEAN && k != 'b') {
+            PyErr_SetString(PyExc_TypeError, "Arrays must Boolean kind");
+            return NULL;
+        }
+        if (kind == BIIS_BOOLEAN && len != bi->bir_count) {
+            PyErr_SetString(PyExc_TypeError, "Boolean arrays must match BlockIndex size");
+            return NULL;
+        }
+    }
+    else if (PySlice_Check(selector)) {
+        if (kind == BIIS_UNKNOWN) {
+            kind = BIIS_SLICE;
+        }
+        else if (kind != BIIS_SLICE) {
+            PyErr_SetString(PyExc_TypeError, "Slices cannot be used as selectors for this type of iterator");
+            return NULL;
+        }
+        if (PySlice_GetIndicesEx(selector, bi->bir_count, &pos, &stop, &step, &len)) {
+            return NULL;
+        }
+        if (reversed) {
+            pos += (step * (len - 1));
+            step *= -1;
+        }
+    }
+    else if (PyList_CheckExact(selector)) {
+        if (kind == BIIS_UNKNOWN) {
+            kind = BIIS_SEQUENCE;
+        }
+        else if (kind != BIIS_SEQUENCE) {
+            PyErr_SetString(PyExc_TypeError, "Lists cannot be used as for non-sequence iterators");
+            return NULL;
+        }
+        len = PyList_GET_SIZE(selector);
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "Input type not supported");
+        return NULL;
+    }
+
+    PyObject *bii = NULL;
+    switch (kind) {
+        case BIIS_SEQUENCE: {
+            BIIterSeqObject* it = PyObject_New(BIIterSeqObject, &BIIterSeqType);
+            if (it == NULL) {goto error;}
+            it->bi = bi;
+            it->selector = selector;
+            it->reversed = reversed;
+            it->len = len;
+            it->pos = 0;
+            it->is_array = is_array;
+            bii = (PyObject*)it;
+            break;
+        }
+        case BIIS_SLICE: {
+            BIIterSliceObject* it = PyObject_New(BIIterSliceObject, &BIIterSliceType);
+            if (it == NULL) {goto error;}
+            it->bi = bi;
+            it->selector = selector;
+            it->reversed = reversed;
+            it->len = len;
+            it->pos = pos;
+            it->step = step;
+            it->count = 0;
+            bii = (PyObject*)it;
+            break;
+        }
+        case BIIS_BOOLEAN: {
+            BIIterBooleanObject* it = PyObject_New(BIIterBooleanObject, &BIIterBooleanType);
+            if (it == NULL) {goto error;}
+            it->bi = bi;
+            it->selector = selector;
+            it->reversed = reversed;
+            it->len = len;
+            it->pos = reversed ? len - 1 : 0;
+            bii = (PyObject*)it;
+            break;
+        }
+        case BIIS_UNKNOWN:
+            goto error; // should not get here!
+    }
+    Py_INCREF(bi);
+    Py_INCREF(selector);
+    return bii;
+error:
+    // nothing shold be increfed when we get here
+    return NULL;
+}
+
 
 
 //------------------------------------------------------------------------------
@@ -4983,10 +5002,7 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
 // Given key, return an iterator of a selection.
 static PyObject*
 BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
-    if (PySlice_Check(selector)) {
-        return BIIterSlice_new(self, selector, 0);
-    }
-    return BIIterSeq_new(self, selector, 0);
+    return BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN);
 }
 
 
