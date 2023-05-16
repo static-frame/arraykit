@@ -211,7 +211,7 @@ class TupleIndexIterBoolArray(ArrayProcessor):
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 2
+NUMBER = 50
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -284,7 +284,7 @@ def plot_performance(frame):
             # ax.set_yscale('log')
 
     fig.set_size_inches(9, 3.5) # width, height
-    fig.legend(post, names_display, loc='center right', fontsize=8)
+    fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
     fig.text(.05, .96, f'BlockIndex Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
