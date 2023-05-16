@@ -1292,31 +1292,35 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 
 // Returns 0 on success, -1 on failure.
 static inline int
-AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment)
-{
-    // TODO: this does ensure that there is increment sized data! must loop
-    if (AK_UNLIKELY((cpl->buffer_count + increment) >= cpl->buffer_capacity)) {
-        // realloc
-        cpl->buffer_capacity *= 2; // needs to be max of this or element_length
+AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment) {
+    Py_ssize_t target = cpl->buffer_count + increment;
+    if (AK_UNLIKELY(target >= cpl->buffer_capacity)) {
+        while (cpl->buffer_capacity < target) {
+            cpl->buffer_capacity <<= 1;
+        }
         cpl->buffer = PyMem_Realloc(cpl->buffer,
                 sizeof(Py_UCS4) * cpl->buffer_capacity);
-        if (cpl->buffer == NULL) return -1;
-
+        if (cpl->buffer == NULL) {
+            return -1;
+        }
         cpl->buffer_current_ptr = cpl->buffer + cpl->buffer_count;
     }
     return 0;
 }
 
+
+// NOTE: we only add one offset at time, so this does not need to take an increment argument.
 static inline int
-AK_CPL_resize_offsets(AK_CodePointLine* cpl)
-{
+AK_CPL_resize_offsets(AK_CodePointLine* cpl) {
     // increment by at most one, so only need to check if equal
     if (AK_UNLIKELY(cpl->offsets_count == cpl->offsets_capacity)) {
         // realloc
-        cpl->offsets_capacity *= 2;
+        cpl->offsets_capacity <<= 1;
         cpl->offsets = PyMem_Realloc(cpl->offsets,
                 sizeof(Py_ssize_t) * cpl->offsets_capacity);
-        if (cpl->offsets == NULL) return -1;
+        if (cpl->offsets == NULL) {
+            return -1;
+        }
     }
     return 0;
 }
@@ -1332,7 +1336,9 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
     Py_ssize_t element_length = PyUnicode_GET_LENGTH(field);
 
     // if we cannot fit field length, resize
-    if (AK_CPL_resize_buffer(cpl, element_length)) return -1;
+    if (AK_CPL_resize_buffer(cpl, element_length)) {
+        return -1;
+    }
 
     // we write the field directly into the CPL buffer
     if(PyUnicode_AsUCS4(field,
