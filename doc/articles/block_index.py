@@ -76,6 +76,7 @@ class ArrayProcessor:
         self.selector_int_array = np.arange(0, len(self.bi), 2)
         self.selector_int_list = list(range(0, len(self.bi), 2))
         self.selector_bool_array = (np.arange(len(self.bi)) % 2) == 0
+        self.selector_slice = slice(0, len(self.bi), 2)
 
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
@@ -191,17 +192,34 @@ class TupleIndexIterIntList(ArrayProcessor):
         _ = [ti[i] for i in self.selector_int_list]
 
 
+class BlockIndexIterSlice(ArrayProcessor):
+    NAME = 'BlockIndex: iter by slice'
+    SORT = 7
+
+    def __call__(self):
+        _ = list(self.bi.iter_select(self.selector_slice))
+
+class TupleIndexIterSlice(ArrayProcessor):
+    NAME = 'TupleIndex: iter by slice'
+    SORT = 17
+
+    def __call__(self):
+        ti = self.ti
+        _ = list(iter(ti[self.selector_slice]))
+
+
+
 
 class BlockIndexIterBoolArray(ArrayProcessor):
     NAME = 'BlockIndex: iter by bool array'
-    SORT = 7
+    SORT = 8
 
     def __call__(self):
         _ = list(self.bi.iter_select(self.selector_bool_array))
 
 class TupleIndexIterBoolArray(ArrayProcessor):
     NAME = 'TupleIndex: iter by bool array'
-    SORT = 17
+    SORT = 18
 
     def __call__(self):
         ti = self.ti
@@ -244,14 +262,16 @@ def plot_performance(frame):
             fixture = fixture.sort_values('sort')
 
             results = fixture['time'].values.tolist()
-            names = [cls.NAME for cls in fixture['cls_processor']]
-            # x = np.arange(len(results))
-            names_display = names
-            post = ax.bar(names_display, results, color=color)
+            x_labels = [f'{i}: {cls.NAME}' for i, cls in
+                    zip(range(1, len(results) + 1), fixture['cls_processor'])
+                    ]
+            x_tick_labels = [str(l + 1) for l in range(len(x_labels))]
+            x = np.arange(len(results))
+            x_bar = ax.bar(x_labels, results, color=color)
 
             title = f'{cat_label:.0e}\n{fixture_label}'
             ax.set_title(title, fontsize=6)
-            ax.set_box_aspect(0.75) # makes taller tan wide
+            ax.set_box_aspect(0.5) # larger makes taller tan wide
 
             time_max = fixture["time"].max()
             time_min = fixture["time"].min()
@@ -269,14 +289,16 @@ def plot_performance(frame):
 
             ax.set_yticks(y_ticks)
             ax.set_yticklabels(y_labels, fontsize=4)
-            # ax.set_xticks(x, names_display, rotation='vertical')
-            ax.tick_params(
-                axis="x",
-                bottom=False,
-                labelbottom=False,
-            )
             ax.tick_params(
                 axis="y",
+                length=2,
+                width=0.5,
+                pad=1,
+            )
+            ax.set_xticks(x)
+            ax.set_xticklabels(x_tick_labels, fontsize=4)
+            ax.tick_params(
+                axis="x",
                 length=2,
                 width=0.5,
                 pad=1,
@@ -284,7 +306,7 @@ def plot_performance(frame):
             # ax.set_yscale('log')
 
     fig.set_size_inches(9, 3.5) # width, height
-    fig.legend(post, names_display, loc='center right', fontsize=6)
+    fig.legend(x_bar, x_labels, loc='center right', fontsize=6)
     # horizontal, vertical
     fig.text(.05, .96, f'BlockIndex Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
@@ -295,7 +317,7 @@ def plot_performance(frame):
             bottom=0.05,
             right=0.80,
             top=0.80,
-            wspace=1, # width
+            wspace=0.6, # width
             hspace=0.6,
             )
     # plt.rcParams.update({'font.size': 22})
@@ -380,7 +402,8 @@ CLS_PROCESSOR = (
     TupleIndexIterIntList,
     BlockIndexIterBoolArray,
     TupleIndexIterBoolArray,
-
+    BlockIndexIterSlice,
+    TupleIndexIterSlice,
     )
 
 CLS_FF = (
