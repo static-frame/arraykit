@@ -43,7 +43,7 @@ What is New in ArrayKit
 
 Added ``BlockIndex``, a tool to be used by ``TypeBlocks`` for mapping realized column positions to arrays.
 
-Corrected poetential issue in
+Corrected potential issue in ``AK_CPL_resize_buffer`` that could segfault for very large offsets.
 
 
 0.3.4
