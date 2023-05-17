@@ -7,13 +7,14 @@ import pickle
 import numpy as np
 
 from arraykit import BlockIndex
-from arraykit import ErrorInitBlocks
+from arraykit import ErrorInitTypeBlocks
 
 
 class TestUnit(unittest.TestCase):
 
     def test_block_index_init_a(self) -> None:
         bi1 = BlockIndex()
+        self.assertEqual(bi1.dtype, np.dtype(float))
         # print(bi1)
 
     def test_block_index_init_b1(self) -> None:
@@ -52,19 +53,19 @@ class TestUnit(unittest.TestCase):
 
     def test_block_index_register_a(self) -> None:
         bi1 = BlockIndex()
-        with self.assertRaises(ErrorInitBlocks):
+        with self.assertRaises(ErrorInitTypeBlocks):
             bi1.register('foo')
 
-        with self.assertRaises(ErrorInitBlocks):
+        with self.assertRaises(ErrorInitTypeBlocks):
             bi1.register(3.5)
 
     def test_block_index_register_b(self) -> None:
 
         bi1 = BlockIndex()
-        with self.assertRaises(ErrorInitBlocks):
+        with self.assertRaises(ErrorInitTypeBlocks):
             bi1.register(np.array(0))
 
-        with self.assertRaises(ErrorInitBlocks):
+        with self.assertRaises(ErrorInitTypeBlocks):
             bi1.register(np.arange(12).reshape(2,3,2))
 
 
@@ -76,6 +77,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(bi1.to_list(),
             [(0, 0), (1, 0), (2, 0), (2, 1)])
         self.assertEqual(bi1.shape, (3, 4))
+        self.assertEqual(bi1.rows, 3)
+        self.assertEqual(bi1.columns, 4)
 
     def test_block_index_register_d(self) -> None:
         bi1 = BlockIndex()
@@ -87,18 +90,55 @@ class TestUnit(unittest.TestCase):
             [(0, 0), (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (3, 5)]
             )
         self.assertEqual(bi1.shape, (2, 14))
+        self.assertEqual(bi1.rows, 2)
+        self.assertEqual(bi1.columns, 14)
 
     def test_block_index_register_e(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(2))
-        with self.assertRaises(ErrorInitBlocks):
+        with self.assertRaises(ErrorInitTypeBlocks):
             bi1.register(np.arange(12).reshape(3,4))
 
 
     def test_block_index_register_f(self) -> None:
         bi1 = BlockIndex()
-        a1 = np.arange(20000).reshape(2, 10_000) #.reshape(2, 10_000)
+        a1 = np.arange(20000).reshape(2, 10_000)
         bi1.register(a1)
+        self.assertEqual(bi1.rows, 2)
+        self.assertEqual(bi1.columns, 10_000)
+
+
+    def test_block_index_register_g(self) -> None:
+        bi1 = BlockIndex()
+        a1 = np.array(()).reshape(4, 0)
+        self.assertFalse(bi1.register(a1))
+        self.assertEqual(bi1.shape, (4, 0))
+        # as not dtype has been registered, we will get default float
+        self.assertEqual(bi1.dtype, np.dtype(float))
+
+        a2 = np.arange(8).reshape(4, 2).astype(bool)
+        self.assertTrue(bi1.register(a2))
+        self.assertEqual(bi1.shape, (4, 2))
+        self.assertEqual(bi1.dtype, np.dtype(bool))
+
+
+    def test_block_index_register_h(self) -> None:
+        bi1 = BlockIndex()
+        a1 = np.array(()).reshape(0, 4).astype(bool)
+        self.assertTrue(bi1.register(a1))
+        self.assertEqual(bi1.shape, (0, 4))
+        self.assertEqual(bi1.dtype, np.dtype(bool))
+
+        a2 = np.array(()).reshape(0, 0).astype(float)
+        self.assertFalse(bi1.register(a2))
+        self.assertEqual(bi1.shape, (0, 4))
+        # dtype is still bool
+        self.assertEqual(bi1.dtype, np.dtype(bool))
+
+        a3 = np.array(()).reshape(0, 3).astype(int)
+        self.assertTrue(bi1.register(a3))
+        self.assertEqual(bi1.shape, (0, 7))
+        self.assertEqual(bi1.dtype, np.dtype(object))
 
 
     #---------------------------------------------------------------------------
@@ -191,10 +231,11 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
         self.assertEqual(bi1.shape, (2, 6))
+        self.assertEqual(bi1.columns, 6)
 
         bi1.register(np.arange(4).reshape(2,2))
         self.assertEqual(bi1.shape, (2, 8))
-
+        self.assertEqual(bi1.columns, 8)
 
     def test_block_index_getitem_b(self) -> None:
         bi1 = BlockIndex()
