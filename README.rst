@@ -37,6 +37,15 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.4.1
+............
+
+Updated ``BlockIndex.register()`` to handle 0-column 2D arrays and return False.
+
+Added ``BlockIndex.rows``, ``BlockIndex.columns`` properties.
+
+Updated unset ``BlockIndex.dtype`` to return a float dtype.
+
 
 0.4.0
 ............

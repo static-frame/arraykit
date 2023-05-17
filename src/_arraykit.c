@@ -4114,7 +4114,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 //------------------------------------------------------------------------------
 
 static PyTypeObject BlockIndexType;
-static PyObject *ErrorInitBlocks;
+static PyObject *ErrorInitTypeBlocks;
 
 // NOTE: we use platform size types here, which are appropriate for the values, but might pose issues if trying to pass pickles between 32 and 64 bit machines.
 typedef struct BlockIndexRecord {
@@ -4777,18 +4777,18 @@ BlockIndex_repr(BlockIndexObject *self) {
             dt);
 }
 
-// Returns NULL on error, None otherwise. This checks and raises on non-array inputs, dimensions other than 1 or 2.
+// Returns NULL on error, True if the block should be reatained, False if the block has zero columns and should not be retained. This checks and raises on non-array inputs, dimensions other than 1 or 2, and mis-aligned columns.
 static PyObject *
 BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     if (!PyArray_Check(value)) {
-        PyErr_Format(ErrorInitBlocks, "Found non-array block: %R", value);
+        PyErr_Format(ErrorInitTypeBlocks, "Found non-array block: %R", value);
         return NULL;
     }
     PyArrayObject *a = (PyArrayObject *)value;
     int ndim = PyArray_NDIM(a);
 
     if (ndim < 1 || ndim > 2) {
-        PyErr_Format(ErrorInitBlocks, "Array block has invalid dimensions: %i", ndim);
+        PyErr_Format(ErrorInitTypeBlocks, "Array block has invalid dimensions: %i", ndim);
         return NULL;
     }
     Py_ssize_t increment = ndim == 1 ? 1 : PyArray_DIM(a, 1);
@@ -4799,11 +4799,15 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
         self->row_count = alignment;
     }
     else if (self->row_count != alignment) {
-        PyErr_Format(ErrorInitBlocks,
+        PyErr_Format(ErrorInitTypeBlocks,
                 "Array block has unaligned row count: found %i, expected %i",
                 alignment,
                 self->row_count);
         return NULL;
+    }
+
+    if (increment == 0) {
+        Py_RETURN_FALSE;
     }
 
     PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
@@ -4829,7 +4833,7 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
         self->bir_count++;
     }
     self->block_count++;
-    Py_RETURN_NONE;
+    Py_RETURN_TRUE;
 }
 
 
@@ -4942,20 +4946,36 @@ BlockIndex_iter(BlockIndexObject* self) {
 
 static PyObject *
 BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    // NOTE: this could be cached
     return Py_BuildValue("nn", self->row_count, self->bir_count);
 }
 
+static PyObject *
+BlockIndex_rows_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    return PyLong_FromSsize_t(self->row_count);
+}
+
+static PyObject *
+BlockIndex_columns_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    return PyLong_FromSsize_t(self->bir_count );
+}
+
+// Return the resolved dtype for all registered blocks. If no block have been registered, this will return a float dtype.
 static PyObject *
 BlockIndex_dtype_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
     if (self->dtype != NULL) {
         Py_INCREF(self->dtype);
         return (PyObject*)self->dtype;
     }
-    Py_RETURN_NONE;
+    // NOTE: could use NPY_DEFAULT_TYPE here; SF defines this explicitly as float64
+    return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
 }
+
 
 static struct PyGetSetDef BlockIndex_getset[] = {
     {"shape", (getter)BlockIndex_shape_getter, NULL, NULL, NULL},
+    {"rows", (getter)BlockIndex_rows_getter, NULL, NULL, NULL},
+    {"columns", (getter)BlockIndex_columns_getter, NULL, NULL, NULL},
     {"dtype", (getter)BlockIndex_dtype_getter, NULL, NULL, NULL},
     {NULL},
 };
@@ -5380,12 +5400,12 @@ PyInit__arraykit(void)
 {
     import_array();
 
-    ErrorInitBlocks = PyErr_NewExceptionWithDoc(
-            "arraykit.ErrorInitBlocks",
+    ErrorInitTypeBlocks = PyErr_NewExceptionWithDoc(
+            "arraykit.ErrorInitTypeBlocks",
             "RuntimeError error in block initialization.",
             PyExc_RuntimeError,
             NULL);
-    if (ErrorInitBlocks == NULL) {
+    if (ErrorInitTypeBlocks == NULL) {
         return NULL;
     }
 
@@ -5411,7 +5431,7 @@ PyInit__arraykit(void)
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
         PyModule_AddObject(m, "deepcopy", deepcopy) ||
-        PyModule_AddObject(m, "ErrorInitBlocks", ErrorInitBlocks)
+        PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks)
     ){
         Py_DECREF(deepcopy);
         Py_XDECREF(m);
