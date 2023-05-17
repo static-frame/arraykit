@@ -4945,13 +4945,15 @@ BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
     return Py_BuildValue("nn", self->row_count, self->bir_count);
 }
 
+
+// Return the resolved dtype for all registered blocks. If no block have been registered, this will return a float dtype.
 static PyObject *
 BlockIndex_dtype_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
     if (self->dtype != NULL) {
         Py_INCREF(self->dtype);
         return (PyObject*)self->dtype;
     }
-    Py_RETURN_NONE;
+    return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
 }
 
 static struct PyGetSetDef BlockIndex_getset[] = {

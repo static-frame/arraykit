@@ -14,6 +14,7 @@ class TestUnit(unittest.TestCase):
 
     def test_block_index_init_a(self) -> None:
         bi1 = BlockIndex()
+        self.assertEqual(bi1.dtype, np.dtype(float))
         # print(bi1)
 
     def test_block_index_init_b1(self) -> None:
