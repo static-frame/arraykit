@@ -102,7 +102,7 @@ class TestUnit(unittest.TestCase):
 
     def test_block_index_register_f(self) -> None:
         bi1 = BlockIndex()
-        a1 = np.arange(20000).reshape(2, 10_000) #.reshape(2, 10_000)
+        a1 = np.arange(20000).reshape(2, 10_000)
         bi1.register(a1)
         self.assertEqual(bi1.rows, 2)
         self.assertEqual(bi1.columns, 10_000)
@@ -198,10 +198,11 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
         self.assertEqual(bi1.shape, (2, 6))
+        self.assertEqual(bi1.columns, 6)
 
         bi1.register(np.arange(4).reshape(2,2))
         self.assertEqual(bi1.shape, (2, 8))
-
+        self.assertEqual(bi1.columns, 8)
 
     def test_block_index_getitem_b(self) -> None:
         bi1 = BlockIndex()
