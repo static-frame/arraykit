@@ -705,12 +705,14 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_slice_to_ascending_slice_a(self) -> None:
-        self.assertEqual(slice_to_ascending_slice(slice(5, 2, -1), 6),
-                None,
+        self.assertEqual(slice_to_ascending_slice(
+                slice(5, 2, -1), 6),
+                slice(3, 6, 1),
                 )
 
     def test_slice_to_ascending_slice_b(self) -> None:
-        self.assertEqual(slice_to_ascending_slice(slice(2, 5, 1), 6),
+        self.assertEqual(slice_to_ascending_slice(
+                slice(2, 5, 1), 6),
                 slice(2, 5, 1),
                 )
 

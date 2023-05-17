@@ -3354,7 +3354,19 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
             &start,
             &stop,
             step);
-    Py_RETURN_NONE;
+
+    PyObject* asc_start = PyLong_FromSsize_t(stop + 1);
+    PyObject* asc_stop = PyLong_FromSsize_t(start + 1);
+    PyObject* asc_step = PyLong_FromSsize_t(-step);
+
+    // might be NULL, let return
+    PyObject* asc = PySlice_New(asc_start, asc_stop, asc_step);
+
+    Py_DECREF(asc_start);
+    Py_DECREF(asc_stop);
+    Py_DECREF(asc_step);
+
+    return asc;
 }
 
 //------------------------------------------------------------------------------
