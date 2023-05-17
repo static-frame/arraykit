@@ -18,10 +18,10 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
-from arraykit import split_after_count
 from arraykit import count_iteration
 from arraykit import first_true_1d
 from arraykit import first_true_2d
+from arraykit import slice_to_ascending_slice
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -703,7 +703,23 @@ class TestUnit(unittest.TestCase):
                 [1, 0, 2, 1])
 
 
+    #---------------------------------------------------------------------------
+    def test_slice_to_ascending_slice_a(self) -> None:
+        self.assertEqual(slice_to_ascending_slice(slice(5, 2, -1), 6),
+                None,
+                )
 
+    def test_slice_to_ascending_slice_b(self) -> None:
+        self.assertEqual(slice_to_ascending_slice(slice(2, 5, 1), 6),
+                slice(2, 5, 1),
+                )
+
+    def test_slice_to_ascending_slice_c(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = slice_to_ascending_slice('a', 6)
+
+        with self.assertRaises(TypeError):
+            _ = slice_to_ascending_slice(slice(1, 4), 'x')
 
 
 

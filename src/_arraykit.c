@@ -16,10 +16,11 @@
 
 //------------------------------------------------------------------------------
 // Given a PyObject, raise if not an array.
-# define AK_CHECK_NUMPY_ARRAY(O)                                              \
-    if (!PyArray_Check(O)) {                                                  \
-        return PyErr_Format(PyExc_TypeError, "Expected NumPy array (got %s)", \
-                            Py_TYPE(O)->tp_name);                             \
+# define AK_CHECK_NUMPY_ARRAY(O)                 \
+    if (!PyArray_Check(O)) {                     \
+        return PyErr_Format(PyExc_TypeError,     \
+                "Expected NumPy array, not %s.", \
+                Py_TYPE(O)->tp_name);            \
     }
 
 // Given a PyObject, raise if not an array or is not one or two dimensional.
@@ -29,7 +30,7 @@
         int ndim = PyArray_NDIM((PyArrayObject *)O);      \
         if (ndim != 1 && ndim != 2) {                     \
             return PyErr_Format(PyExc_NotImplementedError,\
-                    "expected 1D or 2D array (got %i)",   \
+                    "Expected 1D or 2D array, not %i.",   \
                     ndim);                                \
         }                                                 \
     } while (0)
@@ -3322,6 +3323,40 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
     return a;
 }
 
+
+// Convert any slice to an ascending slice that covers the same values.
+static PyObject *
+slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
+
+    PyObject* slice;
+    PyObject* size;
+    if (!PyArg_ParseTuple(args,
+            "O!O!:slice_to_ascending_slice",
+            &PySlice_Type, &slice,
+            &PyLong_Type, &size)) {
+        return NULL;
+    }
+
+    Py_ssize_t len = -1;
+    Py_ssize_t start = 0;
+    Py_ssize_t stop = 0;
+    Py_ssize_t step = 0;
+
+    if (PySlice_Unpack(slice, &start, &stop, &step)) {
+        return NULL;
+    }
+    if (step > 0) {
+        Py_INCREF(slice);
+        return slice;
+    }
+    len = PySlice_AdjustIndices(
+            PyLong_AsSsize_t(size),
+            &start,
+            &stop,
+            step);
+    Py_RETURN_NONE;
+}
+
 //------------------------------------------------------------------------------
 // array utility
 
@@ -5328,6 +5363,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"column_2d_filter", column_2d_filter, METH_O, NULL},
     {"column_1d_filter", column_1d_filter, METH_O, NULL},
     {"row_1d_filter", row_1d_filter, METH_O, NULL},
+    {"slice_to_ascending_slice", slice_to_ascending_slice, METH_VARARGS, NULL},
     {"array_deepcopy",
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
