@@ -9,7 +9,7 @@ from itertools import repeat
 import pickle
 
 from arraykit import BlockIndex
-# from arraykit import ErrorInitBlocks
+# from arraykit import ErrorInitTypeBlocks
 from arraykit import shape_filter
 from arraykit import resolve_dtype
 
