@@ -90,6 +90,8 @@ class TestUnit(unittest.TestCase):
             [(0, 0), (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (3, 5)]
             )
         self.assertEqual(bi1.shape, (2, 14))
+        self.assertEqual(bi1.rows, 2)
+        self.assertEqual(bi1.columns, 14)
 
     def test_block_index_register_e(self) -> None:
         bi1 = BlockIndex()
@@ -102,6 +104,8 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         a1 = np.arange(20000).reshape(2, 10_000) #.reshape(2, 10_000)
         bi1.register(a1)
+        self.assertEqual(bi1.rows, 2)
+        self.assertEqual(bi1.columns, 10_000)
 
 
     #---------------------------------------------------------------------------
