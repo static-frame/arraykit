@@ -77,6 +77,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(bi1.to_list(),
             [(0, 0), (1, 0), (2, 0), (2, 1)])
         self.assertEqual(bi1.shape, (3, 4))
+        self.assertEqual(bi1.rows, 3)
+        self.assertEqual(bi1.columns, 4)
 
     def test_block_index_register_d(self) -> None:
         bi1 = BlockIndex()

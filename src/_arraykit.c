@@ -4945,6 +4945,15 @@ BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
     return Py_BuildValue("nn", self->row_count, self->bir_count);
 }
 
+static PyObject *
+BlockIndex_rows_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    return PyLong_FromSsize_t(self->row_count);
+}
+
+static PyObject *
+BlockIndex_columns_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
+    return PyLong_FromSsize_t(self->bir_count );
+}
 
 // Return the resolved dtype for all registered blocks. If no block have been registered, this will return a float dtype.
 static PyObject *
@@ -4953,11 +4962,15 @@ BlockIndex_dtype_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
         Py_INCREF(self->dtype);
         return (PyObject*)self->dtype;
     }
+    // NOTE: could use NPY_DEFAULT_TYPE here; SF defines this explicitly as float64
     return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
 }
 
+
 static struct PyGetSetDef BlockIndex_getset[] = {
     {"shape", (getter)BlockIndex_shape_getter, NULL, NULL, NULL},
+    {"rows", (getter)BlockIndex_rows_getter, NULL, NULL, NULL},
+    {"columns", (getter)BlockIndex_columns_getter, NULL, NULL, NULL},
     {"dtype", (getter)BlockIndex_dtype_getter, NULL, NULL, NULL},
     {NULL},
 };
