@@ -37,6 +37,14 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.4.2-dev
+............
+
+Added ``slice_to_ascending_slice()``.
+
+Updated ``BlockIndex.shape`` to internally cache the shape tuple.
+
+
 0.4.1
 ............
 

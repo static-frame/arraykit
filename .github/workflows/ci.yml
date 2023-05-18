@@ -11,7 +11,7 @@ on:
 jobs:
   tar_gz:
     name: Package
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, windows-2022]
+        os: [macos-12, ubuntu-22.04, windows-2022]
         major: [3]
         minor: [7, 8]
     runs-on: ${{ matrix.os }}
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-22.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'windows-2022'
 
@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, windows-2022]
+        os: [macos-12, ubuntu-22.04, windows-2022]
         major: [3]
         minor: [9, 10, 11]
     runs-on: ${{ matrix.os }}
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-22.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'windows-2022'
 
@@ -89,7 +89,7 @@ jobs:
     name: Publish
     if: github.event_name == 'release'
     needs: [tar_gz, whl_lt_3_9, whl_gte_3_9]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v3
         with:
