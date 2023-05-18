@@ -4578,11 +4578,13 @@ static PyTypeObject BIIterBooleanType = {
 //------------------------------------------------------------------------------
 
 // NOTE: this constructor returns one of three different PyObject types. We do this to consolidate error reporting and type checks.
+// The ascending argument is applied before consideration of a reverse iterator
 static PyObject *
 BIIterSelector_new(BlockIndexObject *bi,
         PyObject* selector,
         int8_t reversed,
-        BIIterSelectorKind kind
+        BIIterSelectorKind kind,
+        int8_t ascending;
         ) {
 
     int8_t is_array = 0;
@@ -5123,7 +5125,7 @@ static PyObject*
 BlockIndex_iter_select_slices(BlockIndexObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject* selector;
-    int ascending = 0;
+    int8_t ascending = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "O!|p:iter_select_slices",
