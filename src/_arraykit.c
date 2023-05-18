@@ -4201,8 +4201,8 @@ typedef struct BlockIndexObject {
 } BlockIndexObject;
 
 
-// Returns a new reference to tuple. Returns NULL on error.
-static PyObject*
+// Returns a new reference to tuple. Returns NULL on error. Python already wraps negative numbers up to negative length when used in the sequence slot
+static inline PyObject*
 AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
     if (!((size_t)i < (size_t)self->bir_count)) {
         PyErr_SetString(PyExc_IndexError, "index out of range");
@@ -4210,6 +4210,16 @@ AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
     }
     BlockIndexRecord* biri = &self->bir[i];
     return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL
+}
+
+// Returns a new reference to tuple. Returns NULL on error. Supports negative numbers up to negative length.
+static inline PyObject*
+AK_BI_item_wraps(BlockIndexObject* self, Py_ssize_t i)
+{
+    if (i < 0) {
+        i = self->bir_count + i;
+    }
+    return AK_BI_item(self, i);
 }
 
 //------------------------------------------------------------------------------
@@ -4397,7 +4407,7 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
             return NULL;
         }
     }
-    return AK_BI_item(self->bi, t); // return new ref
+    return AK_BI_item_wraps(self->bi, t); // return new ref
 }
 
 static PyObject *
@@ -4578,7 +4588,6 @@ static PyTypeObject BIIterBooleanType = {
     .tp_name = "arraykit.BlockIndexIteratorBoolean",
 };
 
-
 //------------------------------------------------------------------------------
 
 // NOTE: this constructor returns one of three different PyObject types. We do this to consolidate error reporting and type checks.
@@ -4736,8 +4745,6 @@ error:
     // nothing shold be increfed when we get here
     return NULL;
 }
-
-
 
 //------------------------------------------------------------------------------
 
