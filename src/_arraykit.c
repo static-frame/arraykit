@@ -3324,19 +3324,31 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 }
 
 
-// Convert any slice to an ascending slice that covers the same values.
-static PyObject *
-slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
-
-    PyObject* slice;
-    PyObject* size;
-    if (!PyArg_ParseTuple(args,
-            "O!O!:slice_to_ascending_slice",
-            &PySlice_Type, &slice,
-            &PyLong_Type, &size)) {
+static inline PyObject*
+AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step)
+{
+    PyObject* py_start = PyLong_FromSsize_t(start);
+    PyObject* py_stop = PyLong_FromSsize_t(stop);
+    PyObject* py_step = PyLong_FromSsize_t(step);
+    if (py_start == NULL || py_stop == NULL || py_step == NULL) {
         return NULL;
     }
 
+    // might be NULL, let return
+    PyObject* new = PySlice_New(py_start, py_stop, py_step);
+
+    Py_DECREF(py_start);
+    Py_DECREF(py_stop);
+    Py_DECREF(py_step);
+
+    return new;
+}
+
+
+// Utility function for converting slices; returns NULL on error; returns a new reference.
+static inline PyObject*
+AK_slice_to_ascending_slice(PyObject* slice, Py_ssize_t size)
+{
     Py_ssize_t step_count = -1;
     Py_ssize_t start = 0;
     Py_ssize_t stop = 0;
@@ -3350,24 +3362,32 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
         return slice;
     }
     step_count = PySlice_AdjustIndices(
-            PyLong_AsSsize_t(size),
+            size,
             &start,
             &stop,
             step);
 
-    PyObject* asc_stop = PyLong_FromSsize_t(start + 1);
     // step will be negative; shift original start value down to find new start
-    PyObject* asc_start = PyLong_FromSsize_t(start + (step * (step_count - 1)));
-    PyObject* asc_step = PyLong_FromSsize_t(-step);
+    return AK_build_slice(
+            start + (step * (step_count - 1)),
+            start + 1,
+            -step);
+}
 
-    // might be NULL, let return
-    PyObject* asc = PySlice_New(asc_start, asc_stop, asc_step);
+// Convert any slice to an ascending slice that covers the same values.
+static PyObject *
+slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
 
-    Py_DECREF(asc_start);
-    Py_DECREF(asc_stop);
-    Py_DECREF(asc_step);
-
-    return asc;
+    PyObject* slice;
+    PyObject* size;
+    if (!PyArg_ParseTuple(args,
+            "O!O!:slice_to_ascending_slice",
+            &PySlice_Type, &slice,
+            &PyLong_Type, &size)) {
+        return NULL;
+    }
+    // will delegate NULL on eroror
+    return AK_slice_to_ascending_slice(slice, PyLong_AsSsize_t(size));
 }
 
 //------------------------------------------------------------------------------
