@@ -3463,8 +3463,7 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "O!|$p:first_true_1d",
             first_true_1d_kwarg_names,
-            &PyArray_Type,
-            &array,
+            &PyArray_Type, &array,
             &forward
             )) {
         return NULL;
@@ -3718,8 +3717,6 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     return (PyObject *)array_pos;
 }
-
-
 
 
 static PyObject *
@@ -5121,6 +5118,25 @@ BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
     return BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN);
 }
 
+// Given key, return an iterator of a selection.
+static PyObject*
+BlockIndex_iter_select_slices(BlockIndexObject *self, PyObject *args, PyObject *kwargs)
+{
+    PyObject* selector;
+    int ascending = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!|p:iter_select_slices",
+            first_true_1d_kwarg_names,
+            &selector,
+            &ascending
+            )) {
+        return NULL;
+    }
+
+    return BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN);
+}
+
 
 static PySequenceMethods BlockIndex_as_sequece = {
     .sq_length = (lenfunc)BlockIndex_length,
@@ -5139,6 +5155,10 @@ static PyMethodDef BlockIndex_methods[] = {
     {"get_block", (PyCFunction) BlockIndex_get_block, METH_O, NULL},
     {"get_column", (PyCFunction) BlockIndex_get_column, METH_O, NULL},
     {"iter_select", (PyCFunction) BlockIndex_iter_select, METH_O, NULL},
+    {"iter_select_slices",
+            (PyCFunction) BlockIndex_iter_select_slices,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
     {NULL},
 };
