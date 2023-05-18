@@ -730,5 +730,20 @@ class TestUnit(unittest.TestCase):
                 slice(4, 11, 2),
                 )
 
+    def test_slice_to_ascending_slice_e(self) -> None:
+        for slc, size in (
+                (slice(10, 2, -2), 12),
+                (slice(12, 2, -3), 12),
+                (slice(12, None, -4), 12),
+                (slice(76, 12, -8), 100),
+                (slice(81, 33, -12), 100),
+                (slice(97, 6, -7), 101),
+                ):
+            self.assertEqual(
+                slice_to_ascending_slice(slc, size),
+                slice_to_ascending_slice_ref(slc, size),
+                )
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -3337,7 +3337,7 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
         return NULL;
     }
 
-    Py_ssize_t len = -1;
+    Py_ssize_t step_count = -1;
     Py_ssize_t start = 0;
     Py_ssize_t stop = 0;
     Py_ssize_t step = 0;
@@ -3349,17 +3349,15 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
         Py_INCREF(slice);
         return slice;
     }
-    len = PySlice_AdjustIndices(
+    step_count = PySlice_AdjustIndices(
             PyLong_AsSsize_t(size),
             &start,
             &stop,
             step);
-    // AK_DEBUG_MSG_OBJ("resolved slice", Py_BuildValue("nnnn", pos, stop, step, len));
-
-    // real stop is (len-1); len is negative
 
     PyObject* asc_stop = PyLong_FromSsize_t(start + 1);
-    PyObject* asc_start = PyLong_FromSsize_t(start + (step * (len - 1)));
+    // step will be negative; shift original start value down to find new start
+    PyObject* asc_start = PyLong_FromSsize_t(start + (step * (step_count - 1)));
     PyObject* asc_step = PyLong_FromSsize_t(-step);
 
     // might be NULL, let return
