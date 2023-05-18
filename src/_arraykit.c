@@ -4178,6 +4178,8 @@ typedef struct BlockIndexObject {
     Py_ssize_t bir_capacity;
     BlockIndexRecord* bir;
     PyArray_Descr* dtype;
+    int8_t shape_recache;
+    PyObject* shape;
 } BlockIndexObject;
 
 
@@ -4341,7 +4343,7 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
         PyArrayObject *a = (PyArrayObject *)self->selector;
         switch (PyArray_TYPE(a)) { // type of passed in array
             case NPY_INT64:
-                t = *(npy_int64*)PyArray_GETPTR1(a, i);
+                t = (Py_ssize_t)*(npy_int64*)PyArray_GETPTR1(a, i);
                 break;
             case NPY_INT32:
                 t = *(npy_int32*)PyArray_GETPTR1(a, i);
@@ -4353,7 +4355,7 @@ BIIterSeq_iternext(BIIterSeqObject *self) {
                 t = *(npy_int8*)PyArray_GETPTR1(a, i);
                 break;
             case NPY_UINT64:
-                t = *(npy_uint64*)PyArray_GETPTR1(a, i);
+                t = (Py_ssize_t)*(npy_uint64*)PyArray_GETPTR1(a, i);
                 break;
             case NPY_UINT32:
                 t = *(npy_uint32*)PyArray_GETPTR1(a, i);
@@ -4776,6 +4778,9 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     bi->bir_count = bir_count;
     bi->bir_capacity = bir_capacity;
 
+    bi->shape_recache = 1; // always init to true
+    bi->shape = NULL;
+
     // Load the bi->bir struct array, if defined
     bi->bir = NULL;
     // always set bi to capacity defined at this point
@@ -4800,6 +4805,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             return -1;
         }
     }
+
     return 0;
 }
 
@@ -4808,9 +4814,9 @@ BlockIndex_dealloc(BlockIndexObject *self) {
     if (self->bir != NULL) {
         PyMem_Free(self->bir);
     }
-    if (self->dtype != NULL) {
-        Py_DECREF((PyObject*)self->dtype);
-    }
+    // both dtype and shape might not be set
+    Py_XDECREF((PyObject*)self->dtype);
+    Py_XDECREF(self->shape);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -4841,7 +4847,7 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     }
     Py_ssize_t increment = ndim == 1 ? 1 : PyArray_DIM(a, 1);
 
-    // assign alignment on first observation; otherwise take
+    // assign alignment on first observation; otherwise force alignemnt. We do this regardless of if the array has no columns.
     Py_ssize_t alignment = PyArray_DIM(a, 0);
     if (self->row_count == -1) {
         self->row_count = alignment;
@@ -4854,16 +4860,20 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
         return NULL;
     }
 
+    // if we are not adding columns, we are not adding types, so we are not changing the  dtype or shape
     if (increment == 0) {
         Py_RETURN_FALSE;
     }
 
+
     PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
-    if (self->dtype == NULL) {
+    self->shape_recache = 1; // adjusting columns, must recache shape
+
+    if (self->dtype == NULL) { // if not already set
         Py_INCREF((PyObject*)dt);
         self->dtype = dt;
     }
-    else if (!PyDataType_ISOBJECT(self->dtype)) {
+    else if (!PyDataType_ISOBJECT(self->dtype)) { // if object cannot resolve further
         PyArray_Descr* dtr = AK_ResolveDTypes(self->dtype, dt); // new ref
         Py_DECREF((PyObject*)self->dtype);
         self->dtype = dtr;
@@ -4972,6 +4982,9 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
     bi->bir_count = self->bir_count;
     bi->bir_capacity = self->bir_capacity;
 
+    bi->shape_recache = 1; // could copy, but do not want to copy a pending cache state
+    bi->shape = NULL;
+
     bi->bir = NULL;
     AK_BI_BIR_new(bi); // do initial alloc to self->bir_capacity
     memcpy(bi->bir,
@@ -4993,9 +5006,16 @@ BlockIndex_iter(BlockIndexObject* self) {
 
 
 static PyObject *
-BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
-    // NOTE: this could be cached
-    return Py_BuildValue("nn", self->row_count, self->bir_count);
+BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure))
+{
+    if (self->shape == NULL || self->shape_recache) {
+        Py_XDECREF(self->shape); // get rid of old if it exists
+        self->shape = Py_BuildValue("nn", self->row_count, self->bir_count); // new ref
+    }
+    // shape is not null and shape_recache is false
+    Py_INCREF(self->shape); // for caller
+    self->shape_recache = 0;
+    return self->shape;
 }
 
 static PyObject *
