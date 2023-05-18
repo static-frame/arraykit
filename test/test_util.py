@@ -18,15 +18,16 @@ from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
 from arraykit import dtype_from_element
-from arraykit import split_after_count
 from arraykit import count_iteration
 from arraykit import first_true_1d
 from arraykit import first_true_2d
+from arraykit import slice_to_ascending_slice
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
 
 from performance.reference.util import mloc as mloc_ref
+from performance.reference.util import slice_to_ascending_slice as slice_to_ascending_slice_ref
 
 
 class TestUnit(unittest.TestCase):
@@ -703,8 +704,45 @@ class TestUnit(unittest.TestCase):
                 [1, 0, 2, 1])
 
 
+    #---------------------------------------------------------------------------
+    def test_slice_to_ascending_slice_a(self) -> None:
+        self.assertEqual(slice_to_ascending_slice(
+                slice(5, 2, -1), 6),
+                slice(3, 6, 1),
+                )
 
+    def test_slice_to_ascending_slice_b(self) -> None:
+        self.assertEqual(slice_to_ascending_slice(
+                slice(2, 5, 1), 6),
+                slice(2, 5, 1),
+                )
 
+    def test_slice_to_ascending_slice_c(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = slice_to_ascending_slice('a', 6)
+
+        with self.assertRaises(TypeError):
+            _ = slice_to_ascending_slice(slice(1, 4), 'x')
+
+    def test_slice_to_ascending_slice_d(self) -> None:
+        self.assertEqual(slice_to_ascending_slice(
+                slice(10, 2, -2), 12),
+                slice(4, 11, 2),
+                )
+
+    def test_slice_to_ascending_slice_e(self) -> None:
+        for slc, size in (
+                (slice(10, 2, -2), 12),
+                (slice(12, 2, -3), 12),
+                (slice(12, None, -4), 12),
+                (slice(76, 12, -8), 100),
+                (slice(81, 33, -12), 100),
+                (slice(97, 6, -7), 101),
+                ):
+            self.assertEqual(
+                slice_to_ascending_slice(slc, size),
+                slice_to_ascending_slice_ref(slc, size),
+                )
 
 
 if __name__ == '__main__':

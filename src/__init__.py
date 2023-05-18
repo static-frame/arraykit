@@ -26,3 +26,4 @@ from ._arraykit import split_after_count as split_after_count
 from ._arraykit import count_iteration as count_iteration
 from ._arraykit import first_true_1d as first_true_1d
 from ._arraykit import first_true_2d as first_true_2d
+from ._arraykit import slice_to_ascending_slice as slice_to_ascending_slice
