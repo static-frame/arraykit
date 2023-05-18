@@ -546,5 +546,5 @@ class TestUnit(unittest.TestCase):
             print("ascending", tuple(bi1.iter_contiguous(sel, ascending=True)))
 
 
-        import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
 
