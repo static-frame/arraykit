@@ -724,7 +724,11 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = slice_to_ascending_slice(slice(1, 4), 'x')
 
-
+    def test_slice_to_ascending_slice_d(self) -> None:
+        self.assertEqual(slice_to_ascending_slice(
+                slice(10, 2, -2), 12),
+                slice(4, 11, 2),
+                )
 
 if __name__ == '__main__':
     unittest.main()

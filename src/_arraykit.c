@@ -3354,9 +3354,12 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
             &start,
             &stop,
             step);
+    // AK_DEBUG_MSG_OBJ("resolved slice", Py_BuildValue("nnnn", pos, stop, step, len));
 
-    PyObject* asc_start = PyLong_FromSsize_t(stop + 1);
+    // real stop is (len-1); len is negative
+
     PyObject* asc_stop = PyLong_FromSsize_t(start + 1);
+    PyObject* asc_start = PyLong_FromSsize_t(start + (step * (len - 1)));
     PyObject* asc_step = PyLong_FromSsize_t(-step);
 
     // might be NULL, let return
