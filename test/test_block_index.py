@@ -529,3 +529,22 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(list(bi1.iter_select(np.full(len(bi1), True))),
                 [(0, 0), (0, 1), (1, 0)]
                 )
+
+
+
+    def test_block_index_iter_contiguous_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(2))
+
+
+        for sel in (np.array([1,0,7,6]), slice(7,1,-2)):
+            print('sel', sel)
+            print("not ascending", tuple(bi1.iter_contiguous(sel)))
+            print("ascending", tuple(bi1.iter_contiguous(sel, ascending=True)))
+
+
+        import ipdb; ipdb.set_trace()
+

@@ -46,7 +46,7 @@ class BlockIndex:
     def iter_select(self,
             __key: tp.Union[slice, np.ndarray, tp.List[int]],
             ) -> tp.Iterator[tp.Tuple[int, int]]: ...
-    def iter_select_slices(self,
+    def iter_contiguous(self,
             __key: tp.Union[slice, np.ndarray, tp.List[int]],
             ascending: bool = False,
             ) -> tp.Iterator[tp.Tuple[int, int]]: ...
