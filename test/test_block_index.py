@@ -529,3 +529,26 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(list(bi1.iter_select(np.full(len(bi1), True))),
                 [(0, 0), (0, 1), (1, 0)]
                 )
+
+    #---------------------------------------------------------------------------
+    def test_block_index_iter_select_sequence_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+
+        self.assertEqual(list(bi1.iter_select([0, -1, -2, -8])),
+                [(0, 0), (2, 4), (2, 3), (0, 0)]
+                )
+        self.assertEqual(list(bi1.iter_select(np.array([0, -1, -2, -8]))),
+                [(0, 0), (2, 4), (2, 3), (0, 0)]
+                )
+
+    def test_block_index_iter_select_sequence_b(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+
+        with self.assertRaises(IndexError):
+            _ = list(bi1.iter_select([-9]))
