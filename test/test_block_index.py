@@ -15,7 +15,11 @@ class TestUnit(unittest.TestCase):
     def test_block_index_init_a(self) -> None:
         bi1 = BlockIndex()
         self.assertEqual(bi1.dtype, np.dtype(float))
-        # print(bi1)
+        s = bi1.shape
+        self.assertEqual(s, (-1, 0))
+        del bi1
+        self.assertEqual(s, (-1, 0))
+        del s
 
     def test_block_index_init_b1(self) -> None:
         with self.assertRaises(ValueError):
@@ -165,10 +169,12 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         bi1.register(np.arange(12).reshape(2,6))
         bi1.register(np.arange(4).reshape(2,2))
-
+        s1 = bi1.shape
         bi2 = bi1.copy()
         self.assertEqual(bi1.to_list(), bi2.to_list())
-
+        self.assertEqual(bi1.dtype, bi2.dtype)
+        del bi1
+        self.assertEqual(bi2.shape, s1)
 
     def test_block_index_copy_b(self) -> None:
         dt1 = np.dtype(np.float64)
