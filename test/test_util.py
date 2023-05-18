@@ -27,6 +27,7 @@ from performance.reference.util import get_new_indexers_and_screen_ak as get_new
 from arraykit import get_new_indexers_and_screen
 
 from performance.reference.util import mloc as mloc_ref
+from performance.reference.util import slice_to_ascending_slice as slice_to_ascending_slice_ref
 
 
 class TestUnit(unittest.TestCase):
