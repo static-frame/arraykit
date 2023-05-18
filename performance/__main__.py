@@ -27,6 +27,7 @@ from performance.reference.util import get_new_indexers_and_screen_ak
 from performance.reference.util import get_new_indexers_and_screen_ref
 from performance.reference.util import split_after_count as split_after_count_ref
 from performance.reference.util import count_iteration as count_iteration_ref
+from performance.reference.util import slice_to_ascending_slice as slice_to_ascending_slice_ref
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -45,6 +46,7 @@ from arraykit import delimited_to_arrays as delimited_to_arrays_ak
 from arraykit import isna_element as isna_element_ak
 from arraykit import split_after_count as split_after_count_ak
 from arraykit import count_iteration as count_iteration_ak
+from arraykit import slice_to_ascending_slice as slice_to_ascending_slice_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -734,6 +736,22 @@ class CountIterationsAK(CountIterations):
 class CountIterationsREF(CountIterations):
     entry = staticmethod(count_iteration_ref)
 
+
+#-------------------------------------------------------------------------------
+class SliceToAscending(Perf):
+    NUMBER = 1_000_000
+
+    def __init__(self):
+        self.slc = slice(100, 1, -3)
+
+    def main(self):
+        _ = self.entry(self.slc, 101)
+
+class SliceToAscendingAK(SliceToAscending):
+    entry = staticmethod(slice_to_ascending_slice_ak)
+
+class SliceToAscendingREF(SliceToAscending):
+    entry = staticmethod(slice_to_ascending_slice_ref)
 
 #-------------------------------------------------------------------------------
 
