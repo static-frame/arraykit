@@ -4212,16 +4212,6 @@ AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
     return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL
 }
 
-// Returns a new reference to tuple. Returns NULL on error. Supports negative numbers up to negative length.
-// static inline PyObject*
-// AK_BI_item_wraps(BlockIndexObject* self, Py_ssize_t i)
-// {
-//     if (i < 0) {
-//         i = self->bir_count + i;
-//     }
-//     return AK_BI_item(self, i);
-// }
-
 //------------------------------------------------------------------------------
 // BI Iterator
 static PyTypeObject BIIterType;
@@ -4309,13 +4299,13 @@ static PyTypeObject BIIterType = {
 // BI Iterator sequence selection
 static PyTypeObject BIIterSeqType;
 static PyTypeObject BIIterSliceType;
-static PyTypeObject BIIterBooleanType;
+static PyTypeObject BIIterBoolType;
 
 
 typedef enum BIIterSelectorKind {
     BIIS_SEQ, // BIIterSeqType
     BIIS_SLICE,
-    BIIS_BOOLEAN, // BIIterBooleanType
+    BIIS_BOOLEAN, // BIIterBoolType
     BIIS_UNKNOWN
 } BIIterSelectorKind;
 
@@ -4487,16 +4477,26 @@ BIIterSlice_iter(BIIterSliceObject *self) {
     return self;
 }
 
-
-// NOTE: this does not use `reversed`, as pos, step, and count are set in BIIterSelector_new
-static PyObject *
-BIIterSlice_iternext(BIIterSliceObject *self) {
+static inline Py_ssize_t
+BIIterSlice_iternext_core(BIIterSliceObject *self)
+{
     if (self->len == 0 || self->count >= self->len) {
-        return NULL;
+        return -1;
     }
     Py_ssize_t i = self->pos;
     self->pos += self->step;
     self->count++; // by counting index we we do not need to compare to stop
+    // i will never be out of range
+    return i;
+}
+
+// NOTE: this does not use `reversed`, as pos, step, and count are set in BIIterSelector_new
+static PyObject *
+BIIterSlice_iternext(BIIterSliceObject *self) {
+    Py_ssize_t i = BIIterSlice_iternext_core(self);
+    if (i == -1) {
+        return NULL;
+    }
     return AK_BI_item(self->bi, i); // return new ref
 }
 
@@ -4553,8 +4553,9 @@ BIIterBoolean_iter(BIIterBooleanObject *self) {
     return self;
 }
 
-static PyObject *
-BIIterBoolean_iternext(BIIterBooleanObject *self) {
+static inline Py_ssize_t
+BIIterBoolean_iternext_core(BIIterBooleanObject *self)
+{
     npy_bool v = 0;
     Py_ssize_t i = -1;
     PyArrayObject* a = (PyArrayObject*) self->selector;
@@ -4582,9 +4583,18 @@ BIIterBoolean_iternext(BIIterBooleanObject *self) {
         }
     }
     if (i != -1) {
-        return AK_BI_item(self->bi, i); // return new ref
+        return i;
     }
-    return NULL; // no True remain
+    return -1; // no True remain
+}
+
+static PyObject *
+BIIterBoolean_iternext(BIIterBooleanObject *self) {
+    Py_ssize_t i = BIIterBoolean_iternext_core(self);
+    if (i == -1) {
+        return NULL;
+    }
+    return AK_BI_item(self->bi, i); // return new ref
 }
 
 static PyObject *
@@ -4598,7 +4608,7 @@ static PyMethodDef BIiterBoolean_methods[] = {
     {NULL},
 };
 
-static PyTypeObject BIIterBooleanType = {
+static PyTypeObject BIIterBoolType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_basicsize = sizeof(BIIterBooleanObject),
     .tp_dealloc = (destructor) BIIterBoolean_dealloc,
@@ -4648,17 +4658,26 @@ BIIterContig_iter(BIIterContigObject *self) {
 
 static PyObject *
 BIIterContig_iternext(BIIterContigObject *self) {
-    Py_ssize_t i;
+    Py_ssize_t i = -1;
     PyObject* iter = self->iter;
 
-    if (Py_TYPE(iter) == &BIIterSeqType) {
+    PyTypeObject* type = Py_TYPE(iter);
+
+    if (type == &BIIterSeqType) {
         i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
-        if (i == -1) {
-            return NULL;
-        }
-        return PyLong_FromSsize_t(i);
     }
-    return NULL;
+    else if (type == &BIIterSliceType) {
+        i = BIIterSlice_iternext_core((BIIterSliceObject*)iter);
+    }
+    else if (type == &BIIterBoolType) {
+        i = BIIterBoolean_iternext_core((BIIterBooleanObject*)iter);
+    }
+
+    if (i == -1) {
+        return NULL;
+    }
+    return PyLong_FromSsize_t(i);
+
 }
 
 // not implementing __reversed__, __length_hint__
@@ -4822,7 +4841,7 @@ BIIterSelector_new(BlockIndexObject *bi,
             break;
         }
         case BIIS_BOOLEAN: {
-            BIIterBooleanObject* it = PyObject_New(BIIterBooleanObject, &BIIterBooleanType);
+            BIIterBooleanObject* it = PyObject_New(BIIterBooleanObject, &BIIterBoolType);
             if (it == NULL) {goto error;}
             it->bi = bi;
             it->selector = selector;
@@ -5690,7 +5709,7 @@ PyInit__arraykit(void)
         PyType_Ready(&BIIterType) ||
         PyType_Ready(&BIIterSeqType) ||
         PyType_Ready(&BIIterSliceType) ||
-        PyType_Ready(&BIIterBooleanType) ||
+        PyType_Ready(&BIIterBoolType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
