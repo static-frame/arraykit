@@ -4689,6 +4689,20 @@ BIIterSelector_new(BlockIndexObject *bi,
             return NULL;
         }
         len = PyList_GET_SIZE(selector);
+
+        if (ascending) {
+            // abandoning borrowed ref
+            selector = PyObject_CallMethod(selector, "copy", NULL); // new ref
+            if (selector == NULL) {
+                return NULL;
+            }
+            PyObject* post = PyObject_CallMethod(selector, "sort", NULL); // new ref
+            if (post == NULL) {
+                return NULL;
+            }
+            Py_DECREF(post); // just a None
+            incref_selector = 0;
+        }
     }
     else {
         PyErr_SetString(PyExc_TypeError, "Input type not supported");
@@ -4747,6 +4761,7 @@ error:
 }
 
 //------------------------------------------------------------------------------
+// block index new, init, memory
 
 // Returns 0 on succes, -1 on error.
 int
@@ -4870,16 +4885,7 @@ BlockIndex_dealloc(BlockIndexObject *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static PyObject *
-BlockIndex_repr(BlockIndexObject *self) {
-    PyObject* dt = self->dtype == NULL ? Py_None : (PyObject*) self->dtype;
-    return PyUnicode_FromFormat("<%s(blocks: %i, rows: %i, columns: %i, dtype: %R)>",
-            Py_TYPE(self)->tp_name,
-            self->block_count,
-            self->row_count,
-            self->bir_count,
-            dt);
-}
+//------------------------------------------------------------------------------
 
 // Returns NULL on error, True if the block should be reatained, False if the block has zero columns and should not be retained. This checks and raises on non-array inputs, dimensions other than 1 or 2, and mis-aligned columns.
 static PyObject *
@@ -4944,6 +4950,8 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     Py_RETURN_TRUE;
 }
 
+//------------------------------------------------------------------------------
+// exporters
 
 static PyObject*
 BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
@@ -4965,7 +4973,6 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     return list;
 }
 
-
 // Returns NULL on error
 static PyObject*
 AK_BI_to_bytes(BlockIndexObject *self) {
@@ -4975,13 +4982,14 @@ AK_BI_to_bytes(BlockIndexObject *self) {
     return bytes;
 }
 
-
 // Returns NULL on error
 static PyObject*
 BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     return AK_BI_to_bytes(self);
 }
 
+//------------------------------------------------------------------------------
+// pickle support
 
 // Returns NULL on error, PyObject* otherwise.
 static PyObject*
@@ -5018,42 +5026,8 @@ BlockIndex_setstate(BlockIndexObject *self, PyObject *state)
     Py_RETURN_NONE;
 }
 
-
-static PyObject *
-BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
-{
-    PyTypeObject* cls = Py_TYPE(self); // borrowed ref
-    BlockIndexObject *bi = (BlockIndexObject *)cls->tp_alloc(cls, 0);
-    if (bi == NULL) {
-        return NULL;
-    }
-    bi->block_count = self->block_count;
-    bi->row_count = self->row_count;
-    bi->bir_count = self->bir_count;
-    bi->bir_capacity = self->bir_capacity;
-
-    bi->shape_recache = 1; // could copy, but do not want to copy a pending cache state
-    bi->shape = NULL;
-
-    bi->bir = NULL;
-    AK_BI_BIR_new(bi); // do initial alloc to self->bir_capacity
-    memcpy(bi->bir,
-            self->bir,
-            self->bir_count * sizeof(BlockIndexRecord));
-
-    bi->dtype = NULL;
-    if (self->dtype != NULL) {
-        bi->dtype = self->dtype;
-        Py_INCREF((PyObject*)bi->dtype);
-    }
-    return (PyObject *)bi;
-}
-
-static PyObject*
-BlockIndex_iter(BlockIndexObject* self) {
-    return BIIter_new(self, 0);
-}
-
+//------------------------------------------------------------------------------
+// getters
 
 static PyObject *
 BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure))
@@ -5089,7 +5063,6 @@ BlockIndex_dtype_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
     return (PyObject*)PyArray_DescrFromType(NPY_FLOAT64);
 }
 
-
 static struct PyGetSetDef BlockIndex_getset[] = {
     {"shape", (getter)BlockIndex_shape_getter, NULL, NULL, NULL},
     {"rows", (getter)BlockIndex_rows_getter, NULL, NULL, NULL},
@@ -5098,6 +5071,49 @@ static struct PyGetSetDef BlockIndex_getset[] = {
     {NULL},
 };
 
+//------------------------------------------------------------------------------
+// general methods
+
+static PyObject *
+BlockIndex_repr(BlockIndexObject *self) {
+    PyObject* dt = self->dtype == NULL ? Py_None : (PyObject*) self->dtype;
+    return PyUnicode_FromFormat("<%s(blocks: %i, rows: %i, columns: %i, dtype: %R)>",
+            Py_TYPE(self)->tp_name,
+            self->block_count,
+            self->row_count,
+            self->bir_count,
+            dt);
+}
+
+static PyObject *
+BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
+{
+    PyTypeObject* cls = Py_TYPE(self); // borrowed ref
+    BlockIndexObject *bi = (BlockIndexObject *)cls->tp_alloc(cls, 0);
+    if (bi == NULL) {
+        return NULL;
+    }
+    bi->block_count = self->block_count;
+    bi->row_count = self->row_count;
+    bi->bir_count = self->bir_count;
+    bi->bir_capacity = self->bir_capacity;
+
+    bi->shape_recache = 1; // could copy, but do not want to copy a pending cache state
+    bi->shape = NULL;
+
+    bi->bir = NULL;
+    AK_BI_BIR_new(bi); // do initial alloc to self->bir_capacity
+    memcpy(bi->bir,
+            self->bir,
+            self->bir_count * sizeof(BlockIndexRecord));
+
+    bi->dtype = NULL;
+    if (self->dtype != NULL) {
+        bi->dtype = self->dtype;
+        Py_INCREF((PyObject*)bi->dtype);
+    }
+    return (PyObject *)bi;
+}
 
 static Py_ssize_t
 BlockIndex_length(BlockIndexObject *self){
@@ -5144,12 +5160,20 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
     return NULL;
 }
 
-
 static char *iter_contiguous_kargs_names[] = {
     "selector",
     "ascending",
     NULL
 };
+
+
+//------------------------------------------------------------------------------
+// iterators
+
+static PyObject*
+BlockIndex_iter(BlockIndexObject* self) {
+    return BIIter_new(self, 0);
+}
 
 // Given key, return an iterator of a selection.
 static PyObject*
@@ -5172,9 +5196,15 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
             )) {
         return NULL;
     }
-    return BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
+
+    PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
+    Py_DECREF(iter);
+    Py_RETURN_NONE;
+    // can compose this iterator in another iterator!
 }
 
+//------------------------------------------------------------------------------
+// slot / method def
 
 static PySequenceMethods BlockIndex_as_sequece = {
     .sq_length = (lenfunc)BlockIndex_length,
