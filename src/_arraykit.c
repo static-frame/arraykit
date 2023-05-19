@@ -4620,18 +4620,18 @@ static PyTypeObject BIIterBoolType = {
 
 //------------------------------------------------------------------------------
 // BI Iterator Contigous
-static PyTypeObject BIIterContigType;
+static PyTypeObject BIIterContiguousType;
 
-typedef struct BIIterContigObject {
+typedef struct BIIterContiguousObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
     PyObject* iter; // own refernce to core iterator
     int8_t reversed;
-} BIIterContigObject;
+} BIIterContiguousObject;
 
 static PyObject *
-BIIterContig_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
-    BIIterContigObject *bii = PyObject_New(BIIterContigObject, &BIIterContigType);
+BIIterContiguous_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
+    BIIterContiguousObject *bii = PyObject_New(BIIterContiguousObject, &BIIterContiguousType);
     if (!bii) {
         return NULL;
     }
@@ -4644,25 +4644,24 @@ BIIterContig_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
 }
 
 static void
-BIIterContig_dealloc(BIIterContigObject *self) {
+BIIterContiguous_dealloc(BIIterContiguousObject *self) {
     Py_DECREF(self->bi);
     Py_DECREF(self->iter);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static BIIterContigObject *
-BIIterContig_iter(BIIterContigObject *self) {
+static BIIterContiguousObject *
+BIIterContiguous_iter(BIIterContiguousObject *self) {
     Py_INCREF(self);
     return self;
 }
 
 static PyObject *
-BIIterContig_iternext(BIIterContigObject *self) {
+BIIterContiguous_iternext(BIIterContiguousObject *self) {
     Py_ssize_t i = -1;
     PyObject* iter = self->iter;
 
     PyTypeObject* type = Py_TYPE(iter);
-
     if (type == &BIIterSeqType) {
         i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
     }
@@ -4679,14 +4678,50 @@ BIIterContig_iternext(BIIterContigObject *self) {
     return PyLong_FromSsize_t(i);
 }
 
-// not implementing __reversed__, __length_hint__
+static PyObject *
+BIIterContiguous_reversed(BIIterContiguousObject *self) {
 
-static PyTypeObject BIIterContigType = {
+    PyObject* selector = NULL;
+    PyTypeObject* type = Py_TYPE(self->iter);
+    if (type == &BIIterSeqType) {
+        selector = ((BIIterSeqObject*)self->iter)->selector;
+    }
+    else if (type == &BIIterSliceType) {
+        selector = ((BIIterSliceObject*)self->iter)->selector;
+    }
+    else if (type == &BIIterBoolType) {
+        selector = ((BIIterBooleanObject*)self->iter)->selector;
+    }
+
+    if (selector == NULL) {
+        return NULL;
+    }
+
+    PyObject* iter = BIIterSelector_new(self->bi,
+            selector,
+            !self->reversed,
+            BIIS_UNKNOWN, // let type be determined by selector
+            0);
+    PyObject* biiter = BIIterContiguous_new(self->bi, !self->reversed, self->iter);
+    Py_DECREF(iter);
+    return biiter;
+}
+
+
+// not implementing __length_hint__
+static PyMethodDef BIIterContiguous_methods[] = {
+    {"__reversed__", (PyCFunction)BIIterContiguous_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+
+static PyTypeObject BIIterContiguousType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_basicsize = sizeof(BIIterContigObject),
-    .tp_dealloc = (destructor) BIIterContig_dealloc,
-    .tp_iter = (getiterfunc) BIIterContig_iter,
-    .tp_iternext = (iternextfunc) BIIterContig_iternext,
+    .tp_basicsize = sizeof(BIIterContiguousObject),
+    .tp_dealloc = (destructor) BIIterContiguous_dealloc,
+    .tp_iter = (getiterfunc) BIIterContiguous_iter,
+    .tp_iternext = (iternextfunc) BIIterContiguous_iternext,
+    .tp_methods = BIIterContiguous_methods,
     .tp_name = "arraykit.BlockIndexContiguousIterator",
 };
 
@@ -5302,7 +5337,7 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
 
     // might need to store enum type for branching
     PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
-    PyObject* biiter = BIIterContig_new(self, 0, iter); // will incref iter
+    PyObject* biiter = BIIterContiguous_new(self, 0, iter); // will incref iter
     Py_DECREF(iter);
 
     return biiter;
