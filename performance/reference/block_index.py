@@ -122,38 +122,36 @@ class IterContiguous:
             if self.next_block == -2:
                 return None # terminate the loop
             if self.next_block != -1:
-                # we found a discontinuity on the last iteration, so this is a new start
+                # discontinuity found on last iteration, set new start
                 self.last_block = self.next_block
                 self.last_column = self.next_column
                 slice_start = self.last_column
-                self.next_block = -1 # clear next statte
+                self.next_block = -1 # clear next state
+                self.next_column = -1
 
             try:
                 block, column = next(self.indices)
             except StopIteration:
+                # no more pairs, but set a previous slice_start that has not been emitted
+                # return that now, and flag for end on next call
                 self.next_block = -2
                 return self.last_block, self.build_slice(slice_start, self.last_column)
 
-            if self.last_block == -1: # only on init
+            if self.last_block == -1:
+                # initialization
                 self.last_block = block
                 self.last_column = column
                 slice_start = column
                 continue
 
-            if self.last_block == block: # in the same block
-                if abs(column - self.last_column) == 1:
-                    self.last_column = column
-                    continue
-                else: # not contiguous, need to emit a slice, store next
-                    self.next_block = block
-                    self.next_column = column
+            if self.last_block == block and abs(column - self.last_column) == 1: # contiguous
+                self.last_column = column
+                continue
 
-                    return self.last_block, self.build_slice(slice_start, self.last_column)
-
-            # blocks are not equal, must emit a slice
+            # not contiguous, need to emit a slice for previous region
+            # store this block, column as next, so we have
             self.next_block = block
             self.next_column = column
-
             return self.last_block, self.build_slice(slice_start, self.last_column)
 
 
@@ -175,9 +173,11 @@ if __name__ == '__main__':
         [(0, 0), (2, 1), (3, 5), (10, 1)],
         [(0, 0), (2, 1), (2, 2), (2, 5), (2, 6), (10, 1)],
         [(10, 1)],
-        [(10, 1)],
+        [(0, 1), (0, 2), (0, 3), (0, 4)],
         [(0, 0), (2, 3), (2, 2), (2, 1), (2, 6), (10, 1)],
         [(2, 3), (0, 0), (2, 2), (2, 1), (2, 6), (2, 7)],
+        [(2, 3), (2, 2), (5, 2), (5, 1), (5, 0), (2, 1), (2, 0)],
+
     )
     for sample in samples:
         p1 = list(indices_to_contiguous_pairs(sample))
