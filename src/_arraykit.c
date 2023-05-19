@@ -4196,7 +4196,7 @@ typedef struct BlockIndexObject {
     Py_ssize_t bir_capacity;
     BlockIndexRecord* bir;
     PyArray_Descr* dtype;
-    int8_t shape_recache;
+    bool shape_recache;
     PyObject* shape;
 } BlockIndexObject;
 
@@ -5004,7 +5004,7 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     bi->bir_count = bir_count;
     bi->bir_capacity = bir_capacity;
 
-    bi->shape_recache = 1; // always init to true
+    bi->shape_recache = true; // always init to true
     bi->shape = NULL;
 
     // Load the bi->bir struct array, if defined
@@ -5084,7 +5084,7 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
 
 
     PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
-    self->shape_recache = 1; // adjusting columns, must recache shape
+    self->shape_recache = true; // adjusting columns, must recache shape
 
     if (self->dtype == NULL) { // if not already set
         Py_INCREF((PyObject*)dt);
@@ -5199,7 +5199,7 @@ BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure))
     }
     // shape is not null and shape_recache is false
     Py_INCREF(self->shape); // for caller
-    self->shape_recache = 0;
+    self->shape_recache = false;
     return self->shape;
 }
 
@@ -5259,7 +5259,7 @@ BlockIndex_copy(BlockIndexObject *self, PyObject *Py_UNUSED(unused))
     bi->bir_count = self->bir_count;
     bi->bir_capacity = self->bir_capacity;
 
-    bi->shape_recache = 1; // could copy, but do not want to copy a pending cache state
+    bi->shape_recache = true; // could copy, but do not want to copy a pending cache state
     bi->shape = NULL;
 
     bi->bir = NULL;
