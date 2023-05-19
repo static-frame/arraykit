@@ -4668,8 +4668,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
     PyObject* iter = self->iter;
     PyTypeObject* type = Py_TYPE(iter);
 
-    Py_ssize_t slice_start;
-    Py_ssize_t slice_end;
+    // Py_ssize_t slice_start;
 
     while (1) {
         // this is in a loop
@@ -4692,7 +4691,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
         if (self->last_block == -1) {
             self->last_block = biri->block;
             self->last_column = biri->column;
-            slice_start = biri->column;
+            // slice_start = biri->column;
             continue;
         }
         // if (self->last_block == biri->block) {
