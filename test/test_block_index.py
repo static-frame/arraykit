@@ -575,10 +575,11 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(2))
 
 
+        print('\n', bi1.to_list())
         for sel in ([1,0,7,6], np.array([1,0,7,6]), slice(7,1,-2)):
-            print('sel', sel)
+            print('          sel', sel)
             print("not ascending", tuple(bi1.iter_contiguous(sel)))
-            print("ascending", tuple(bi1.iter_contiguous(sel, ascending=True)))
+            print("    ascending", tuple(bi1.iter_contiguous(sel, ascending=True)))
 
 
         # import ipdb; ipdb.set_trace()

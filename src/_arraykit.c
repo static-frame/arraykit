@@ -3267,7 +3267,7 @@ shape_filter(PyObject *Py_UNUSED(m), PyObject *a) {
     npy_intp size0 = PyArray_DIM(array, 0);
     // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
     npy_intp size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
-    return Py_BuildValue("ii", size0, size1);
+    return Py_BuildValue("nn", size0, size1);
 }
 
 // Reshape if necessary a flat ndim 1 array into a 2D array with one columns and rows of length.
@@ -4629,6 +4629,8 @@ typedef struct BIIterContiguousObject {
     int8_t reversed;
     Py_ssize_t last_block;
     Py_ssize_t last_column;
+    Py_ssize_t next_block;
+    Py_ssize_t next_column;
 } BIIterContiguousObject;
 
 static PyObject *
@@ -4645,6 +4647,8 @@ BIIterContiguous_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
 
     bii->last_block = -1;
     bii->last_column = -1;
+    bii->next_block = -1;
+    bii->next_column = -1;
 
     return (PyObject *)bii;
 }
@@ -4668,9 +4672,23 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
     PyObject* iter = self->iter;
     PyTypeObject* type = Py_TYPE(iter);
 
-    // Py_ssize_t slice_start;
+    Py_ssize_t slice_start = -1;
+    Py_ssize_t block;
+    Py_ssize_t column;
 
     while (1) {
+        if (self->next_block == -2) {
+            break; // terminate
+        }
+        if (self->next_block != -1) {
+            // discontinuity found on last iteration, set new start
+            self->last_block = self->next_block;
+            self->last_column = self->next_column;
+            slice_start = self->last_column;
+
+            self->next_block = self->next_column = -1; // clear next state
+        }
+
         // this is in a loop
         if (type == &BIIterSeqType) {
             i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
@@ -4681,24 +4699,40 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
         else if (type == &BIIterBoolType) {
             i = BIIterBoolean_iternext_core((BIIterBooleanObject*)iter);
         }
+        // if (i == -1) {return NULL;}
+        // return PyLong_FromLong(i);
         if (i == -1) { // end of iteration or error
-            return NULL;
+            if (PyErr_Occurred()) {
+                break;
+            }
+            // no more pairs, return previous slice_start, flag for end on next call
+            self->next_block = -2;
+            AK_DEBUG_MSG_OBJ("last tuple", Py_None);
+            return Py_BuildValue("nnn", self->last_block, slice_start, self->last_column);
         }
         // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_core, and that function validates the range
         BlockIndexRecord* biri = &self->bi->bir[i];
+        block = biri->block;
+        column = biri->column;
 
-        // if last block not seen, return -1
+        // inititialization
         if (self->last_block == -1) {
-            self->last_block = biri->block;
-            self->last_column = biri->column;
-            // slice_start = biri->column;
+            self->last_block = block;
+            self->last_column = column;
+            slice_start = column;
             continue;
         }
-        // if (self->last_block == biri->block) {
-        //     // in the same block
-        // }
+
+        if (self->last_block == block && llabs(column - self->last_column) == 1) {
+            // contiguious region found, can be postive or negative
+            self->last_column = column;
+            continue;
+        }
+        self->next_block = block;
+        self->next_column = column;
+        return Py_BuildValue("nnn", self->last_block, slice_start, self->last_column);
     }
-    return PyLong_FromSsize_t(i);
+    return NULL;
 }
 
 static PyObject *
