@@ -4677,7 +4677,6 @@ BIIterContig_iternext(BIIterContigObject *self) {
         return NULL;
     }
     return PyLong_FromSsize_t(i);
-
 }
 
 // not implementing __reversed__, __length_hint__
