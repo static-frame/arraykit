@@ -554,6 +554,17 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(IndexError):
             _ = list(bi1.iter_select([-9]))
 
+
+
+    def test_block_index_iter_select_sequence_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(4).reshape(2,2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(10).reshape(2,5))
+
+        with self.assertRaises(TypeError):
+            _ = list(bi1.iter_select(['b', 'c']))
+
     #---------------------------------------------------------------------------
 
     def test_block_index_iter_contiguous_a(self) -> None:
