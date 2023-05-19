@@ -8,54 +8,22 @@ import typing as tp
 from itertools import repeat
 import pickle
 
-from arraykit import BlockIndex
-# from arraykit import ErrorInitTypeBlocks
-from arraykit import shape_filter
-from arraykit import resolve_dtype
-
-import arraykit as ak
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from arraykit import BlockIndex
+# from arraykit import ErrorInitTypeBlocks
+
+import arraykit as ak
+
 sys.path.append(os.getcwd())
 
+from performance.reference.block_index import from_blocks
 
-def from_blocks(
-        raw_blocks: tp.Iterable[np.ndarray],
-        ):
-    index: tp.List[tp.Tuple[int, int]] = [] # columns position to blocks key
-    block_count = 0
-    row_count = None
-    column_count = 0
-    dtype = None
 
-    for block in raw_blocks:
-        if not block.__class__ is np.ndarray:
-            raise ErrorInitTypeBlocks(f'found non array block: {block}')
-        if block.ndim > 2:
-            raise ErrorInitTypeBlocks(f'cannot include array with {block.ndim} dimensions')
 
-        r, c = shape_filter(block)
-
-        if row_count is not None and r != row_count: #type: ignore [unreachable]
-            raise ErrorInitTypeBlocks(f'mismatched row count: {r}: {row_count}')
-        else:
-            row_count = r
-        if c == 0:
-            continue
-
-        if dtype is None:
-            dtype = block.dtype
-        else:
-            dtype = resolve_dtype(dtype, block.dtype)
-
-        for i in range(c):
-            index.append((block_count, i))
-        column_count += c
-        block_count += 1
-    return (row_count, column_count), index
+#-------------------------------------------------------------------------------
 
 class ArrayProcessor:
     NAME = ''
@@ -77,6 +45,7 @@ class ArrayProcessor:
         self.selector_int_list = list(range(0, len(self.bi), 2))
         self.selector_bool_array = (np.arange(len(self.bi)) % 2) == 0
         self.selector_slice = slice(0, len(self.bi), 2)
+
 
 #-------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
@@ -223,13 +192,11 @@ class TupleIndexIterBoolArray(ArrayProcessor):
 
     def __call__(self):
         ti = self.ti
-        _ = [ti[i] for i in self.selector_bool_array if i]
-
-
+        _ = [ti[i] for i, b in enumerate(self.selector_bool_array) if b]
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 50
+NUMBER = 5
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER

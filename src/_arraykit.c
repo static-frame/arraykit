@@ -4627,6 +4627,8 @@ typedef struct BIIterContiguousObject {
     BlockIndexObject *bi;
     PyObject* iter; // own refernce to core iterator
     int8_t reversed;
+    Py_ssize_t last_block;
+    Py_ssize_t last_column;
 } BIIterContiguousObject;
 
 static PyObject *
@@ -4640,6 +4642,10 @@ BIIterContiguous_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
     Py_INCREF(iter);
     bii->iter = iter;
     bii->reversed = reversed;
+
+    bii->last_block = -1;
+    bii->last_column = -1;
+
     return (PyObject *)bii;
 }
 
@@ -4660,20 +4666,38 @@ static PyObject *
 BIIterContiguous_iternext(BIIterContiguousObject *self) {
     Py_ssize_t i = -1;
     PyObject* iter = self->iter;
-
     PyTypeObject* type = Py_TYPE(iter);
-    if (type == &BIIterSeqType) {
-        i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
-    }
-    else if (type == &BIIterSliceType) {
-        i = BIIterSlice_iternext_core((BIIterSliceObject*)iter);
-    }
-    else if (type == &BIIterBoolType) {
-        i = BIIterBoolean_iternext_core((BIIterBooleanObject*)iter);
-    }
 
-    if (i == -1) {
-        return NULL;
+    Py_ssize_t slice_start;
+    Py_ssize_t slice_end;
+
+    while (1) {
+        // this is in a loop
+        if (type == &BIIterSeqType) {
+            i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
+        }
+        else if (type == &BIIterSliceType) {
+            i = BIIterSlice_iternext_core((BIIterSliceObject*)iter);
+        }
+        else if (type == &BIIterBoolType) {
+            i = BIIterBoolean_iternext_core((BIIterBooleanObject*)iter);
+        }
+        if (i == -1) { // end of iteration or error
+            return NULL;
+        }
+        // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_core, and that function validates the range
+        BlockIndexRecord* biri = &self->bi->bir[i];
+
+        // if last block not seen, return -1
+        if (self->last_block == -1) {
+            self->last_block = biri->block;
+            self->last_column = biri->column;
+            slice_start = biri->column;
+            continue;
+        }
+        // if (self->last_block == biri->block) {
+        //     // in the same block
+        // }
     }
     return PyLong_FromSsize_t(i);
 }
