@@ -3324,27 +3324,52 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 }
 
 
-// Returns a new ref; returns NULL on error.
+// Returns a new ref; returns NULL on error. Any start or stop less than 0 will be set to NULL.
 static inline PyObject*
 AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step)
 {
-    PyObject* py_start = PyLong_FromSsize_t(start);
-    PyObject* py_stop = PyLong_FromSsize_t(stop);
-    PyObject* py_step = PyLong_FromSsize_t(step);
-    if (py_start == NULL || py_stop == NULL || py_step == NULL) {
-        return NULL;
+    PyObject* py_start = NULL;
+    PyObject* py_stop = NULL;
+    PyObject* py_step = NULL;
+
+    if (start >= 0) {
+        py_start = PyLong_FromSsize_t(start);
+        if (py_start == NULL) {return NULL;}
+    }
+    if (stop >= 0) {
+        py_stop = PyLong_FromSsize_t(stop);
+        if (py_stop == NULL) {return NULL;}
+    }
+    // do not set a step if not necessary
+    if (step != 0 && step != 1) {
+        py_step = PyLong_FromSsize_t(step);
+        if (py_step == NULL) {return NULL;}
     }
 
     // might be NULL, let return
     PyObject* new = PySlice_New(py_start, py_stop, py_step);
 
-    Py_DECREF(py_start);
-    Py_DECREF(py_stop);
-    Py_DECREF(py_step);
+    Py_XDECREF(py_start);
+    Py_XDECREF(py_stop);
+    Py_XDECREF(py_step);
 
     return new;
 }
 
+// Given inclusive start, end indices, return a slice
+static inline PyObject*
+AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end)
+{
+    assert(start >= 0);
+
+    if (start <= end) {
+        return AK_build_slice(start, end + 1, 1);
+    }
+    if (end == 0) {
+        return AK_build_slice(start, -1, -1);
+    }
+    return AK_build_slice(start, end - 1, -1);
+}
 
 // Utility function for converting slices; returns NULL on error; returns a new reference.
 static inline PyObject*
@@ -4707,7 +4732,6 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
             }
             // no more pairs, return previous slice_start, flag for end on next call
             self->next_block = -2;
-            AK_DEBUG_MSG_OBJ("last tuple", Py_None);
             return Py_BuildValue("nnn", self->last_block, slice_start, self->last_column);
         }
         // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_core, and that function validates the range
