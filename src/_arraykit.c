@@ -3356,18 +3356,16 @@ AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step)
     return new;
 }
 
-// Given inclusive start, end indices, return a slice
+// Given inclusive start, end indices, returns a new reference to a slice. Returns NULL on error.
 static inline PyObject*
 AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end)
 {
+    // TODO: if start and end are the same, return an integer; this can be configured with a parameter
     assert(start >= 0);
-
     if (start <= end) {
         return AK_build_slice(start, end + 1, 1);
     }
-    if (end == 0) {
-        return AK_build_slice(start, -1, -1);
-    }
+    // end of 0 goes to -1, gets converted to None
     return AK_build_slice(start, end - 1, -1);
 }
 
@@ -4726,7 +4724,9 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
             }
             // no more pairs, return previous slice_start, flag for end on next call
             self->next_block = -2;
-            return Py_BuildValue("nnn", self->last_block, slice_start, self->last_column);
+            return Py_BuildValue("nN", // N steals ref
+                    self->last_block,
+                    AK_build_slice_inclusive(slice_start, self->last_column));
         }
         // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_core, and that function validates the range
         BlockIndexRecord* biri = &self->bi->bir[i];
@@ -4747,7 +4747,9 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
         }
         self->next_block = block;
         self->next_column = column;
-        return Py_BuildValue("nnn", self->last_block, slice_start, self->last_column);
+        return Py_BuildValue("nN", // N steals ref
+                self->last_block,
+                AK_build_slice_inclusive(slice_start, self->last_column));
     }
     return NULL;
 }
@@ -5370,13 +5372,6 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
     return NULL;
 }
 
-static char *iter_contiguous_kargs_names[] = {
-    "selector",
-    "ascending",
-    NULL
-};
-
-
 //------------------------------------------------------------------------------
 // iterators
 
@@ -5391,6 +5386,12 @@ BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
     return BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, 0);
 }
 
+static char *iter_contiguous_kargs_names[] = {
+    "selector",
+    "ascending",
+    NULL
+};
+
 // Given key, return an iterator of a selection.
 static PyObject*
 BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwargs)
@@ -5399,7 +5400,7 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
     int ascending = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|p:iter_contiguous",
+            "O|$p:iter_contiguous",
             iter_contiguous_kargs_names,
             &selector,
             &ascending

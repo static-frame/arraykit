@@ -574,14 +574,102 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(6).reshape(2,3))
         bi1.register(np.arange(2))
 
+        self.assertEqual(
+            list(bi1.iter_contiguous([1,2,6,7])),
+            [(0, slice(1, 3, None)), (2, slice(2, 3, None)), (3, slice(0, 1, None))]
+            )
 
-        print('\n', bi1.to_list())
-        for sel in ([1,0,7,6], np.array([1,0,7,6]), slice(7,1,-2)):
-            print('          sel', sel)
-            print("not ascending", tuple(bi1.iter_contiguous(sel)))
-            print("    ascending", tuple(bi1.iter_contiguous(sel, ascending=True)))
+        self.assertEqual(
+            list(bi1.iter_contiguous([7,6,2,1])),
+            [(3, slice(0, 1, None)), (2, slice(2, 3, None)), (0, slice(2, 0, -1))]
+            )
+
+        self.assertEqual(
+            list(bi1.iter_contiguous([7, 6, 2, 1], ascending=True)),
+            [(0, slice(1, 3, None)), (2, slice(2, 3, None)), (3, slice(0, 1, None))]
+            )
 
 
-        # import ipdb; ipdb.set_trace()
+    def test_block_index_iter_contiguous_b(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(16).reshape(2,8))
+
+        self.assertEqual(
+            list(bi1.iter_contiguous([0,1,6,7])),
+            [(0, slice(0, 2, None)), (0, slice(6, 8, None))]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(None))),
+            [(0, slice(0, 8, None))]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(1, 6))),
+            [(0, slice(1, 6, None))]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(0, 8, 3))),
+            [(0, slice(0, 1, None)), (0, slice(3, 4, None)), (0, slice(6, 7, None))]
+            )
 
 
+    def test_block_index_iter_contiguous_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(16).reshape(2,8))
+
+        with self.assertRaises(TypeError):
+            list(bi1.iter_contiguous([0,1,6,7], False))
+
+
+    def test_block_index_iter_contiguous_d(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(8).reshape(2,4))
+        bi1.register(np.arange(8).reshape(2,4))
+
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(7,1,-1))),
+            [(1, slice(3, None, -1)), (0, slice(3, 1, -1))]
+            )
+
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(7,1,-1), ascending=True)),
+            [(0, slice(2, 4)), (1, slice(0, 4))]
+            )
+
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(8,1,-1), ascending=True)),
+            [(0, slice(2, 4)), (1, slice(0, 4))]
+            )
+
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(8,None,-1), ascending=True)),
+            [(0, slice(0, 4)), (1, slice(0, 4))]
+            )
+
+    def test_block_index_iter_contiguous_e(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+
+        self.assertEqual(
+            list(bi1.iter_contiguous([6, 0, 7])),
+            [(6, slice(0, 1)), (0, slice(0, 1)), (7, slice(0, 1))]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous([6, 0, 7], ascending=True)),
+            [(0, slice(0, 1)), (6, slice(0, 1)), (7, slice(0, 1))]
+            )
+
+        self.assertEqual(
+            list(bi1.iter_contiguous(np.array([6, 0, 7]))),
+            [(6, slice(0, 1)), (0, slice(0, 1)), (7, slice(0, 1))]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous(np.array([6, 0, 7]), ascending=True)),
+            [(0, slice(0, 1)), (6, slice(0, 1)), (7, slice(0, 1))]
+            )
