@@ -3503,7 +3503,7 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
     if (!PyArray_IS_C_CONTIGUOUS(array)) {
-        PyErr_SetString(PyExc_ValueError, "Array must be continguous");
+        PyErr_SetString(PyExc_ValueError, "Array must be contiguous");
         return NULL;
     }
 
@@ -4708,13 +4708,9 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
         if (self->next_block != -1) {
             // discontinuity found on last iteration, set new start
             self->last_block = self->next_block;
-            self->last_column = self->next_column;
-            slice_start = self->last_column;
-
+            self->last_column = slice_start = self->next_column;
             self->next_block = self->next_column = -1; // clear next state
         }
-
-        // this is in a loop
         if (type == &BIIterSeqType) {
             i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
         }
@@ -4724,8 +4720,6 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
         else if (type == &BIIterBoolType) {
             i = BIIterBoolean_iternext_core((BIIterBooleanObject*)iter);
         }
-        // if (i == -1) {return NULL;}
-        // return PyLong_FromLong(i);
         if (i == -1) { // end of iteration or error
             if (PyErr_Occurred()) {
                 break;
@@ -4746,7 +4740,6 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
             slice_start = column;
             continue;
         }
-
         if (self->last_block == block && llabs(column - self->last_column) == 1) {
             // contiguious region found, can be postive or negative
             self->last_column = column;
@@ -4974,8 +4967,7 @@ BIIterSelector_new(BlockIndexObject *bi,
         Py_INCREF(selector);
     }
     return bii;
-error:
-    // nothing shold be increfed when we get here
+error: // nothing shold be increfed when we get here
     return NULL;
 }
 
@@ -5089,7 +5081,6 @@ BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             return -1;
         }
     }
-
     return 0;
 }
 
