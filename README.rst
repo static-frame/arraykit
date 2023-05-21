@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.4.3
+............
+
+Added ``BlockIndex.iter_contiguous()`` with options for ``ascending`` and ``reduce`` sequences.
+
+
 0.4.2
 ............
 
