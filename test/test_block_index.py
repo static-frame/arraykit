@@ -645,7 +645,7 @@ class TestUnit(unittest.TestCase):
             [(0, slice(0, 4)), (1, slice(0, 4))]
             )
 
-    def test_block_index_iter_contiguous_e(self) -> None:
+    def test_block_index_iter_contiguous_e1(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(2))
         bi1.register(np.arange(2))
@@ -672,4 +672,33 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(
             list(bi1.iter_contiguous(np.array([6, 0, 7]), ascending=True)),
             [(0, slice(0, 1)), (6, slice(0, 1)), (7, slice(0, 1))]
+            )
+
+    def test_block_index_iter_contiguous_e2(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+
+        self.assertEqual(
+            list(bi1.iter_contiguous([6, 0, 7], reduce=True)),
+            [(6, 0), (0, 0), (7, 0)]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous([6, 0, 7], ascending=True, reduce=True)),
+            [(0, 0), (6, 0), (7, 0)]
+            )
+
+        self.assertEqual(
+            list(bi1.iter_contiguous(np.array([6, 0, 7]), reduce=True)),
+            [(6, 0), (0, 0), (7, 0)]
+            )
+        self.assertEqual(
+            list(bi1.iter_contiguous(np.array([6, 0, 7]), ascending=True, reduce=True)),
+            [(0, 0), (6, 0), (7, 0)]
             )

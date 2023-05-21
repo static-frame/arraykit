@@ -3356,12 +3356,14 @@ AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step)
     return new;
 }
 
-// Given inclusive start, end indices, returns a new reference to a slice. Returns NULL on error.
+// Given inclusive start, end indices, returns a new reference to a slice. Returns NULL on error. If `reduce` is True, single width slices return an integer.
 static inline PyObject*
-AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end)
+AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end, bool reduce)
 {
-    // TODO: if start and end are the same, return an integer; this can be configured with a parameter
-    assert(start >= 0);
+    if (reduce && start == end) {
+        return PyLong_FromSsize_t(start); // new ref
+    }
+    // assert(start >= 0);
     if (start <= end) {
         return AK_build_slice(start, end + 1, 1);
     }
@@ -4654,10 +4656,15 @@ typedef struct BIIterContiguousObject {
     Py_ssize_t last_column;
     Py_ssize_t next_block;
     Py_ssize_t next_column;
+    bool reduce; // optionally reduce slices to integers
 } BIIterContiguousObject;
 
 static PyObject *
-BIIterContiguous_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
+BIIterContiguous_new(BlockIndexObject *bi,
+        int8_t reversed,
+        PyObject* iter,
+        bool reduce)
+{
     BIIterContiguousObject *bii = PyObject_New(BIIterContiguousObject, &BIIterContiguousType);
     if (!bii) {
         return NULL;
@@ -4672,6 +4679,7 @@ BIIterContiguous_new(BlockIndexObject *bi, int8_t reversed, PyObject* iter) {
     bii->last_column = -1;
     bii->next_block = -1;
     bii->next_column = -1;
+    bii->reduce = reduce;
 
     return (PyObject *)bii;
 }
@@ -4726,7 +4734,9 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
             self->next_block = -2;
             return Py_BuildValue("nN", // N steals ref
                     self->last_block,
-                    AK_build_slice_inclusive(slice_start, self->last_column));
+                    AK_build_slice_inclusive(slice_start,
+                            self->last_column,
+                            self->reduce));
         }
         // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_core, and that function validates the range
         BlockIndexRecord* biri = &self->bi->bir[i];
@@ -4749,7 +4759,9 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
         self->next_column = column;
         return Py_BuildValue("nN", // N steals ref
                 self->last_block,
-                AK_build_slice_inclusive(slice_start, self->last_column));
+                AK_build_slice_inclusive(slice_start,
+                        self->last_column,
+                        self->reduce));
     }
     return NULL;
 }
@@ -4778,7 +4790,10 @@ BIIterContiguous_reversed(BIIterContiguousObject *self) {
             !self->reversed,
             BIIS_UNKNOWN, // let type be determined by selector
             0);
-    PyObject* biiter = BIIterContiguous_new(self->bi, !self->reversed, self->iter);
+    PyObject* biiter = BIIterContiguous_new(self->bi,
+            !self->reversed,
+            self->iter,
+            self->reduce);
     Py_DECREF(iter);
     return biiter;
 }
@@ -5389,6 +5404,7 @@ BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
 static char *iter_contiguous_kargs_names[] = {
     "selector",
     "ascending",
+    "reduce",
     NULL
 };
 
@@ -5398,19 +5414,21 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
 {
     PyObject* selector;
     int ascending = 0;
+    int reduce = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-            "O|$p:iter_contiguous",
+            "O|$pp:iter_contiguous",
             iter_contiguous_kargs_names,
             &selector,
-            &ascending
+            &ascending,
+            &reduce
             )) {
         return NULL;
     }
 
     // might need to store enum type for branching
     PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
-    PyObject* biiter = BIIterContiguous_new(self, 0, iter); // will incref iter
+    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // will incref iter
     Py_DECREF(iter);
 
     return biiter;
