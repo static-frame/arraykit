@@ -610,7 +610,10 @@ class TestUnit(unittest.TestCase):
             list(bi1.iter_contiguous(slice(0, 8, 3))),
             [(0, slice(0, 1, None)), (0, slice(3, 4, None)), (0, slice(6, 7, None))]
             )
-
+        self.assertEqual(
+            list(bi1.iter_contiguous(slice(0, 8, 3), reduce=True)),
+            [(0, 0), (0, 3), (0, 6)]
+            )
 
     def test_block_index_iter_contiguous_c(self) -> None:
         bi1 = BlockIndex()
