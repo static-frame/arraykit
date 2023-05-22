@@ -4254,7 +4254,7 @@ BIIter_new(BlockIndexObject *bi, int8_t reversed) {
     if (!bii) {
         return NULL;
     }
-    Py_INCREF(bi);
+    Py_INCREF((PyObject*)bi);
     bii->bi = bi;
     bii->reversed = reversed;
     bii->pos = 0;
@@ -4263,7 +4263,7 @@ BIIter_new(BlockIndexObject *bi, int8_t reversed) {
 
 static void
 BIIter_dealloc(BIIterObject *self) {
-    Py_DECREF(self->bi);
+    Py_DECREF((PyObject*)self->bi);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -4355,7 +4355,7 @@ typedef struct BIIterSeqObject {
 
 static void
 BIIterSeq_dealloc(BIIterSeqObject *self) {
-    Py_DECREF(self->bi);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->selector);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -4491,7 +4491,7 @@ typedef struct BIIterSliceObject {
 
 static void
 BIIterSlice_dealloc(BIIterSliceObject *self) {
-    Py_DECREF(self->bi);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->selector);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -4567,7 +4567,7 @@ typedef struct BIIterBooleanObject {
 
 static void
 BIIterBoolean_dealloc(BIIterBooleanObject *self) {
-    Py_DECREF(self->bi);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->selector);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -4669,10 +4669,11 @@ BIIterContiguous_new(BlockIndexObject *bi,
     if (!bii) {
         return NULL;
     }
-    Py_INCREF(bi);
+    Py_INCREF((PyObject*)bi);
     bii->bi = bi;
     Py_INCREF(iter);
     bii->iter = iter;
+
     bii->reversed = reversed;
 
     bii->last_block = -1;
@@ -4681,14 +4682,17 @@ BIIterContiguous_new(BlockIndexObject *bi,
     bii->next_column = -1;
     bii->reduce = reduce;
 
+    AK_DEBUG_MSG_OBJ("complete init", Py_None);
     return (PyObject *)bii;
 }
 
 static void
 BIIterContiguous_dealloc(BIIterContiguousObject *self) {
-    Py_DECREF(self->bi);
+    AK_DEBUG_MSG_OBJ("start dealloc", Py_None);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->iter);
     Py_TYPE(self)->tp_free((PyObject *)self);
+    AK_DEBUG_MSG_OBJ("end dealloc", Py_None);
 }
 
 static BIIterContiguousObject *
@@ -4829,7 +4833,7 @@ BIIterSelector_new(BlockIndexObject *bi,
         int8_t ascending) {
 
     int8_t is_array = 0;
-    int8_t incref_selector = 1; // incref borrowed selector; but if a new ref is made, do not
+    bool incref_selector = true; // incref borrowed selector; but if a new ref is made, do not
 
     Py_ssize_t len = -1;
     Py_ssize_t pos = 0;
@@ -4881,7 +4885,7 @@ BIIterSelector_new(BlockIndexObject *bi,
             if (PyArray_Sort((PyArrayObject*)selector, 0, NPY_QUICKSORT)) {
                 return NULL; // returns -1 on error
             }; // new ref
-            incref_selector = 0;
+            incref_selector = false;
         }
     }
     else if (PySlice_Check(selector)) {
@@ -4896,7 +4900,7 @@ BIIterSelector_new(BlockIndexObject *bi,
         if (ascending) {
             // NOTE: we are abandoning the borrowed reference
             selector = AK_slice_to_ascending_slice(selector, bi->bir_count); // new ref
-            incref_selector = 0;
+            incref_selector = false;
         }
 
         if (PySlice_Unpack(selector, &pos, &stop, &step)) {
@@ -4930,7 +4934,7 @@ BIIterSelector_new(BlockIndexObject *bi,
                 return NULL;
             }
             Py_DECREF(post); // just a None
-            incref_selector = 0;
+            incref_selector = false;
         }
     }
     else {
@@ -4979,7 +4983,7 @@ BIIterSelector_new(BlockIndexObject *bi,
         case BIIS_UNKNOWN:
             goto error; // should not get here!
     }
-    Py_INCREF(bi);
+    Py_INCREF((PyObject*)bi);
     if (incref_selector) {
         Py_INCREF(selector);
     }
@@ -5428,7 +5432,10 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
 
     // might need to store enum type for branching
     PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
-    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // will incref iter
+    if (iter == NULL) {
+        return NULL; // exception set
+    }
+    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // might be NULL, will incref iter
     Py_DECREF(iter);
 
     return biiter;

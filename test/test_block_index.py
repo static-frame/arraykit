@@ -705,3 +705,31 @@ class TestUnit(unittest.TestCase):
             list(bi1.iter_contiguous(np.array([6, 0, 7]), ascending=True, reduce=True)),
             [(0, 0), (6, 0), (7, 0)]
             )
+
+
+
+    def test_block_index_iter_contiguous_f(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        key = np.array([2, 3, 5])
+
+        def gen():
+            yield from bi1.iter_contiguous(key)
+        post2 = list(gen())
+
+        post1 = list(bi1.iter_contiguous(key))
+        self.assertEqual(post1, post2)
+
+
+
+    def test_block_index_iter_contiguous_g(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        with self.assertRaises(TypeError):
+            _ = list(bi1.iter_contiguous('a'))
