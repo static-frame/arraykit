@@ -565,6 +565,21 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = list(bi1.iter_select(['b', 'c']))
 
+
+
+    def test_block_index_iter_select_sequence_d(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(10).reshape(2,5))
+
+        sel = [0, 3, 4]
+        it1 = iter(bi1.iter_select(sel))
+        it2 = iter(it1)
+        del sel
+        del bi1
+        del it1
+        self.assertEqual(list(it2), [(0, 0), (0, 3), (0, 4)])
+
+
     #---------------------------------------------------------------------------
 
     def test_block_index_iter_contiguous_a(self) -> None:
@@ -705,3 +720,44 @@ class TestUnit(unittest.TestCase):
             list(bi1.iter_contiguous(np.array([6, 0, 7]), ascending=True, reduce=True)),
             [(0, 0), (6, 0), (7, 0)]
             )
+
+
+    def test_block_index_iter_contiguous_f1(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        key = np.array([2, 3, 5])
+
+        def gen1():
+            yield from bi1.iter_select(key)
+        post1 = list(gen1())
+        self.assertEqual(post1, [(0, 2), (1, 0), (1, 2)])
+
+
+
+    def test_block_index_iter_contiguous_f2(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(4).reshape(2,2))
+        key = np.array([2, 3, 5])
+
+        def gen2():
+            yield from bi1.iter_contiguous(key)
+        post2 = list(gen2())
+
+        post1 = list(bi1.iter_contiguous(key))
+        self.assertEqual(post1, post2)
+
+
+
+    def test_block_index_iter_contiguous_g(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(4).reshape(2,2))
+
+        with self.assertRaises(TypeError):
+            _ = list(bi1.iter_contiguous('a'))

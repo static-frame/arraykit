@@ -31,7 +31,14 @@ class BlockIndex:
     rows: int
     columns: int
 
-    def __init__() -> None: ...
+    def __init__(
+            block_count: int = 0,
+            row_count: int = -1,
+            bir_count: int = 0,
+            bir_capacity: int = 8,
+            bir_bytes: bytes = b'',
+            dtype: np.dtype = None,
+            ) -> None: ...
     def register(self, __value: np.ndarray) -> bool: ...
     def to_list(self,) -> tp.List[int]: ...
     def to_bytes(self,) -> bytes: ...
@@ -48,9 +55,10 @@ class BlockIndex:
             ) -> tp.Iterator[tp.Tuple[int, int]]: ...
     def iter_contiguous(self,
             __key: tp.Union[slice, np.ndarray, tp.List[int]],
+            *,
             ascending: bool = False,
             reduce: bool = False,
-            ) -> tp.Iterator[tp.Tuple[int, int]]: ...
+            ) -> tp.Iterator[tp.Tuple[int, tp.Union[slice, int]]]: ...
 
 
 def iterable_str_to_array_1d(

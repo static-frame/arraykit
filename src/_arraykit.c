@@ -57,6 +57,12 @@
         PyObject_Print(obj, stderr, 0); \
     _AK_DEBUG_END()
 
+# define AK_DEBUG_MSG_REFCNT(msg, obj)     \
+    _AK_DEBUG_BEGIN();                  \
+        fprintf(stderr, #msg " ref count: ");      \
+        PyObject_Print(PyLong_FromSsize_t(Py_REFCNT((PyObject*)obj)), stderr, 0); \
+    _AK_DEBUG_END()
+
 # define AK_DEBUG_OBJ(obj)              \
     _AK_DEBUG_BEGIN();                  \
         fprintf(stderr, #obj " = ");    \
@@ -4244,17 +4250,17 @@ static PyTypeObject BIIterType;
 typedef struct BIIterObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
-    int8_t reversed;
+    bool reversed;
     Py_ssize_t pos; // current index state, mutated in-place
 } BIIterObject;
 
 static PyObject *
-BIIter_new(BlockIndexObject *bi, int8_t reversed) {
+BIIter_new(BlockIndexObject *bi, bool reversed) {
     BIIterObject *bii = PyObject_New(BIIterObject, &BIIterType);
     if (!bii) {
         return NULL;
     }
-    Py_INCREF(bi);
+    Py_INCREF((PyObject*)bi);
     bii->bi = bi;
     bii->reversed = reversed;
     bii->pos = 0;
@@ -4263,14 +4269,14 @@ BIIter_new(BlockIndexObject *bi, int8_t reversed) {
 
 static void
 BIIter_dealloc(BIIterObject *self) {
-    Py_DECREF(self->bi);
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    Py_DECREF((PyObject*)self->bi);
+    PyObject_Del((PyObject*)self);
 }
 
-static BIIterObject *
+static PyObject*
 BIIter_iter(BIIterObject *self) {
     Py_INCREF(self);
-    return self;
+    return (PyObject*)self;
 }
 
 static PyObject *
@@ -4319,7 +4325,6 @@ static PyTypeObject BIIterType = {
     .tp_name = "arraykit.BlockIndexIterator",
 };
 
-
 //------------------------------------------------------------------------------
 // BI Iterator sequence selection
 static PyTypeObject BIIterSeqType;
@@ -4338,37 +4343,37 @@ typedef enum BIIterSelectorKind {
 static PyObject *
 BIIterSelector_new(BlockIndexObject *bi,
         PyObject* selector,
-        int8_t reversed,
+        bool reversed,
         BIIterSelectorKind kind,
-        int8_t ascending
+        bool ascending
         );
 
 typedef struct BIIterSeqObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
-    int8_t reversed;
+    bool reversed;
     PyObject* selector;
     Py_ssize_t pos; // current pos in sequence, mutated in-place
     Py_ssize_t len;
-    int8_t is_array;
+    bool is_array;
 } BIIterSeqObject;
 
 static void
 BIIterSeq_dealloc(BIIterSeqObject *self) {
-    Py_DECREF(self->bi);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->selector);
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    PyObject_Del((PyObject*)self);
 }
 
-static BIIterSeqObject *
+static PyObject*
 BIIterSeq_iter(BIIterSeqObject *self) {
     Py_INCREF(self);
-    return self;
+    return (PyObject*)self;
 }
 
 // Returns -1 on end of sequence; return -1 with exception set on
 static inline Py_ssize_t
-BIIterSeq_iternext_core(BIIterSeqObject *self)
+BIIterSeq_iternext_index(BIIterSeqObject *self)
 {
     Py_ssize_t i;
     if (self->reversed) {
@@ -4439,7 +4444,7 @@ BIIterSeq_iternext_core(BIIterSeqObject *self)
 static PyObject *
 BIIterSeq_iternext(BIIterSeqObject *self)
 {
-    Py_ssize_t i = BIIterSeq_iternext_core(self);
+    Py_ssize_t i = BIIterSeq_iternext_index(self);
     if (i == -1) {
         return NULL; // an error is set
     }
@@ -4447,12 +4452,14 @@ BIIterSeq_iternext(BIIterSeqObject *self)
 }
 
 static PyObject *
-BIIterSeq_reversed(BIIterSeqObject *self) {
+BIIterSeq_reversed(BIIterSeqObject *self)
+{
     return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SEQ, 0);
 }
 
 static PyObject *
-BIIterSeq_length_hint(BIIterSeqObject *self) {
+BIIterSeq_length_hint(BIIterSeqObject *self)
+{
     // this works for reversed as we use self-> index to subtract from length
     Py_ssize_t len = Py_MAX(0, self->len - self->pos);
     return PyLong_FromSsize_t(len);
@@ -4480,7 +4487,7 @@ static PyTypeObject BIIterSeqType = {
 typedef struct BIIterSliceObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
-    int8_t reversed;
+    bool reversed;
     PyObject* selector; // slice
     Py_ssize_t count; // count of , mutated in-place
     // these are the normalized values truncated to the span of the bir_count; len is the realized length after extraction; step is always set to 1 if missing; len is 0 if no realized values
@@ -4491,19 +4498,21 @@ typedef struct BIIterSliceObject {
 
 static void
 BIIterSlice_dealloc(BIIterSliceObject *self) {
-    Py_DECREF(self->bi);
+    // AK_DEBUG_MSG_REFCNT("start dealloc", self);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->selector);
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    PyObject_Del((PyObject*)self);
 }
 
-static BIIterSliceObject *
+static PyObject*
 BIIterSlice_iter(BIIterSliceObject *self) {
     Py_INCREF(self);
-    return self;
+    return (PyObject*)self;
 }
 
+// NOTE: this does not use `reversed`, as pos, step, and count are set in BIIterSelector_new
 static inline Py_ssize_t
-BIIterSlice_iternext_core(BIIterSliceObject *self)
+BIIterSlice_iternext_index(BIIterSliceObject *self)
 {
     if (self->len == 0 || self->count >= self->len) {
         return -1;
@@ -4515,10 +4524,9 @@ BIIterSlice_iternext_core(BIIterSliceObject *self)
     return i;
 }
 
-// NOTE: this does not use `reversed`, as pos, step, and count are set in BIIterSelector_new
 static PyObject *
 BIIterSlice_iternext(BIIterSliceObject *self) {
-    Py_ssize_t i = BIIterSlice_iternext_core(self);
+    Py_ssize_t i = BIIterSlice_iternext_index(self);
     if (i == -1) {
         return NULL;
     }
@@ -4526,12 +4534,14 @@ BIIterSlice_iternext(BIIterSliceObject *self) {
 }
 
 static PyObject *
-BIIterSlice_reversed(BIIterSliceObject *self) {
+BIIterSlice_reversed(BIIterSliceObject *self)
+{
     return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SLICE, 0);
 }
 
 static PyObject *
-BIIterSlice_length_hint(BIIterSliceObject *self) {
+BIIterSlice_length_hint(BIIterSliceObject *self)
+{
     // this works for reversed as we use self-> index to subtract from length
     Py_ssize_t len = Py_MAX(0, self->len - self->count);
     return PyLong_FromSsize_t(len);
@@ -4559,7 +4569,7 @@ static PyTypeObject BIIterSliceType = {
 typedef struct BIIterBooleanObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
-    int8_t reversed;
+    bool reversed;
     PyObject* selector;
     Py_ssize_t pos; // current index, mutated in-place
     Py_ssize_t len;
@@ -4567,19 +4577,20 @@ typedef struct BIIterBooleanObject {
 
 static void
 BIIterBoolean_dealloc(BIIterBooleanObject *self) {
-    Py_DECREF(self->bi);
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->selector);
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    PyObject_Del((PyObject*)self);
 }
 
-static BIIterBooleanObject *
-BIIterBoolean_iter(BIIterBooleanObject *self) {
+static PyObject*
+BIIterBoolean_iter(BIIterBooleanObject *self)
+{
     Py_INCREF(self);
-    return self;
+    return (PyObject*)self;
 }
 
 static inline Py_ssize_t
-BIIterBoolean_iternext_core(BIIterBooleanObject *self)
+BIIterBoolean_iternext_index(BIIterBooleanObject *self)
 {
     npy_bool v = 0;
     Py_ssize_t i = -1;
@@ -4615,7 +4626,7 @@ BIIterBoolean_iternext_core(BIIterBooleanObject *self)
 
 static PyObject *
 BIIterBoolean_iternext(BIIterBooleanObject *self) {
-    Py_ssize_t i = BIIterBoolean_iternext_core(self);
+    Py_ssize_t i = BIIterBoolean_iternext_index(self);
     if (i == -1) {
         return NULL;
     }
@@ -4623,7 +4634,8 @@ BIIterBoolean_iternext(BIIterBooleanObject *self) {
 }
 
 static PyObject *
-BIIterBoolean_reversed(BIIterBooleanObject *self) {
+BIIterBoolean_reversed(BIIterBooleanObject *self)
+{
     return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_BOOLEAN, 0);
 }
 
@@ -4650,8 +4662,8 @@ static PyTypeObject BIIterContiguousType;
 typedef struct BIIterContiguousObject {
     PyObject_VAR_HEAD
     BlockIndexObject *bi;
-    PyObject* iter; // own refernce to core iterator
-    int8_t reversed;
+    PyObject* iter; // own reference to core iterator
+    bool reversed;
     Py_ssize_t last_block;
     Py_ssize_t last_column;
     Py_ssize_t next_block;
@@ -4661,7 +4673,7 @@ typedef struct BIIterContiguousObject {
 
 static PyObject *
 BIIterContiguous_new(BlockIndexObject *bi,
-        int8_t reversed,
+        bool reversed,
         PyObject* iter,
         bool reduce)
 {
@@ -4669,10 +4681,12 @@ BIIterContiguous_new(BlockIndexObject *bi,
     if (!bii) {
         return NULL;
     }
-    Py_INCREF(bi);
+    Py_INCREF((PyObject*)bi);
     bii->bi = bi;
+
     Py_INCREF(iter);
     bii->iter = iter;
+
     bii->reversed = reversed;
 
     bii->last_block = -1;
@@ -4685,20 +4699,62 @@ BIIterContiguous_new(BlockIndexObject *bi,
 }
 
 static void
-BIIterContiguous_dealloc(BIIterContiguousObject *self) {
-    Py_DECREF(self->bi);
+BIIterContiguous_dealloc(BIIterContiguousObject *self)
+{
+    Py_DECREF((PyObject*)self->bi);
     Py_DECREF(self->iter);
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    PyObject_Del((PyObject*)self);
 }
 
-static BIIterContiguousObject *
-BIIterContiguous_iter(BIIterContiguousObject *self) {
+
+// Simply incref this object and return it.
+static PyObject*
+BIIterContiguous_iter(BIIterContiguousObject *self)
+{
     Py_INCREF(self);
-    return self;
+    return (PyObject*)self;
+}
+
+// Returns a new reference.
+static PyObject *
+BIIterContiguous_reversed(BIIterContiguousObject *self)
+{
+    bool reversed = !self->reversed;
+
+    PyObject* selector = NULL;
+    PyTypeObject* type = Py_TYPE(self->iter);
+    if (type == &BIIterSeqType) {
+        selector = ((BIIterSeqObject*)self->iter)->selector;
+    }
+    else if (type == &BIIterSliceType) {
+        selector = ((BIIterSliceObject*)self->iter)->selector;
+    }
+    else if (type == &BIIterBoolType) {
+        selector = ((BIIterBooleanObject*)self->iter)->selector;
+    }
+    if (selector == NULL) {
+        return NULL;
+    }
+
+    PyObject* iter = BIIterSelector_new(self->bi,
+            selector,
+            reversed,
+            BIIS_UNKNOWN, // let type be determined by selector
+            0);
+    if (iter == NULL) {
+        return NULL;
+    }
+    PyObject* biiter = BIIterContiguous_new(self->bi,
+            reversed,
+            self->iter,
+            self->reduce);
+    Py_DECREF(iter);
+    return biiter;
 }
 
 static PyObject *
-BIIterContiguous_iternext(BIIterContiguousObject *self) {
+BIIterContiguous_iternext(BIIterContiguousObject *self)
+{
     Py_ssize_t i = -1;
     PyObject* iter = self->iter;
     PyTypeObject* type = Py_TYPE(iter);
@@ -4718,13 +4774,13 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
             self->next_block = self->next_column = -1; // clear next state
         }
         if (type == &BIIterSeqType) {
-            i = BIIterSeq_iternext_core((BIIterSeqObject*)iter);
+            i = BIIterSeq_iternext_index((BIIterSeqObject*)iter);
         }
         else if (type == &BIIterSliceType) {
-            i = BIIterSlice_iternext_core((BIIterSliceObject*)iter);
+            i = BIIterSlice_iternext_index((BIIterSliceObject*)iter);
         }
         else if (type == &BIIterBoolType) {
-            i = BIIterBoolean_iternext_core((BIIterBooleanObject*)iter);
+            i = BIIterBoolean_iternext_index((BIIterBooleanObject*)iter);
         }
         if (i == -1) { // end of iteration or error
             if (PyErr_Occurred()) {
@@ -4738,7 +4794,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
                             self->last_column,
                             self->reduce));
         }
-        // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_core, and that function validates the range
+        // i is gauranteed to be within the range of self->bit_count at this point; the only source of arbitrary indices is in BIIterSeq_iternext_index, and that function validates the range
         BlockIndexRecord* biri = &self->bi->bir[i];
         block = biri->block;
         column = biri->column;
@@ -4766,39 +4822,6 @@ BIIterContiguous_iternext(BIIterContiguousObject *self) {
     return NULL;
 }
 
-static PyObject *
-BIIterContiguous_reversed(BIIterContiguousObject *self) {
-
-    PyObject* selector = NULL;
-    PyTypeObject* type = Py_TYPE(self->iter);
-    if (type == &BIIterSeqType) {
-        selector = ((BIIterSeqObject*)self->iter)->selector;
-    }
-    else if (type == &BIIterSliceType) {
-        selector = ((BIIterSliceObject*)self->iter)->selector;
-    }
-    else if (type == &BIIterBoolType) {
-        selector = ((BIIterBooleanObject*)self->iter)->selector;
-    }
-
-    if (selector == NULL) {
-        return NULL;
-    }
-
-    PyObject* iter = BIIterSelector_new(self->bi,
-            selector,
-            !self->reversed,
-            BIIS_UNKNOWN, // let type be determined by selector
-            0);
-    PyObject* biiter = BIIterContiguous_new(self->bi,
-            !self->reversed,
-            self->iter,
-            self->reduce);
-    Py_DECREF(iter);
-    return biiter;
-}
-
-
 // not implementing __length_hint__
 static PyMethodDef BIIterContiguous_methods[] = {
     {"__reversed__", (PyCFunction)BIIterContiguous_reversed, METH_NOARGS, NULL},
@@ -4816,7 +4839,6 @@ static PyTypeObject BIIterContiguousType = {
     .tp_name = "arraykit.BlockIndexContiguousIterator",
 };
 
-
 //------------------------------------------------------------------------------
 
 // NOTE: this constructor returns one of three different PyObject types. We do this to consolidate error reporting and type checks.
@@ -4824,12 +4846,12 @@ static PyTypeObject BIIterContiguousType = {
 static PyObject *
 BIIterSelector_new(BlockIndexObject *bi,
         PyObject* selector,
-        int8_t reversed,
+        bool reversed,
         BIIterSelectorKind kind,
-        int8_t ascending) {
+        bool ascending) {
 
-    int8_t is_array = 0;
-    int8_t incref_selector = 1; // incref borrowed selector; but if a new ref is made, do not
+    bool is_array = false;
+    bool incref_selector = true; // incref borrowed selector; but if a new ref is made, do not
 
     Py_ssize_t len = -1;
     Py_ssize_t pos = 0;
@@ -4841,7 +4863,7 @@ BIIterSelector_new(BlockIndexObject *bi,
             PyErr_SetString(PyExc_TypeError, "Arrays cannot be used as selectors for slice iterators");
             return NULL;
         }
-        is_array = 1;
+        is_array = true;
         PyArrayObject *a = (PyArrayObject *)selector;
         if (PyArray_NDIM(a) != 1) {
             PyErr_SetString(PyExc_TypeError, "Arrays must be 1-dimensional");
@@ -4881,7 +4903,7 @@ BIIterSelector_new(BlockIndexObject *bi,
             if (PyArray_Sort((PyArrayObject*)selector, 0, NPY_QUICKSORT)) {
                 return NULL; // returns -1 on error
             }; // new ref
-            incref_selector = 0;
+            incref_selector = false;
         }
     }
     else if (PySlice_Check(selector)) {
@@ -4896,9 +4918,8 @@ BIIterSelector_new(BlockIndexObject *bi,
         if (ascending) {
             // NOTE: we are abandoning the borrowed reference
             selector = AK_slice_to_ascending_slice(selector, bi->bir_count); // new ref
-            incref_selector = 0;
+            incref_selector = false;
         }
-
         if (PySlice_Unpack(selector, &pos, &stop, &step)) {
             return NULL;
         }
@@ -4930,7 +4951,7 @@ BIIterSelector_new(BlockIndexObject *bi,
                 return NULL;
             }
             Py_DECREF(post); // just a None
-            incref_selector = 0;
+            incref_selector = false;
         }
     }
     else {
@@ -4979,7 +5000,8 @@ BIIterSelector_new(BlockIndexObject *bi,
         case BIIS_UNKNOWN:
             goto error; // should not get here!
     }
-    Py_INCREF(bi);
+    Py_INCREF((PyObject*)bi);
+
     if (incref_selector) {
         Py_INCREF(selector);
     }
@@ -5040,8 +5062,6 @@ BlockIndex_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs) {
 // Returns 0 on success, -1 on error.
 int
 BlockIndex_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    // PyTypeObject* cls = Py_TYPE(self); // borrowed ref
-    // const char *name = cls->tp_name;
     BlockIndexObject* bi = (BlockIndexObject*)self;
 
     Py_ssize_t block_count = 0;
@@ -5147,7 +5167,6 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     if (increment == 0) {
         Py_RETURN_FALSE;
     }
-
 
     PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
     self->shape_recache = true; // adjusting columns, must recache shape
@@ -5276,7 +5295,7 @@ BlockIndex_rows_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
 
 static PyObject *
 BlockIndex_columns_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
-    return PyLong_FromSsize_t(self->bir_count );
+    return PyLong_FromSsize_t(self->bir_count);
 }
 
 // Return the resolved dtype for all registered blocks. If no block have been registered, this will return a float dtype.
@@ -5428,9 +5447,11 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
 
     // might need to store enum type for branching
     PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
-    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // will incref iter
+    if (iter == NULL) {
+        return NULL; // exception set
+    }
+    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // might be NULL, will incref iter
     Py_DECREF(iter);
-
     return biiter;
 }
 

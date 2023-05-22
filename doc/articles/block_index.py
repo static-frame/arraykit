@@ -20,6 +20,7 @@ import arraykit as ak
 sys.path.append(os.getcwd())
 
 from performance.reference.block_index import from_blocks
+from performance.reference.block_index import indices_to_contiguous_pairs
 
 
 
@@ -130,73 +131,73 @@ class TupleIndexLookup(ArrayProcessor):
 
 
 class BlockIndexIterIntArray(ArrayProcessor):
-    NAME = 'BlockIndex: iter by int array'
+    NAME = 'BlockIndex: contig by int array'
     SORT = 5
 
     def __call__(self):
-        _ = list(self.bi.iter_select(self.selector_int_array))
+        _ = list(self.bi.iter_contiguous(self.selector_int_array))
 
 class TupleIndexIterIntArray(ArrayProcessor):
-    NAME = 'TupleIndex: iter by int array'
+    NAME = 'TupleIndex: contig by int array'
     SORT = 15
 
     def __call__(self):
         ti = self.ti
-        _ = [ti[i] for i in self.selector_int_array]
+        _ = list(indices_to_contiguous_pairs(ti[i] for i in self.selector_int_array))
 
 
 class BlockIndexIterIntList(ArrayProcessor):
-    NAME = 'BlockIndex: iter by int list'
+    NAME = 'BlockIndex: contig by int list'
     SORT = 6
 
     def __call__(self):
-        _ = list(self.bi.iter_select(self.selector_int_list))
+        _ = list(self.bi.iter_contiguous(self.selector_int_list))
 
 class TupleIndexIterIntList(ArrayProcessor):
-    NAME = 'TupleIndex: iter by int list'
+    NAME = 'TupleIndex: contig by int list'
     SORT = 16
 
     def __call__(self):
         ti = self.ti
-        _ = [ti[i] for i in self.selector_int_list]
+        _ = list(indices_to_contiguous_pairs(ti[i] for i in self.selector_int_list))
 
 
 class BlockIndexIterSlice(ArrayProcessor):
-    NAME = 'BlockIndex: iter by slice'
+    NAME = 'BlockIndex: contig by slice'
     SORT = 7
 
     def __call__(self):
-        _ = list(self.bi.iter_select(self.selector_slice))
+        _ = list(self.bi.iter_contiguous(self.selector_slice))
 
 class TupleIndexIterSlice(ArrayProcessor):
-    NAME = 'TupleIndex: iter by slice'
+    NAME = 'TupleIndex: contig by slice'
     SORT = 17
 
     def __call__(self):
         ti = self.ti
-        _ = list(iter(ti[self.selector_slice]))
+        _ = list(indices_to_contiguous_pairs(ti[self.selector_slice]))
 
 
 
 
 class BlockIndexIterBoolArray(ArrayProcessor):
-    NAME = 'BlockIndex: iter by bool array'
+    NAME = 'BlockIndex: contig by bool array'
     SORT = 8
 
     def __call__(self):
-        _ = list(self.bi.iter_select(self.selector_bool_array))
+        _ = list(self.bi.iter_contiguous(self.selector_bool_array))
 
 class TupleIndexIterBoolArray(ArrayProcessor):
-    NAME = 'TupleIndex: iter by bool array'
+    NAME = 'TupleIndex: contig by bool array'
     SORT = 18
 
     def __call__(self):
         ti = self.ti
-        _ = [ti[i] for i, b in enumerate(self.selector_bool_array) if b]
+        _ = list(indices_to_contiguous_pairs(ti[i] for i, b in enumerate(self.selector_bool_array) if b))
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 5
+NUMBER = 50
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
