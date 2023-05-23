@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.4.5
+............
+
+Corrected handling of ``ascending`` in ``BlockIndex.iter_contiguous()`` with Boolean arrays.
+
+
 0.4.4
 ............
 
