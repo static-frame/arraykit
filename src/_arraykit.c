@@ -3263,17 +3263,61 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n) {
     return n;
 }
 
+// Returns NULL on error. Returns a new reference.
+static inline PyObject*
+AK_build_pair_ssize_t(Py_ssize_t a, Py_ssize_t b)
+{
+    PyObject* t = PyTuple_New(2);
+    if (t == NULL) {
+        return NULL;
+    }
+    PyObject* py_a = PyLong_FromSsize_t(a);
+    if (py_a == NULL) {
+        Py_DECREF(t);
+        return NULL;
+    }
+    PyObject* py_b = PyLong_FromSsize_t(b);
+    if (py_b == NULL) {
+        Py_DECREF(t);
+        Py_DECREF(py_a);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(t, 0, py_a);
+    PyTuple_SET_ITEM(t, 1, py_b);
+    return t;
+}
+
+// Returns NULL on error. Returns a new reference. Note that a reference is stolen from the PyObject argument.
+static inline PyObject*
+AK_build_pair_ssize_t_slice(Py_ssize_t a, PyObject* py_b)
+{
+    if (py_b == NULL) { // construction failed
+        return NULL;
+    }
+    PyObject* t = PyTuple_New(2);
+    if (t == NULL) {
+        return NULL;
+    }
+    PyObject* py_a = PyLong_FromSsize_t(a);
+    if (py_a == NULL) {
+        Py_DECREF(t);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(t, 0, py_a);
+    PyTuple_SET_ITEM(t, 1, py_b);
+    return t;
+}
+
 // Represent a 1D array as a 2D array with length as rows of a single-column array.
 // https://stackoverflow.com/questions/56182259/how-does-one-acces-numpy-multidimensionnal-array-in-c-extensions
 static PyObject *
 shape_filter(PyObject *Py_UNUSED(m), PyObject *a) {
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);
     PyArrayObject *array = (PyArrayObject *)a;
-
-    npy_intp size0 = PyArray_DIM(array, 0);
+    npy_intp rows = PyArray_DIM(array, 0);
     // If 1D array, set size for axis 1 at 1, else use 2D array to get the size of axis 1
-    npy_intp size1 = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
-    return Py_BuildValue("nn", size0, size1);
+    npy_intp cols = PyArray_NDIM(array) == 1 ? 1 : PyArray_DIM(array, 1);
+    return AK_build_pair_ssize_t(rows, cols);
 }
 
 // Reshape if necessary a flat ndim 1 array into a 2D array with one columns and rows of length.
@@ -4240,7 +4284,7 @@ AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
         return NULL;
     }
     BlockIndexRecord* biri = &self->bir[i];
-    return Py_BuildValue("nn", biri->block, biri->column); // maybe NULL
+    return AK_build_pair_ssize_t(biri->block, biri->column); // may be NULL
 }
 
 //------------------------------------------------------------------------------
@@ -4788,7 +4832,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self)
             }
             // no more pairs, return previous slice_start, flag for end on next call
             self->next_block = -2;
-            return Py_BuildValue("nN", // N steals ref
+            return AK_build_pair_ssize_t_slice( // steals ref
                     self->last_block,
                     AK_build_slice_inclusive(slice_start,
                             self->last_column,
@@ -4813,7 +4857,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self)
         }
         self->next_block = block;
         self->next_column = column;
-        return Py_BuildValue("nN", // N steals ref
+        return AK_build_pair_ssize_t_slice( // steals ref
                 self->last_block,
                 AK_build_slice_inclusive(slice_start,
                         self->last_column,
@@ -5211,7 +5255,7 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     BlockIndexRecord* bir = self->bir;
 
     for (Py_ssize_t i = 0; i < self->bir_count; i++) {
-        PyObject* item = Py_BuildValue("nn", bir[i].block, bir[i].column);
+        PyObject* item = AK_build_pair_ssize_t(bir[i].block, bir[i].column);
         if (item == NULL) {
             Py_DECREF(list);
             return NULL;
@@ -5248,17 +5292,14 @@ BlockIndex_getstate(BlockIndexObject *self) {
         return NULL;
     }
     PyObject* dt = self->dtype == NULL ? Py_None : (PyObject*) self->dtype;
-
     // state might be NULL on failure; assume exception set
-    PyObject* state = Py_BuildValue("nnnnOO",
+    PyObject* state = Py_BuildValue("nnnnNO", // use N to steal ref of bytes
             self->block_count,
             self->row_count,
             self->bir_count,
             self->bir_capacity,
             bi,
             dt); // increfs passed object
-
-    Py_DECREF(bi);
     return state;
 }
 
@@ -5283,7 +5324,7 @@ BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure))
 {
     if (self->shape == NULL || self->shape_recache) {
         Py_XDECREF(self->shape); // get rid of old if it exists
-        self->shape = Py_BuildValue("nn", self->row_count, self->bir_count); // new ref
+        self->shape = AK_build_pair_ssize_t(self->row_count, self->bir_count);
     }
     // shape is not null and shape_recache is false
     Py_INCREF(self->shape); // for caller
