@@ -4715,6 +4715,8 @@ typedef struct BIIterContiguousObject {
     bool reduce; // optionally reduce slices to integers
 } BIIterContiguousObject;
 
+
+// Create a new contiguous slice iterator. Return NULL on error. Steals a reference to PyObject* iter.
 static PyObject *
 BIIterContiguous_new(BlockIndexObject *bi,
         bool reversed,
@@ -4728,9 +4730,7 @@ BIIterContiguous_new(BlockIndexObject *bi,
     Py_INCREF((PyObject*)bi);
     bii->bi = bi;
 
-    Py_INCREF(iter);
-    bii->iter = iter;
-
+    bii->iter = iter; // steals ref
     bii->reversed = reversed;
 
     bii->last_block = -1;
@@ -4790,9 +4790,8 @@ BIIterContiguous_reversed(BIIterContiguousObject *self)
     }
     PyObject* biiter = BIIterContiguous_new(self->bi,
             reversed,
-            self->iter,
+            iter, // steals ref
             self->reduce);
-    Py_DECREF(iter);
     return biiter;
 }
 
@@ -4832,6 +4831,9 @@ BIIterContiguous_iternext(BIIterContiguousObject *self)
             }
             // no more pairs, return previous slice_start, flag for end on next call
             self->next_block = -2;
+            if (self->last_block == -1) { // iter produced no values, terminate
+                break;
+            }
             return AK_build_pair_ssize_t_slice( // steals ref
                     self->last_block,
                     AK_build_slice_inclusive(slice_start,
@@ -5488,14 +5490,11 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
             )) {
         return NULL;
     }
-
-    // might need to store enum type for branching
     PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
     if (iter == NULL) {
         return NULL; // exception set
     }
-    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // might be NULL, will incref iter
-    Py_DECREF(iter);
+    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // might be NULL, steals iter ref
     return biiter;
 }
 
