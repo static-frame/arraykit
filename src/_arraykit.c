@@ -4885,18 +4885,21 @@ BIIterSelector_new(BlockIndexObject *bi,
             }
         }
         else if (kind == BIIS_SEQ && k != 'i' && k != 'u') {
-            PyErr_SetString(PyExc_TypeError, "Arrays must integer kind");
+            PyErr_SetString(PyExc_TypeError, "Arrays must be integer kind");
             return NULL;
         }
         else if (kind == BIIS_BOOLEAN && k != 'b') {
-            PyErr_SetString(PyExc_TypeError, "Arrays must Boolean kind");
+            PyErr_SetString(PyExc_TypeError, "Arrays must be Boolean kind");
             return NULL;
         }
-        if (kind == BIIS_BOOLEAN && len != bi->bir_count) {
-            PyErr_SetString(PyExc_TypeError, "Boolean arrays must match BlockIndex size");
-            return NULL;
+
+        if (kind == BIIS_BOOLEAN) {
+            if (len != bi->bir_count) {
+                PyErr_SetString(PyExc_TypeError, "Boolean arrays must match BlockIndex size");
+                return NULL;
+            }
         }
-        if (ascending) {
+        else if (ascending) { // not Boolean
             // NOTE: we can overwrite selector here as we have a borrowed refernce; sorting gives us a new reference, so we do not need to incref below
             selector = PyArray_NewCopy(a, NPY_CORDER);
             // sort in-place; can use a non-stable sort

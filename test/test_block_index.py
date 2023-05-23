@@ -761,3 +761,36 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             _ = list(bi1.iter_contiguous('a'))
+
+
+    def test_block_index_iter_contiguous_h1(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        sel = np.array([1, 1, 1, 0, 0, 0]).astype(bool)
+        post1 = list(bi1.iter_contiguous(sel))
+        post2 = list(bi1.iter_contiguous(sel, ascending=True))
+        self.assertEqual(post1, post2)
+        self.assertEqual(post1, [(0, slice(0, 3, None))])
+
+    def test_block_index_iter_contiguous_h2(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        sel = np.array([1, 0, 1, 0, 1, 0]).astype(bool)
+        post1 = list(bi1.iter_contiguous(sel))
+        post2 = list(bi1.iter_contiguous(sel, ascending=True))
+        self.assertEqual(post1, post2)
+        self.assertEqual(post1,
+                [(0, slice(0, 1, None)),
+                (0, slice(2, 3, None)),
+                (1, slice(1, 2, None))])
+
+        post3 = list(bi1.iter_contiguous(sel, ascending=True, reduce=True))
+        self.assertEqual(post3,
+                [(0, 0),
+                (0, 2),
+                (1, 1)])
+
