@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.4.6
+............
+
+Corrected handling of empty selections in ``BlockIndex.iter_contiguous()``.
+
+
 0.4.5
 ............
 
