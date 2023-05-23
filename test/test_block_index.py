@@ -794,3 +794,25 @@ class TestUnit(unittest.TestCase):
                 (0, 2),
                 (1, 1)])
 
+
+    def test_block_index_iter_contiguous_i1(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        self.assertEqual(list(bi1.iter_select(slice(0, 0))), [])
+        self.assertEqual(list(bi1.iter_contiguous(slice(0, 0))), [])
+
+        self.assertEqual(list(bi1.iter_select(slice(30, 60, 2))), [])
+        self.assertEqual(list(bi1.iter_contiguous(slice(30, 60, 2))), [])
+
+    def test_block_index_iter_contiguous_i2(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        self.assertEqual(list(bi1.iter_select([])), [])
+        self.assertEqual(list(bi1.iter_contiguous([])), [])
+
+        self.assertEqual(list(bi1.iter_select(np.full(len(bi1), False))), [])
+        self.assertEqual(list(bi1.iter_contiguous(np.full(len(bi1), False))), [])
