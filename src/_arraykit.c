@@ -5298,7 +5298,7 @@ BlockIndex_getstate(BlockIndexObject *self) {
             self->row_count,
             self->bir_count,
             self->bir_capacity,
-            bi,
+            bi,  // stolen new ref
             dt); // increfs passed object
     return state;
 }
