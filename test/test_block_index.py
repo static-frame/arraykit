@@ -794,3 +794,9 @@ class TestUnit(unittest.TestCase):
                 (0, 2),
                 (1, 1)])
 
+
+    def test_block_index_iter_contiguous_i(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(6).reshape(2,3))
+
