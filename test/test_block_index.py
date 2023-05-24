@@ -16,9 +16,9 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         self.assertEqual(bi1.dtype, np.dtype(float))
         s = bi1.shape
-        self.assertEqual(s, (-1, 0))
+        self.assertEqual(s, (0, 0))
         del bi1
-        self.assertEqual(s, (-1, 0))
+        self.assertEqual(s, (0, 0))
         del s
 
     def test_block_index_init_b1(self) -> None:
@@ -850,3 +850,17 @@ class TestUnit(unittest.TestCase):
 
         slc = slice(None)
         self.assertEqual(list(bi1.iter_block()), [(i, slc) for i in range(8)])
+
+    #---------------------------------------------------------------------------
+
+    def test_block_index_shape_a(self) -> None:
+        bi1 = BlockIndex()
+        self.assertEqual(bi1.shape, (0, 0))
+        self.assertEqual(bi1.rows, 0)
+
+        bi1.register(np.array(()).reshape(2,0))
+        self.assertEqual(bi1.shape, (2, 0))
+        self.assertEqual(bi1.rows, 2)
+
+        with self.assertRaises(ErrorInitTypeBlocks):
+            bi1.register(np.array(()).reshape(3,0))
