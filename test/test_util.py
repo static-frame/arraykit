@@ -744,6 +744,69 @@ class TestUnit(unittest.TestCase):
                 slice_to_ascending_slice_ref(slc, size),
                 )
 
+    def test_slice_to_ascending_slice_f(self) -> None:
+
+        a1 = np.arange(10)
+
+        def compare(slc: slice) -> None:
+            slc_asc = slice_to_ascending_slice(slc, len(a1))
+            self.assertEqual(sorted(a1[slc]), list(a1[slc_asc]))
+
+        compare(slice(4,))
+        compare(slice(6, 1, -1))
+        compare(slice(6, 1, -2))
+        compare(slice(6, None, -3))
+        compare(slice(6, 2, -2))
+        compare(slice(None, 1, -1))
+
+    def test_slice_to_ascending_slice_g(self) -> None:
+        self.assertEqual(
+            slice_to_ascending_slice(slice(3, None, -1), 10),
+            slice(0, 4, None)
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(3, None, -3), 10),
+            slice(0, 4, 3)
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-3, 0, -1), 10),
+            slice(1, 8, None)
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-3, None, -1), 10),
+            slice(0, 8, None)
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-3, 0, -2), 10),
+            slice(1, 8, 2)
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-3, None, -2), 10),
+            slice(1, 8, 2)
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-3, None, -6), 10),
+            slice(1, 8, 6)
+            )
+
+    def test_slice_to_ascending_slice_h(self) -> None:
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-9, -1, 1), 10),
+            slice(-9, -1, 1) # ascenidng
+            )
+        self.assertEqual(
+            slice_to_ascending_slice(slice(-9, -1, -1), 10),
+            slice(2, 2, None) # ascending start stop, descending
+            )
+
+    def test_slice_to_ascending_slice_i(self) -> None:
+        self.assertEqual(
+            slice_to_ascending_slice(slice(1, -10, -1), 10), # [1]
+            slice(1, 2, None)
+            )
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
