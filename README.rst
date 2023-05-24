@@ -37,6 +37,15 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.4.7
+............
+
+Added ``BlockIndex.iter_block()``.
+
+Corrected issue in ``BlockIndex.shape`` when the ``BlockIndex`` has zero rows.
+
+
 0.4.6
 ............
 
