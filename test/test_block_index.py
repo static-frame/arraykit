@@ -854,7 +854,7 @@ class TestUnit(unittest.TestCase):
     def test_block_index_shape_a(self) -> None:
         bi1 = BlockIndex()
         self.assertEqual(bi1.shape, (0, 0))
-        self.assertEqual(bi1.rows, 0)
+        self.assertEqual(bi1.rows, -1) # kept to show no assignemt
 
         bi1.register(np.array(()).reshape(2,0))
         self.assertEqual(bi1.shape, (2, 0))

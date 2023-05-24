@@ -5423,16 +5423,14 @@ BlockIndex_setstate(BlockIndexObject *self, PyObject *state)
 //------------------------------------------------------------------------------
 // getters
 
-// Never expose a negative row value to the caller
-#define AK_BI_ROWS(rows) ((rows) < 0 ? 0 : (rows))
-
+// In a shape tuple, rows will never be negative.
 static PyObject *
 BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure))
 {
     if (self->shape == NULL || self->shape_recache) {
         Py_XDECREF(self->shape); // get rid of old if it exists
         self->shape = AK_build_pair_ssize_t(
-                AK_BI_ROWS(self->row_count),
+                self->row_count < 0 ? 0 : self->row_count,
                 self->bir_count);
     }
     // shape is not null and shape_recache is false
@@ -5441,9 +5439,11 @@ BlockIndex_shape_getter(BlockIndexObject *self, void* Py_UNUSED(closure))
     return self->shape;
 }
 
+
+// Unset rows will be -1.
 static PyObject *
 BlockIndex_rows_getter(BlockIndexObject *self, void* Py_UNUSED(closure)){
-    return PyLong_FromSsize_t(AK_BI_ROWS(self->row_count));
+    return PyLong_FromSsize_t(self->row_count);
 }
 
 static PyObject *
