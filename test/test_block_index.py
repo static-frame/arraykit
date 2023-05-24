@@ -16,9 +16,9 @@ class TestUnit(unittest.TestCase):
         bi1 = BlockIndex()
         self.assertEqual(bi1.dtype, np.dtype(float))
         s = bi1.shape
-        self.assertEqual(s, (-1, 0))
+        self.assertEqual(s, (0, 0))
         del bi1
-        self.assertEqual(s, (-1, 0))
+        self.assertEqual(s, (0, 0))
         del s
 
     def test_block_index_init_b1(self) -> None:
@@ -327,7 +327,7 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
-    def test_block_index_iter_a(self) -> None:
+    def test_block_index_iter_a1(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(2))
         bi1.register(np.arange(6).reshape(2,3))
@@ -339,9 +339,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(list(bi1), [(0, 0), (1, 0), (1, 1), (1, 2), (2, 0)])
         self.assertEqual(list(reversed(bi1)), [(2, 0), (1, 2), (1, 1), (1, 0), (0, 0)])
 
-
-    #---------------------------------------------------------------------------
-    def test_block_index_iter_a(self) -> None:
+    def test_block_index_iter_a2(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(4).reshape(2,2))
         bi1.register(np.arange(2))
@@ -816,3 +814,51 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(list(bi1.iter_select(np.full(len(bi1), False))), [])
         self.assertEqual(list(bi1.iter_contiguous(np.full(len(bi1), False))), [])
+
+
+
+    #---------------------------------------------------------------------------
+
+    def test_block_index_iter_block_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        slc = slice(None)
+        self.assertEqual(list(bi1.iter_block()), [(0, slc), (1, slc), (2, slc)])
+        self.assertEqual(list(reversed(bi1.iter_block())), [(2, slc), (1, slc), (0, slc)])
+
+
+    def test_block_index_iter_block_b(self) -> None:
+        bi1 = BlockIndex()
+        self.assertEqual(list(bi1.iter_block()), [])
+
+
+    def test_block_index_iter_block_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+
+        slc = slice(None)
+        self.assertEqual(list(bi1.iter_block()), [(i, slc) for i in range(8)])
+
+    #---------------------------------------------------------------------------
+
+    def test_block_index_shape_a(self) -> None:
+        bi1 = BlockIndex()
+        self.assertEqual(bi1.shape, (0, 0))
+        self.assertEqual(bi1.rows, 0)
+
+        bi1.register(np.array(()).reshape(2,0))
+        self.assertEqual(bi1.shape, (2, 0))
+        self.assertEqual(bi1.rows, 2)
+
+        with self.assertRaises(ErrorInitTypeBlocks):
+            bi1.register(np.array(()).reshape(3,0))
