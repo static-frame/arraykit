@@ -4264,7 +4264,7 @@ typedef struct BlockIndexRecord {
 } BlockIndexRecord;
 
 typedef struct BlockIndexObject {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     Py_ssize_t block_count;
     Py_ssize_t row_count;
     Py_ssize_t bir_count;
@@ -4292,7 +4292,7 @@ AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
 static PyTypeObject BIIterType;
 
 typedef struct BIIterObject {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     BlockIndexObject *bi;
     bool reversed;
     Py_ssize_t pos; // current index state, mutated in-place
@@ -4393,7 +4393,7 @@ BIIterSelector_new(BlockIndexObject *bi,
         );
 
 typedef struct BIIterSeqObject {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     BlockIndexObject *bi;
     bool reversed;
     PyObject* selector;
@@ -4529,7 +4529,7 @@ static PyTypeObject BIIterSeqType = {
 // BI Iterator slice selection
 
 typedef struct BIIterSliceObject {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     BlockIndexObject *bi;
     bool reversed;
     PyObject* selector; // slice
@@ -4611,7 +4611,7 @@ static PyTypeObject BIIterSliceType = {
 // BI Iterator Boolean array selection
 
 typedef struct BIIterBooleanObject {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     BlockIndexObject *bi;
     bool reversed;
     PyObject* selector;
@@ -4704,7 +4704,7 @@ static PyTypeObject BIIterBoolType = {
 static PyTypeObject BIIterContiguousType;
 
 typedef struct BIIterContiguousObject {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     BlockIndexObject *bi;
     PyObject* iter; // own reference to core iterator
     bool reversed;
@@ -5550,7 +5550,7 @@ static PyTypeObject BlockIndexType = {
 //------------------------------------------------------------------------------
 
 typedef struct {
-    PyObject_VAR_HEAD
+    PyObject_HEAD
     PyObject *array;
     PyObject *list;
 } ArrayGOObject;
