@@ -4484,7 +4484,6 @@ BIIterSeq_iternext_index(BIIterSeqObject *self)
     return t;
 }
 
-
 static PyObject *
 BIIterSeq_iternext(BIIterSeqObject *self)
 {
@@ -4701,6 +4700,7 @@ static PyTypeObject BIIterBoolType = {
 
 //------------------------------------------------------------------------------
 // BI Iterator Contigous
+
 static PyTypeObject BIIterContiguousType;
 
 typedef struct BIIterContiguousObject {
@@ -4883,6 +4883,94 @@ static PyTypeObject BIIterContiguousType = {
     .tp_iternext = (iternextfunc) BIIterContiguous_iternext,
     .tp_methods = BIIterContiguous_methods,
     .tp_name = "arraykit.BlockIndexContiguousIterator",
+};
+
+//------------------------------------------------------------------------------
+// BI Iterator Block Slice
+
+static PyTypeObject BIIterBlockType;
+
+typedef struct BIIterBlockObject {
+    PyObject_HEAD
+    BlockIndexObject *bi;
+    bool reversed;
+    Py_ssize_t pos; // current index state, mutated in-place
+    PyObject* null_slice;
+} BIIterBlockObject;
+
+static PyObject *
+BIIterBlock_new(BlockIndexObject *bi, bool reversed) {
+    BIIterBlockObject *bii = PyObject_New(BIIterBlockObject, &BIIterBlockType);
+    if (!bii) {
+        return NULL;
+    }
+    Py_INCREF((PyObject*)bi);
+    bii->bi = bi;
+    bii->reversed = reversed;
+    bii->pos = 0;
+
+    // create a new ref of the null slice
+
+    return (PyObject *)bii;
+}
+
+static void
+BIIterBlock_dealloc(BIIterBlockObject *self) {
+    Py_DECREF((PyObject*)self->bi);
+    PyObject_Del((PyObject*)self);
+}
+
+static PyObject*
+BIIterBlock_iter(BIIterBlockObject *self) {
+    Py_INCREF(self);
+    return (PyObject*)self;
+}
+
+static PyObject *
+BIIterBlock_iternext(BIIterBlockObject *self) {
+    Py_ssize_t i;
+    if (self->reversed) {
+        i = self->bi->block_count - ++self->pos;
+        if (i < 0) {
+            return NULL;
+        }
+    }
+    else {
+        i = self->pos++;
+    }
+    if (self->bi->block_count <= i) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+    // return AK_BI_item(self->bi, i); // return new ref
+}
+
+static PyObject *
+BIIterBlock_reversed(BIIterBlockObject *self) {
+    return BIIterBlock_new(self->bi, !self->reversed);
+}
+
+static PyObject *
+BIIterBlock_length_hint(BIIterBlockObject *self) {
+    // this works for reversed as we use self->pos to subtract from length
+    Py_ssize_t len = Py_MAX(0, self->bi->block_count - self->pos);
+    return PyLong_FromSsize_t(len);
+}
+
+static PyMethodDef BIIterBlock_methods[] = {
+    {"__length_hint__", (PyCFunction)BIIterBlock_length_hint, METH_NOARGS, NULL},
+    {"__reversed__", (PyCFunction)BIIterBlock_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+static PyTypeObject BIIterBlockType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(BIIterBlockObject),
+    .tp_dealloc = (destructor) BIIterBlock_dealloc,
+    .tp_iter = (getiterfunc) BIIterBlock_iter,
+    .tp_iternext = (iternextfunc) BIIterBlock_iternext,
+    .tp_methods = BIIterBlock_methods,
+    .tp_name = "arraykit.BlockIndexBlockIterator",
 };
 
 //------------------------------------------------------------------------------
@@ -5490,13 +5578,20 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
             )) {
         return NULL;
     }
-    PyObject* iter = BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, ascending);
+    PyObject* iter = BIIterSelector_new(self, selector, false, BIIS_UNKNOWN, ascending);
     if (iter == NULL) {
         return NULL; // exception set
     }
-    PyObject* biiter = BIIterContiguous_new(self, 0, iter, reduce); // might be NULL, steals iter ref
+    PyObject* biiter = BIIterContiguous_new(self, false, iter, reduce); // might be NULL, steals iter ref
     return biiter;
 }
+
+// Given key, return an iterator of a selection.
+static PyObject*
+BlockIndex_iter_block(BlockIndexObject *self){
+    return BIIterBlock_new(self, false);
+}
+
 
 //------------------------------------------------------------------------------
 // slot / method def
@@ -5522,6 +5617,7 @@ static PyMethodDef BlockIndex_methods[] = {
             (PyCFunction) BlockIndex_iter_contiguous,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"iter_block", (PyCFunction) BlockIndex_iter_block, METH_NOARGS, NULL},
     // {"__getnewargs__", (PyCFunction)BlockIndex_getnewargs, METH_NOARGS, NULL},
     {NULL},
 };
@@ -5899,6 +5995,8 @@ PyInit__arraykit(void)
         PyType_Ready(&BIIterSeqType) ||
         PyType_Ready(&BIIterSliceType) ||
         PyType_Ready(&BIIterBoolType) ||
+        PyType_Ready(&BIIterContiguousType) ||
+        PyType_Ready(&BIIterBlockType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||

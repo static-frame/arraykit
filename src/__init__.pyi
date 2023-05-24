@@ -59,7 +59,7 @@ class BlockIndex:
             ascending: bool = False,
             reduce: bool = False,
             ) -> tp.Iterator[tp.Tuple[int, tp.Union[slice, int]]]: ...
-
+    def iter_block(self) -> tp.Iterator[tp.Tuple[int, slice]]: ...
 
 def iterable_str_to_array_1d(
         iterable: tp.Iterable[str],
