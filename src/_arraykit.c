@@ -3282,6 +3282,7 @@ AK_build_pair_ssize_t(Py_ssize_t a, Py_ssize_t b)
         Py_DECREF(py_a);
         return NULL;
     }
+    // steals refs
     PyTuple_SET_ITEM(t, 0, py_a);
     PyTuple_SET_ITEM(t, 1, py_b);
     return t;
@@ -3289,7 +3290,7 @@ AK_build_pair_ssize_t(Py_ssize_t a, Py_ssize_t b)
 
 // Returns NULL on error. Returns a new reference. Note that a reference is stolen from the PyObject argument.
 static inline PyObject*
-AK_build_pair_ssize_t_slice(Py_ssize_t a, PyObject* py_b)
+AK_build_pair_ssize_t_pyo(Py_ssize_t a, PyObject* py_b)
 {
     if (py_b == NULL) { // construction failed
         return NULL;
@@ -3303,6 +3304,7 @@ AK_build_pair_ssize_t_slice(Py_ssize_t a, PyObject* py_b)
         Py_DECREF(t);
         return NULL;
     }
+    // steals refs
     PyTuple_SET_ITEM(t, 0, py_a);
     PyTuple_SET_ITEM(t, 1, py_b);
     return t;
@@ -4497,7 +4499,7 @@ BIIterSeq_iternext(BIIterSeqObject *self)
 static PyObject *
 BIIterSeq_reversed(BIIterSeqObject *self)
 {
-    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SEQ, 0);
+    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SEQ, false);
 }
 
 static PyObject *
@@ -4579,7 +4581,7 @@ BIIterSlice_iternext(BIIterSliceObject *self) {
 static PyObject *
 BIIterSlice_reversed(BIIterSliceObject *self)
 {
-    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SLICE, 0);
+    return BIIterSelector_new(self->bi, self->selector, !self->reversed, BIIS_SLICE, false);
 }
 
 static PyObject *
@@ -4834,7 +4836,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self)
             if (self->last_block == -1) { // iter produced no values, terminate
                 break;
             }
-            return AK_build_pair_ssize_t_slice( // steals ref
+            return AK_build_pair_ssize_t_pyo( // steals ref
                     self->last_block,
                     AK_build_slice_inclusive(slice_start,
                             self->last_column,
@@ -4859,7 +4861,7 @@ BIIterContiguous_iternext(BIIterContiguousObject *self)
         }
         self->next_block = block;
         self->next_column = column;
-        return AK_build_pair_ssize_t_slice( // steals ref
+        return AK_build_pair_ssize_t_pyo( // steals ref
                 self->last_block,
                 AK_build_slice_inclusive(slice_start,
                         self->last_column,
@@ -4910,13 +4912,18 @@ BIIterBlock_new(BlockIndexObject *bi, bool reversed) {
     bii->pos = 0;
 
     // create a new ref of the null slice
-
+    PyObject* ns = AK_build_slice(-1, -1, 1); // get all null; new ref
+    if (ns == NULL) {
+        return NULL;
+    }
+    bii->null_slice = ns;
     return (PyObject *)bii;
 }
 
 static void
 BIIterBlock_dealloc(BIIterBlockObject *self) {
     Py_DECREF((PyObject*)self->bi);
+    Py_DECREF(self->null_slice);
     PyObject_Del((PyObject*)self);
 }
 
@@ -4941,8 +4948,14 @@ BIIterBlock_iternext(BIIterBlockObject *self) {
     if (self->bi->block_count <= i) {
         return NULL;
     }
-    Py_RETURN_NONE;
-    // return AK_BI_item(self->bi, i); // return new ref
+    // AK_build_pair_ssize_t_pyo steals the reference to the object; so incref here
+    Py_INCREF(self->null_slice);
+    PyObject* t = AK_build_pair_ssize_t_pyo(i, self->null_slice); // return new ref
+    if (t == NULL) {
+        // if tuple creation failed need to undo incref
+        Py_DECREF(self->null_slice);
+    }
+    return t;
 }
 
 static PyObject *
@@ -5551,7 +5564,7 @@ BlockIndex_iter(BlockIndexObject* self) {
 // Given key, return an iterator of a selection.
 static PyObject*
 BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
-    return BIIterSelector_new(self, selector, 0, BIIS_UNKNOWN, 0);
+    return BIIterSelector_new(self, selector, false, BIIS_UNKNOWN, false);
 }
 
 static char *iter_contiguous_kargs_names[] = {
@@ -5566,7 +5579,7 @@ static PyObject*
 BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject* selector;
-    int ascending = 0;
+    int ascending = 0; // must be int for parsing to "p"
     int reduce = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,

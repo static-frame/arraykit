@@ -816,3 +816,37 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(list(bi1.iter_select(np.full(len(bi1), False))), [])
         self.assertEqual(list(bi1.iter_contiguous(np.full(len(bi1), False))), [])
+
+
+
+    #---------------------------------------------------------------------------
+
+    def test_block_index_iter_block_a(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(6).reshape(2,3))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(6).reshape(2,3))
+
+        slc = slice(None)
+        self.assertEqual(list(bi1.iter_block()), [(0, slc), (1, slc), (2, slc)])
+        self.assertEqual(list(reversed(bi1.iter_block())), [(2, slc), (1, slc), (0, slc)])
+
+
+    def test_block_index_iter_block_b(self) -> None:
+        bi1 = BlockIndex()
+        self.assertEqual(list(bi1.iter_block()), [])
+
+
+    def test_block_index_iter_block_c(self) -> None:
+        bi1 = BlockIndex()
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+        bi1.register(np.arange(2))
+
+        slc = slice(None)
+        self.assertEqual(list(bi1.iter_block()), [(i, slc) for i in range(8)])
