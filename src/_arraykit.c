@@ -5564,7 +5564,12 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
 
 static PyObject*
 BlockIndex_iter(BlockIndexObject* self) {
-    return BIIter_new(self, 0);
+    return BIIter_new(self, false);
+}
+
+static PyObject*
+BlockIndex_reversed(BlockIndexObject* self) {
+    return BIIter_new(self, true);
 }
 
 // Given key, return an iterator of a selection.
@@ -5626,6 +5631,7 @@ static PyMethodDef BlockIndex_methods[] = {
     {"__getstate__", (PyCFunction) BlockIndex_getstate, METH_NOARGS, NULL},
     {"__setstate__", (PyCFunction) BlockIndex_setstate, METH_O, NULL},
     {"__sizeof__", (PyCFunction) BlockIndex_sizeof, METH_NOARGS, NULL},
+    {"__reversed__", (PyCFunction) BlockIndex_reversed, METH_NOARGS, NULL},
     {"to_list", (PyCFunction)BlockIndex_to_list, METH_NOARGS, NULL},
     {"to_bytes", (PyCFunction)BlockIndex_to_bytes, METH_NOARGS, NULL},
     {"copy", (PyCFunction)BlockIndex_copy, METH_NOARGS, NULL},

@@ -327,7 +327,7 @@ class TestUnit(unittest.TestCase):
 
 
     #---------------------------------------------------------------------------
-    def test_block_index_iter_a(self) -> None:
+    def test_block_index_iter_a1(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(2))
         bi1.register(np.arange(6).reshape(2,3))
@@ -339,9 +339,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(list(bi1), [(0, 0), (1, 0), (1, 1), (1, 2), (2, 0)])
         self.assertEqual(list(reversed(bi1)), [(2, 0), (1, 2), (1, 1), (1, 0), (0, 0)])
 
-
-    #---------------------------------------------------------------------------
-    def test_block_index_iter_a(self) -> None:
+    def test_block_index_iter_a2(self) -> None:
         bi1 = BlockIndex()
         bi1.register(np.arange(4).reshape(2,2))
         bi1.register(np.arange(2))
