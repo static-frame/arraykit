@@ -37,6 +37,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.4.8
+............
+
+Restored behavior of ``Blockndex.rows`` to return -1 when ``BlockIndex`` has zero rows.
+
 
 0.4.7
 ............
