@@ -56,5 +56,5 @@ jobs:
 
       - name: Copy to AWS s3
         run: |
-          aws s3 cp "build/arraykit-0.4.8-cp311-cp311-emscripten_3_1_32_wasm32.whl" s3://flexatone/packages/
+          aws s3 cp . s3://flexatone/packages/ --exclude "*" --include "*.whl" --recursive
 
