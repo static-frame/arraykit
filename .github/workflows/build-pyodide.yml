@@ -44,5 +44,4 @@ jobs:
       - name: Test
         run: |
           source .venv-pyodide/bin/activate
-          cd ..
-          pytest {project}/test
+          pytest test
