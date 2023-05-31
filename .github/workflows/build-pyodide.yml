@@ -56,5 +56,5 @@ jobs:
 
       - name: Copy to AWS s3
         run: |
-          aws s3 cp build/ s3://flexatone/packages/ --exclude "*" --include "*.whl" --recursive
+          aws s3 cp "build/" s3://flexatone/packages/ --exclude "*" --include "*.whl" --recursive
 
