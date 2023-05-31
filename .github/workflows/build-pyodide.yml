@@ -37,7 +37,9 @@ jobs:
           pyodide venv .venv-pyodide
           source .venv-pyodide/bin/activate
           pip install dist/*.whl
-          pip install -r requirements-test.txt
+          pip install numpy
+          pip install pytest
+          pip install hypothesis
 
       - name: Test
         run: |
