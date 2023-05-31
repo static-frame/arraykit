@@ -38,6 +38,7 @@ jobs:
           source .venv-pyodide/bin/activate
           pip install dist/*.whl
           pip install numpy
+          pip install pandas
           pip install pytest
           pip install hypothesis
 
