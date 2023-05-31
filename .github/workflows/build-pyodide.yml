@@ -1,0 +1,27 @@
+name: Build PyOdide
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  release:
+    types: [published]
+
+jobs:
+    runs-on: ubuntu-22.04
+      steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-python@master
+         with:
+           python-version: 3.11.2
+      - run: |
+          pip install pyodide-build>=0.23.0
+          echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
+      - uses: mymindstorm/setup-emsdk@v12
+         with:
+           version: ${{ env.EMSCRIPTEN_VERSION }}
+      - run: pyodide build
+
+
