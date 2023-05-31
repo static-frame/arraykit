@@ -46,3 +46,11 @@ jobs:
         run: |
           source .venv-pyodide/bin/activate
           pytest test
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist
+
+
+
