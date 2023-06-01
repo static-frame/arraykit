@@ -13,7 +13,7 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
 
-    @given(st.lists(st.integers(min_value=-9223372036854775809, max_value=9223372036854775807), min_size=1, max_size=40))
+    @given(st.lists(st.integers(min_value=-9223372036854775808, max_value=9223372036854775807), min_size=1, max_size=40))
     def test_delimited_to_arrays_parse_a(self, v) -> None:
         msg = [f'{x},{x}' for x in v]
         post = delimited_to_arrays(msg, dtypes=None, axis=1)

@@ -233,9 +233,8 @@ class TestUnit(unittest.TestCase):
         mutable = [np.nan]
         memo = {}
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            a1 = np.array((None, 'foo', True, mutable))
+        a1 = np.array((None, 'foo', True, None))
+        a1[3] = mutable
         a2 = array_deepcopy(a1, memo)
 
         self.assertIsNot(a1, a2)
@@ -246,9 +245,8 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_c2(self) -> None:
         memo = {}
         mutable = [np.nan]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            a1 = np.array((None, 'foo', True, mutable))
+        a1 = np.array((None, 'foo', True, None))
+        a1[3] = mutable
         a2 = array_deepcopy(a1, memo)
         self.assertIsNot(a1, a2)
         self.assertNotEqual(mloc(a1), mloc(a2))
@@ -259,9 +257,8 @@ class TestUnit(unittest.TestCase):
     def test_array_deepcopy_d(self) -> None:
         memo = {}
         mutable = [3, 4, 5]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            a1 = np.array((None, 'foo', True, mutable))
+        a1 = np.array((None, 'foo', True, None))
+        a1[3] = mutable
         a2 = array_deepcopy(a1, memo=memo)
         self.assertIsNot(a1, a2)
         self.assertTrue(id(mutable) in memo)
