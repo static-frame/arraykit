@@ -2,9 +2,6 @@ name: Build PyOdide
 on:
   workflow_dispatch:
 
-# using pyodide-build 0.23.0 results in emscripten 3.1.32
-# using pyodide-build 0.22.1 results in emscripten 3.1.27
-
 jobs:
   build:
     name: Build
@@ -15,7 +12,7 @@ jobs:
         with:
           python-version: 3.11.2
       - run: |
-          pip install pyodide-build==0.22.1
+          pip install pyodide-build>=0.23.0
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
       - uses: mymindstorm/setup-emsdk@v12
         with:
