@@ -3526,6 +3526,8 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
+#define AK_FT_MEMCMP_SIZE 16
+
 static char *first_true_1d_kwarg_names[] = {
     "array",
     "forward",
@@ -3559,8 +3561,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    static npy_bool zero_buffer[AK_FT_MEMCMP_SIZE] = {0};
+
     npy_intp size = PyArray_SIZE(array);
-    ldiv_t size_div = ldiv((long)size, 4); // quot, rem
+    lldiv_t size_div = lldiv((long long)size, AK_FT_MEMCMP_SIZE); // quot, rem
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
@@ -3576,14 +3580,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p_end = p + size;
 
         while (p < p_end - size_div.rem) {
-            if (*p) break;
-            p++;
-            if (*p) break;
-            p++;
-            if (*p) break;
-            p++;
-            if (*p) break;
-            p++;
+            if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+                break; // found a true
+            }
+            p += AK_FT_MEMCMP_SIZE;
         }
         while (p < p_end) {
             if (*p) break;
@@ -3594,14 +3594,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
         while (p > p_end + size_div.rem) {
-            if (*p) break;
-            p--;
-            if (*p) break;
-            p--;
-            if (*p) break;
-            p--;
-            if (*p) break;
-            p--;
+            if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+                break; // found a true
+            }
+            p -= AK_FT_MEMCMP_SIZE;
         }
         while (p > p_end) {
             if (*p) break;
