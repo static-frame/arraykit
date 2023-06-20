@@ -576,7 +576,6 @@ class TestUnit(unittest.TestCase):
                 [9, 18, -1, 8, 16]
                 )
         post2 = first_true_2d(a1, axis=1, forward=False)
-        # NOTE: this is an axis 1 result by argmax
         self.assertEqual(post2.tolist(),
                 [19, 18, -1, 8, 16]
                 )

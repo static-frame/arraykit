@@ -3526,7 +3526,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define AK_FT_MEMCMP_SIZE 16
+#define AK_FT_MEMCMP_SIZE 8
 
 static char *first_true_1d_kwarg_names[] = {
     "array",
@@ -3697,13 +3697,15 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         array_ind = array; // can use array, no decref needed
     }
 
+    static npy_bool zero_buffer[AK_FT_MEMCMP_SIZE] = {0};
+
     // buffer of indicators
     npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array_ind);
 
     npy_intp count_row = PyArray_DIM(array_ind, 0);
     npy_intp count_col = PyArray_DIM(array_ind, 1);
 
-    ldiv_t div_col = ldiv((long)count_col, 4); // quot, rem
+    lldiv_t div_col = lldiv((long long)count_col, AK_FT_MEMCMP_SIZE); // quot, rem
 
     npy_intp dims_post = {count_row};
     PyArrayObject *array_pos = (PyArrayObject*)PyArray_EMPTY(
@@ -3739,24 +3741,20 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             // scan each row from the front and terminate when True
             // remove from the end the remainder
             while (p < p_end - div_col.rem) {
-                if (*p) break;
-                p++;
-                if (*p) break;
-                p++;
-                if (*p) break;
-                p++;
-                if (*p) break;
-                p++;
+                if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+                    break; // found a true
+                }
+                p += AK_FT_MEMCMP_SIZE;
             }
             while (p < p_end) {
                 if (*p) break;
                 p++;
             }
-            if (p != p_end) { // else, return -1
+            if (p != p_end) {
                 position = p - p_start;
             }
         }
-        else {
+        else { // reverse
             // start at the next row, then subtract one for last elem in previous row
             p_start = buffer_ind + (count_col * (r + 1)) - 1;
             p = p_start;
@@ -3764,20 +3762,26 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             p_end = buffer_ind + (count_col * r) - 1;
 
             while (p > p_end + div_col.rem) {
-                if (*p) break;
-                p--;
-                if (*p) break;
-                p--;
-                if (*p) break;
-                p--;
-                if (*p) break;
-                p--;
+
+                if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+                    break; // found a true
+                }
+                p -= AK_FT_MEMCMP_SIZE;
+
+                // if (*p) break;
+                // p--;
+                // if (*p) break;
+                // p--;
+                // if (*p) break;
+                // p--;
+                // if (*p) break;
+                // p--;
             }
             while (p > p_end) {
                 if (*p) break;
                 p--;
             }
-            if (p != p_end) { // else, return -1
+            if (p != p_end) {
                 position = p - (p_end + 1);
             }
         }
