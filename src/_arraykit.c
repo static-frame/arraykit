@@ -3526,7 +3526,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define AK_FT_MEMCMP_SIZE 8
+#define AK_FT_MEMCMP_SIZE 16
 
 static char *first_true_1d_kwarg_names[] = {
     "array",
@@ -3594,7 +3594,9 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
         while (p > p_end + size_div.rem) {
-            if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+            if (memcmp(p - AK_FT_MEMCMP_SIZE + 1,
+                    zero_buffer,
+                    AK_FT_MEMCMP_SIZE) != 0) {
                 break; // found a true
             }
             p -= AK_FT_MEMCMP_SIZE;
@@ -3747,7 +3749,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
                 p += AK_FT_MEMCMP_SIZE;
             }
             while (p < p_end) {
-                if (*p) break;
+                if (*p) {break;}
                 p++;
             }
             if (p != p_end) {
@@ -3762,23 +3764,16 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             p_end = buffer_ind + (count_col * r) - 1;
 
             while (p > p_end + div_col.rem) {
-
-                if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+                // must give memcmp the start of the buffer
+                if (memcmp(p - AK_FT_MEMCMP_SIZE + 1,
+                        zero_buffer,
+                        AK_FT_MEMCMP_SIZE) != 0) {
                     break; // found a true
                 }
                 p -= AK_FT_MEMCMP_SIZE;
-
-                // if (*p) break;
-                // p--;
-                // if (*p) break;
-                // p--;
-                // if (*p) break;
-                // p--;
-                // if (*p) break;
-                // p--;
             }
             while (p > p_end) {
-                if (*p) break;
+                if (*p) {break;}
                 p--;
             }
             if (p != p_end) {
