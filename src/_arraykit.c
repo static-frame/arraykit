@@ -3594,7 +3594,7 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
         while (p > p_end + size_div.rem) {
-            if (memcmp(p - AK_FT_MEMCMP_SIZE + 1,
+            if (memcmp(p - AK_FT_MEMCMP_SIZE + 1, // go to front
                     zero_buffer,
                     AK_FT_MEMCMP_SIZE) != 0) {
                 break; // found a true
@@ -3765,7 +3765,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
             while (p > p_end + div_col.rem) {
                 // must give memcmp the start of the buffer
-                if (memcmp(p - AK_FT_MEMCMP_SIZE + 1,
+                if (memcmp(p - AK_FT_MEMCMP_SIZE + 1, // go to front
                         zero_buffer,
                         AK_FT_MEMCMP_SIZE) != 0) {
                     break; // found a true
