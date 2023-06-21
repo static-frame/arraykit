@@ -3526,7 +3526,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define AK_FT_MEMCMP_SIZE 16
+#define AK_FT_MEMCMP_SIZE 8
 
 static char *first_true_1d_kwarg_names[] = {
     "array",
