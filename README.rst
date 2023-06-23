@@ -40,7 +40,7 @@ What is New in ArrayKit
 0.4.9
 ............
 
-Improved performance of ``first_true_1d()`` and ``first_true_2s()``.
+Improved performance of ``first_true_1d()`` and ``first_true_2d()``.
 
 
 0.4.8
