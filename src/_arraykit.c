@@ -3526,7 +3526,6 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define AK_FT_MEMCMP_SIZE 8
 
 static char *first_true_1d_kwarg_names[] = {
     "array",
@@ -3561,10 +3560,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    static npy_bool zero_buffer[AK_FT_MEMCMP_SIZE] = {0};
+    npy_intp lookahead = sizeof(npy_uint64);
 
     npy_intp size = PyArray_SIZE(array);
-    lldiv_t size_div = lldiv((long long)size, AK_FT_MEMCMP_SIZE); // quot, rem
+    lldiv_t size_div = lldiv((long long)size, lookahead); // quot, rem
 
     npy_bool *array_buffer = (npy_bool*)PyArray_DATA(array);
 
@@ -3580,10 +3579,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p_end = p + size;
 
         while (p < p_end - size_div.rem) {
-            if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
-                break; // found a true
+            if (*(npy_uint64*)p != 0) {
+                break; // found a true within lookahead
             }
-            p += AK_FT_MEMCMP_SIZE;
+            p += lookahead;
         }
         while (p < p_end) {
             if (*p) break;
@@ -3594,12 +3593,10 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
         while (p > p_end + size_div.rem) {
-            if (memcmp(p - AK_FT_MEMCMP_SIZE + 1, // go to front
-                    zero_buffer,
-                    AK_FT_MEMCMP_SIZE) != 0) {
-                break; // found a true
+            if (*(npy_uint64*)(p - lookahead + 1) != 0) {
+                break; // found a true within lookahead
             }
-            p -= AK_FT_MEMCMP_SIZE;
+            p -= lookahead;
         }
         while (p > p_end) {
             if (*p) break;
@@ -3699,7 +3696,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         array_ind = array; // can use array, no decref needed
     }
 
-    static npy_bool zero_buffer[AK_FT_MEMCMP_SIZE] = {0};
+    npy_intp lookahead = sizeof(npy_uint64);
 
     // buffer of indicators
     npy_bool *buffer_ind = (npy_bool*)PyArray_DATA(array_ind);
@@ -3707,7 +3704,7 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_intp count_row = PyArray_DIM(array_ind, 0);
     npy_intp count_col = PyArray_DIM(array_ind, 1);
 
-    lldiv_t div_col = lldiv((long long)count_col, AK_FT_MEMCMP_SIZE); // quot, rem
+    lldiv_t div_col = lldiv((long long)count_col, lookahead); // quot, rem
 
     npy_intp dims_post = {count_row};
     PyArrayObject *array_pos = (PyArrayObject*)PyArray_EMPTY(
@@ -3743,10 +3740,10 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             // scan each row from the front and terminate when True
             // remove from the end the remainder
             while (p < p_end - div_col.rem) {
-                if (memcmp(p, zero_buffer, AK_FT_MEMCMP_SIZE) != 0) {
+                if (*(npy_uint64*)p != 0) {
                     break; // found a true
                 }
-                p += AK_FT_MEMCMP_SIZE;
+                p += lookahead;
             }
             while (p < p_end) {
                 if (*p) {break;}
@@ -3764,13 +3761,11 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             p_end = buffer_ind + (count_col * r) - 1;
 
             while (p > p_end + div_col.rem) {
-                // must give memcmp the start of the buffer
-                if (memcmp(p - AK_FT_MEMCMP_SIZE + 1, // go to front
-                        zero_buffer,
-                        AK_FT_MEMCMP_SIZE) != 0) {
+                // must go to start of lookahead
+                if (*(npy_uint64*)(p - lookahead + 1) != 0) {
                     break; // found a true
                 }
-                p -= AK_FT_MEMCMP_SIZE;
+                p -= lookahead;
             }
             while (p > p_end) {
                 if (*p) {break;}
