@@ -145,6 +145,14 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(bi1.dtype, np.dtype(object))
 
 
+    def test_block_index_register_i(self) -> None:
+        bi1 = BlockIndex()
+        # NOTE: this value in one context returned an unset exception; I think I have now covered those cases but cannot reproduce the failure; testing the full size is too slow, so reducing here as a placeholder
+        size = 2_147_483_649 // 100
+        post = bi1.register(np.array(()).reshape(0, size))
+        self.assertEqual(bi1.shape, (0, size))
+
+
     #---------------------------------------------------------------------------
 
     def test_block_index_to_bytes_a(self) -> None:
