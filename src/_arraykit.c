@@ -101,6 +101,7 @@ AK_ImmutableFilter(PyArrayObject *a)
     return a;
 }
 
+// Returns NULL on error.
 PyArray_Descr*
 AK_ResolveDTypes(PyArray_Descr *d1, PyArray_Descr *d2)
 {
@@ -5159,6 +5160,7 @@ AK_BI_BIR_new(BlockIndexObject* bi) {
     BlockIndexRecord* bir = (BlockIndexRecord*)PyMem_Malloc(
             sizeof(BlockIndexRecord) * bi->bir_capacity);
     if (bir == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
     bi->bir = bir;
@@ -5176,6 +5178,7 @@ AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
         bi->bir = PyMem_Realloc(bi->bir,
                 sizeof(BlockIndexRecord) * capacity);
         if (bi->bir == NULL) {
+            PyErr_SetNone(PyExc_MemoryError);
             return -1;
         }
         bi->bir_capacity = capacity;
@@ -5318,6 +5321,9 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     }
     else if (!PyDataType_ISOBJECT(self->dtype)) { // if object cannot resolve further
         PyArray_Descr* dtr = AK_ResolveDTypes(self->dtype, dt); // new ref
+        if (dtr == NULL) {
+            return NULL;
+        }
         Py_DECREF((PyObject*)self->dtype);
         self->dtype = dtr;
     }
@@ -5329,10 +5335,12 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     BlockIndexRecord* bir = self->bir;
     Py_ssize_t bc = self->block_count;
 
+    Py_ssize_t birc = self->bir_count;
     for (Py_ssize_t i = 0; i < increment; i++) {
-        bir[self->bir_count] = (BlockIndexRecord){bc, i};
-        self->bir_count++;
+        bir[birc] = (BlockIndexRecord){bc, i};
+        birc++;
     }
+    self->bir_count = birc;
     self->block_count++;
     Py_RETURN_TRUE;
 }
