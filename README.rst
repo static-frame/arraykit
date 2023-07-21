@@ -29,13 +29,20 @@ Dependencies
 
 ArrayKit requires the following:
 
-- Python >= 3.7
-- NumPy >= 1.18.5
+- Python>=3.8
+- numpy>=1.19.5
 
 
 
 What is New in ArrayKit
 -------------------------
+
+0.4.10-dev
+............
+
+Minimum supported Python set to 3.8.
+Minimum supported NumPy set to 1.19.5.
+
 
 0.4.9
 ............
