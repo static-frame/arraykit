@@ -319,7 +319,7 @@ AK_set_int(const char *name,
     return 0;
 }
 
-// Set a character from `src` on `target`; if src is NULL use default. Returns -1 on error, else 0.
+// Set a character from `src` on `target`; if src is NULL use default. Returns -1 on error, else 0. If a None is given, a null char will be assigned.
 static int
 AK_set_char(const char *name,
         Py_UCS4 *target,

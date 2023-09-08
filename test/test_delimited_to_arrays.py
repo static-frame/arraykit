@@ -871,6 +871,12 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = delimited_to_arrays(msg, axis=1, delimiter='foo')
 
+    def test_delimited_to_arrays_delimiter_b(self) -> None:
+        msg  = ['a,3,True', 'b,-1,False']
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, delimiter=None)
+
+
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_escapechar_a(self) -> None:
         msg  = ['a,3,True', 'b,-1,False']
@@ -889,6 +895,15 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([a.tolist() for a in post1],
                 [['f"oo', 'b,ar'], [3, -1], [True, False]])
 
+    def test_delimited_to_arrays_escapechar_c(self) -> None:
+        msg  = ['foo,3,True', 'bar,-1,False']
+        post1 = delimited_to_arrays(msg,
+                axis=1,
+                escapechar=None,
+                )
+        self.assertEqual([a.tolist() for a in post1],
+                [['foo', 'bar'], [3, -1], [True, False]])
+
     #---------------------------------------------------------------------------
     def test_delimited_to_arrays_quotechar_a(self) -> None:
         msg  = ['a,3,True', 'b,-1,False']
@@ -897,6 +912,12 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             _ = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL, quotechar='foo')
+
+        with self.assertRaises(TypeError):
+            _ = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_ALL, quotechar=None)
+
+        _ = delimited_to_arrays(msg, axis=1, quoting=csv.QUOTE_NONE, quotechar=None)
+
 
     def test_delimited_to_arrays_quotechar_b(self) -> None:
         msg  = ['|foo|,|3|,|True|', '|bar|,|-1|,|False|']
