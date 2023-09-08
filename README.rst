@@ -37,10 +37,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
-0.4.10-dev
+0.4.10
 ............
 
+Updated types in ``pyi`` file.
+
 Minimum supported Python set to 3.8.
+
 Minimum supported NumPy set to 1.19.5.
 
 
