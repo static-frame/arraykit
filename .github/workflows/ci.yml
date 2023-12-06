@@ -106,7 +106,7 @@ jobs:
           output-dir: dist
         env:
           CIBW_BUILD: cp3${{ matrix.minor }}-*
-          CIBW_ARCHS_WINDOWS: auto64
+          CIBW_ARCHS_WINDOWS: x86 AMD64
           CIBW_ARCHS_MACOS: x86_64 universal2 arm64
           CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_12.txt
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_12.txt
