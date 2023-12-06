@@ -8,6 +8,7 @@ on:
       - master
   release:
     types: [published]
+
 jobs:
   tar_gz:
     name: Package
@@ -29,14 +30,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-22.04, windows-2022]
+        os: [macos-13, ubuntu-22.04, windows-2022]
         minor: [8]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-22.04'
+        if: matrix.os == 'macos-13' || matrix.os == 'ubuntu-22.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'windows-2022'
 
@@ -59,14 +60,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-22.04, windows-2022]
+        os: [macos-13, ubuntu-22.04, windows-2022]
         minor: [9, 10, 11]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-22.04'
+        if: matrix.os == 'macos-13' || matrix.os == 'ubuntu-22.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'windows-2022'
 
@@ -89,14 +90,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-22.04, windows-2022]
+        os: [macos-13, ubuntu-22.04, windows-2022]
         minor: [12]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-12' || matrix.os == 'ubuntu-22.04'
+        if: matrix.os == 'macos-13' || matrix.os == 'ubuntu-22.04'
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: matrix.os == 'windows-2022'
 
