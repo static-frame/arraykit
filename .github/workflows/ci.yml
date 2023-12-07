@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, ubuntu-22.04, windows-2022, macos-13-arm64]
+        os: [macos-13, ubuntu-22.04, windows-2022]
         minor: [9, 10, 11]
     runs-on: ${{ matrix.os }}
     steps:
@@ -108,7 +108,7 @@ jobs:
           output-dir: dist
         env:
           CIBW_BUILD: cp3${{ matrix.minor }}-*
-          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_ARCHS_WINDOWS: AMD64 # testing requires pandas, which does not publish 3.12 32bit x86 wheels
           CIBW_ARCHS_MACOS: x86_64 universal2 arm64
           CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_12.txt
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_12.txt
