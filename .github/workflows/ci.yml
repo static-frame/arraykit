@@ -113,6 +113,10 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_12.txt
           CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_12.txt
           CIBW_TEST_COMMAND: pytest {project}/test
+      - uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist
 
   upload:
     name: Publish
