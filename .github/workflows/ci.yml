@@ -34,11 +34,11 @@ jobs:
 
     steps:
       - id: step1
-      - run: echo "matrix_os=[macos-13-xlarge, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+        run: echo "matrix_os=[macos-13-xlarge, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
         if: github.event_name == 'release'
 
       - id: step2
-      - run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+        run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
         if: github.event_name != 'release'
 
   whl_3_8:
