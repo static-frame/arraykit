@@ -31,6 +31,7 @@ jobs:
     outputs:
       matrix_os: ${{ steps.set.outputs.matrix_os }}
     steps:
+      - uses: actions/checkout@master
       - id: set
       - run: echo "matrix_os=[macos-13-xlarge, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
         if: github.event_name == 'release'
