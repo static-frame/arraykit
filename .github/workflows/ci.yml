@@ -25,29 +25,25 @@ jobs:
           name: dist
           path: dist
 
-  matrix_release:
-    name: Matrix Config Release
-    if: github.event_name == 'release'
+  matrix_config:
+    name: Matrix Config
     runs-on: ubuntu-22.04
     outputs:
-      matrix_os: ${{ steps.echo.outputs.matrix_os }}
-    steps:
-      - id: echo
-        run: echo "matrix_os=[macos-13-xlarge, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+      matrix_os: ${{ steps.step1.outputs.matrix_os }}
+      matrix_os: ${{ steps.step2.outputs.matrix_os }}
 
-  matrix_not_release:
-    name: Matrix Config Release
-    if: github.event_name != 'release'
-    runs-on: ubuntu-22.04
-    outputs:
-      matrix_os: ${{ steps.echo.outputs.matrix_os }}
     steps:
-      - id: echo
-        run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+      - id: step1
+      - run: echo "matrix_os=[macos-13-xlarge, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+        if: github.event_name == 'release'
+
+      - id: step2
+      - run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+        if: github.event_name != 'release'
 
   whl_3_8:
     name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
-    needs: [matrix_release, matrix_not_release]
+    needs: matrix_config
     strategy:
       fail-fast: false
       matrix:
@@ -81,7 +77,7 @@ jobs:
 
   whl_3_9_to_3_11:
     name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
-    needs: [matrix_release, matrix_not_release]
+    needs: matrix_config
     strategy:
       fail-fast: false
       matrix:
@@ -115,7 +111,7 @@ jobs:
 
   whl_3_12:
     name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
-    needs: [matrix_release, matrix_not_release]
+    needs: matrix_config
     strategy:
       fail-fast: false
       matrix:
