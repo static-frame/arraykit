@@ -31,12 +31,11 @@ jobs:
     outputs:
       matrix_os: ${{ steps.set.outputs.matrix_os }}
     steps:
-      - id: set
       - run: echo "matrix_os=[macos-13-xlarge, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
-        # if: github.event_name == 'release'
+        if: github.event_name == 'release'
 
-      # - run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
-      #   if: github.event_name != 'release'
+      - run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
+        if: github.event_name != 'release'
 
   whl_3_8:
     name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
