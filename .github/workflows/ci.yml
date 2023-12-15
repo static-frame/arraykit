@@ -28,14 +28,12 @@ jobs:
   matrix_config:
     name: Matrix Config
     runs-on: ubuntu-22.04
-    env:
-      EVENT_NAME: {{ github.event_name }}
 
     outputs:
       matrix_os: ${{ steps.step.outputs.matrix_os }}
 
     steps:
-      - run: echo "$EVENT_NAME"
+      - run: echo "$GITHUB_EVENT_NAME"
       - id: step
         run: echo "matrix_os=[macos-13, ubuntu-22.04, windows-2022]" >> $GITHUB_OUTPUT
 
