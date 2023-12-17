@@ -5,7 +5,7 @@ from setuptools import Extension  # type: ignore
 from setuptools import setup
 from pathlib import Path
 
-AK_VERSION = '0.4.11'
+AK_VERSION = '0.5.0'
 
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
@@ -39,7 +39,6 @@ ak_extension = Extension(
         libraries=['npymath'], # not including mlib at this time
         )
 
-
 setup(
     name='arraykit',
     version=AK_VERSION,
@@ -63,6 +62,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
     keywords='numpy array',
     packages=['arraykit'],
