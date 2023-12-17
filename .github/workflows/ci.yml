@@ -26,17 +26,19 @@ jobs:
           path: dist
 
   matrix_config:
-    name: Matrix Config
+    name: Matrix Runner Config
     runs-on: ubuntu-22.04
-
     outputs:
       matrix_os: ${{ steps.step.outputs.matrix_os }}
-
     steps:
       - run: echo "$GITHUB_EVENT_NAME"
       - id: step
-        run: echo "matrix_os=[\"macos-13\", \"ubuntu-22.04\", \"windows-2022\"]" >> $GITHUB_OUTPUT
-
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            echo 'matrix_os=["macos-13-xlarge", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix_os=["macos-13", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
+          fi
 
   whl_3_8:
     name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
@@ -44,7 +46,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # os: [macos-13-xlarge, ubuntu-22.04, windows-2022]
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         minor: [8]
     runs-on: ${{ matrix.os }}
@@ -79,7 +80,6 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{fromJson(needs.matrix_config.outputs.matrix_os)}}
-        # os: [macos-13-xlarge, ubuntu-22.04, windows-2022]
         minor: [9, 10, 11]
     runs-on: ${{ matrix.os }}
     steps:
@@ -113,7 +113,6 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{fromJson(needs.matrix_config.outputs.matrix_os)}}
-        # os: [macos-13-xlarge, ubuntu-22.04, windows-2022]
         minor: [12]
     runs-on: ${{ matrix.os }}
     steps:

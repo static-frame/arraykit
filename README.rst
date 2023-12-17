@@ -37,6 +37,15 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.5.0
+............
+
+Now building wheels for 3.12.
+
+Now building functional wheels for Mac OS ``arm64`` / Apple Silicon
+
+
 0.4.11
 ............
 
