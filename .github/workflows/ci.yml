@@ -7,7 +7,7 @@ on:
     branches:
       - master
   release:
-    types: [published]
+    types: published
 
 jobs:
   tar_gz:
@@ -53,11 +53,13 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-13' || matrix.os == 'ubuntu-22.04'
+        if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: matrix.os == 'windows-2022'
+        if: startsWith(matrix.os, 'windows-')
 
       - run: pip install pipx
+        if: startsWith(matrix.os, 'macos-')
+
       - uses: pypa/cibuildwheel@v2.16.2
         with:
           output-dir: dist
@@ -86,11 +88,13 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-13' || matrix.os == 'ubuntu-22.04'
+        if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: matrix.os == 'windows-2022'
+        if: startsWith(matrix.os, 'windows-')
 
       - run: pip install pipx
+        if: startsWith(matrix.os, 'macos-')
+
       - uses: pypa/cibuildwheel@v2.16.2
         with:
           output-dir: dist
@@ -119,11 +123,13 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
       - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: matrix.os == 'macos-13' || matrix.os == 'ubuntu-22.04'
+        if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: matrix.os == 'windows-2022'
+        if: startsWith(matrix.os, 'windows-')
 
       - run: pip install pipx
+        if: startsWith(matrix.os, 'macos-')
+
       - uses: pypa/cibuildwheel@v2.16.2
         with:
           output-dir: dist

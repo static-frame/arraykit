@@ -43,7 +43,7 @@ What is New in ArrayKit
 
 Now building wheels for 3.12.
 
-Now building functional wheels for Mac OS ``arm64`` / Apple Silicon
+Now building functional wheels for Mac OS ``arm64`` / Apple Silicon.
 
 
 0.4.11
