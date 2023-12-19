@@ -2,5 +2,4 @@ numpy==1.23.5
 pytest==7.1.2
 pylint==2.7.4
 invoke==1.4.0
-pandas==1.4.3
 hypothesis==6.10.1

@@ -5,7 +5,7 @@ import unittest
 import warnings
 from io import StringIO
 import numpy as np  # type: ignore
-import pandas as pd
+# import pandas as pd # disable so as to compile 32 bit wheels for python 3.12
 
 from arraykit import resolve_dtype
 from arraykit import resolve_dtype_iter
@@ -345,12 +345,12 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(isna_element(None, False))
         self.assertTrue(isna_element(None, True))
 
-    def test_isna_element_d(self) -> None:
-        ts = pd.Timestamp('nat')
-        self.assertTrue(isna_element(ts))
+    # def test_isna_element_d(self) -> None:
+    #     ts = pd.Timestamp('nat')
+    #     self.assertTrue(isna_element(ts))
 
-        s1 = pd.Series((0,))
-        self.assertFalse(isna_element(s1))
+    #     s1 = pd.Series((0,))
+    #     self.assertFalse(isna_element(s1))
 
 
     def test_isna_element_e(self) -> None:

@@ -40,14 +40,20 @@ jobs:
             echo 'matrix_os=["macos-13", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
           fi
 
-  whl_3_8:
-    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
+  wheels:
+    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }}
     needs: matrix_config
     strategy:
       fail-fast: false
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
-        minor: [8]
+        python:
+            - {minor: 8,  req_build: 'requirements-build-3_08.txt', req_test: 'requirements-dev-3_08.txt'}
+            - {minor: 9,  req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
+            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
+            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
+            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt'}
+
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
@@ -62,11 +68,11 @@ jobs:
         with:
           output-dir: dist
         env:
-          CIBW_BUILD: cp3${{ matrix.minor }}-*
+          CIBW_BUILD: cp3${{ matrix.python.minor }}-*
           CIBW_ARCHS_WINDOWS: x86 AMD64
           CIBW_ARCHS_MACOS: x86_64
-          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_08.txt
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_08.txt
+          CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
+          CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
 
       - run: pip install pipx
@@ -76,101 +82,9 @@ jobs:
         with:
           output-dir: dist
         env:
-          CIBW_BUILD: cp3${{ matrix.minor }}-macosx_arm64
-          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_08.txt
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_08.txt
-          CIBW_TEST_COMMAND: pytest {project}/test
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: dist
-          path: dist
-
-  whl_3_9_to_3_11:
-    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
-    needs: matrix_config
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{fromJson(needs.matrix_config.outputs.matrix_os)}}
-        minor: [9, 10, 11]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@master
-      - uses: actions/setup-python@master
-      - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
-      - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: startsWith(matrix.os, 'windows-')
-
-      - uses: pypa/cibuildwheel@v2.16.2
-        if: matrix.os != 'macos-13-xlarge'
-        with:
-          output-dir: dist
-        env:
-          CIBW_BUILD: cp3${{ matrix.minor }}-*
-          CIBW_ARCHS_WINDOWS: x86 AMD64
-          CIBW_ARCHS_MACOS: x86_64
-          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_11.txt
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_11.txt
-          CIBW_TEST_COMMAND: pytest {project}/test
-
-      - run: pip install pipx
-        if: matrix.os == 'macos-13-xlarge'
-      - uses: pypa/cibuildwheel@v2.16.2
-        if: matrix.os == 'macos-13-xlarge'
-        with:
-          output-dir: dist
-        env:
-          CIBW_BUILD: cp3${{ matrix.minor }}-macosx_arm64
-          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_11.txt
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_11.txt
-          CIBW_TEST_COMMAND: pytest {project}/test
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: dist
-          path: dist
-
-  whl_3_12:
-    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.minor }}
-    needs: matrix_config
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{fromJson(needs.matrix_config.outputs.matrix_os)}}
-        minor: [12]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@master
-      - uses: actions/setup-python@master
-      - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
-        if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
-      - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
-        if: startsWith(matrix.os, 'windows-')
-
-      - uses: pypa/cibuildwheel@v2.16.2
-        if: matrix.os != 'macos-13-xlarge'
-        with:
-          output-dir: dist
-        env:
-          CIBW_BUILD: cp3${{ matrix.minor }}-*
-          CIBW_ARCHS_WINDOWS: AMD64 # testing requires pandas, which does not publish 3.12 32bit x86 wheels
-          CIBW_ARCHS_MACOS: x86_64
-          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_12.txt
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_12.txt
-          CIBW_TEST_COMMAND: pytest {project}/test
-
-      - run: pip install pipx
-        if: matrix.os == 'macos-13-xlarge'
-      - uses: pypa/cibuildwheel@v2.16.2
-        if: matrix.os == 'macos-13-xlarge'
-        with:
-          output-dir: dist
-        env:
-          CIBW_BUILD: cp3${{ matrix.minor }}-macosx_arm64
-          CIBW_BEFORE_BUILD: pip install -r {project}/requirements-build-3_12.txt
-          CIBW_BEFORE_TEST: pip install -r {project}/requirements-dev-3_12.txt
+          CIBW_BUILD: cp3${{ matrix.python.minor }}-macosx_arm64
+          CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
+          CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
 
       - uses: actions/upload-artifact@v3
