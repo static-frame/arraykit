@@ -95,7 +95,7 @@ jobs:
   upload:
     name: Publish
     if: github.event_name == 'release'
-    needs: [tar_gz, whl_3_8, whl_3_9_to_3_11, whl_3_12]
+    needs: [tar_gz, wheels]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v3
