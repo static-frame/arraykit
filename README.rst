@@ -37,6 +37,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.5.1
+............
+
+Restored functional wheels for Mac OS ``x86_64``.
+
 
 0.5.0
 ............
