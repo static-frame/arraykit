@@ -3527,7 +3527,6 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-
 static char *first_true_1d_kwarg_names[] = {
     "array",
     "forward",
@@ -5668,7 +5667,7 @@ static PyTypeObject BlockIndexType = {
 // ArrayGO
 //------------------------------------------------------------------------------
 
-typedef struct {
+typedef struct ArrayGOObject {
     PyObject_HEAD
     PyObject *array;
     PyObject *list;
