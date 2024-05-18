@@ -5778,6 +5778,18 @@ TriMap_dealloc(TriMapObject *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+static PyObject *
+TriMap_repr(TriMapObject *self) {
+    const char *is_many = self->is_many ? "true" : "false";
+    return PyUnicode_FromFormat("<%s(i: %i, src_connected: %i, dst_connected: %i, is_many: %s)>",
+            Py_TYPE(self)->tp_name,
+            self->i,
+            self->src_connected,
+            self->dst_connected,
+            is_many);
+}
+
+
 // static PyMethodDef TriMap_methods[] = {
 //     {"__sizeof__", (PyCFunction) TriMap_sizeof, METH_NOARGS, NULL},
 //     {NULL},
@@ -5785,20 +5797,15 @@ TriMap_dealloc(TriMapObject *self) {
 
 static PyTypeObject TriMapType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    // .tp_as_mapping = &TriMap_as_mapping,
-    // .tp_as_sequence = &TriMap_as_sequece,
     .tp_basicsize = sizeof(TriMapObject), // this does not get size of struct
     .tp_dealloc = (destructor)TriMap_dealloc,
     .tp_doc = TriMap_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
-    // .tp_getset = TriMap_getset,
-    // .tp_iter = (getiterfunc)TriMap_iter,
     // .tp_methods = TriMap_methods,
     .tp_name = "arraykit.TriMap",
     .tp_new = TriMap_new,
     .tp_init = TriMap_init,
-    // .tp_repr = (reprfunc) TriMap_repr,
-    // .tp_traverse = (traverseproc)TriMap_traverse,
+    .tp_repr = (reprfunc) TriMap_repr,
 };
 
 
