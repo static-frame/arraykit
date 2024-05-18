@@ -5692,13 +5692,13 @@ PyDoc_STRVAR(
 // Returns 0 on success, -1 on error.
 int
 TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    BlockIndexObject* bi = (BlockIndexObject*)self;
+    TriMapObject* tm = (TriMapObject*)self;
 
     Py_ssize_t src_len = 0;
     Py_ssize_t dst_len = 0;
 
     if (!PyArg_ParseTuple(args,
-            "|nn:__init__",
+            "nn:__init__",
             &src_len,
             &dst_len)) {
         return -1;

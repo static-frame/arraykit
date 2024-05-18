@@ -45,6 +45,11 @@ class ArrayGO:
     def copy(self: _T) -> _T: ...
     def extend(self, __values: tp.Iterable[object]) -> None: ...
 
+
+class TriMap:
+    ...
+
+
 class BlockIndex:
     shape: tp.Tuple[int, int]
     dtype: np.dtype
