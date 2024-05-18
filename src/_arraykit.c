@@ -5648,7 +5648,7 @@ static PyTypeObject BlockIndexType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     // .tp_as_mapping = &BlockIndex_as_mapping,
     .tp_as_sequence = &BlockIndex_as_sequece,
-    .tp_basicsize = sizeof(BlockIndexObject), // this does not get size of struct
+    .tp_basicsize = sizeof(BlockIndexObject),
     .tp_dealloc = (destructor)BlockIndex_dealloc,
     .tp_doc = BlockIndex_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -5660,6 +5660,76 @@ static PyTypeObject BlockIndexType = {
     .tp_init = BlockIndex_init,
     .tp_repr = (reprfunc) BlockIndex_repr,
     // .tp_traverse = (traverseproc)BlockIndex_traverse,
+};
+
+//------------------------------------------------------------------------------
+// TriMap
+//------------------------------------------------------------------------------
+
+typedef struct TriMapObject {
+    PyObject_HEAD
+    // Py_ssize_t block_count;
+    // bool shape_recache;
+    // PyObject* shape;
+} TriMapObject;
+
+
+static PyObject *
+TriMap_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs) {
+    TriMapObject *self = (TriMapObject *)cls->tp_alloc(cls, 0);
+    if (!self) {
+        return NULL;
+    }
+    return (PyObject *)self;
+}
+
+PyDoc_STRVAR(
+    TriMap_doc,
+    "\n"
+    "A utilty for three-way join mappings."
+);
+
+// Returns 0 on success, -1 on error.
+int
+TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    BlockIndexObject* bi = (BlockIndexObject*)self;
+
+    Py_ssize_t src_len = 0;
+    Py_ssize_t dst_len = 0;
+
+    if (!PyArg_ParseTuple(args,
+            "|nn:__init__",
+            &src_len,
+            &dst_len)) {
+        return -1;
+    }
+    // handle all Py_ssize_t
+    // bi->block_count = block_count;
+    // bi->row_count = row_count;
+    return 0;
+}
+
+// static PyMethodDef TriMap_methods[] = {
+//     {"__sizeof__", (PyCFunction) BlockIndex_sizeof, METH_NOARGS, NULL},
+//     {NULL},
+// };
+
+static PyTypeObject TriMapType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    // .tp_as_mapping = &TriMap_as_mapping,
+    // .tp_as_sequence = &TriMap_as_sequece,
+    .tp_basicsize = sizeof(TriMapObject), // this does not get size of struct
+    // .tp_dealloc = (destructor)TriMap_dealloc,
+    .tp_doc = TriMap_doc,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    // .tp_getset = TriMap_getset,
+    // .tp_iter = (getiterfunc)TriMap_iter,
+    // .tp_methods = TriMap_methods,
+    .tp_name = "arraykit.TriMap",
+    .tp_new = TriMap_new,
+    .tp_init = TriMap_init,
+    // .tp_repr = (reprfunc) TriMap_repr,
+    // .tp_traverse = (traverseproc)TriMap_traverse,
 };
 
 
@@ -6019,8 +6089,10 @@ PyInit__arraykit(void)
         PyType_Ready(&BIIterBoolType) ||
         PyType_Ready(&BIIterContiguousType) ||
         PyType_Ready(&BIIterBlockType) ||
+        PyType_Ready(&TriMapType) ||
         PyType_Ready(&ArrayGOType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
+        PyModule_AddObject(m, "TriMap", (PyObject *) &TriMapType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
         PyModule_AddObject(m, "deepcopy", deepcopy) ||
         PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks)
