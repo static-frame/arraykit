@@ -5718,8 +5718,18 @@ typedef struct TriMapObject {
     Py_ssize_t len;
     Py_ssize_t src_connected;
     Py_ssize_t dst_connected;
-    PyObject* src_match;
-    PyObject* dst_match;
+
+    PyObject* src_match; // array
+    PyObject* dst_match; // array
+
+    TriMapOne* src_one;
+    Py_ssize_t src_one_count;
+    Py_ssize_t src_one_capacity;
+
+    TriMapOne* dst_one;
+    Py_ssize_t dst_one_count;
+    Py_ssize_t dst_one_capacity;
+
 } TriMapObject;
 
 
