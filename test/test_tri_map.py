@@ -10,3 +10,4 @@ class TestUnit(unittest.TestCase):
             tm1 = TriMap()
 
         tm2 = TriMap(10, 20)
+        tm3 = TriMap(10_000, 20_000)

@@ -5666,11 +5666,54 @@ static PyTypeObject BlockIndexType = {
 // TriMap
 //------------------------------------------------------------------------------
 
+// NOTE: slice selection and assignment is much faster than array selection
+// >>> a1 = np.arange(100_000)
+// >>> slc = slice(50_000, 60_000)
+// >>> alc = np.arange(50_000, 60_000)
+// >>> %timeit a1[slc]
+// 45.6 ns ± 0.133 ns per loop (mean ± std. dev. of 7 runs, 10,000,000 loops each)
+// >>> %timeit a1[alc]
+// 4.98 µs ± 12.2 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+// >>> %timeit a1[slc] = alc
+// 873 ns ± 3.33 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
+// >>> %timeit a1[alc] = alc
+// 6.3 µs ± 25.7 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+
+// -- ctypes
+// self._i = 0 # position in the final
+// self._is_many = False
+// self._src_connected = 0
+// self._dst_connected = 0
+
+// -- binary arrays
+// self._src_match = np.full(src_len, False)
+// self._dst_match = np.full(dst_len, False)
+
+// -- struct of two integers
+// self._src_one_from: tp.List[int] = []
+// self._src_one_to: tp.List[int] = []
+
+// self._dst_one_from: tp.List[int] = []
+// self._dst_one_to: tp.List[int] = []
+
+// -- normal lists of objects?
+// self._src_many_from: tp.List[int] = []
+// self._src_many_to: tp.List[slice] = [] // could be int-pairs
+
+// self._dst_many_from: tp.List[TNDArrayInt] = []
+// self._dst_many_to: tp.List[slice] = [] // could be int-pairs
+
+// -- API notes
+// can use PyArray_FillWithScalar if fill is PyObject
+
 typedef struct TriMapObject {
     PyObject_HEAD
-    // Py_ssize_t block_count;
-    // bool shape_recache;
-    // PyObject* shape;
+    bool is_many;
+    Py_ssize_t i;
+    Py_ssize_t src_connected;
+    Py_ssize_t dst_connected;
+    PyObject* src_match;
+    PyObject* dst_match;
 } TriMapObject;
 
 
@@ -5694,8 +5737,8 @@ int
 TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     TriMapObject* tm = (TriMapObject*)self;
 
-    Py_ssize_t src_len = 0;
-    Py_ssize_t dst_len = 0;
+    Py_ssize_t src_len;
+    Py_ssize_t dst_len;
 
     if (!PyArg_ParseTuple(args,
             "nn:__init__",
@@ -5703,14 +5746,40 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             &dst_len)) {
         return -1;
     }
-    // handle all Py_ssize_t
-    // bi->block_count = block_count;
-    // bi->row_count = row_count;
+    // handle all C types
+    tm->is_many = false;
+    tm->i = 0;
+    tm->src_connected = 0;
+    tm->dst_connected = 0;
+
+    npy_intp dims_src_len[] = {src_len};
+    tm->src_match = PyArray_ZEROS(1, dims_src_len, NPY_BOOL, 0);
+    if (tm->src_match == NULL) {
+        return -1;
+    }
+
+    npy_intp dims_dst_len[] = {dst_len};
+    tm->dst_match = PyArray_ZEROS(1, dims_dst_len, NPY_BOOL, 0);
+    if (tm->dst_match == NULL) {
+        return -1;
+    }
+
     return 0;
 }
 
+static void
+TriMap_dealloc(TriMapObject *self) {
+    // if (self->bir != NULL) {
+    //     PyMem_Free(self->bir);
+    // }
+    // NOTE: we use XDECREF incase init fails before these objects get allocated
+    Py_XDECREF(self->src_match);
+    Py_XDECREF(self->dst_match);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
 // static PyMethodDef TriMap_methods[] = {
-//     {"__sizeof__", (PyCFunction) BlockIndex_sizeof, METH_NOARGS, NULL},
+//     {"__sizeof__", (PyCFunction) TriMap_sizeof, METH_NOARGS, NULL},
 //     {NULL},
 // };
 
@@ -5719,7 +5788,7 @@ static PyTypeObject TriMapType = {
     // .tp_as_mapping = &TriMap_as_mapping,
     // .tp_as_sequence = &TriMap_as_sequece,
     .tp_basicsize = sizeof(TriMapObject), // this does not get size of struct
-    // .tp_dealloc = (destructor)TriMap_dealloc,
+    .tp_dealloc = (destructor)TriMap_dealloc,
     .tp_doc = TriMap_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
     // .tp_getset = TriMap_getset,
