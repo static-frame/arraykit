@@ -5680,7 +5680,7 @@ static PyTypeObject BlockIndexType = {
 // 6.3 µs ± 25.7 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
 
 // -- ctypes
-// self._i = 0 # position in the final
+// self._len = 0 # position in the final
 // self._is_many = False
 // self._src_connected = 0
 // self._dst_connected = 0
@@ -5709,7 +5709,7 @@ static PyTypeObject BlockIndexType = {
 typedef struct TriMapObject {
     PyObject_HEAD
     bool is_many;
-    Py_ssize_t i;
+    Py_ssize_t len;
     Py_ssize_t src_connected;
     Py_ssize_t dst_connected;
     PyObject* src_match;
@@ -5748,7 +5748,7 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
     // handle all C types
     tm->is_many = false;
-    tm->i = 0;
+    tm->len = 0;
     tm->src_connected = 0;
     tm->dst_connected = 0;
 
@@ -5781,9 +5781,9 @@ TriMap_dealloc(TriMapObject *self) {
 static PyObject *
 TriMap_repr(TriMapObject *self) {
     const char *is_many = self->is_many ? "true" : "false";
-    return PyUnicode_FromFormat("<%s(i: %i, src_connected: %i, dst_connected: %i, is_many: %s)>",
+    return PyUnicode_FromFormat("<%s(len: %i, src_connected: %i, dst_connected: %i, is_many: %s)>",
             Py_TYPE(self)->tp_name,
-            self->i,
+            self->len,
             self->src_connected,
             self->dst_connected,
             is_many);

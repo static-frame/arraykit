@@ -14,6 +14,6 @@ class TestUnit(unittest.TestCase):
 
     def test_tri_map_repr_a(self) -> None:
         tm = TriMap(10_000, 20_000)
-        self.assertEqual(str(tm), '<arraykit.TriMap(i: 0, src_connected: 0, dst_connected: 0, is_many: false)>')
+        self.assertEqual(str(tm), '<arraykit.TriMap(len: 0, src_connected: 0, dst_connected: 0, is_many: false)>')
 
 
