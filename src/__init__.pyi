@@ -47,8 +47,8 @@ class ArrayGO:
 
 
 class TriMap:
-    ...
-
+    def __init__(src_len: int, dst_len: int) -> None: ...
+    def register_one(src_from: int, dst_from: int) -> None: ...
 
 class BlockIndex:
     shape: tp.Tuple[int, int]

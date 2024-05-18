@@ -5824,11 +5824,28 @@ TriMap_repr(TriMapObject *self) {
             is_many);
 }
 
+static PyObject *
+TriMap_register_one(TriMapObject *self, PyObject *args) {
+    TriMapObject* tm = (TriMapObject*)self;
 
-// static PyMethodDef TriMap_methods[] = {
-//     {"__sizeof__", (PyCFunction) TriMap_sizeof, METH_NOARGS, NULL},
-//     {NULL},
-// };
+    Py_ssize_t src_from;
+    Py_ssize_t dst_from;
+
+    if (!PyArg_ParseTuple(args,
+            "nn:register_one",
+            &src_from,
+            &dst_from)) {
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef TriMap_methods[] = {
+    // {"__sizeof__", (PyCFunction) TriMap_sizeof, METH_NOARGS, NULL},
+    {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
+    {NULL},
+};
 
 static PyTypeObject TriMapType = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -5836,7 +5853,7 @@ static PyTypeObject TriMapType = {
     .tp_dealloc = (destructor)TriMap_dealloc,
     .tp_doc = TriMap_doc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
-    // .tp_methods = TriMap_methods,
+    .tp_methods = TriMap_methods,
     .tp_name = "arraykit.TriMap",
     .tp_new = TriMap_new,
     .tp_init = TriMap_init,
