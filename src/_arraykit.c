@@ -3561,7 +3561,6 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     npy_intp lookahead = sizeof(npy_uint64);
-
     npy_intp size = PyArray_SIZE(array);
     lldiv_t size_div = lldiv((long long)size, lookahead); // quot, rem
 
@@ -3611,7 +3610,6 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject* post = PyLong_FromSsize_t(position);
     return post;
 }
-
 
 static char *first_true_2d_kwarg_names[] = {
     "array",
@@ -5166,13 +5164,14 @@ AK_BI_BIR_new(BlockIndexObject* bi) {
     return 0;
 }
 
+// Returns 0 on success, -1 on error
 static inline int
 AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
     Py_ssize_t target = bi->bir_count + increment;
     Py_ssize_t capacity = bi->bir_capacity;
     if (AK_UNLIKELY(target >= capacity)) {
         while (capacity < target) {
-            capacity <<= 1; // get 2x the size
+            capacity <<= 1; // get 2x the capacity
         }
         bi->bir = PyMem_Realloc(bi->bir,
                 sizeof(BlockIndexRecord) * capacity);
@@ -5305,7 +5304,6 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
                 self->row_count);
         return NULL;
     }
-
     // if we are not adding columns, we are not adding types, so we are not changing the  dtype or shape
     if (increment == 0) {
         Py_RETURN_FALSE;
@@ -5331,9 +5329,10 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
     if (AK_BI_BIR_resize(self, increment)) {
         return NULL;
     };
+
+    // pull out references
     BlockIndexRecord* bir = self->bir;
     Py_ssize_t bc = self->block_count;
-
     Py_ssize_t birc = self->bir_count;
     for (Py_ssize_t i = 0; i < increment; i++) {
         bir[birc] = (BlockIndexRecord){bc, i};
@@ -5696,8 +5695,9 @@ static PyTypeObject BlockIndexType = {
 // self._dst_one_from: tp.List[int] = []
 // self._dst_one_to: tp.List[int] = []
 
-// -- normal lists of objects?
+// -- array of integers
 // self._src_many_from: tp.List[int] = []
+// -- normal lists of objects?
 // self._src_many_to: tp.List[slice] = [] // could be int-pairs
 
 // self._dst_many_from: tp.List[TNDArrayInt] = []
@@ -5711,7 +5711,6 @@ typedef struct TriMapOne {
     Py_ssize_t to;
 } TriMapOne;
 
-
 typedef struct TriMapObject {
     PyObject_HEAD
     bool is_many;
@@ -5720,7 +5719,9 @@ typedef struct TriMapObject {
     Py_ssize_t dst_connected;
 
     PyObject* src_match; // array
+    npy_bool* src_match_data;
     PyObject* dst_match; // array
+    npy_bool* dst_match_data;
 
     TriMapOne* src_one;
     Py_ssize_t src_one_count;
@@ -5729,9 +5730,7 @@ typedef struct TriMapObject {
     TriMapOne* dst_one;
     Py_ssize_t dst_one_count;
     Py_ssize_t dst_one_capacity;
-
 } TriMapObject;
-
 
 static PyObject *
 TriMap_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs) {
@@ -5751,17 +5750,15 @@ PyDoc_STRVAR(
 // Returns 0 on success, -1 on error.
 int
 TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    TriMapObject* tm = (TriMapObject*)self;
-
     Py_ssize_t src_len;
     Py_ssize_t dst_len;
-
     if (!PyArg_ParseTuple(args,
             "nn:__init__",
             &src_len,
             &dst_len)) {
         return -1;
     }
+    TriMapObject* tm = (TriMapObject*)self;
     // handle all C types
     tm->is_many = false;
     tm->len = 0;
@@ -5773,27 +5770,30 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     if (tm->src_match == NULL) {
         return -1;
     }
+    tm->src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->src_match);
+
     npy_intp dims_dst_len[] = {dst_len};
     tm->dst_match = PyArray_ZEROS(1, dims_dst_len, NPY_BOOL, 0);
     if (tm->dst_match == NULL) {
         return -1;
     }
+    tm->dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->dst_match);
+
 
     tm->src_one_count = 0;
-    tm->src_one_capacity = 8;
+    tm->src_one_capacity = 16;
     tm->src_one = (TriMapOne*)PyMem_Malloc(sizeof(TriMapOne) * tm->src_one_capacity);
     if (tm->src_one == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
     tm->dst_one_count = 0;
-    tm->dst_one_capacity = 8;
+    tm->dst_one_capacity = 16;
     tm->dst_one = (TriMapOne*)PyMem_Malloc(sizeof(TriMapOne) * tm->dst_one_capacity);
     if (tm->dst_one == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
-
     return 0;
 }
 
@@ -5809,7 +5809,6 @@ TriMap_dealloc(TriMapObject *self) {
     if (self->dst_one != NULL) {
         PyMem_Free(self->dst_one);
     }
-
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -5824,20 +5823,62 @@ TriMap_repr(TriMapObject *self) {
             is_many);
 }
 
+// Return NULL on error
 static PyObject *
 TriMap_register_one(TriMapObject *self, PyObject *args) {
-    TriMapObject* tm = (TriMapObject*)self;
-
     Py_ssize_t src_from;
     Py_ssize_t dst_from;
-
     if (!PyArg_ParseTuple(args,
             "nn:register_one",
             &src_from,
             &dst_from)) {
         return NULL;
     }
+    TriMapObject* tm = (TriMapObject*)self;
+    bool src_matched = src_from >= 0;
+    bool dst_matched = dst_from >= 0;
 
+    if (src_matched) {
+        if (AK_UNLIKELY(tm->src_one_count == tm->src_one_capacity)) {
+            tm->src_one_capacity <<= 1; // get 2x the capacity
+            tm->src_one = PyMem_Realloc(tm->src_one,
+                    sizeof(TriMapOne) * tm->src_one_capacity);
+            if (tm->src_one == NULL) {
+                PyErr_SetNone(PyExc_MemoryError);
+                return NULL;
+            }
+        }
+        tm->src_one[tm->src_one_count] = (TriMapOne){src_from, tm->len};
+        tm->src_one_count += 1;
+        tm->src_connected += 1;
+    }
+    if (dst_matched) {
+        if (AK_UNLIKELY(tm->dst_one_count == tm->dst_one_capacity)) {
+            tm->dst_one_capacity <<= 1; // get 2x the capacity
+            tm->dst_one = PyMem_Realloc(tm->dst_one,
+                    sizeof(TriMapOne) * tm->dst_one_capacity);
+            if (tm->dst_one == NULL) {
+                PyErr_SetNone(PyExc_MemoryError);
+                return NULL;
+            }
+        }
+        tm->dst_one[tm->dst_one_count] = (TriMapOne){src_from, tm->len};
+        tm->dst_one_count += 1;
+        tm->dst_connected += 1;
+    }
+
+// if src_matched and dst_matched:
+//     # if we have seen this value before in src
+//     if not self._is_many and (self._src_match[src_from] or self._dst_match[dst_from]):
+//         self._is_many = True
+//     self._src_match[src_from] = True
+//     self._dst_match[dst_from] = True
+
+    if (src_matched && dst_matched) {
+        tm->src_match_data[src_from] = NPY_TRUE;
+        tm->dst_match_data[dst_from] = NPY_TRUE;
+    }
+    tm->len += 1;
     Py_RETURN_NONE;
 }
 

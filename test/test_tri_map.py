@@ -32,3 +32,11 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             tm.register_one()
+
+    def test_tri_map_register_one_b(self) -> None:
+        tm = TriMap(2000, 2000)
+        for i in range(2000):
+            tm.register_one(i, i)
+
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 2000, src_connected: 2000, dst_connected: 2000, is_many: false)>')
+
