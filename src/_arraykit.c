@@ -5706,6 +5706,12 @@ static PyTypeObject BlockIndexType = {
 // -- API notes
 // can use PyArray_FillWithScalar if fill is PyObject
 
+typedef struct TriMapOne {
+    Py_ssize_t from; // signed
+    Py_ssize_t to;
+} TriMapOne;
+
+
 typedef struct TriMapObject {
     PyObject_HEAD
     bool is_many;
