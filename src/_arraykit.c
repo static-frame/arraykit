@@ -5773,10 +5773,24 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     if (tm->src_match == NULL) {
         return -1;
     }
-
     npy_intp dims_dst_len[] = {dst_len};
     tm->dst_match = PyArray_ZEROS(1, dims_dst_len, NPY_BOOL, 0);
     if (tm->dst_match == NULL) {
+        return -1;
+    }
+
+    tm->src_one_count = 0;
+    tm->src_one_capacity = 8;
+    tm->src_one = (TriMapOne*)PyMem_Malloc(sizeof(TriMapOne) * tm->src_one_capacity);
+    if (tm->src_one == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        return -1;
+    }
+    tm->dst_one_count = 0;
+    tm->dst_one_capacity = 8;
+    tm->dst_one = (TriMapOne*)PyMem_Malloc(sizeof(TriMapOne) * tm->dst_one_capacity);
+    if (tm->dst_one == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
 
@@ -5785,12 +5799,17 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 static void
 TriMap_dealloc(TriMapObject *self) {
-    // if (self->bir != NULL) {
-    //     PyMem_Free(self->bir);
-    // }
     // NOTE: we use XDECREF incase init fails before these objects get allocated
     Py_XDECREF(self->src_match);
     Py_XDECREF(self->dst_match);
+
+    if (self->src_one != NULL) {
+        PyMem_Free(self->src_one);
+    }
+    if (self->dst_one != NULL) {
+        PyMem_Free(self->dst_one);
+    }
+
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
