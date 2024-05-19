@@ -5880,9 +5880,29 @@ TriMap_is_many(TriMapObject *self, PyObject *args) {
     Py_RETURN_FALSE;
 }
 
+static PyObject *
+TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
+    TriMapObject* tm = (TriMapObject*)self;
+    if (tm->src_connected == tm->len) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+}
+
+static PyObject *
+TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
+    TriMapObject* tm = (TriMapObject*)self;
+    if (tm->dst_connected == tm->len) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+}
+
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
     {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
+    {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
+    {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
     {NULL},
 };
 
