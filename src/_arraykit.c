@@ -5862,19 +5862,16 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
                 return NULL;
             }
         }
-        tm->dst_one[tm->dst_one_count] = (TriMapOne){src_from, tm->len};
+        tm->dst_one[tm->dst_one_count] = (TriMapOne){dst_from, tm->len};
         tm->dst_one_count += 1;
         tm->dst_connected += 1;
     }
-
-// if src_matched and dst_matched:
-//     # if we have seen this value before in src
-//     if not self._is_many and (self._src_match[src_from] or self._dst_match[dst_from]):
-//         self._is_many = True
-//     self._src_match[src_from] = True
-//     self._dst_match[dst_from] = True
-
     if (src_matched && dst_matched) {
+        if (!tm->is_many) {
+            if (tm->src_match_data[src_from] || tm->dst_match_data[dst_from]) {
+                tm->is_many = true;
+            }
+        }
         tm->src_match_data[src_from] = NPY_TRUE;
         tm->dst_match_data[dst_from] = NPY_TRUE;
     }
