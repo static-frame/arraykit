@@ -5811,22 +5811,15 @@ TriMap_repr(TriMapObject *self) {
 }
 
 // Provide the integer positions connecting the `src` to the `dst`. If there is no match to `src` or `dst`, the unmatched position can be provided with -1. From each side, a connection is documented to the current `len`. Each time this is called `len` is incremented, indicating the inrease in position of th `final`. Return NULL on error
-static PyObject *
-TriMap_register_one(TriMapObject *self, PyObject *args) {
-    Py_ssize_t src_from;
-    Py_ssize_t dst_from;
-    if (!PyArg_ParseTuple(args,
-            "nn:register_one",
-            &src_from,
-            &dst_from)) {
-        return NULL;
-    }
-    TriMapObject* tm = (TriMapObject*)self;
+
+// Inner function for calling from C; returns 0 on success, -1 on error. Exceptions will be set on error.
+static inline int
+AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
     bool src_matched = src_from >= 0;
     bool dst_matched = dst_from >= 0;
     if (src_from >= tm->src_len || dst_from >= tm->dst_len) {
         PyErr_SetString(PyExc_ValueError, "Out of bounds locator");
-        return NULL;
+        return -1;
     }
 
     if (src_matched) {
@@ -5836,7 +5829,7 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
                     sizeof(TriMapOne) * tm->src_one_capacity);
             if (tm->src_one == NULL) {
                 PyErr_SetNone(PyExc_MemoryError);
-                return NULL;
+                return -1;
             }
         }
         tm->src_one[tm->src_one_count] = (TriMapOne){src_from, tm->len};
@@ -5850,7 +5843,7 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
                     sizeof(TriMapOne) * tm->dst_one_capacity);
             if (tm->dst_one == NULL) {
                 PyErr_SetNone(PyExc_MemoryError);
-                return NULL;
+                return -1;
             }
         }
         tm->dst_one[tm->dst_one_count] = (TriMapOne){dst_from, tm->len};
@@ -5868,8 +5861,82 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
         tm->dst_match_data[dst_from] = NPY_TRUE;
     }
     tm->len += 1;
-    Py_RETURN_NONE;
+    return 0;
 }
+
+// Public function for calling from Python.
+static PyObject*
+TriMap_register_one(TriMapObject *self, PyObject *args) {
+    Py_ssize_t src_from;
+    Py_ssize_t dst_from;
+    if (!PyArg_ParseTuple(args,
+            "nn:register_one",
+            &src_from,
+            &dst_from)) {
+        return NULL;
+    }
+    TriMapObject* tm = (TriMapObject*)self;
+    if (AK_TM_register_one(tm, src_from, dst_from)) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+
+    // bool src_matched = src_from >= 0;
+    // bool dst_matched = dst_from >= 0;
+    // if (src_from >= tm->src_len || dst_from >= tm->dst_len) {
+    //     PyErr_SetString(PyExc_ValueError, "Out of bounds locator");
+    //     return NULL;
+    // }
+
+    // if (src_matched) {
+    //     if (AK_UNLIKELY(tm->src_one_count == tm->src_one_capacity)) {
+    //         tm->src_one_capacity <<= 1; // get 2x the capacity
+    //         tm->src_one = PyMem_Realloc(tm->src_one,
+    //                 sizeof(TriMapOne) * tm->src_one_capacity);
+    //         if (tm->src_one == NULL) {
+    //             PyErr_SetNone(PyExc_MemoryError);
+    //             return NULL;
+    //         }
+    //     }
+    //     tm->src_one[tm->src_one_count] = (TriMapOne){src_from, tm->len};
+    //     tm->src_one_count += 1;
+    //     tm->src_connected += 1;
+    // }
+    // if (dst_matched) {
+    //     if (AK_UNLIKELY(tm->dst_one_count == tm->dst_one_capacity)) {
+    //         tm->dst_one_capacity <<= 1; // get 2x the capacity
+    //         tm->dst_one = PyMem_Realloc(tm->dst_one,
+    //                 sizeof(TriMapOne) * tm->dst_one_capacity);
+    //         if (tm->dst_one == NULL) {
+    //             PyErr_SetNone(PyExc_MemoryError);
+    //             return NULL;
+    //         }
+    //     }
+    //     tm->dst_one[tm->dst_one_count] = (TriMapOne){dst_from, tm->len};
+    //     tm->dst_one_count += 1;
+    //     tm->dst_connected += 1;
+    // }
+    // if (src_matched && dst_matched) {
+    //     if (!tm->is_many) {
+    //         // if we have seen this connection before, we have a many
+    //         if (tm->src_match_data[src_from] || tm->dst_match_data[dst_from]) {
+    //             tm->is_many = true;
+    //         }
+    //     }
+    //     tm->src_match_data[src_from] = NPY_TRUE;
+    //     tm->dst_match_data[dst_from] = NPY_TRUE;
+    // }
+    // tm->len += 1;
+    // Py_RETURN_NONE;
+}
+
+    // def register_unmapped_dst(self) -> None:
+    //     if self._dst_match.sum() < len(self._dst_match):
+    //         idx, = np.nonzero(~self._dst_match)
+    //         for dst_i in idx:
+    //             self.register_one(-1, dst_i)
+
+
 
 static PyObject *
 TriMap_is_many(TriMapObject *self, PyObject *args) {
@@ -5880,6 +5947,7 @@ TriMap_is_many(TriMapObject *self, PyObject *args) {
     Py_RETURN_FALSE;
 }
 
+// Return True if the `src` will not need a fill. This is only correct of `src` is binding to a left join or an inner join.
 static PyObject *
 TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
     TriMapObject* tm = (TriMapObject*)self;
@@ -5889,6 +5957,7 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
     Py_RETURN_FALSE;
 }
 
+// Return True if the `dst` will not need a fill. This is only correct of `dst` is binding to a left join or an inner join.
 static PyObject *
 TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
     TriMapObject* tm = (TriMapObject*)self;

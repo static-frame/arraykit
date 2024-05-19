@@ -52,3 +52,19 @@ class TestUnit(unittest.TestCase):
         tm.register_one(19, 29)
         tm.register_one(18, 29)
         self.assertTrue(tm.is_many())
+
+
+    def test_tri_map_src_no_fill_a(self) -> None:
+        tm = TriMap(3, 3)
+        tm.register_one(0, 0)
+        tm.register_one(1, 1)
+        tm.register_one(2, -1)
+        self.assertTrue(tm.src_no_fill())
+        self.assertFalse(tm.dst_no_fill())
+
+
+
+
+
+
+
