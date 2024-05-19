@@ -5678,23 +5678,6 @@ static PyTypeObject BlockIndexType = {
 // >>> %timeit a1[alc] = alc
 // 6.3 µs ± 25.7 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
 
-// -- ctypes
-// self._len = 0 # position in the final
-// self._is_many = False
-// self._src_connected = 0
-// self._dst_connected = 0
-
-// -- binary arrays
-// self._src_match = np.full(src_len, False)
-// self._dst_match = np.full(dst_len, False)
-
-// -- struct of two integers
-// self._src_one_from: tp.List[int] = []
-// self._src_one_to: tp.List[int] = []
-
-// self._dst_one_from: tp.List[int] = []
-// self._dst_one_to: tp.List[int] = []
-
 // -- array of integers
 // self._src_many_from: tp.List[int] = []
 // -- normal lists of objects?
@@ -5713,15 +5696,17 @@ typedef struct TriMapOne {
 
 typedef struct TriMapObject {
     PyObject_HEAD
-    bool is_many;
+    Py_ssize_t src_len;
+    Py_ssize_t dst_len;
     Py_ssize_t len;
     Py_ssize_t src_connected;
     Py_ssize_t dst_connected;
+    bool is_many;
 
-    PyObject* src_match; // array
-    npy_bool* src_match_data;
-    PyObject* dst_match; // array
-    npy_bool* dst_match_data;
+    PyObject* src_match; // array object
+    npy_bool* src_match_data; // C-array
+    PyObject* dst_match; // array object
+    npy_bool* dst_match_data; // C-array
 
     TriMapOne* src_one;
     Py_ssize_t src_one_count;
@@ -5760,11 +5745,14 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
     TriMapObject* tm = (TriMapObject*)self;
     // handle all C types
+    tm->src_len = src_len;
+    tm->dst_len = dst_len;
     tm->is_many = false;
     tm->len = 0;
     tm->src_connected = 0;
     tm->dst_connected = 0;
 
+    // we create arrays, and also pre-extract pointers to array data for fast insertion; we keep the array for optimal summing routines
     npy_intp dims_src_len[] = {src_len};
     tm->src_match = PyArray_ZEROS(1, dims_src_len, NPY_BOOL, 0);
     if (tm->src_match == NULL) {
@@ -5778,7 +5766,6 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         return -1;
     }
     tm->dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->dst_match);
-
 
     tm->src_one_count = 0;
     tm->src_one_capacity = 16;
@@ -5823,7 +5810,7 @@ TriMap_repr(TriMapObject *self) {
             is_many);
 }
 
-// Return NULL on error
+// Provide the integer positions connecting the `src` to the `dst`. If there is no match to `src` or `dst`, the unmatched position can be provided with -1. From each side, a connection is documented to the current `len`. Each time this is called `len` is incremented, indicating the inrease in position of th `final`. Return NULL on error
 static PyObject *
 TriMap_register_one(TriMapObject *self, PyObject *args) {
     Py_ssize_t src_from;
@@ -5837,6 +5824,10 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
     TriMapObject* tm = (TriMapObject*)self;
     bool src_matched = src_from >= 0;
     bool dst_matched = dst_from >= 0;
+    if (src_from >= tm->src_len || dst_from >= tm->dst_len) {
+        PyErr_SetString(PyExc_ValueError, "Out of bounds locator");
+        return NULL;
+    }
 
     if (src_matched) {
         if (AK_UNLIKELY(tm->src_one_count == tm->src_one_capacity)) {
@@ -5868,6 +5859,7 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
     }
     if (src_matched && dst_matched) {
         if (!tm->is_many) {
+            // if we have seen this connection before, we have a many
             if (tm->src_match_data[src_from] || tm->dst_match_data[dst_from]) {
                 tm->is_many = true;
             }
@@ -5879,9 +5871,18 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *
+TriMap_is_many(TriMapObject *self, PyObject *args) {
+    TriMapObject* tm = (TriMapObject*)self;
+    if (tm->is_many) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+}
+
 static PyMethodDef TriMap_methods[] = {
-    // {"__sizeof__", (PyCFunction) TriMap_sizeof, METH_NOARGS, NULL},
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
+    {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
     {NULL},
 };
 

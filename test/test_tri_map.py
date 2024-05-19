@@ -40,3 +40,15 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 2000, src_connected: 2000, dst_connected: 2000, is_many: false)>')
 
+    def test_tri_map_register_one_c(self) -> None:
+        tm = TriMap(20, 30)
+        self.assertFalse(tm.is_many())
+
+        with self.assertRaises(ValueError):
+            tm.register_one(22, 0)
+        with self.assertRaises(ValueError):
+            tm.register_one(0, 30)
+
+        tm.register_one(19, 29)
+        tm.register_one(18, 29)
+        self.assertTrue(tm.is_many())
