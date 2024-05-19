@@ -5880,55 +5880,8 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
         return NULL;
     }
     Py_RETURN_NONE;
-
-    // bool src_matched = src_from >= 0;
-    // bool dst_matched = dst_from >= 0;
-    // if (src_from >= tm->src_len || dst_from >= tm->dst_len) {
-    //     PyErr_SetString(PyExc_ValueError, "Out of bounds locator");
-    //     return NULL;
-    // }
-
-    // if (src_matched) {
-    //     if (AK_UNLIKELY(tm->src_one_count == tm->src_one_capacity)) {
-    //         tm->src_one_capacity <<= 1; // get 2x the capacity
-    //         tm->src_one = PyMem_Realloc(tm->src_one,
-    //                 sizeof(TriMapOne) * tm->src_one_capacity);
-    //         if (tm->src_one == NULL) {
-    //             PyErr_SetNone(PyExc_MemoryError);
-    //             return NULL;
-    //         }
-    //     }
-    //     tm->src_one[tm->src_one_count] = (TriMapOne){src_from, tm->len};
-    //     tm->src_one_count += 1;
-    //     tm->src_connected += 1;
-    // }
-    // if (dst_matched) {
-    //     if (AK_UNLIKELY(tm->dst_one_count == tm->dst_one_capacity)) {
-    //         tm->dst_one_capacity <<= 1; // get 2x the capacity
-    //         tm->dst_one = PyMem_Realloc(tm->dst_one,
-    //                 sizeof(TriMapOne) * tm->dst_one_capacity);
-    //         if (tm->dst_one == NULL) {
-    //             PyErr_SetNone(PyExc_MemoryError);
-    //             return NULL;
-    //         }
-    //     }
-    //     tm->dst_one[tm->dst_one_count] = (TriMapOne){dst_from, tm->len};
-    //     tm->dst_one_count += 1;
-    //     tm->dst_connected += 1;
-    // }
-    // if (src_matched && dst_matched) {
-    //     if (!tm->is_many) {
-    //         // if we have seen this connection before, we have a many
-    //         if (tm->src_match_data[src_from] || tm->dst_match_data[dst_from]) {
-    //             tm->is_many = true;
-    //         }
-    //     }
-    //     tm->src_match_data[src_from] = NPY_TRUE;
-    //     tm->dst_match_data[dst_from] = NPY_TRUE;
-    // }
-    // tm->len += 1;
-    // Py_RETURN_NONE;
 }
+
 
     // def register_unmapped_dst(self) -> None:
     //     if self._dst_match.sum() < len(self._dst_match):
