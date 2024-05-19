@@ -4750,7 +4750,7 @@ BIIterContiguous_iter(BIIterContiguousObject *self)
 }
 
 // Returns a new reference.
-static PyObject *
+static PyObject*
 BIIterContiguous_reversed(BIIterContiguousObject *self)
 {
     bool reversed = !self->reversed;
@@ -5875,13 +5875,28 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
             &dst_from)) {
         return NULL;
     }
-    TriMapObject* tm = (TriMapObject*)self;
-    if (AK_TM_register_one(tm, src_from, dst_from)) {
+    if (AK_TM_register_one(self, src_from, dst_from)) {
         return NULL;
     }
     Py_RETURN_NONE;
 }
 
+static PyObject*
+TriMap_register_unmapped_dst(TriMapObject *self) {
+
+    PyArrayObject *sum_array = (PyArrayObject *)PyArray_Sum(
+            (PyArrayObject *)self->dst_match,
+            NPY_MAXDIMS,
+            NPY_INT64,
+            NULL);
+    if (!sum_array) {
+        return NULL;
+    }
+    npy_intp sum = *(npy_intp *)PyArray_DATA(sum_array);
+    Py_DECREF(sum_array);
+
+    return NULL;
+}
 
     // def register_unmapped_dst(self) -> None:
     //     if self._dst_match.sum() < len(self._dst_match):
@@ -5893,8 +5908,7 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
 
 static PyObject *
 TriMap_is_many(TriMapObject *self, PyObject *args) {
-    TriMapObject* tm = (TriMapObject*)self;
-    if (tm->is_many) {
+    if (self->is_many) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
@@ -5903,8 +5917,7 @@ TriMap_is_many(TriMapObject *self, PyObject *args) {
 // Return True if the `src` will not need a fill. This is only correct of `src` is binding to a left join or an inner join.
 static PyObject *
 TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
-    TriMapObject* tm = (TriMapObject*)self;
-    if (tm->src_connected == tm->len) {
+    if (self->src_connected == self->len) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
@@ -5913,8 +5926,7 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
 // Return True if the `dst` will not need a fill. This is only correct of `dst` is binding to a left join or an inner join.
 static PyObject *
 TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
-    TriMapObject* tm = (TriMapObject*)self;
-    if (tm->dst_connected == tm->len) {
+    if (self->dst_connected == self->len) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
@@ -5922,6 +5934,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
 
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
+    {"register_unmapped_dst", (PyCFunction)TriMap_register_unmapped_dst, METH_NOARGS, NULL},
     {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
