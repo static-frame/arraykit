@@ -5883,19 +5883,26 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
 
 static PyObject*
 TriMap_register_unmapped_dst(TriMapObject *self) {
-
-    PyArrayObject *sum_array = (PyArrayObject *)PyArray_Sum(
-            (PyArrayObject *)self->dst_match,
+    PyArrayObject* dst_match_array = (PyArrayObject *)self->dst_match;
+    PyObject *sum_array = (PyArrayObject *)PyArray_Sum(
+            dst_match_array,
             NPY_MAXDIMS,
             NPY_INT64,
             NULL);
     if (!sum_array) {
         return NULL;
     }
-    npy_intp sum = *(npy_intp *)PyArray_DATA(sum_array);
-    Py_DECREF(sum_array);
+    npy_intp sum = *(npy_intp *)PyArray_DATA((PyArrayObject*)sum_array);
 
-    return NULL;
+    if (sum < self->dst_len) {
+        // AK_DEBUG_MSG_OBJ("dst_match", self->dst_match);
+        // PyObject *nonzero = PyArray_Nonzero(dst_match_array);
+        // if (!nonzero) {
+        //     return NULL;
+        // }
+    }
+
+    Py_RETURN_NONE;
 }
 
     // def register_unmapped_dst(self) -> None:
