@@ -69,6 +69,6 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 2)
         tm.register_unmatched_dst()
 
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 6, src_connected: 3, dst_connected: 6, is_many: false)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 8, src_connected: 3, dst_connected: 8, is_many: false)>')
 
 

@@ -5884,7 +5884,6 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
 static PyObject*
 TriMap_register_unmatched_dst(TriMapObject *self) {
     PyArrayObject* dst_match_array = (PyArrayObject *)self->dst_match;
-
     PyObject* sum_scalar = PyArray_Sum(
             dst_match_array,
             NPY_MAXDIMS,
@@ -5898,9 +5897,15 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
     Py_DECREF(sum_scalar);
 
     if (sum < self->dst_len) {
+        PyArrayObject* dst_unmatched = (PyArrayObject *)PyObject_CallMethod(
+                self->dst_match, // PyObject
+                "__invert__",
+                NULL);
+        if (!dst_unmatched) {
+            return NULL;
+        }
 
-        PyArrayObject* dst_unmatch_array = (PyArrayObject *)PyArray_Invert(dst_match_array);
-        PyObject* nonzero = PyArray_Nonzero(dst_match_array);
+        PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
         // borrow ref to array in 1-element tuple
         PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
         npy_intp *index_data = (npy_intp *)PyArray_DATA(indices);
@@ -5909,10 +5914,12 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
         for (npy_intp i = 0; i < index_len; i++) {
             if (AK_TM_register_one(self, -1, index_data[i])) {
                 Py_DECREF(nonzero);
+                Py_DECREF((PyObject*)dst_unmatched);
                 return NULL;
             }
         }
         Py_DECREF(nonzero);
+        Py_DECREF((PyObject*)dst_unmatched);
     }
     Py_RETURN_NONE;
 }
