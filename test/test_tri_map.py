@@ -75,3 +75,5 @@ class TestUnit(unittest.TestCase):
     def test_tri_map_register_many_a(self) -> None:
         tm = TriMap(100, 50)
         tm.register_many(3, np.array([2,5,8]))
+
+        tm.register_many("foo", np.array([2,5,8]))
