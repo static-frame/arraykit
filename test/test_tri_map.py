@@ -62,12 +62,12 @@ class TestUnit(unittest.TestCase):
         self.assertTrue(tm.src_no_fill())
         self.assertFalse(tm.dst_no_fill())
 
-    def test_tri_map_register_unmapped_dst_a(self) -> None:
+    def test_tri_map_register_unmatched_dst_a(self) -> None:
         tm = TriMap(10, 8)
         tm.register_one(0, 0)
         tm.register_one(1, 1)
         tm.register_one(2, 2)
-        tm.register_unmapped_dst()
+        tm.register_unmatched_dst()
 
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 6, src_connected: 3, dst_connected: 6, is_many: false)>')
 

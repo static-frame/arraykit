@@ -5882,7 +5882,7 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
 }
 
 static PyObject*
-TriMap_register_unmapped_dst(TriMapObject *self) {
+TriMap_register_unmatched_dst(TriMapObject *self) {
     PyArrayObject* dst_match_array = (PyArrayObject *)self->dst_match;
 
     PyObject* sum_scalar = PyArray_Sum(
@@ -5898,6 +5898,8 @@ TriMap_register_unmapped_dst(TriMapObject *self) {
     Py_DECREF(sum_scalar);
 
     if (sum < self->dst_len) {
+
+        PyArrayObject* dst_unmatch_array = (PyArrayObject *)PyArray_Invert(dst_match_array);
         PyObject* nonzero = PyArray_Nonzero(dst_match_array);
         // borrow ref to array in 1-element tuple
         PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
@@ -5915,6 +5917,11 @@ TriMap_register_unmapped_dst(TriMapObject *self) {
     Py_RETURN_NONE;
 }
 
+    // def register_unmatched_dst(self) -> None:
+    //     if self._dst_match.sum() < len(self._dst_match):
+    //         idx, = np.nonzero(~self._dst_match)
+    //         for dst_i in idx:
+    //             self.register_one(-1, dst_i)
 
 
 static PyObject *
@@ -5945,7 +5952,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
 
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
-    {"register_unmapped_dst", (PyCFunction)TriMap_register_unmapped_dst, METH_NOARGS, NULL},
+    {"register_unmatched_dst", (PyCFunction)TriMap_register_unmatched_dst, METH_NOARGS, NULL},
     {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
