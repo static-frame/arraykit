@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 
 from arraykit import TriMap
 
@@ -71,4 +72,6 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 8, src_connected: 3, dst_connected: 8, is_many: false)>')
 
-
+    def test_tri_map_register_many_a(self) -> None:
+        tm = TriMap(100, 50)
+        tm.register_many(3, np.array([2,5,8]))

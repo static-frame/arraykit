@@ -4041,9 +4041,11 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
 
     static char *kwlist[] = {"indexers", "positions", NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!:get_new_indexers_and_screen", kwlist,
-                &PyArray_Type, &indexers,
-                &PyArray_Type, &positions
+    if (!PyArg_ParseTupleAndKeywords(args,
+            kwargs,
+            "O!O!:get_new_indexers_and_screen", kwlist,
+            &PyArray_Type, &indexers,
+            &PyArray_Type, &positions
         ))
     {
         return NULL;
@@ -5924,11 +5926,46 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
     Py_RETURN_NONE;
 }
 
-    // def register_unmatched_dst(self) -> None:
-    //     if self._dst_match.sum() < len(self._dst_match):
-    //         idx, = np.nonzero(~self._dst_match)
-    //         for dst_i in idx:
-    //             self.register_one(-1, dst_i)
+static PyObject*
+TriMap_register_many(TriMapObject *self, PyObject *args) {
+    Py_ssize_t src_from;
+    PyArrayObject* dst_from;
+    if (!PyArg_ParseTuple(args,
+            "nO!:register_many",
+            &src_from,
+            &PyArray_Type, &dst_from)) {
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+    // def register_many(self,
+    //         src_from: int,
+    //         dst_from: TNDArrayInt,
+    //         ) -> None:
+    //     '''Register a source position `src_from` and automatically register the destination positions based on `dst_from`. Length of `dst_from` should always be greater than 1.
+    //     '''
+    //     # assert isinstance(src_from, int)
+    //     # assert not isinstance(dst_from, int)
+
+    //     increment = len(dst_from)
+    //     s = slice(self._len, self._len + increment)
+
+    //     self._src_many_from.append(src_from)
+    //     self._src_many_to.append(s)
+
+    //     self._dst_many_from.append(dst_from)
+    //     self._dst_many_to.append(s)
+
+    //     self._src_match[src_from] = True
+    //     self._dst_match[dst_from] = True
+
+    //     self._len += increment
+    //     self._is_many = True
+    //     self._src_connected += increment
+    //     self._dst_connected += increment
+
 
 
 static PyObject *
@@ -5960,6 +5997,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
     {"register_unmatched_dst", (PyCFunction)TriMap_register_unmatched_dst, METH_NOARGS, NULL},
+    {"register_many", (PyCFunction)TriMap_register_many, METH_VARARGS, NULL},
     {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
