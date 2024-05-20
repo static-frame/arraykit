@@ -5884,32 +5884,36 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
 static PyObject*
 TriMap_register_unmapped_dst(TriMapObject *self) {
     PyArrayObject* dst_match_array = (PyArrayObject *)self->dst_match;
-    PyObject *sum_array = (PyArrayObject *)PyArray_Sum(
+
+    PyObject* sum_scalar = PyArray_Sum(
             dst_match_array,
             NPY_MAXDIMS,
             NPY_INT64,
             NULL);
-    if (!sum_array) {
+    if (!sum_scalar) {
         return NULL;
     }
-    npy_intp sum = *(npy_intp *)PyArray_DATA((PyArrayObject*)sum_array);
+    // for a 1D array PyArray_SUM returns a scalar
+    npy_int64 sum = PyArrayScalar_VAL(sum_scalar, Int64);
+    Py_DECREF(sum_scalar);
 
     if (sum < self->dst_len) {
-        // AK_DEBUG_MSG_OBJ("dst_match", self->dst_match);
-        // PyObject *nonzero = PyArray_Nonzero(dst_match_array);
-        // if (!nonzero) {
-        //     return NULL;
-        // }
-    }
+        PyObject* nonzero = PyArray_Nonzero(dst_match_array);
+        // borrow ref to array in 1-element tuple
+        PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
+        npy_intp *index_data = (npy_intp *)PyArray_DATA(indices);
+        npy_intp index_len = PyArray_SIZE(indices);
 
+        for (npy_intp i = 0; i < index_len; i++) {
+            if (AK_TM_register_one(self, -1, index_data[i])) {
+                Py_DECREF(nonzero);
+                return NULL;
+            }
+        }
+        Py_DECREF(nonzero);
+    }
     Py_RETURN_NONE;
 }
-
-    // def register_unmapped_dst(self) -> None:
-    //     if self._dst_match.sum() < len(self._dst_match):
-    //         idx, = np.nonzero(~self._dst_match)
-    //         for dst_i in idx:
-    //             self.register_one(-1, dst_i)
 
 
 
