@@ -5696,6 +5696,17 @@ typedef struct TriMapOne {
     Py_ssize_t to;
 } TriMapOne;
 
+typedef struct TriMapManyTo {
+    Py_ssize_t start;
+    Py_ssize_t stop;
+} TriMapManyTo;
+
+typedef struct TriMapManyFrom {
+    npy_intp src;
+    PyObject* dst; // arrays
+} TriMapManyFrom;
+
+
 typedef struct TriMapObject {
     PyObject_HEAD
     Py_ssize_t src_len;
@@ -5710,6 +5721,7 @@ typedef struct TriMapObject {
     PyObject* dst_match; // array object
     npy_bool* dst_match_data; // C-array
 
+    // register one
     TriMapOne* src_one;
     Py_ssize_t src_one_count;
     Py_ssize_t src_one_capacity;
@@ -5717,6 +5729,13 @@ typedef struct TriMapObject {
     TriMapOne* dst_one;
     Py_ssize_t dst_one_count;
     Py_ssize_t dst_one_capacity;
+
+    // register_many
+    TriMapManyTo* many_to;
+    TriMapManyFrom* many_from;
+    Py_ssize_t many_count;
+    Py_ssize_t many_capacity;
+
 } TriMapObject;
 
 static PyObject *
@@ -5945,31 +5964,30 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-    // def register_many(self,
-    //         src_from: int,
-    //         dst_from: TNDArrayInt,
-    //         ) -> None:
-    //     '''Register a source position `src_from` and automatically register the destination positions based on `dst_from`. Length of `dst_from` should always be greater than 1.
-    //     '''
-    //     # assert isinstance(src_from, int)
-    //     # assert not isinstance(dst_from, int)
 
-    //     increment = len(dst_from)
-    //     s = slice(self._len, self._len + increment)
+// def register_many(self,
+//         src_from: int,
+//         dst_from: TNDArrayInt,
+//         ) -> None:
+//     '''Register a source position `src_from` and automatically register the destination positions based on `dst_from`. Length of `dst_from` should always be greater than 1.
+//     '''
+//     # assert isinstance(src_from, int)
+//     # assert not isinstance(dst_from, int)
 
-    //     self._src_many_from.append(src_from)
-    //     self._src_many_to.append(s)
+//     increment = len(dst_from)
+//     s = slice(self._len, self._len + increment)
 
-    //     self._dst_many_from.append(dst_from)
-    //     self._dst_many_to.append(s)
+//     self._many_to.append(s)
+//     self._src_many_from.append(src_from)
+//     self._dst_many_from.append(dst_from)
 
-    //     self._src_match[src_from] = True
-    //     self._dst_match[dst_from] = True
+//     self._src_match[src_from] = True
+//     self._dst_match[dst_from] = True
 
-    //     self._len += increment
-    //     self._is_many = True
-    //     self._src_connected += increment
-    //     self._dst_connected += increment
+//     self._len += increment
+//     self._is_many = True
+//     self._src_connected += increment
+//     self._dst_connected += increment
 
 
 
