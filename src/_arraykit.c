@@ -5985,9 +5985,8 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
             &PyArray_Type, &dst_from)) {
         return NULL;
     }
-    PyArray_Descr *dst_from_dtype = PyArray_DESCR(dst_from); // borrowed
-
-    if (dst_from_dtype->kind != 'i') {
+    int dst_from_type = PyArray_TYPE(dst_from);
+    if (dst_from_type != NPY_INT64 && dst_from_type != NPY_INT32) {
         PyErr_SetString(PyExc_ValueError, "Array must be an integer array");
         return NULL;
     }
@@ -6016,9 +6015,17 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
 
     self->src_match_data[src_from] = NPY_TRUE;
     // iterate over dst_from and set values to True; cannot assume that dst_from is contiguous; dst_match_data is contiguous
-    for (Py_ssize_t i = 0; i < increment; i++){
-        npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i);
-        self->dst_match_data[pos] = NPY_TRUE;
+    if (dst_from_type == NPY_INT64) {
+        for (Py_ssize_t i = 0; i < increment; i++){
+            npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i);
+            self->dst_match_data[pos] = NPY_TRUE;
+        }
+    }
+    else { // must by NPY_INT32
+        for (Py_ssize_t i = 0; i < increment; i++){
+            npy_int32 pos = *(npy_int32*)PyArray_GETPTR1(dst_from, i);
+            self->dst_match_data[pos] = NPY_TRUE;
+        }
     }
 
     self->src_connected += increment;

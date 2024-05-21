@@ -92,8 +92,15 @@ class TestUnit(unittest.TestCase):
         tm.register_many(3, np.array([2, 5, 8]))
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 3, src_connected: 3, dst_connected: 3, is_many: true)>')
 
-    def test_tri_map_register_many_d(self) -> None:
+    def test_tri_map_register_many_d1(self) -> None:
         tm = TriMap(100, 50)
         for i in range(100):
-            tm.register_many(i, np.array([3, 20]))
+            tm.register_many(i, np.array([3, 20], dtype=np.int32))
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true)>')
+
+    def test_tri_map_register_many_d2(self) -> None:
+        tm = TriMap(100, 50)
+        for i in range(100):
+            tm.register_many(i, np.array([3, 20], dtype=np.int64))
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true)>')
+
