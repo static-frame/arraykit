@@ -82,8 +82,18 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             tm.register_many(3, [3, 2])
 
-    def test_tri_map_register_many_a(self) -> None:
+    def test_tri_map_register_many_b(self) -> None:
         tm = TriMap(100, 50)
         with self.assertRaises(ValueError):
-            tm.register_many(3, np.array([2,5,8], dtype=float))
+            tm.register_many(3, np.array([2, 5, 8], dtype=float))
 
+    def test_tri_map_register_many_c(self) -> None:
+        tm = TriMap(100, 50)
+        tm.register_many(3, np.array([2, 5, 8]))
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 3, src_connected: 3, dst_connected: 3, is_many: true)>')
+
+    def test_tri_map_register_many_d(self) -> None:
+        tm = TriMap(100, 50)
+        for i in range(100):
+            tm.register_many(i, np.array([3, 20]))
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true)>')

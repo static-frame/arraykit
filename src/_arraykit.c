@@ -5703,7 +5703,7 @@ typedef struct TriMapManyTo {
 
 typedef struct TriMapManyFrom {
     npy_intp src;
-    PyObject* dst; // arrays
+    PyArrayObject* dst;
 } TriMapManyFrom;
 
 
@@ -5717,9 +5717,9 @@ typedef struct TriMapObject {
     bool is_many;
 
     PyObject* src_match; // array object
-    npy_bool* src_match_data; // C-array
+    npy_bool* src_match_data; // contiguous C array
     PyObject* dst_match; // array object
-    npy_bool* dst_match_data; // C-array
+    npy_bool* dst_match_data; // contiguous C array
 
     // register one
     TriMapOne* src_one;
@@ -5731,8 +5731,8 @@ typedef struct TriMapObject {
     Py_ssize_t dst_one_capacity;
 
     // register_many
-    TriMapManyTo* many_to;
-    TriMapManyFrom* many_from;
+    TriMapManyTo* many_to; // two integers
+    TriMapManyFrom* many_from; // int and array
     Py_ssize_t many_count;
     Py_ssize_t many_capacity;
 
@@ -5788,20 +5788,39 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
     tm->dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->dst_match);
 
+    // register one
     tm->src_one_count = 0;
     tm->src_one_capacity = 16;
-    tm->src_one = (TriMapOne*)PyMem_Malloc(sizeof(TriMapOne) * tm->src_one_capacity);
+    tm->src_one = (TriMapOne*)PyMem_Malloc(
+            sizeof(TriMapOne) * tm->src_one_capacity);
     if (tm->src_one == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
     tm->dst_one_count = 0;
     tm->dst_one_capacity = 16;
-    tm->dst_one = (TriMapOne*)PyMem_Malloc(sizeof(TriMapOne) * tm->dst_one_capacity);
+    tm->dst_one = (TriMapOne*)PyMem_Malloc(
+            sizeof(TriMapOne) * tm->dst_one_capacity);
     if (tm->dst_one == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
+    // register many
+    tm->many_count = 0;
+    tm->many_capacity = 16;
+    tm->many_to = (TriMapManyTo*)PyMem_Malloc(
+            sizeof(TriMapManyTo) * tm->many_capacity);
+    if (tm->many_to == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        return -1;
+    }
+    tm->many_from = (TriMapManyFrom*)PyMem_Malloc(
+            sizeof(TriMapManyFrom) * tm->many_capacity);
+    if (tm->many_from == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        return -1;
+    }
+
     return 0;
 }
 
@@ -5816,6 +5835,17 @@ TriMap_dealloc(TriMapObject *self) {
     }
     if (self->dst_one != NULL) {
         PyMem_Free(self->dst_one);
+    }
+    if (self->many_to != NULL) {
+        PyMem_Free(self->many_to);
+    }
+    if (self->many_from != NULL) {
+        // decref all arrays before freeing
+        for (Py_ssize_t i = 0; i < self->many_count; i++) {
+            // NOTE: using dot to get to pointer?
+            Py_DECREF((PyObject*)self->many_from[i].dst);
+        }
+        PyMem_Free(self->many_from);
     }
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -5842,7 +5872,6 @@ AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
         PyErr_SetString(PyExc_ValueError, "Out of bounds locator");
         return -1;
     }
-
     if (src_matched) {
         if (AK_UNLIKELY(tm->src_one_count == tm->src_one_capacity)) {
             tm->src_one_capacity <<= 1; // get 2x the capacity
@@ -5907,8 +5936,8 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
     PyArrayObject* dst_match_array = (PyArrayObject *)self->dst_match;
     PyObject* sum_scalar = PyArray_Sum(
             dst_match_array,
-            NPY_MAXDIMS,
-            NPY_INT64,
+            0,
+            NPY_INT64, // this converts before sum; not sure this is necessary
             NULL);
     if (!sum_scalar) {
         return NULL;
@@ -5925,7 +5954,6 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
         if (!dst_unmatched) {
             return NULL;
         }
-
         PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
         // borrow ref to array in 1-element tuple
         PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
@@ -5945,51 +5973,60 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
     Py_RETURN_NONE;
 }
 
+// Given an integer (for the src) and an array of integers (for the dst), store mappings from src to final and dest to final.
 static PyObject*
 TriMap_register_many(TriMapObject *self, PyObject *args) {
     Py_ssize_t src_from;
     PyArrayObject* dst_from;
+
     if (!PyArg_ParseTuple(args,
             "nO!:register_many",
             &src_from,
             &PyArray_Type, &dst_from)) {
         return NULL;
     }
-    PyArray_Descr *dst_from_dtype = PyArray_DESCR(dst_from);
-    if (dst_from_dtype->kind != 'i' && dst_from_dtype->kind != 'u') {
+    PyArray_Descr *dst_from_dtype = PyArray_DESCR(dst_from); // borrowed
+
+    if (dst_from_dtype->kind != 'i') {
         PyErr_SetString(PyExc_ValueError, "Array must be an integer array");
         return NULL;
     }
+    npy_intp increment = PyArray_SIZE(dst_from);
 
+    if (AK_UNLIKELY(self->many_count == self->many_capacity)) {
+        self->many_capacity <<= 1; // get 2x the capacity
+
+        self->many_to = PyMem_Realloc(self->many_to,
+                sizeof(TriMapManyTo) * self->many_capacity);
+        if (self->many_to == NULL) {
+            PyErr_SetNone(PyExc_MemoryError);
+            return NULL;
+        }
+        self->many_from = PyMem_Realloc(self->many_from,
+                sizeof(TriMapManyFrom) * self->many_capacity);
+        if (self->many_from == NULL) {
+            PyErr_SetNone(PyExc_MemoryError);
+            return NULL;
+        }
+    }
+    self->many_to[self->many_count] = (TriMapManyTo){self->len, self->len + increment};
+    Py_INCREF((PyObject*)dst_from); // decref on dealloc
+    self->many_from[self->many_count] = (TriMapManyFrom){src_from, dst_from};
+    self->many_count += 1;
+
+    self->src_match_data[src_from] = NPY_TRUE;
+    // iterate over dst_from and set values to True; cannot assume that dst_from is contiguous; dst_match_data is contiguous
+    for (Py_ssize_t i = 0; i < increment; i++){
+        npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i);
+        self->dst_match_data[pos] = NPY_TRUE;
+    }
+
+    self->src_connected += increment;
+    self->dst_connected += increment;
+    self->len += increment;
+    self->is_many = true;
     Py_RETURN_NONE;
 }
-
-
-// def register_many(self,
-//         src_from: int,
-//         dst_from: TNDArrayInt,
-//         ) -> None:
-//     '''Register a source position `src_from` and automatically register the destination positions based on `dst_from`. Length of `dst_from` should always be greater than 1.
-//     '''
-//     # assert isinstance(src_from, int)
-//     # assert not isinstance(dst_from, int)
-
-//     increment = len(dst_from)
-//     s = slice(self._len, self._len + increment)
-
-//     self._many_to.append(s)
-//     self._src_many_from.append(src_from)
-//     self._dst_many_from.append(dst_from)
-
-//     self._src_match[src_from] = True
-//     self._dst_match[dst_from] = True
-
-//     self._len += increment
-//     self._is_many = True
-//     self._src_connected += increment
-//     self._dst_connected += increment
-
-
 
 static PyObject *
 TriMap_is_many(TriMapObject *self, PyObject *args) {
