@@ -5936,6 +5936,11 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
             &PyArray_Type, &dst_from)) {
         return NULL;
     }
+    PyArray_Descr *dst_from_dtype = PyArray_DESCR(dst_from);
+    if (dst_from_dtype->kind != 'i' && dst_from_dtype->kind != 'u') {
+        PyErr_SetString(PyExc_ValueError, "Array must be an integer array");
+        return NULL;
+    }
 
     Py_RETURN_NONE;
 }

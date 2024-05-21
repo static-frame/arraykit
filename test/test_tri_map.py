@@ -81,3 +81,9 @@ class TestUnit(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             tm.register_many(3, [3, 2])
+
+    def test_tri_map_register_many_a(self) -> None:
+        tm = TriMap(100, 50)
+        with self.assertRaises(ValueError):
+            tm.register_many(3, np.array([2,5,8], dtype=float))
+
