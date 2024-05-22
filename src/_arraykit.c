@@ -6052,19 +6052,19 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 
+// Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `from_dst`. This will not error.
 static inline void
 AK_TM_transfer(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
         PyArrayObject* array_to) {
-    // array_to is contiguous, array_from may not be contigious, both are same type
+    Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
+    TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
+
     switch(PyArray_TYPE(array_to)) {
+
         case NPY_INT64: {
             npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to); // contiguous
-
-            Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
-            TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
-
             for (Py_ssize_t i = 0; i < one_count; i++) {
                 TriMapOne pair = one_pairs[i];
                 array_to_data[pair.to] = *(npy_int64*)PyArray_GETPTR1(
@@ -6153,6 +6153,7 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
         return NULL;
     }
     if (PyArray_FillWithScalar(array_to, fill_value)) {
+        Py_DECREF((PyObject*)array_to);
         return NULL;
     }
     // PyArray_FillObjectArray might be needed

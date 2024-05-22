@@ -109,8 +109,8 @@ class TestUnit(unittest.TestCase):
 
 
     def test_tri_map_map_src_no_fill_a(self) -> None:
-        src = np.array([10, 20, 30, 40])
-        dst = np.array([30, 30, 40, 40])
+        src = np.array([10, 20, 30, 40], dtype=np.int64)
+        dst = np.array([30, 30, 40, 40], dtype=np.int64)
 
         tm = TriMap(4, 4)
         tm.register_one(0, -1)
@@ -126,8 +126,8 @@ class TestUnit(unittest.TestCase):
 
 
     def test_tri_map_map_src_fill_a(self) -> None:
-        src = np.array([10, 20, 30, 40])
-        dst = np.array([0, 20, 30, 50])
+        src = np.array([10, 20, 30, 40], dtype=np.int64)
+        dst = np.array([0, 20, 30, 50], dtype=np.int64)
 
         tm = TriMap(4, 4)
         tm.register_one(0, -1)
