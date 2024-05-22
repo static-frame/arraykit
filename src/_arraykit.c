@@ -6061,17 +6061,31 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     Py_RETURN_FALSE;
 }
 
+
 static inline void
-AK_TM_transfer_from_src(TriMapObject* tm, PyArrayObject* array_from, PyArrayObject* array_to) {
-    // for all non-object arrays
+AK_TM_transfer_from_src(TriMapObject* tm,
+        PyArrayObject* array_from,
+        PyArrayObject* array_to) {
+    // NOTE: pass struct arrays instead of tm?
     // array_to is contniguous, array_from may not be contigious, both are same type
     switch(PyArray_TYPE(array_to)) {
         case NPY_INT64: {
             npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to);
+
             for (Py_ssize_t i = 0; i < tm->src_one_count; i++) {
                 TriMapOne pair = tm->src_one[i];
                 array_to_data[pair.to] = *(npy_int64*)PyArray_GETPTR1(
                         array_from, pair.from);
+            }
+            for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+                TriMapManyTo mto = tm->many_to[i]; // start stop
+                TriMapManyFrom mfrom = tm->many_from[i]; // src dst; src is int
+
+                npy_int64* t = array_to_data + mto.start;
+                npy_int64* end = array_to_data + mto.stop;
+                for (; t < end; t++) {
+                    *t = *(npy_int64*)PyArray_GETPTR1(array_from, mfrom.src);
+                }
             }
             break;
         }
@@ -6085,7 +6099,6 @@ AK_TM_transfer_from_src(TriMapObject* tm, PyArrayObject* array_from, PyArrayObje
     //     # NOTE: array_from, array_to here might be any type, including object types
     //     array_to[self._src_one_to] = array_from[self._src_one_from]
 
-    //     # if many_from, many_to are empty, this is a no-op
     //     for assign_from, assign_to in zip(self._src_many_from, self._many_to):
     //         array_to[assign_to] = array_from[assign_from]
 
@@ -6112,7 +6125,7 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
     PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0);
 
     AK_TM_transfer_from_src(self, array_from, array_to);
-
+    PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
     // def map_src_no_fill(self,

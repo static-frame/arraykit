@@ -115,5 +115,6 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 1]))
         tm.register_many(3, np.array([2, 3]))
 
-        x = tm.map_src_no_fill(src)
-        print('post', x)
+        post = tm.map_src_no_fill(src)
+        self.assertFalse(post.flags.writeable)
+        print('post', post)
