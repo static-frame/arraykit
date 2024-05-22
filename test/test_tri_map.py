@@ -104,3 +104,16 @@ class TestUnit(unittest.TestCase):
             tm.register_many(i, np.array([3, 20], dtype=np.int64))
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true)>')
 
+
+    def test_tri_map_map_src_no_fill_a(self) -> None:
+        src = np.array([10, 20, 30, 40])
+        dst = np.array([30, 30, 40, 40])
+
+        tm = TriMap(4, 4)
+        tm.register_one(0, -1)
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 1]))
+        tm.register_many(3, np.array([2, 3]))
+
+        x = tm.map_src_no_fill(src)
+        print('post', x)

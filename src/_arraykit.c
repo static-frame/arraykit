@@ -6036,7 +6036,7 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
 }
 
 static PyObject *
-TriMap_is_many(TriMapObject *self, PyObject *args) {
+TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->is_many) {
         Py_RETURN_TRUE;
     }
@@ -6045,7 +6045,7 @@ TriMap_is_many(TriMapObject *self, PyObject *args) {
 
 // Return True if the `src` will not need a fill. This is only correct of `src` is binding to a left join or an inner join.
 static PyObject *
-TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
+TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->src_connected == self->len) {
         Py_RETURN_TRUE;
     }
@@ -6054,12 +6054,86 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *args) {
 
 // Return True if the `dst` will not need a fill. This is only correct of `dst` is binding to a left join or an inner join.
 static PyObject *
-TriMap_dst_no_fill(TriMapObject *self, PyObject *args) {
+TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->dst_connected == self->len) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
 }
+
+static inline void
+AK_TM_transfer_from_src(TriMapObject* tm, PyArrayObject* array_from, PyArrayObject* array_to) {
+    // for all non-object arrays
+    // array_to is contniguous, array_from may not be contigious, both are same type
+    switch(PyArray_TYPE(array_to)) {
+        case NPY_INT64: {
+            npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to);
+            for (Py_ssize_t i = 0; i < tm->src_one_count; i++) {
+                TriMapOne pair = tm->src_one[i];
+                array_to_data[pair.to] = *(npy_int64*)PyArray_GETPTR1(
+                        array_from, pair.from);
+            }
+            break;
+        }
+    }
+}
+
+    // def _transfer_from_src(self,
+    //         array_from: TNDArrayAny,
+    //         array_to: TNDArrayAny,
+    //         ) -> TNDArrayAny:
+    //     # NOTE: array_from, array_to here might be any type, including object types
+    //     array_to[self._src_one_to] = array_from[self._src_one_from]
+
+    //     # if many_from, many_to are empty, this is a no-op
+    //     for assign_from, assign_to in zip(self._src_many_from, self._many_to):
+    //         array_to[assign_to] = array_from[assign_from]
+
+    //     array_to.flags.writeable = False
+    //     return array_to
+
+
+static PyObject*
+TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
+    if (!PyArray_Check(arg)) {
+        PyErr_SetString(PyExc_TypeError, "Must provide an array");
+        return NULL;
+    }
+
+    PyArrayObject* array_from = (PyArrayObject*)arg;
+    if (!(PyArray_NDIM(array_from) == 1)) {
+        PyErr_SetString(PyExc_TypeError, "Array must be 1D");
+        return NULL;
+    }
+
+    PyArray_Descr* dtype = PyArray_DESCR(array_from);
+    Py_INCREF((PyObject*)dtype);
+    npy_intp dims[] = {self->len};
+    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0);
+
+    AK_TM_transfer_from_src(self, array_from, array_to);
+
+    return (PyObject*)array_to;
+}
+    // def map_src_no_fill(self,
+    //         array_from: TNDArrayAny,
+    //         ) -> TNDArrayAny:
+    //     '''Apply all mappings from `array_from` to `array_to`.
+    //     '''
+    //     array_to = np.empty(self._len, dtype=array_from.dtype)
+    //     return self._transfer_from_src(array_from, array_to)
+
+    // def map_src_fill(self,
+    //         array_from: TNDArrayAny,
+    //         fill_value: tp.Any,
+    //         fill_value_dtype: TDtypeAny,
+    //         ) -> TNDArrayAny:
+    //     '''Apply all mappings from `array_from` to `array_to`.
+    //     '''
+    //     resolved_dtype = resolve_dtype(array_from.dtype, fill_value_dtype)
+    //     array_to = np.full(self._len, fill_value, dtype=resolved_dtype)
+    //     return self._transfer_from_src(array_from, array_to)
+
 
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
@@ -6068,6 +6142,8 @@ static PyMethodDef TriMap_methods[] = {
     {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
+    {"map_src_no_fill", (PyCFunction)TriMap_map_src_no_fill, METH_O, NULL},
+
     {NULL},
 };
 
