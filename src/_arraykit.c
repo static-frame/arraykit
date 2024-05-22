@@ -6062,7 +6062,8 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
 
 static inline void
-AK_TM_transfer_from_src(TriMapObject* tm,
+AK_TM_transfer(TriMapObject* tm,
+        bool from_src,
         PyArrayObject* array_from,
         PyArrayObject* array_to) {
     // array_to is contniguous, array_from may not be contigious, both are same type
@@ -6070,38 +6071,54 @@ AK_TM_transfer_from_src(TriMapObject* tm,
         case NPY_INT64: {
             npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to);
 
-            for (Py_ssize_t i = 0; i < tm->src_one_count; i++) {
-                TriMapOne pair = tm->src_one[i];
+            Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
+            TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
+
+            for (Py_ssize_t i = 0; i < one_count; i++) {
+                TriMapOne pair = one_pairs[i];
                 array_to_data[pair.to] = *(npy_int64*)PyArray_GETPTR1(
                         array_from, pair.from);
             }
             for (Py_ssize_t i = 0; i < tm->many_count; i++) {
-                TriMapManyTo mto = tm->many_to[i]; // start stop
-                TriMapManyFrom mfrom = tm->many_from[i]; // src dst; src is int
-
-                npy_int64* t = array_to_data + mto.start;
-                npy_int64* end = array_to_data + mto.stop;
-                for (; t < end; t++) {
-                    *t = *(npy_int64*)PyArray_GETPTR1(array_from, mfrom.src);
+                npy_int64* t = array_to_data + tm->many_to[i].start;
+                npy_int64* end = array_to_data + tm->many_to[i].stop;
+                if (from_src) {
+                    for (; t < end; t++) {
+                        *t = *(npy_int64*)PyArray_GETPTR1(
+                                array_from,
+                                tm->many_from[i].src);
+                    }
+                }
+                else { // from_dst, dst is an array
+                    npy_intp dst_pos = 0;
+                    PyArrayObject* dst = tm->many_from[i].dst; // int64 or int32
+                    int dst_from_type = PyArray_TYPE(dst);
+                    if (dst_from_type == NPY_INT64) {
+                        for (; t < end; t++) {
+                            *t = *(npy_int64*)PyArray_GETPTR1(
+                                    array_from,
+                                    *(npy_int64*)PyArray_GETPTR1(
+                                            dst,
+                                            dst_pos));
+                            dst_pos++;
+                        }
+                    }
+                    else { // dst is int32
+                        for (; t < end; t++) {
+                            *t = *(npy_int64*)PyArray_GETPTR1(
+                                    array_from,
+                                    *(npy_int32*)PyArray_GETPTR1(
+                                            dst,
+                                            dst_pos));
+                            dst_pos++;
+                        }
+                    }
                 }
             }
             break;
         }
     }
 }
-
-    // def _transfer_from_src(self,
-    //         array_from: TNDArrayAny,
-    //         array_to: TNDArrayAny,
-    //         ) -> TNDArrayAny:
-    //     # NOTE: array_from, array_to here might be any type, including object types
-    //     array_to[self._src_one_to] = array_from[self._src_one_from]
-
-    //     for assign_from, assign_to in zip(self._src_many_from, self._many_to):
-    //         array_to[assign_to] = array_from[assign_from]
-
-    //     array_to.flags.writeable = False
-    //     return array_to
 
 
 static PyObject*
@@ -6122,7 +6139,8 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
     npy_intp dims[] = {self->len};
     PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0);
 
-    AK_TM_transfer_from_src(self, array_from, array_to);
+    bool from_src = true;
+    AK_TM_transfer(self, from_src, array_from, array_to);
 
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
