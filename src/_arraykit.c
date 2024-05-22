@@ -6102,35 +6102,36 @@ AK_TM_transfer(TriMapObject* tm,
             // get number of UCS4 code points per element
             npy_intp element_cp = element_size / UCS4_SIZE;
             Py_UCS4* array_to_data = (Py_UCS4*)PyArray_DATA(array_to); // contiguous
+            Py_UCS4* f;
+            Py_UCS4* t;
+            Py_UCS4* t_end;
             for (Py_ssize_t i = 0; i < one_count; i++) {
-                Py_UCS4* f = (Py_UCS4*)PyArray_GETPTR1(array_from, one_pairs[i].from);
-                Py_UCS4* t = array_to_data + (element_cp * one_pairs[i].to);
+                f = (Py_UCS4*)PyArray_GETPTR1(array_from, one_pairs[i].from);
+                t = array_to_data + element_cp * one_pairs[i].to;
                 memcpy(t, f, element_size);
-
             }
-            // for (Py_ssize_t i = 0; i < tm->many_count; i++) {
-            //     npy_int64* t = array_to_data + tm->many_to[i].start;
-            //     npy_int64* end = array_to_data + tm->many_to[i].stop;
-            //     if (from_src) {
-            //         for (; t < end; t++) {
-            //             *t = *(npy_int64*)PyArray_GETPTR1(
-            //                     array_from,
-            //                     tm->many_from[i].src);
-            //         }
-            //     }
-            //     else { // from_dst, dst is an array
-            //         npy_intp dst_pos = 0;
-            //         PyArrayObject* dst = tm->many_from[i].dst;
-            //         for (; t < end; t++) {
-            //             *t = *(npy_int64*)PyArray_GETPTR1(
-            //                     array_from,
-            //                     *(npy_int64*)PyArray_GETPTR1( // DO NOT TEMPLATE (always int64)
-            //                             dst,
-            //                             dst_pos));
-            //             dst_pos++;
-            //         }
-            //     }
-            // }
+            for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+                t = array_to_data + element_cp * tm->many_to[i].start;
+                t_end = array_to_data + element_cp * tm->many_to[i].stop;
+                if (from_src) {
+                    // copy the same src into multiple final
+                    f = (Py_UCS4*)PyArray_GETPTR1(array_from, tm->many_from[i].src);
+                    for (; t < t_end; t += element_cp) {
+                        memcpy(t, f, element_size);
+                    }
+                }
+                else { // from_dst, dst is an array
+                    npy_intp dst_pos = 0;
+                    PyArrayObject* dst = tm->many_from[i].dst;
+                    npy_int64 f_pos;
+                    for (; t < t_end; t += element_cp) {
+                        f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos); // DO NOT TEMPLATE
+                        f = (Py_UCS4*)PyArray_GETPTR1(array_from, f_pos);
+                        memcpy(t, f, element_size);
+                        dst_pos++;
+                    }
+                }
+            }
             break;
         }
     }

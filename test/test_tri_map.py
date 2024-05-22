@@ -122,8 +122,6 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_no_fill(src)
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), [10, 20, 30, 30, 40, 40])
-        # print('post', post)
-
 
     def test_tri_map_map_src_no_fill_b(self) -> None:
         src = np.array(['a', 'bbb', 'cc', 'dddd'])
@@ -135,15 +133,22 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 2)
         tm.register_one(3, 3)
 
-        # tm.register_many(2, np.array([0, 1]))
-        # tm.register_many(3, np.array([2, 3]))
-
         post = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), ['a', 'bbb', 'cc', 'dddd'])
-        # import ipdb; ipdb.set_trace()
 
+    def test_tri_map_map_src_no_fill_c(self) -> None:
+        src = np.array(['aaaaa', 'bbb', 'cc', 'dddd'])
+
+        tm = TriMap(4, 4)
+        tm.register_many(0, np.array([1, 3], dtype=np.int64))
+        tm.register_many(1, np.array([0, 2], dtype=np.int64))
+
+        post = tm.map_src_no_fill(src)
+        del src
+        self.assertFalse(post.flags.writeable)
+        self.assertEqual(post.tolist(), ['aaaaa', 'aaaaa', 'bbb', 'bbb'])
 
     #---------------------------------------------------------------------------
 
@@ -161,4 +166,19 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_fill(src, -1, np.dtype(np.int64))
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), [10, 20, 30, 40, -1, -1])
-        # import ipdb; ipdb.set_trace()
+
+
+    def test_tri_map_map_src_fill_a(self) -> None:
+        src = np.array(['aa', 'bbbbb', 'ccc', 'dddd'])
+        dst = np.array(['', 'bbbbb', 'ccc', ''])
+
+        tm = TriMap(4, 4)
+        tm.register_one(0, -1)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+
+        post = tm.map_src_fill(src, 'na', np.dtype(str))
+        self.assertFalse(post.flags.writeable)
+        self.assertEqual(post.tolist(), ['aa', 'bbbbb', 'ccc', 'dddd', 'na', 'na'])
