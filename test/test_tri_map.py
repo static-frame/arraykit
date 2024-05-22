@@ -107,6 +107,7 @@ class TestUnit(unittest.TestCase):
             tm.register_many(i, np.array([3, 20], dtype=np.int64))
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true)>')
 
+    #---------------------------------------------------------------------------
 
     def test_tri_map_map_src_no_fill_a(self) -> None:
         src = np.array([10, 20, 30, 40], dtype=np.int64)
@@ -124,6 +125,27 @@ class TestUnit(unittest.TestCase):
         # print('post', post)
 
 
+    def test_tri_map_map_src_no_fill_b(self) -> None:
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'cc', 'dddd', 'dddd'])
+
+        tm = TriMap(4, 4)
+        tm.register_one(0, 0)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_one(3, 3)
+
+        # tm.register_many(2, np.array([0, 1]))
+        # tm.register_many(3, np.array([2, 3]))
+
+        post = tm.map_src_no_fill(src)
+        del src
+        self.assertFalse(post.flags.writeable)
+        self.assertEqual(post.tolist(), ['a', 'bbb', 'cc', 'dddd'])
+        # import ipdb; ipdb.set_trace()
+
+
+    #---------------------------------------------------------------------------
 
     def test_tri_map_map_src_fill_a(self) -> None:
         src = np.array([10, 20, 30, 40], dtype=np.int64)

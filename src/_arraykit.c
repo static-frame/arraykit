@@ -11,6 +11,8 @@
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
 
+const static size_t UCS4_SIZE = sizeof(Py_UCS4);
+
 //------------------------------------------------------------------------------
 // Macros
 
@@ -1247,7 +1249,7 @@ AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 
     cpl->buffer_count = 0;
     cpl->buffer_capacity =  16384; // 2048;
-    cpl->buffer = (Py_UCS4*)PyMem_Malloc(sizeof(Py_UCS4) * cpl->buffer_capacity);
+    cpl->buffer = (Py_UCS4*)PyMem_Malloc(UCS4_SIZE * cpl->buffer_capacity);
     if (cpl->buffer == NULL) {
         PyMem_Free(cpl);
         return (AK_CodePointLine*)PyErr_NoMemory();
@@ -1307,7 +1309,7 @@ AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment) {
             cpl->buffer_capacity <<= 1;
         }
         cpl->buffer = PyMem_Realloc(cpl->buffer,
-                sizeof(Py_UCS4) * cpl->buffer_capacity);
+                UCS4_SIZE * cpl->buffer_capacity);
         if (cpl->buffer == NULL) {
             return -1;
         }
@@ -1596,7 +1598,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
     npy_intp dims[] = {count};
 
     // NOTE: empty preferred over zeros
-    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // dtype will incref
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
         return NULL;
     }
@@ -1675,7 +1677,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     // NOTE: empty prefered over zeros
-    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // dtype will incref
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
         return NULL;
     }
@@ -1748,7 +1750,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     // NOTE: empty prefered over zeros
-    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // dtype will incref
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
         return NULL;
     }
@@ -1825,18 +1827,18 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // mutate the passed dtype as it is new and will be stolen in array construction
     if (dtype->elsize == 0) {
         field_points = cpl->offset_max;
-        dtype->elsize = (int)(field_points * sizeof(Py_UCS4));
+        dtype->elsize = (int)(field_points * UCS4_SIZE);
         capped_points = false;
     }
     else {
         // assume that elsize is already given in units of 4
-        // assert(dtype->elsize % sizeof(Py_UCS4) == 0);
-        field_points = dtype->elsize / sizeof(Py_UCS4);
+        // assert(dtype->elsize % UCS4_SIZE == 0);
+        field_points = dtype->elsize / UCS4_SIZE;
         capped_points = true;
     }
 
     // NOTE: it is assumed (though not verified in some testing) that we need to get zeroed array here as we might copy to the array with less than the full item size width
-    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // increfs dtype
     if (array == NULL) {
         // expected array to steal dtype reference
         return NULL;
@@ -1853,9 +1855,9 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         Py_ssize_t copy_bytes;
         while (array_buffer < end) {
             if (cpl->offsets[cpl->offsets_current_index] >= field_points) {
-                copy_bytes = field_points * sizeof(Py_UCS4);
+                copy_bytes = field_points * UCS4_SIZE;
             } else {
-                copy_bytes = cpl->offsets[cpl->offsets_current_index] * sizeof(Py_UCS4);
+                copy_bytes = cpl->offsets[cpl->offsets_current_index] * UCS4_SIZE;
             }
             memcpy(array_buffer,
                     cpl->buffer_current_ptr,
@@ -1868,7 +1870,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
         while (array_buffer < end) {
             memcpy(array_buffer,
                     cpl->buffer_current_ptr,
-                    cpl->offsets[cpl->offsets_current_index] * sizeof(Py_UCS4));
+                    cpl->offsets[cpl->offsets_current_index] * UCS4_SIZE);
             array_buffer += field_points;
             AK_CPL_CurrentAdvance(cpl);
         }
@@ -6066,13 +6068,13 @@ AK_TM_transfer(TriMapObject* tm,
         case NPY_INT64: {
             npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to); // contiguous
             for (Py_ssize_t i = 0; i < one_count; i++) {
-                TriMapOne pair = one_pairs[i];
-                array_to_data[pair.to] = *(npy_int64*)PyArray_GETPTR1(
-                        array_from, pair.from);
+                array_to_data[one_pairs[i].to] = *(npy_int64*)PyArray_GETPTR1(
+                        array_from, one_pairs[i].from);
             }
             for (Py_ssize_t i = 0; i < tm->many_count; i++) {
                 npy_int64* t = array_to_data + tm->many_to[i].start;
                 npy_int64* end = array_to_data + tm->many_to[i].stop;
+
                 if (from_src) {
                     for (; t < end; t++) {
                         *t = *(npy_int64*)PyArray_GETPTR1(
@@ -6095,6 +6097,42 @@ AK_TM_transfer(TriMapObject* tm,
             }
             break;
         }
+        case NPY_UNICODE: {
+            npy_intp element_size = PyArray_DESCR(array_to)->elsize;
+            // get number of UCS4 code points per element
+            npy_intp element_cp = element_size / UCS4_SIZE;
+            Py_UCS4* array_to_data = (Py_UCS4*)PyArray_DATA(array_to); // contiguous
+            for (Py_ssize_t i = 0; i < one_count; i++) {
+                Py_UCS4* f = (Py_UCS4*)PyArray_GETPTR1(array_from, one_pairs[i].from);
+                Py_UCS4* t = array_to_data + (element_cp * one_pairs[i].to);
+                memcpy(t, f, element_size);
+
+            }
+            // for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+            //     npy_int64* t = array_to_data + tm->many_to[i].start;
+            //     npy_int64* end = array_to_data + tm->many_to[i].stop;
+            //     if (from_src) {
+            //         for (; t < end; t++) {
+            //             *t = *(npy_int64*)PyArray_GETPTR1(
+            //                     array_from,
+            //                     tm->many_from[i].src);
+            //         }
+            //     }
+            //     else { // from_dst, dst is an array
+            //         npy_intp dst_pos = 0;
+            //         PyArrayObject* dst = tm->many_from[i].dst;
+            //         for (; t < end; t++) {
+            //             *t = *(npy_int64*)PyArray_GETPTR1(
+            //                     array_from,
+            //                     *(npy_int64*)PyArray_GETPTR1( // DO NOT TEMPLATE (always int64)
+            //                             dst,
+            //                             dst_pos));
+            //             dst_pos++;
+            //         }
+            //     }
+            // }
+            break;
+        }
     }
 }
 
@@ -6111,8 +6149,11 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
         return NULL;
     }
     PyArray_Descr* dtype = PyArray_DESCR(array_from); // borowed ref
+    Py_INCREF(dtype);
+    // PyArray_Descr* dtype = PyArray_DescrNew(PyArray_DESCR(array_from));
     npy_intp dims[] = {self->len};
-    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // dtype will incref
+    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // // steals dtype ref
+    // Py_DECREF(dtype); // NOTE: this segfaults
     if (array_to == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
@@ -6146,8 +6187,7 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
     // passing a borrowed ref; returns a new ref
     PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
     npy_intp dims[] = {self->len};
-    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // dtype will incref
-    Py_DECREF(dtype);
+    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
     if (array_to == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
