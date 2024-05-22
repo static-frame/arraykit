@@ -6027,7 +6027,6 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
             self->dst_match_data[pos] = NPY_TRUE;
         }
     }
-
     self->src_connected += increment;
     self->dst_connected += increment;
     self->len += increment;
@@ -6066,7 +6065,6 @@ static inline void
 AK_TM_transfer_from_src(TriMapObject* tm,
         PyArrayObject* array_from,
         PyArrayObject* array_to) {
-    // NOTE: pass struct arrays instead of tm?
     // array_to is contniguous, array_from may not be contigious, both are same type
     switch(PyArray_TYPE(array_to)) {
         case NPY_INT64: {
@@ -6125,6 +6123,7 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
     PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0);
 
     AK_TM_transfer_from_src(self, array_from, array_to);
+
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
