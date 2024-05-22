@@ -1595,23 +1595,23 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
     Py_ssize_t count = cpl->offsets_count;
     npy_intp dims[] = {count};
 
-    // NOTE: empty prefered over zeros
-    PyObject *array = PyArray_Empty(1, dims, dtype, 0);
+    // NOTE: empty preferred over zeros
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // dtype will incref
     if (array == NULL) {
-        // expected array to steal dtype reference
         return NULL;
     }
 
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
+    int elsize = dtype->elsize;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
 
-    if (dtype->elsize == 16) {
+    if (elsize == 16) {
         # ifdef PyFloat128ArrType_Type
         npy_float128 *array_buffer = (npy_float128*)PyArray_DATA((PyArrayObject*)array);
         npy_float128 *end = array_buffer + count;
@@ -1622,7 +1622,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
         }
         # endif
     }
-    else if (dtype->elsize == 8) {
+    else if (elsize == 8) {
         npy_float64 *array_buffer = (npy_float64*)PyArray_DATA((PyArrayObject*)array);
         npy_float64 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1630,7 +1630,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 4) {
+    else if (elsize == 4) {
         npy_float32 *array_buffer = (npy_float32*)PyArray_DATA((PyArrayObject*)array);
         npy_float32 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1638,7 +1638,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 2) {
+    else if (elsize == 2) {
         npy_float16 *array_buffer = (npy_float16*)PyArray_DATA((PyArrayObject*)array);
         npy_float16 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1675,20 +1675,20 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     // NOTE: empty prefered over zeros
-    PyObject *array = PyArray_Empty(1, dims, dtype, 0);
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // dtype will incref
     if (array == NULL) {
-        // expected array to steal dtype reference
         return NULL;
     }
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
+    int elsize = dtype->elsize;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
-    if (dtype->elsize == 8) {
+    if (elsize == 8) {
         npy_int64 *array_buffer = (npy_int64*)PyArray_DATA((PyArrayObject*)array);
         npy_int64 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1696,7 +1696,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 4) {
+    else if (elsize == 4) {
         npy_int32 *array_buffer = (npy_int32*)PyArray_DATA((PyArrayObject*)array);
         npy_int32 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1704,7 +1704,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 2) {
+    else if (elsize == 2) {
         npy_int16 *array_buffer = (npy_int16*)PyArray_DATA((PyArrayObject*)array);
         npy_int16 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1712,7 +1712,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 1) {
+    else if (elsize == 1) {
         npy_int8 *array_buffer = (npy_int8*)PyArray_DATA((PyArrayObject*)array);
         npy_int8 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1748,20 +1748,20 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     npy_intp dims[] = {count};
 
     // NOTE: empty prefered over zeros
-    PyObject *array = PyArray_Empty(1, dims, dtype, 0);
+    PyObject *array = PyArray_Empty(1, dims, dtype, 0); // dtype will incref
     if (array == NULL) {
-        // expected array to steal dtype reference
         return NULL;
     }
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
+    int elsize = dtype->elsize;
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
     AK_CPL_CurrentReset(cpl);
-    if (dtype->elsize == 8) {
+    if (elsize == 8) {
         npy_uint64 *array_buffer = (npy_uint64*)PyArray_DATA((PyArrayObject*)array);
         npy_uint64 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1769,7 +1769,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 4) {
+    else if (elsize == 4) {
         npy_uint32 *array_buffer = (npy_uint32*)PyArray_DATA((PyArrayObject*)array);
         npy_uint32 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1777,7 +1777,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 2) {
+    else if (elsize == 2) {
         npy_uint16 *array_buffer = (npy_uint16*)PyArray_DATA((PyArrayObject*)array);
         npy_uint16 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -1785,7 +1785,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
             AK_CPL_CurrentAdvance(cpl);
         }
     }
-    else if (dtype->elsize == 1) {
+    else if (elsize == 1) {
         npy_uint8 *array_buffer = (npy_uint8*)PyArray_DATA((PyArrayObject*)array);
         npy_uint8 *end = array_buffer + count;
         while (array_buffer < end) {
@@ -5688,8 +5688,6 @@ static PyTypeObject BlockIndexType = {
 // self._dst_many_from: tp.List[TNDArrayInt] = []
 // self._dst_many_to: tp.List[slice] = [] // could be int-pairs
 
-// -- API notes
-// can use PyArray_FillWithScalar if fill is PyObject
 
 typedef struct TriMapOne {
     Py_ssize_t from; // signed
@@ -5986,8 +5984,8 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
         return NULL;
     }
     int dst_from_type = PyArray_TYPE(dst_from);
-    if (dst_from_type != NPY_INT64 && dst_from_type != NPY_INT32) {
-        PyErr_SetString(PyExc_ValueError, "Array must be an integer array");
+    if (dst_from_type != NPY_INT64) {
+        PyErr_SetString(PyExc_ValueError, "`dst_from` must be a 64 bit integer array");
         return NULL;
     }
     npy_intp increment = PyArray_SIZE(dst_from);
@@ -6015,18 +6013,11 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
 
     self->src_match_data[src_from] = NPY_TRUE;
     // iterate over dst_from and set values to True; cannot assume that dst_from is contiguous; dst_match_data is contiguous
-    if (dst_from_type == NPY_INT64) {
-        for (Py_ssize_t i = 0; i < increment; i++){
-            npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i);
-            self->dst_match_data[pos] = NPY_TRUE;
-        }
+    for (Py_ssize_t i = 0; i < increment; i++){
+        npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i); // always int64
+        self->dst_match_data[pos] = NPY_TRUE;
     }
-    else { // must by NPY_INT32
-        for (Py_ssize_t i = 0; i < increment; i++){
-            npy_int32 pos = *(npy_int32*)PyArray_GETPTR1(dst_from, i);
-            self->dst_match_data[pos] = NPY_TRUE;
-        }
-    }
+
     self->src_connected += increment;
     self->dst_connected += increment;
     self->len += increment;
@@ -6066,10 +6057,10 @@ AK_TM_transfer(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
         PyArrayObject* array_to) {
-    // array_to is contniguous, array_from may not be contigious, both are same type
+    // array_to is contiguous, array_from may not be contigious, both are same type
     switch(PyArray_TYPE(array_to)) {
         case NPY_INT64: {
-            npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to);
+            npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to); // contiguous
 
             Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
             TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
@@ -6091,27 +6082,14 @@ AK_TM_transfer(TriMapObject* tm,
                 }
                 else { // from_dst, dst is an array
                     npy_intp dst_pos = 0;
-                    PyArrayObject* dst = tm->many_from[i].dst; // int64 or int32
-                    int dst_from_type = PyArray_TYPE(dst);
-                    if (dst_from_type == NPY_INT64) {
-                        for (; t < end; t++) {
-                            *t = *(npy_int64*)PyArray_GETPTR1(
-                                    array_from,
-                                    *(npy_int64*)PyArray_GETPTR1(
-                                            dst,
-                                            dst_pos));
-                            dst_pos++;
-                        }
-                    }
-                    else { // dst is int32
-                        for (; t < end; t++) {
-                            *t = *(npy_int64*)PyArray_GETPTR1(
-                                    array_from,
-                                    *(npy_int32*)PyArray_GETPTR1(
-                                            dst,
-                                            dst_pos));
-                            dst_pos++;
-                        }
+                    PyArrayObject* dst = tm->many_from[i].dst;
+                    for (; t < end; t++) {
+                        *t = *(npy_int64*)PyArray_GETPTR1(
+                                array_from,
+                                *(npy_int64*)PyArray_GETPTR1( // DO NOT TEMPLATE (always int64)
+                                        dst,
+                                        dst_pos));
+                        dst_pos++;
                     }
                 }
             }
@@ -6127,42 +6105,63 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
         PyErr_SetString(PyExc_TypeError, "Must provide an array");
         return NULL;
     }
-
     PyArrayObject* array_from = (PyArrayObject*)arg;
     if (!(PyArray_NDIM(array_from) == 1)) {
         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
         return NULL;
     }
-
-    PyArray_Descr* dtype = PyArray_DESCR(array_from);
-    Py_INCREF((PyObject*)dtype);
+    PyArray_Descr* dtype = PyArray_DESCR(array_from); // borowed ref
     npy_intp dims[] = {self->len};
-    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0);
-
+    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // dtype will incref
+    if (array_to == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        return NULL;
+    }
     bool from_src = true;
     AK_TM_transfer(self, from_src, array_from, array_to);
-
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
-    // def map_src_no_fill(self,
-    //         array_from: TNDArrayAny,
-    //         ) -> TNDArrayAny:
-    //     '''Apply all mappings from `array_from` to `array_to`.
-    //     '''
-    //     array_to = np.empty(self._len, dtype=array_from.dtype)
-    //     return self._transfer_from_src(array_from, array_to)
 
-    // def map_src_fill(self,
-    //         array_from: TNDArrayAny,
-    //         fill_value: tp.Any,
-    //         fill_value_dtype: TDtypeAny,
-    //         ) -> TNDArrayAny:
-    //     '''Apply all mappings from `array_from` to `array_to`.
-    //     '''
-    //     resolved_dtype = resolve_dtype(array_from.dtype, fill_value_dtype)
-    //     array_to = np.full(self._len, fill_value, dtype=resolved_dtype)
-    //     return self._transfer_from_src(array_from, array_to)
+
+static PyObject*
+TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
+    PyArrayObject* array_from;
+    PyObject* fill_value;
+    PyArray_Descr* fill_value_dtype;
+
+    if (!PyArg_ParseTuple(args,
+            "O!OO!:map_src_no_fill",
+            &PyArray_Type, &array_from,
+            &fill_value,
+            &PyArrayDescr_Type, &fill_value_dtype
+            )) {
+        return NULL;
+    }
+    if (!(PyArray_NDIM(array_from) == 1)) {
+        PyErr_SetString(PyExc_TypeError, "Array must be 1D");
+        return NULL;
+    }
+
+    // passing a borrowed ref; returns a new ref
+    PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
+    npy_intp dims[] = {self->len};
+    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // dtype will incref
+    Py_DECREF(dtype);
+    if (array_to == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        return NULL;
+    }
+    if (PyArray_FillWithScalar(array_to, fill_value)) {
+        return NULL;
+    }
+    // PyArray_FillObjectArray might be needed
+    bool from_src = true;
+    AK_TM_transfer(self, from_src, array_from, array_to);
+    PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
+    return (PyObject*)array_to;
+}
+
 
 
 static PyMethodDef TriMap_methods[] = {
@@ -6173,7 +6172,7 @@ static PyMethodDef TriMap_methods[] = {
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
     {"map_src_no_fill", (PyCFunction)TriMap_map_src_no_fill, METH_O, NULL},
-
+    {"map_src_fill", (PyCFunction)TriMap_map_src_fill, METH_VARARGS, NULL},
     {NULL},
 };
 

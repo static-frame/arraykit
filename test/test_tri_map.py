@@ -74,13 +74,16 @@ class TestUnit(unittest.TestCase):
 
     def test_tri_map_register_many_a(self) -> None:
         tm = TriMap(100, 50)
-        tm.register_many(3, np.array([2,5,8]))
+        tm.register_many(3, np.array([2,5,8], dtype=np.int64))
 
         with self.assertRaises(TypeError):
             tm.register_many("foo", np.array([2,5,8]))
 
         with self.assertRaises(TypeError):
             tm.register_many(3, [3, 2])
+
+        with self.assertRaises(ValueError):
+            tm.register_many(3, np.array([2,5,8], dtype=np.int32))
 
     def test_tri_map_register_many_b(self) -> None:
         tm = TriMap(100, 50)
@@ -89,13 +92,13 @@ class TestUnit(unittest.TestCase):
 
     def test_tri_map_register_many_c(self) -> None:
         tm = TriMap(100, 50)
-        tm.register_many(3, np.array([2, 5, 8]))
+        tm.register_many(3, np.array([2, 5, 8], dtype=np.int64))
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 3, src_connected: 3, dst_connected: 3, is_many: true)>')
 
     def test_tri_map_register_many_d1(self) -> None:
         tm = TriMap(100, 50)
         for i in range(100):
-            tm.register_many(i, np.array([3, 20], dtype=np.int32))
+            tm.register_many(i, np.array([3, 20], dtype=np.int64))
         self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true)>')
 
     def test_tri_map_register_many_d2(self) -> None:
@@ -112,9 +115,28 @@ class TestUnit(unittest.TestCase):
         tm = TriMap(4, 4)
         tm.register_one(0, -1)
         tm.register_one(1, -1)
-        tm.register_many(2, np.array([0, 1]))
-        tm.register_many(3, np.array([2, 3]))
+        tm.register_many(2, np.array([0, 1], dtype=np.int64))
+        tm.register_many(3, np.array([2, 3], dtype=np.int64))
 
         post = tm.map_src_no_fill(src)
         self.assertFalse(post.flags.writeable)
-        print('post', post)
+        self.assertEqual(post.tolist(), [10, 20, 30, 30, 40, 40])
+        # print('post', post)
+
+
+
+    def test_tri_map_map_src_fill_a(self) -> None:
+        src = np.array([10, 20, 30, 40])
+        dst = np.array([0, 20, 30, 50])
+
+        tm = TriMap(4, 4)
+        tm.register_one(0, -1)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+
+        post = tm.map_src_fill(src, -1, np.dtype(np.int64))
+        self.assertFalse(post.flags.writeable)
+        self.assertEqual(post.tolist(), [10, 20, 30, 40, -1, -1])
+        # import ipdb; ipdb.set_trace()
