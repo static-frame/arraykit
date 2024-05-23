@@ -6141,6 +6141,9 @@ AK_TM_transfer(TriMapObject* tm,
             break;
         }
         case NPY_UNICODE: {
+            if (PyArray_TYPE(array_from) != NPY_UNICODE) {
+                return -1;
+            }
             npy_intp element_size = PyArray_DESCR(array_to)->elsize;
             // get number of UCS4 code points per element
             npy_intp element_cp = element_size / UCS4_SIZE;
@@ -6180,6 +6183,10 @@ AK_TM_transfer(TriMapObject* tm,
             break;
         }
         case NPY_OBJECT: {
+            // array_from must be pre-converted to object; or handle here?
+            if (PyArray_TYPE(array_from) != NPY_OBJECT) {
+                return -1;
+            }
             PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
             PyObject* pyo;
             for (Py_ssize_t i = 0; i < one_count; i++) {
