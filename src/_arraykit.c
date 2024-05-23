@@ -6185,23 +6185,18 @@ AK_TM_transfer(TriMapObject* tm,
     }
 }
 
-
-static PyObject*
-TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
-    if (!PyArray_Check(arg)) {
-        PyErr_SetString(PyExc_TypeError, "Must provide an array");
-        return NULL;
-    }
-    PyArrayObject* array_from = (PyArrayObject*)arg;
+// Returns NULL on error.
+static inline PyObject*
+AK_TM_map_no_fill(TriMapObject* tm,
+        bool from_src,
+        PyArrayObject* array_from) {
     if (!(PyArray_NDIM(array_from) == 1)) {
         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
         return NULL;
     }
-
-    npy_intp dims[] = {self->len};
+    npy_intp dims[] = {tm->len};
     PyArrayObject* array_to;
-    if (PyArray_TYPE(array_from) == NPY_OBJECT) {
-        // initializes values to NULL
+    if (PyArray_TYPE(array_from) == NPY_OBJECT) { // initializes values to NULL
         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
     }
     else {
@@ -6213,27 +6208,40 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    bool from_src = true;
-    AK_TM_transfer(self, from_src, array_from, array_to);
+    AK_TM_transfer(tm, from_src, array_from, array_to);
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
 
-
 static PyObject*
-TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
-    PyArrayObject* array_from;
-    PyObject* fill_value;
-    PyArray_Descr* fill_value_dtype;
-
-    if (!PyArg_ParseTuple(args,
-            "O!OO!:map_src_fill",
-            &PyArray_Type, &array_from,
-            &fill_value,
-            &PyArrayDescr_Type, &fill_value_dtype
-            )) {
+TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
+    if (!PyArray_Check(arg)) {
+        PyErr_SetString(PyExc_TypeError, "Must provide an array");
         return NULL;
     }
+    PyArrayObject* array_from = (PyArrayObject*)arg;
+    bool from_src = true;
+    return AK_TM_map_no_fill(self, from_src, array_from);
+}
+
+static PyObject*
+TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
+    if (!PyArray_Check(arg)) {
+        PyErr_SetString(PyExc_TypeError, "Must provide an array");
+        return NULL;
+    }
+    PyArrayObject* array_from = (PyArrayObject*)arg;
+    bool from_src = false;
+    return AK_TM_map_no_fill(self, from_src, array_from);
+}
+
+// Returns NULL on error.
+static inline PyObject*
+AK_TM_map_fill(TriMapObject* tm,
+        bool from_src,
+        PyArrayObject* array_from,
+        PyObject* fill_value,
+        PyArray_Descr* fill_value_dtype) {
     if (!(PyArray_NDIM(array_from) == 1)) {
         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
         return NULL;
@@ -6241,7 +6249,7 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
     // passing a borrowed ref; returns a new ref
     PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
 
-    npy_intp dims[] = {self->len};
+    npy_intp dims[] = {tm->len};
     PyArrayObject* array_to;
     if (dtype->type_num == NPY_OBJECT) {
         Py_DECREF(dtype); // not needed
@@ -6259,12 +6267,46 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
         Py_DECREF((PyObject*)array_to);
         return NULL;
     }
-    bool from_src = true;
-    AK_TM_transfer(self, from_src, array_from, array_to);
+    AK_TM_transfer(tm, from_src, array_from, array_to);
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
 
+static PyObject*
+TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
+    PyArrayObject* array_from;
+    PyObject* fill_value;
+    PyArray_Descr* fill_value_dtype;
+
+    if (!PyArg_ParseTuple(args,
+            "O!OO!:map_src_fill",
+            &PyArray_Type, &array_from,
+            &fill_value,
+            &PyArrayDescr_Type, &fill_value_dtype
+            )) {
+        return NULL;
+    }
+    bool from_src = true;
+    return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
+}
+
+static PyObject*
+TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
+    PyArrayObject* array_from;
+    PyObject* fill_value;
+    PyArray_Descr* fill_value_dtype;
+
+    if (!PyArg_ParseTuple(args,
+            "O!OO!:map_dst_fill",
+            &PyArray_Type, &array_from,
+            &fill_value,
+            &PyArrayDescr_Type, &fill_value_dtype
+            )) {
+        return NULL;
+    }
+    bool from_src = false;
+    return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
+}
 
 
 static PyMethodDef TriMap_methods[] = {
@@ -6275,7 +6317,9 @@ static PyMethodDef TriMap_methods[] = {
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
     {"map_src_no_fill", (PyCFunction)TriMap_map_src_no_fill, METH_O, NULL},
+    {"map_dst_no_fill", (PyCFunction)TriMap_map_dst_no_fill, METH_O, NULL},
     {"map_src_fill", (PyCFunction)TriMap_map_src_fill, METH_VARARGS, NULL},
+    {"map_dst_fill", (PyCFunction)TriMap_map_dst_fill, METH_VARARGS, NULL},
     {NULL},
 };
 
