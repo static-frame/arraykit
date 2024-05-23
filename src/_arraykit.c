@@ -6227,7 +6227,7 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
     PyArray_Descr* fill_value_dtype;
 
     if (!PyArg_ParseTuple(args,
-            "O!OO!:map_src_no_fill",
+            "O!OO!:map_src_fill",
             &PyArray_Type, &array_from,
             &fill_value,
             &PyArrayDescr_Type, &fill_value_dtype
