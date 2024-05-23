@@ -6136,6 +6136,43 @@ AK_TM_transfer(TriMapObject* tm,
             }
             break;
         }
+        case NPY_OBJECT: {
+            PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
+            for (Py_ssize_t i = 0; i < one_count; i++) {
+                PyObject* pyo = *(PyObject**)PyArray_GETPTR1(
+                        array_from,
+                        one_pairs[i].from);
+                Py_INCREF(pyo);
+                array_to_data[one_pairs[i].to] = pyo;
+            }
+            // npy_int64* t;
+            // npy_int64* t_end;
+            // for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+            //     t = array_to_data + tm->many_to[i].start;
+            //     t_end = array_to_data + tm->many_to[i].stop;
+
+            //     if (from_src) {
+            //         for (; t < t_end; t++) {
+            //             *t = *(npy_int64*)PyArray_GETPTR1(
+            //                     array_from,
+            //                     tm->many_from[i].src);
+            //         }
+            //     }
+            //     else { // from_dst, dst is an array
+            //         npy_intp dst_pos = 0;
+            //         PyArrayObject* dst = tm->many_from[i].dst;
+            //         for (; t < t_end; t++) {
+            //             *t = *(npy_int64*)PyArray_GETPTR1(
+            //                     array_from,
+            //                     *(npy_int64*)PyArray_GETPTR1( // DO NOT TEMPLATE (always int64)
+            //                             dst,
+            //                             dst_pos));
+            //             dst_pos++;
+            //         }
+            //     }
+            // }
+            break;
+        }
     }
 }
 
@@ -6151,12 +6188,18 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
         return NULL;
     }
-    PyArray_Descr* dtype = PyArray_DESCR(array_from); // borowed ref
-    Py_INCREF(dtype);
-    // PyArray_Descr* dtype = PyArray_DescrNew(PyArray_DESCR(array_from));
+
     npy_intp dims[] = {self->len};
-    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // // steals dtype ref
-    // Py_DECREF(dtype); // NOTE: this segfaults
+    PyArrayObject* array_to;
+    if (PyArray_TYPE(array_from) == NPY_OBJECT) {
+        // initializes values to NULL
+        array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    }
+    else {
+        PyArray_Descr* dtype = PyArray_DESCR(array_from); // borowed ref
+        Py_INCREF(dtype);
+        array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+    }
     if (array_to == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
@@ -6189,17 +6232,25 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
 
     // passing a borrowed ref; returns a new ref
     PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
+
     npy_intp dims[] = {self->len};
-    PyArrayObject* array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+    PyArrayObject* array_to;
+    if (dtype->type_num == NPY_OBJECT) {
+        Py_DECREF(dtype); // not needed
+        array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    }
+    else {
+        array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+    }
     if (array_to == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    if (PyArray_FillWithScalar(array_to, fill_value)) {
+    // we assume this increfs object fill_valus correctly
+    if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
         Py_DECREF((PyObject*)array_to);
         return NULL;
     }
-    // PyArray_FillObjectArray might be needed
     bool from_src = true;
     AK_TM_transfer(self, from_src, array_from, array_to);
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
