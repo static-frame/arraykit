@@ -150,7 +150,6 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), ['aaaaa', 'aaaaa', 'bbb', 'bbb'])
 
-
     def test_tri_map_map_src_no_fill_c(self) -> None:
         src = np.array([None, 'bbb', 3, False])
 
@@ -163,6 +162,19 @@ class TestUnit(unittest.TestCase):
         del src
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), [None, 'bbb', 3, False])
+
+    def test_tri_map_map_src_no_fill_d(self) -> None:
+        src = np.array([None, 'bbb', 3, False])
+
+        tm = TriMap(4, 4)
+        tm.register_many(0, np.array([1, 3], dtype=np.int64))
+        tm.register_many(1, np.array([0, 2], dtype=np.int64))
+
+        post = tm.map_src_no_fill(src)
+        del src
+        self.assertFalse(post.flags.writeable)
+        self.assertEqual(post.tolist(), [None, None, 'bbb', 'bbb'])
+
 
     #---------------------------------------------------------------------------
 

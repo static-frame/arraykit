@@ -6145,19 +6145,21 @@ AK_TM_transfer(TriMapObject* tm,
                 Py_INCREF(pyo);
                 array_to_data[one_pairs[i].to] = pyo;
             }
-            // npy_int64* t;
-            // npy_int64* t_end;
-            // for (Py_ssize_t i = 0; i < tm->many_count; i++) {
-            //     t = array_to_data + tm->many_to[i].start;
-            //     t_end = array_to_data + tm->many_to[i].stop;
+            PyObject** t;
+            PyObject** t_end;
+            for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+                t = array_to_data + tm->many_to[i].start;
+                t_end = array_to_data + tm->many_to[i].stop;
 
-            //     if (from_src) {
-            //         for (; t < t_end; t++) {
-            //             *t = *(npy_int64*)PyArray_GETPTR1(
-            //                     array_from,
-            //                     tm->many_from[i].src);
-            //         }
-            //     }
+                if (from_src) {
+                    for (; t < t_end; t++) {
+                        PyObject* pyo = *(PyObject**)PyArray_GETPTR1(
+                                array_from,
+                                tm->many_from[i].src);
+                        Py_INCREF(pyo);
+                        *t = pyo;
+                    }
+                }
             //     else { // from_dst, dst is an array
             //         npy_intp dst_pos = 0;
             //         PyArrayObject* dst = tm->many_from[i].dst;
@@ -6170,7 +6172,7 @@ AK_TM_transfer(TriMapObject* tm,
             //             dst_pos++;
             //         }
             //     }
-            // }
+            }
             break;
         }
     }
