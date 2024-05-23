@@ -6054,8 +6054,47 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 
-// Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `from_dst`. This will not error.
-static inline void
+# define TRANSFER_SCALARS(npy_type_to, npy_type_from) {                                 \
+    npy_type_to* array_to_data = (npy_type_to*)PyArray_DATA(array_to);                  \
+    for (Py_ssize_t i = 0; i < one_count; i++) {                                        \
+        array_to_data[one_pairs[i].to] = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1( \
+                array_from, one_pairs[i].from);                                         \
+    }                                                                                   \
+    npy_type_to* t;                                                                     \
+    npy_type_to* t_end;                                                                 \
+    npy_intp dst_pos;                                                                   \
+    PyArrayObject* dst;                                                                 \
+    for (Py_ssize_t i = 0; i < tm->many_count; i++) {                                   \
+        t = array_to_data + tm->many_to[i].start;                                       \
+        t_end = array_to_data + tm->many_to[i].stop;                                    \
+        if (from_src) {                                                                 \
+            for (; t < t_end; t++) {                                                    \
+                *t = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1(                     \
+                        array_from,                                                     \
+                        tm->many_from[i].src);                                          \
+            }                                                                           \
+        }                                                                               \
+        else {                                                                          \
+            dst_pos = 0;                                                                \
+            dst = tm->many_from[i].dst;                                                 \
+            for (; t < t_end; t++) {                                                    \
+                *t = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1(                     \
+                        array_from,                                                     \
+                        *(npy_int64*)PyArray_GETPTR1(                                   \
+                                dst,                                                    \
+                                dst_pos));                                              \
+                dst_pos++;                                                              \
+            }                                                                           \
+        }                                                                               \
+    }                                                                                   \
+}                                                                                       \
+
+
+
+
+
+// Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error.
+static inline int
 AK_TM_transfer(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
@@ -6064,7 +6103,6 @@ AK_TM_transfer(TriMapObject* tm,
     TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
 
     switch(PyArray_TYPE(array_to)) {
-
         case NPY_INT64: {
             npy_int64* array_to_data = (npy_int64*)PyArray_DATA(array_to); // contiguous
             for (Py_ssize_t i = 0; i < one_count; i++) {
@@ -6099,6 +6137,7 @@ AK_TM_transfer(TriMapObject* tm,
                     }
                 }
             }
+            // TRANSFER_SCALARS(npy_int64, npy_int64);
             break;
         }
         case NPY_UNICODE: {
@@ -6182,7 +6221,10 @@ AK_TM_transfer(TriMapObject* tm,
             }
             break;
         }
+        default:
+            return -1;
     }
+    return 0;
 }
 
 // Returns NULL on error.
@@ -6208,7 +6250,10 @@ AK_TM_map_no_fill(TriMapObject* tm,
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    AK_TM_transfer(tm, from_src, array_from, array_to);
+    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
+        Py_DECREF((PyObject*)array_to);
+        return NULL;
+    }
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
@@ -6267,7 +6312,10 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_to);
         return NULL;
     }
-    AK_TM_transfer(tm, from_src, array_from, array_to);
+    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
+        Py_DECREF((PyObject*)array_to);
+        return NULL;
+    }
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
