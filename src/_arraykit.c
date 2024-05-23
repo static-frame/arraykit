@@ -6238,7 +6238,6 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
         return NULL;
     }
-
     // passing a borrowed ref; returns a new ref
     PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
 
