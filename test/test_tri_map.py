@@ -194,9 +194,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post.tolist(), [10, 20, 30, 40, -1, -1])
 
 
-    def test_tri_map_map_src_fill_a(self) -> None:
+    def test_tri_map_map_src_fill_b(self) -> None:
         src = np.array(['aa', 'bbbbb', 'ccc', 'dddd'])
-        dst = np.array(['', 'bbbbb', 'ccc', ''])
 
         tm = TriMap(4, 4)
         tm.register_one(0, -1)
@@ -208,3 +207,17 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_fill(src, 'na', np.dtype(str))
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), ['aa', 'bbbbb', 'ccc', 'dddd', 'na', 'na'])
+
+    def test_tri_map_map_src_fill_c(self) -> None:
+        src = np.array(['aa', None, False, 300000000000000000000])
+
+        tm = TriMap(4, 4)
+        tm.register_one(0, -1)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+
+        post = tm.map_src_fill(src, 'na', np.dtype(str))
+        self.assertFalse(post.flags.writeable)
+        self.assertEqual(post.tolist(), ['aa', None, False, 300000000000000000000, 'na', 'na'])

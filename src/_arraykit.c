@@ -6073,6 +6073,8 @@ AK_TM_transfer(TriMapObject* tm,
             }
             npy_int64* t;
             npy_int64* t_end;
+            npy_intp dst_pos;
+            PyArrayObject* dst;
             for (Py_ssize_t i = 0; i < tm->many_count; i++) {
                 t = array_to_data + tm->many_to[i].start;
                 t_end = array_to_data + tm->many_to[i].stop;
@@ -6085,8 +6087,8 @@ AK_TM_transfer(TriMapObject* tm,
                     }
                 }
                 else { // from_dst, dst is an array
-                    npy_intp dst_pos = 0;
-                    PyArrayObject* dst = tm->many_from[i].dst;
+                    dst_pos = 0; // DO NOT TEMPLATE
+                    dst = tm->many_from[i].dst;
                     for (; t < t_end; t++) {
                         *t = *(npy_int64*)PyArray_GETPTR1(
                                 array_from,
@@ -6107,6 +6109,9 @@ AK_TM_transfer(TriMapObject* tm,
             Py_UCS4* f;
             Py_UCS4* t;
             Py_UCS4* t_end;
+            npy_intp dst_pos;
+            npy_int64 f_pos;
+            PyArrayObject* dst;
             for (Py_ssize_t i = 0; i < one_count; i++) {
                 f = (Py_UCS4*)PyArray_GETPTR1(array_from, one_pairs[i].from);
                 t = array_to_data + element_cp * one_pairs[i].to;
@@ -6123,9 +6128,8 @@ AK_TM_transfer(TriMapObject* tm,
                     }
                 }
                 else { // from_dst, dst is an array
-                    npy_intp dst_pos = 0;
-                    PyArrayObject* dst = tm->many_from[i].dst;
-                    npy_int64 f_pos;
+                    dst_pos = 0;
+                    dst = tm->many_from[i].dst;
                     for (; t < t_end; t += element_cp) {
                         f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos); // DO NOT TEMPLATE
                         f = (Py_UCS4*)PyArray_GETPTR1(array_from, f_pos);
@@ -6138,40 +6142,43 @@ AK_TM_transfer(TriMapObject* tm,
         }
         case NPY_OBJECT: {
             PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
+            PyObject* pyo;
             for (Py_ssize_t i = 0; i < one_count; i++) {
-                PyObject* pyo = *(PyObject**)PyArray_GETPTR1(
-                        array_from,
-                        one_pairs[i].from);
+                pyo = *(PyObject**)PyArray_GETPTR1(array_from, one_pairs[i].from);
                 Py_INCREF(pyo);
                 array_to_data[one_pairs[i].to] = pyo;
             }
             PyObject** t;
             PyObject** t_end;
+            npy_intp dst_pos;
+            PyArrayObject* dst;
             for (Py_ssize_t i = 0; i < tm->many_count; i++) {
                 t = array_to_data + tm->many_to[i].start;
                 t_end = array_to_data + tm->many_to[i].stop;
 
                 if (from_src) {
+                    pyo = *(PyObject**)PyArray_GETPTR1(
+                            array_from,
+                            tm->many_from[i].src);
                     for (; t < t_end; t++) {
-                        PyObject* pyo = *(PyObject**)PyArray_GETPTR1(
-                                array_from,
-                                tm->many_from[i].src);
                         Py_INCREF(pyo);
                         *t = pyo;
                     }
                 }
-            //     else { // from_dst, dst is an array
-            //         npy_intp dst_pos = 0;
-            //         PyArrayObject* dst = tm->many_from[i].dst;
-            //         for (; t < t_end; t++) {
-            //             *t = *(npy_int64*)PyArray_GETPTR1(
-            //                     array_from,
-            //                     *(npy_int64*)PyArray_GETPTR1( // DO NOT TEMPLATE (always int64)
-            //                             dst,
-            //                             dst_pos));
-            //             dst_pos++;
-            //         }
-            //     }
+                else { // from_dst, dst is an array
+                    dst_pos = 0;
+                    dst = tm->many_from[i].dst;
+                    for (; t < t_end; t++) {
+                        pyo = *(PyObject**)PyArray_GETPTR1(
+                                array_from,
+                                *(npy_int64*)PyArray_GETPTR1(
+                                        dst,
+                                        dst_pos));
+                        Py_INCREF(pyo);
+                        *t = pyo;
+                        dst_pos++;
+                    }
+                }
             }
             break;
         }
