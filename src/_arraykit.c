@@ -6180,14 +6180,18 @@ AK_TM_transfer(TriMapObject* tm,
         }
         case NPY_OBJECT: {
             // array_from must be pre-converted to object; or handle here?
-            if (PyArray_TYPE(array_from) != NPY_OBJECT) {
-                return -1;
-            }
+            bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
             PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
             PyObject* pyo;
             for (Py_ssize_t i = 0; i < one_count; i++) {
-                pyo = *(PyObject**)PyArray_GETPTR1(array_from, one_pairs[i].from);
-                Py_INCREF(pyo);
+                void* f = PyArray_GETPTR1(array_from, one_pairs[i].from);
+                if (f_is_obj) {
+                    pyo = *(PyObject**)f;
+                    Py_INCREF(pyo);
+                }
+                else {
+                    pyo = PyArray_GETITEM(array_from, f);
+                }
                 array_to_data[one_pairs[i].to] = pyo;
             }
             PyObject** t;
