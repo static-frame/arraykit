@@ -3503,6 +3503,24 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
     return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
+// JTODO: here
+// Reshape if necessary a row that might be 2D or 1D is returned as a 1D array.
+static PyObject *
+array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a); // JTODO: should we allow 1D arrays?
+    PyArrayObject *array = (PyArrayObject *)a;
+
+    if (PyArray_NDIM(array) == 2) {
+        npy_intp dim[1] = {PyArray_DIM(array, 1)};
+        PyArray_Dims shape = {dim, 1};
+        // NOTE: this will set PyErr if shape is not compatible
+        return PyArray_Newshape(array, &shape, NPY_ANYORDER);
+    }
+    Py_INCREF(a);
+    return a;
+}
+
 //------------------------------------------------------------------------------
 // type resolution
 
@@ -5943,6 +5961,7 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"array2d_to_array1d", array2d_to_array1d, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"first_true_1d",

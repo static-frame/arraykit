@@ -22,6 +22,7 @@ from arraykit import count_iteration
 from arraykit import first_true_1d
 from arraykit import first_true_2d
 from arraykit import slice_to_ascending_slice
+from arraykit import array2d_to_array1d
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -282,6 +283,13 @@ class TestUnit(unittest.TestCase):
         a1 = np.arange(10)
         with self.assertRaises(TypeError):
             a2 = array_deepcopy(a1, ())
+
+    #---------------------------------------------------------------------------
+    def test_array2d_to_array1d_a(self) -> None:
+        a1 = np.arange(10)
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(mloc(a1), mloc(a2))
+
 
     #---------------------------------------------------------------------------
 
