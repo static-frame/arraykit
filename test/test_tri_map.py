@@ -271,8 +271,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post_dst.tolist(), ['a', 'bbb', 'cc', 'cc', 'dddd', 'a'])
 
     def test_tri_map_map_c(self) -> None:
-        src = np.array([0, 200, 300, 400, 0])
-        dst = np.array([300, 400, 0, 200, 300])
+        src = np.array([0, 200, 300, 400, 0], dtype=np.int64)
+        dst = np.array([300, 400, 0, 200, 300], dtype=np.int64)
 
         tm = TriMap(len(src), len(dst))
         tm.register_one(0, 2)
@@ -293,8 +293,8 @@ class TestUnit(unittest.TestCase):
 
 
     def test_tri_map_map_d(self) -> None:
-        src = np.array([0, 200, 300, 300, 0])
-        dst = np.array([300, 200, 300, 200, 300, -1, -1])
+        src = np.array([0, 200, 300, 300, 0], dtype=np.int64)
+        dst = np.array([300, 200, 300, 200, 300, -1, -1], dtype=np.int64)
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(1, np.array([1, 3], dtype=np.dtype(np.int64)))
@@ -315,8 +315,8 @@ class TestUnit(unittest.TestCase):
 
 
     def test_tri_map_map_e(self) -> None:
-        src = np.array([0, 200, 300, 5, 0])
-        dst = np.array([-1, 200, 300, 200, 300, -1, -1])
+        src = np.array([0, 200, 300, 5, 0], dtype=np.int64)
+        dst = np.array([-1, 200, 300, 200, 300, -1, -1], dtype=np.int64)
 
         # full outer
         tm = TriMap(len(src), len(dst))
@@ -327,12 +327,12 @@ class TestUnit(unittest.TestCase):
         tm.register_one(4, -1)
         tm.register_unmatched_dst()
 
-        post_src = tm.map_src_fill(src, -20, np.dtype(int))
+        post_src = tm.map_src_fill(src, -20, np.dtype(np.int64))
         del src
         self.assertFalse(post_src.flags.writeable)
         self.assertEqual(post_src.tolist(), [0, 200, 200, 300, 300, 5, 0, -20, -20, -20])
 
-        post_dst = tm.map_dst_fill(dst, -20, np.dtype(int))
+        post_dst = tm.map_dst_fill(dst, -20, np.dtype(np.int64))
         del dst
         self.assertFalse(post_dst.flags.writeable)
         self.assertEqual(post_dst.tolist(), [-20, 200, 200, 300, 300, -20, -20, -1, -1, -1])
