@@ -337,3 +337,25 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(post_dst.flags.writeable)
         self.assertEqual(post_dst.tolist(), [-20, 200, 200, 300, 300, -20, -20, -1, -1, -1])
 
+
+    def test_tri_map_map_src_fill_c(self) -> None:
+        src = np.array([0, 200, 300], dtype=np.int64)
+        dst = np.array([-1, 400, 200], dtype=np.int64)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_one(1, 2)
+        tm.register_one(2, -1)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, None, np.dtype(np.object_))
+        del src
+        self.assertFalse(post_src.flags.writeable)
+        self.assertEqual(post_src.tolist(), [0, 200, 300, None, None])
+
+        post_dst = tm.map_dst_fill(dst, None, np.dtype(np.object_))
+        del dst
+        self.assertFalse(post_dst.flags.writeable)
+        self.assertEqual(post_dst.tolist(), [None, 200, None, -1, 400])
+
