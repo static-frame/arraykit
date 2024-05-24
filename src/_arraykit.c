@@ -6207,16 +6207,18 @@ AK_TM_transfer(TriMapObject* tm,
 
                 if (from_src) {
                     f = PyArray_GETPTR1(array_from, tm->many_from[i].src);
+                    if (f_is_obj) {
+                        pyo = *(PyObject**)f;
+                        Py_INCREF(pyo); // pre add new ref so equal to PyArray_GETITEM
+                    }
+                    else {
+                        pyo = PyArray_GETITEM(array_from, f); // given a new ref
+                    }
                     for (; t < t_end; t++) {
-                        if (f_is_obj) {
-                            pyo = *(PyObject**)f;
-                            Py_INCREF(pyo);
-                        }
-                        else {
-                            pyo = PyArray_GETITEM(array_from, f);
-                        }
+                        Py_INCREF(pyo); // one more than we need
                         *t = pyo;
                     }
+                    Py_DECREF(pyo); // remove the extra one
                 }
                 else { // from_dst, dst is an array
                     dst_pos = 0;

@@ -338,7 +338,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post_dst.tolist(), [-20, 200, 200, 300, 300, -20, -20, -1, -1, -1])
 
 
-    def test_tri_map_map_src_fill_c(self) -> None:
+    def test_tri_map_map_f(self) -> None:
         src = np.array([0, 200, 300], dtype=np.int64)
         dst = np.array([-1, 400, 200], dtype=np.int64)
 
@@ -358,4 +358,29 @@ class TestUnit(unittest.TestCase):
         del dst
         self.assertFalse(post_dst.flags.writeable)
         self.assertEqual(post_dst.tolist(), [None, 200, None, -1, 400])
+
+
+    def test_tri_map_map_f(self) -> None:
+        src = np.array([0, 20000, 300], dtype=np.int64)
+        dst = np.array([-1, 20000, 20000, 20000], dtype=np.int64)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+        tm.register_one(2, -1)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, None, np.dtype(np.object_))
+        del src
+        self.assertFalse(post_src.flags.writeable)
+        self.assertEqual(post_src.tolist(), [0, 20000, 20000, 20000, 300, None])
+        # we reuse the same instance
+        self.assertEqual(id(post_src[1]), id(post_src[2]))
+        self.assertEqual(id(post_src[1]), id(post_src[3]))
+
+        post_dst = tm.map_dst_fill(dst, None, np.dtype(np.object_))
+        del dst
+        self.assertFalse(post_dst.flags.writeable)
+        self.assertEqual(post_dst.tolist(), [None, 20000, 20000, 20000, None, -1])
 
