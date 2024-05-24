@@ -6183,8 +6183,9 @@ AK_TM_transfer(TriMapObject* tm,
             bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
             PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
             PyObject* pyo;
+            void* f;
             for (Py_ssize_t i = 0; i < one_count; i++) {
-                void* f = PyArray_GETPTR1(array_from, one_pairs[i].from);
+                f = PyArray_GETPTR1(array_from, one_pairs[i].from);
                 if (f_is_obj) {
                     pyo = *(PyObject**)f;
                     Py_INCREF(pyo);
@@ -6197,17 +6198,22 @@ AK_TM_transfer(TriMapObject* tm,
             PyObject** t;
             PyObject** t_end;
             npy_intp dst_pos;
+            npy_int64 f_pos;
             PyArrayObject* dst;
             for (Py_ssize_t i = 0; i < tm->many_count; i++) {
                 t = array_to_data + tm->many_to[i].start;
                 t_end = array_to_data + tm->many_to[i].stop;
 
                 if (from_src) {
-                    pyo = *(PyObject**)PyArray_GETPTR1(
-                            array_from,
-                            tm->many_from[i].src);
+                    f = PyArray_GETPTR1(array_from, tm->many_from[i].src);
                     for (; t < t_end; t++) {
-                        Py_INCREF(pyo);
+                        if (f_is_obj) {
+                            pyo = *(PyObject**)f;
+                            Py_INCREF(pyo);
+                        }
+                        else {
+                            pyo = PyArray_GETITEM(array_from, f);
+                        }
                         *t = pyo;
                     }
                 }
@@ -6215,12 +6221,15 @@ AK_TM_transfer(TriMapObject* tm,
                     dst_pos = 0;
                     dst = tm->many_from[i].dst;
                     for (; t < t_end; t++) {
-                        pyo = *(PyObject**)PyArray_GETPTR1(
-                                array_from,
-                                *(npy_int64*)PyArray_GETPTR1(
-                                        dst,
-                                        dst_pos));
-                        Py_INCREF(pyo);
+                        f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
+                        f = PyArray_GETPTR1(array_from, f_pos);
+                        if (f_is_obj) {
+                            pyo = *(PyObject**)f;
+                            Py_INCREF(pyo);
+                        }
+                        else {
+                            pyo = PyArray_GETITEM(array_from, f);
+                        }
                         *t = pyo;
                         dst_pos++;
                     }
