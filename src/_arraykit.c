@@ -6120,16 +6120,16 @@ AK_TM_transfer(TriMapObject* tm,
                 t_end = array_to_data + tm->many_to[i].stop;
                 if (from_src) {
                     f = *(npy_int64*)PyArray_GETPTR1(array_from, tm->many_from[i].src);
-                    for (; t < t_end; t++) {
-                        *t = f;
+                    while (t < t_end) {
+                        *t++ = f;
                     }
                 }
                 else { // from_dst, dst is an array
                     dst_pos = 0;
                     dst = tm->many_from[i].dst; // array of int64
-                    for (; t < t_end; t++) {
+                    while (t < t_end) {
                         f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
-                        *t = *(npy_int64*)PyArray_GETPTR1(array_from, f_pos);
+                        *t++ = *(npy_int64*)PyArray_GETPTR1(array_from, f_pos);
                         dst_pos++;
                     }
                 }
@@ -6214,16 +6214,16 @@ AK_TM_transfer(TriMapObject* tm,
                     else {
                         pyo = PyArray_GETITEM(array_from, f); // given a new ref
                     }
-                    for (; t < t_end; t++) {
+                    while (t < t_end) {
                         Py_INCREF(pyo); // one more than we need
-                        *t = pyo;
+                        *t++ = pyo;
                     }
                     Py_DECREF(pyo); // remove the extra one
                 }
                 else { // from_dst, dst is an array
                     dst_pos = 0;
                     dst = tm->many_from[i].dst;
-                    for (; t < t_end; t++) {
+                    while (t < t_end) {
                         f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
                         f = PyArray_GETPTR1(array_from, f_pos);
                         if (f_is_obj) {
@@ -6233,7 +6233,7 @@ AK_TM_transfer(TriMapObject* tm,
                         else {
                             pyo = PyArray_GETITEM(array_from, f);
                         }
-                        *t = pyo;
+                        *t++ = pyo;
                         dst_pos++;
                     }
                 }
