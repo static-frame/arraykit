@@ -35,6 +35,18 @@
         }                                                 \
     } while (0)
 
+// Given a PyObject, raise if not an array or is not two dimensional.
+# define AK_CHECK_NUMPY_ARRAY_2D(O)                       \
+    do {                                                  \
+        AK_CHECK_NUMPY_ARRAY(O)                           \
+        int ndim = PyArray_NDIM((PyArrayObject *)O);      \
+        if (ndim != 2) {                                  \
+            return PyErr_Format(PyExc_NotImplementedError,\
+                    "Expected a 2D array, not %i.",       \
+                    ndim);                                \
+        }                                                 \
+    } while (0)
+
 // Placeholder of not implemented pathways / debugging.
 # define AK_NOT_IMPLEMENTED(msg)                        \
     do {                                                \
@@ -3508,17 +3520,45 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 static PyObject *
 array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY_1D_2D(a); // JTODO: should we allow 1D arrays?
-    PyArrayObject *array = (PyArrayObject *)a;
+    AK_CHECK_NUMPY_ARRAY_2D(a); // JTODO: should we allow 1D arrays?
+    PyArrayObject *input_array = (PyArrayObject *)a;
+    
+    // get array dimensions
+    npy_intp num_rows = PyArray_DIM(input_array, 0);
+    npy_intp num_cols = PyArray_DIM(input_array, 1);
 
-    if (PyArray_NDIM(array) == 2) {
-        npy_intp dim[1] = {PyArray_DIM(array, 1)};
-        PyArray_Dims shape = {dim, 1};
-        // NOTE: this will set PyErr if shape is not compatible
-        return PyArray_Newshape(array, &shape, NPY_ANYORDER);
+    // create output array
+    npy_intp dims[1] = {num_rows};
+    PyObject* output_array = PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    if (!output_array) {
+        return NULL; // JTODO: check if this is the correct error handling
     }
-    Py_INCREF(a);
-    return a;
+
+    for (npy_intp i = 0; i < num_rows; ++i) {
+        PyObject* tuple = PyTuple_New(num_cols);
+        if (!tuple) {
+            Py_DECREF(output_array);
+            return NULL;
+        }
+
+        for (npy_intp j = 0; j < num_cols; ++j) {
+            PyObject* item = PyArray_GETITEM(input_array, PyArray_GETPTR2(input_array, i, j));
+            if (!item) {
+                Py_DECREF(tuple);
+                Py_DECREF(output_array);
+                return NULL;
+            }
+            PyTuple_SET_ITEM(tuple, j, item);
+        }
+
+        PyArray_SETITEM((PyArrayObject*)output_array, PyArray_GETPTR1((PyArrayObject*)output_array, i), tuple);
+        Py_DECREF(tuple); // JTODO: check
+    }
+
+    PyArray_CLEARFLAGS((PyArrayObject *)output_array, NPY_ARRAY_WRITEABLE);
+
+    // Py_INCREF(a); // JTODO: check if this is necessary
+    return output_array;
 }
 
 //------------------------------------------------------------------------------

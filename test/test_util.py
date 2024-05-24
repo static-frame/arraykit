@@ -285,10 +285,28 @@ class TestUnit(unittest.TestCase):
             a2 = array_deepcopy(a1, ())
 
     #---------------------------------------------------------------------------
-    def test_array2d_to_array1d_a(self) -> None:
+    def test_array2d_to_array1d_dummy(self) -> None:
+        # JTODO: remove
         a1 = np.arange(10)
-        a2 = array2d_to_array1d(a1)
-        self.assertEqual(mloc(a1), mloc(a2))
+        with self.assertRaises(NotImplementedError):
+            # 1 dimensional
+            _ = array2d_to_array1d(a1)
+
+    def test_array2d_to_array1d_b(self) -> None:
+        # def py_array2d_to_array1d(array: np.ndarray) -> np.ndarray:
+        #     post: np.ndarray = np.empty(array.shape[0], dtype=object)
+        #     for i, row in enumerate(array):
+        #         post[i] = tuple(row)
+        #     post.flags.writeable = False
+        #     return post
+
+        a1 = np.arange(10).reshape(5, 2)
+
+        result = array2d_to_array1d(a1)
+        assert isinstance(result[0], tuple)
+        assert result[0] == (0, 1)
+        assert tuple(result) == ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9))
+        
 
 
     #---------------------------------------------------------------------------
