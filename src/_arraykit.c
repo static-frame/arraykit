@@ -6089,7 +6089,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }                                                                                       \
 
 
-#define TO_TYPE_PAIR(e1, e2) ((e1 << 8) | e2)
+// #define TO_TYPE_PAIR(e1, e2) ((e1 << 8) | e2)
 
 // Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error.
 static inline int
@@ -6100,76 +6100,97 @@ AK_TM_transfer(TriMapObject* tm,
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
     TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
 
-    switch(TO_TYPE_PAIR(PyArray_TYPE(array_to), PyArray_TYPE(array_from))) {
-        // bool; bool and anything else resolves to object
-        case TO_TYPE_PAIR(NPY_BOOL, NPY_BOOL):
+    switch(PyArray_TYPE(array_to)){
+        case NPY_BOOL:
             TRANSFER_SCALARS(npy_bool, npy_bool); // to, from
             break;
-        // ints-ints
-        case TO_TYPE_PAIR(NPY_INT64, NPY_INT64):
-            TRANSFER_SCALARS(npy_int64, npy_int64); // to, from
+        case NPY_INT64:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_INT64:
+                    TRANSFER_SCALARS(npy_int64, npy_int64); // to, from
+                    break;
+                case NPY_INT32:
+                    TRANSFER_SCALARS(npy_int64, npy_int32); // to, from
+                    break;
+                case NPY_INT16:
+                    TRANSFER_SCALARS(npy_int64, npy_int16); // to, from
+                    break;
+                case NPY_INT8:
+                    TRANSFER_SCALARS(npy_int64, npy_int8); // to, from
+                    break;
+            }
             break;
-        case TO_TYPE_PAIR(NPY_INT64, NPY_INT32):
-            TRANSFER_SCALARS(npy_int64, npy_int32);
+        case NPY_INT32:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_INT32:
+                    TRANSFER_SCALARS(npy_int32, npy_int32); // to, from
+                    break;
+                case NPY_INT16:
+                    TRANSFER_SCALARS(npy_int32, npy_int16); // to, from
+                    break;
+                case NPY_INT8:
+                    TRANSFER_SCALARS(npy_int32, npy_int8); // to, from
+                    break;
+            }
             break;
-        case TO_TYPE_PAIR(NPY_INT64, NPY_INT16):
-            TRANSFER_SCALARS(npy_int64, npy_int16);
+        case NPY_INT16:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_INT16:
+                    TRANSFER_SCALARS(npy_int16, npy_int16); // to, from
+                    break;
+                case NPY_INT8:
+                    TRANSFER_SCALARS(npy_int16, npy_int8); // to, from
+                    break;
+            }
             break;
-        case TO_TYPE_PAIR(NPY_INT64, NPY_INT8):
-            TRANSFER_SCALARS(npy_int64, npy_int8);
+        case NPY_INT8:
+            TRANSFER_SCALARS(npy_int8, npy_int8); // to, from
             break;
-        case TO_TYPE_PAIR(NPY_INT32, NPY_INT32):
-            TRANSFER_SCALARS(npy_int32, npy_int32);
+        case NPY_UINT64:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_UINT64:
+                    TRANSFER_SCALARS(npy_uint64, npy_uint64); // to, from
+                    break;
+                case NPY_UINT32:
+                    TRANSFER_SCALARS(npy_uint64, npy_uint32); // to, from
+                    break;
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_uint64, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_uint64, npy_uint8); // to, from
+                    break;
+            }
             break;
-        case TO_TYPE_PAIR(NPY_INT32, NPY_INT16):
-            TRANSFER_SCALARS(npy_int32, npy_int16);
+        case NPY_UINT32:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_UINT32:
+                    TRANSFER_SCALARS(npy_uint32, npy_uint32); // to, from
+                    break;
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_uint32, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_uint32, npy_uint8); // to, from
+                    break;
+            }
             break;
-        case TO_TYPE_PAIR(NPY_INT32, NPY_INT8):
-            TRANSFER_SCALARS(npy_int32, npy_int8);
+        case NPY_UINT16:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_uint16, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_uint16, npy_uint8); // to, from
+                    break;
+            }
             break;
-        case TO_TYPE_PAIR(NPY_INT16, NPY_INT16):
-            TRANSFER_SCALARS(npy_int16, npy_int16);
-            break;
-        case TO_TYPE_PAIR(NPY_INT16, NPY_INT8):
-            TRANSFER_SCALARS(npy_int16, npy_int8);
-            break;
-        case TO_TYPE_PAIR(NPY_INT8, NPY_INT8):
-            TRANSFER_SCALARS(npy_int8, npy_int8);
-            break;
-        // uints-uints
-        case TO_TYPE_PAIR(NPY_UINT64, NPY_UINT64):
-            TRANSFER_SCALARS(npy_uint64, npy_uint64); // to, from
-            break;
-        case TO_TYPE_PAIR(NPY_UINT64, NPY_UINT32):
-            TRANSFER_SCALARS(npy_uint64, npy_uint32);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT64, NPY_UINT16):
-            TRANSFER_SCALARS(npy_uint64, npy_uint16);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT64, NPY_UINT8):
-            TRANSFER_SCALARS(npy_uint64, npy_uint8);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT32, NPY_UINT32):
-            TRANSFER_SCALARS(npy_uint32, npy_uint32);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT32, NPY_UINT16):
-            TRANSFER_SCALARS(npy_uint32, npy_uint16);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT32, NPY_UINT8):
-            TRANSFER_SCALARS(npy_uint32, npy_uint8);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT16, NPY_UINT16):
-            TRANSFER_SCALARS(npy_uint16, npy_uint16);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT16, NPY_UINT8):
-            TRANSFER_SCALARS(npy_uint16, npy_uint8);
-            break;
-        case TO_TYPE_PAIR(NPY_UINT8, NPY_UINT8):
-            TRANSFER_SCALARS(npy_uint8, npy_uint8);
+        case NPY_UINT8:
+            TRANSFER_SCALARS(npy_uint8, npy_uint8); // to, from
             break;
 
         // unicode
-        case TO_TYPE_PAIR(NPY_UNICODE, NPY_UNICODE): {
+        case NPY_UNICODE: {
             if (PyArray_TYPE(array_from) != NPY_UNICODE) {
                 return -1;
             }
@@ -6212,17 +6233,7 @@ AK_TM_transfer(TriMapObject* tm,
             break;
         }
         // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
-        // case NPY_OBJECT: {
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_BOOL):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_UINT8):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_UINT16):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_UINT32):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_UINT64):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_INT8):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_INT16):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_INT32):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_INT64):
-        case TO_TYPE_PAIR(NPY_OBJECT, NPY_OBJECT): {
+        case NPY_OBJECT: {
             bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
             PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
             PyObject* pyo;
