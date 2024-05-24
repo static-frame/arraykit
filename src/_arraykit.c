@@ -6112,7 +6112,8 @@ AK_TM_transfer(TriMapObject* tm,
             npy_int64* t;
             npy_int64* t_end;
             npy_int64 f;
-            npy_intp dst_pos;
+            npy_int64 f_pos; // DO NOT TEMPLATE
+            npy_intp dst_pos; // DO NOT TEMPLATE
             PyArrayObject* dst;
             for (Py_ssize_t i = 0; i < tm->many_count; i++) {
                 t = array_to_data + tm->many_to[i].start;
@@ -6124,10 +6125,10 @@ AK_TM_transfer(TriMapObject* tm,
                     }
                 }
                 else { // from_dst, dst is an array
-                    dst_pos = 0; // DO NOT TEMPLATE
+                    dst_pos = 0;
                     dst = tm->many_from[i].dst; // array of int64
                     for (; t < t_end; t++) {
-                        npy_int64 f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
+                        f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
                         *t = *(npy_int64*)PyArray_GETPTR1(array_from, f_pos);
                         dst_pos++;
                     }
