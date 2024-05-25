@@ -6241,7 +6241,6 @@ AK_TM_transfer(TriMapObject* tm,
         case NPY_UINT8:
             TRANSFER_SCALARS(npy_uint8, npy_uint8); // to, from
             break;
-
         case NPY_FLOAT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT64:
@@ -6279,7 +6278,6 @@ AK_TM_transfer(TriMapObject* tm,
                     break;
             }
             break;
-
         case NPY_FLOAT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT32:
@@ -6302,7 +6300,6 @@ AK_TM_transfer(TriMapObject* tm,
                     break;
             }
             break;
-
         case NPY_FLOAT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT16:
@@ -6319,85 +6316,6 @@ AK_TM_transfer(TriMapObject* tm,
                     break;
             }
             break;
-
-        // NOTE: full support for scalar to complex requires assigning within complex struct
-        case NPY_COMPLEX128:
-            switch (PyArray_TYPE(array_from)) {
-                case NPY_COMPLEX128:
-                    TRANSFER_SCALARS(npy_complex128, npy_complex128); // to, from
-                    break;
-                // case NPY_COMPLEX64:
-                //     TRANSFER_SCALARS(npy_complex128, npy_complex64); // to, from
-                //     break;
-                // case NPY_FLOAT64:
-                //     TRANSFER_SCALARS(npy_complex128, npy_float64); // to, from
-                //     break;
-                // case NPY_FLOAT32:
-                //     TRANSFER_SCALARS(npy_complex128, npy_float32); // to, from
-                //     break;
-                // case NPY_FLOAT16:
-                //     TRANSFER_SCALARS(npy_complex128, npy_float16); // to, from
-                //     break;
-                // case NPY_INT64:
-                //     TRANSFER_SCALARS(npy_complex128, npy_int64); // to, from
-                //     break;
-                // case NPY_INT32:
-                //     TRANSFER_SCALARS(npy_complex128, npy_int32); // to, from
-                //     break;
-                // case NPY_INT16:
-                //     TRANSFER_SCALARS(npy_complex128, npy_int16); // to, from
-                //     break;
-                // case NPY_INT8:
-                //     TRANSFER_SCALARS(npy_complex128, npy_int8); // to, from
-                //     break;
-                // case NPY_UINT64:
-                //     TRANSFER_SCALARS(npy_complex128, npy_uint64); // to, from
-                //     break;
-                // case NPY_UINT32:
-                //     TRANSFER_SCALARS(npy_complex128, npy_uint32); // to, from
-                //     break;
-                // case NPY_UINT16:
-                //     TRANSFER_SCALARS(npy_complex128, npy_uint16); // to, from
-                //     break;
-                // case NPY_UINT8:
-                //     TRANSFER_SCALARS(npy_complex128, npy_uint8); // to, from
-                //     break;
-            }
-            break;
-
-        case NPY_COMPLEX64:
-            switch (PyArray_TYPE(array_from)) {
-                case NPY_COMPLEX64:
-                    TRANSFER_SCALARS(npy_complex64, npy_complex64); // to, from
-                    break;
-                // case NPY_FLOAT32:
-                //     TRANSFER_SCALARS(npy_complex64, npy_float32); // to, from
-                //     break;
-                // case NPY_FLOAT16:
-                //     TRANSFER_SCALARS(npy_complex64, npy_float16); // to, from
-                //     break;
-                // case NPY_INT32:
-                //     TRANSFER_SCALARS(npy_complex64, npy_int32); // to, from
-                //     break;
-                // case NPY_INT16:
-                //     TRANSFER_SCALARS(npy_complex64, npy_int16); // to, from
-                //     break;
-                // case NPY_INT8:
-                //     TRANSFER_SCALARS(npy_complex64, npy_int8); // to, from
-                //     break;
-                // case NPY_UINT32:
-                //     TRANSFER_SCALARS(npy_complex64, npy_uint32); // to, from
-                //     break;
-                // case NPY_UINT16:
-                //     TRANSFER_SCALARS(npy_complex64, npy_uint16); // to, from
-                //     break;
-                // case NPY_UINT8:
-                //     TRANSFER_SCALARS(npy_complex64, npy_uint8); // to, from
-                //     break;
-            }
-            break;
-
-        // unicode
         case NPY_UNICODE: {
             TRANSFER_FLEXIBLE(Py_UCS4);
             break;
@@ -6468,6 +6386,8 @@ AK_TM_transfer(TriMapObject* tm,
             break;
         }
         default:
+            // NOTE: full support for scalar to complex requires assigning within complex struct
+            // better to use PyArray_CastToType
             PyErr_SetString(PyExc_TypeError, "No handling for types");
             return -1;
     }
