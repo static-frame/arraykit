@@ -6131,6 +6131,12 @@ AK_TM_transfer(TriMapObject* tm,
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_int32, npy_int8); // to, from
                     break;
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_int32, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_int32, npy_uint8); // to, from
+                    break;
             }
             break;
         case NPY_INT16:
