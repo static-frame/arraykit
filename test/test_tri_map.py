@@ -884,3 +884,20 @@ class TestUnit(unittest.TestCase):
         post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.uint8))
         self.assertEqual(post_dst.dtype, np.dtype(np.float16))
         self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_bytes_a(self) -> None:
+        src = np.array(['a', 'bbb', 'cc', 'dddd', 'a'], dtype=np.bytes_)
+        dst = np.array(['cc', 'dddd', 'a', 'bbb', 'cc'], dtype=np.bytes_)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, 2)
+        tm.register_one(1, 3)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, 1)
+        tm.register_one(4, 2)
+
+        post_src = tm.map_src_no_fill(src)
+        self.assertEqual(post_src.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
+
+        post_dst = tm.map_dst_no_fill(dst)
+        self.assertEqual(post_dst.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
