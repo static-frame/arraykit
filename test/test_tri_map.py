@@ -521,7 +521,6 @@ class TestUnit(unittest.TestCase):
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
 
-        # import ipdb; ipdb.set_trace()
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint32))
         del src
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -545,7 +544,6 @@ class TestUnit(unittest.TestCase):
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
 
-        # import ipdb; ipdb.set_trace()
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint64))
         del src
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -569,7 +567,6 @@ class TestUnit(unittest.TestCase):
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
 
-        # import ipdb; ipdb.set_trace()
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int16))
         del src
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -593,13 +590,176 @@ class TestUnit(unittest.TestCase):
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
 
-        # import ipdb; ipdb.set_trace()
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int32))
-        del src
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
         self.assertEqual(post_src.dtype, np.dtype(np.int32))
 
         post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int32))
-        del dst
         self.assertEqual(post_dst.dtype, np.dtype(np.int32))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+
+    def test_tri_map_map_uint_f(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.uint16)
+        dst = np.array([7, 20, 20, 8], dtype=np.uint16)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.int32))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.int32))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int32))
+        self.assertEqual(post_dst.dtype, np.dtype(np.int32))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_uint_g(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.uint32)
+        dst = np.array([7, 20, 20, 8], dtype=np.uint32)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.int64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.int64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.int64))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_uint_h(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.uint8)
+        dst = np.array([7, 20, 20, 8], dtype=np.uint8)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.int64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.int64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.int64))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+
+    def test_tri_map_map_uint_i(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.uint64)
+        dst = np.array([7, 20, 20, 8], dtype=np.uint64)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.int64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float64))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+
+
+    def test_tri_map_map_float_a(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.uint8)
+        dst = np.array([7, 20, 20, 8], dtype=np.uint8)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float64))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+
+    def test_tri_map_map_float_b(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.int8)
+        dst = np.array([7, 20, 20, 8], dtype=np.int8)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float64))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+
+    def test_tri_map_map_float_c(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float32)
+        dst = np.array([7, 20, 20, 8], dtype=np.float32)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float64))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_float_d(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float64)
+        dst = np.array([7, 20, 20, 8], dtype=np.float64)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float64))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float64))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float64))
         self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])

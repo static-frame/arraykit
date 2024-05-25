@@ -6091,7 +6091,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
 // #define TO_TYPE_PAIR(e1, e2) ((e1 << 8) | e2)
 
-// Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error.
+// Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error. This only needs to match to / from type combinations that are possible from `resolve_dtype`, i.e., bool never goes to integer.
 static inline int
 AK_TM_transfer(TriMapObject* tm,
         bool from_src,
@@ -6117,6 +6117,15 @@ AK_TM_transfer(TriMapObject* tm,
                     break;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_int64, npy_int8); // to, from
+                    break;
+                case NPY_UINT32:
+                    TRANSFER_SCALARS(npy_int64, npy_uint32); // to, from
+                    break;
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_int64, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_int64, npy_uint8); // to, from
                     break;
             }
             break;
@@ -6197,6 +6206,45 @@ AK_TM_transfer(TriMapObject* tm,
         case NPY_UINT8:
             TRANSFER_SCALARS(npy_uint8, npy_uint8); // to, from
             break;
+
+        case NPY_FLOAT64:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_FLOAT64:
+                    TRANSFER_SCALARS(npy_float64, npy_float64); // to, from
+                    break;
+                case NPY_FLOAT32:
+                    TRANSFER_SCALARS(npy_float64, npy_float32); // to, from
+                    break;
+                case NPY_FLOAT16:
+                    TRANSFER_SCALARS(npy_float64, npy_float16); // to, from
+                    break;
+                case NPY_INT64:
+                    TRANSFER_SCALARS(npy_float64, npy_int64); // to, from
+                    break;
+                case NPY_INT32:
+                    TRANSFER_SCALARS(npy_float64, npy_int32); // to, from
+                    break;
+                case NPY_INT16:
+                    TRANSFER_SCALARS(npy_float64, npy_int16); // to, from
+                    break;
+                case NPY_INT8:
+                    TRANSFER_SCALARS(npy_float64, npy_int8); // to, from
+                    break;
+                case NPY_UINT64:
+                    TRANSFER_SCALARS(npy_float64, npy_uint64); // to, from
+                    break;
+                case NPY_UINT32:
+                    TRANSFER_SCALARS(npy_float64, npy_uint32); // to, from
+                    break;
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_float64, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_float64, npy_uint8); // to, from
+                    break;
+            }
+            break;
+
 
         // unicode
         case NPY_UNICODE: {
