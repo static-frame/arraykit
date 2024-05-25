@@ -6245,6 +6245,42 @@ AK_TM_transfer(TriMapObject* tm,
             }
             break;
 
+        case NPY_FLOAT32:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_FLOAT32:
+                    TRANSFER_SCALARS(npy_float32, npy_float32); // to, from
+                    break;
+                case NPY_FLOAT16:
+                    TRANSFER_SCALARS(npy_float32, npy_float16); // to, from
+                    break;
+                case NPY_INT16:
+                    TRANSFER_SCALARS(npy_float32, npy_int16); // to, from
+                    break;
+                case NPY_INT8:
+                    TRANSFER_SCALARS(npy_float32, npy_int8); // to, from
+                    break;
+                case NPY_UINT16:
+                    TRANSFER_SCALARS(npy_float32, npy_uint16); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_float32, npy_uint8); // to, from
+                    break;
+            }
+            break;
+
+        case NPY_FLOAT16:
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_FLOAT16:
+                    TRANSFER_SCALARS(npy_float16, npy_float16); // to, from
+                    break;
+                case NPY_INT8:
+                    TRANSFER_SCALARS(npy_float16, npy_int8); // to, from
+                    break;
+                case NPY_UINT8:
+                    TRANSFER_SCALARS(npy_float16, npy_uint8); // to, from
+                    break;
+            }
+            break;
 
         // unicode
         case NPY_UNICODE: {

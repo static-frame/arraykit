@@ -763,3 +763,124 @@ class TestUnit(unittest.TestCase):
         post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float64))
         self.assertEqual(post_dst.dtype, np.dtype(np.float64))
         self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_float_e(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float32)
+        dst = np.array([7, 20, 20, 8], dtype=np.float32)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.int8))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float32))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int8))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float32))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_float_f(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float32)
+        dst = np.array([7, 20, 20, 8], dtype=np.float32)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.uint16))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float32))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.uint16))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float32))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_float_g(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float32)
+        dst = np.array([7, 20, 20, 8], dtype=np.float32)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.float32))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float32))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float32))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float32))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_float_h(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float16)
+        dst = np.array([7, 20, 20, 8], dtype=np.float16)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.float16))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float16))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.float16))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float16))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+
+    def test_tri_map_map_float_i(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float16)
+        dst = np.array([7, 20, 20, 8], dtype=np.float16)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.int8))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float16))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.int8))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float16))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
+
+    def test_tri_map_map_float_i(self) -> None:
+        src = np.array([0, 20, 8, 8], dtype=np.float16)
+        dst = np.array([7, 20, 20, 8], dtype=np.float16)
+
+        # full outer
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_many(1, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(2, 3)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, 17, np.dtype(np.uint8))
+        self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
+        self.assertEqual(post_src.dtype, np.dtype(np.float16))
+
+        post_dst = tm.map_dst_fill(dst, 17, np.dtype(np.uint8))
+        self.assertEqual(post_dst.dtype, np.dtype(np.float16))
+        self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
