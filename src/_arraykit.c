@@ -6138,191 +6138,195 @@ AK_TM_transfer(TriMapObject* tm,
     switch(PyArray_TYPE(array_to)){
         case NPY_BOOL:
             TRANSFER_SCALARS(npy_bool, npy_bool); // to, from
-            break;
+            return 0;
         case NPY_INT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT64:
                     TRANSFER_SCALARS(npy_int64, npy_int64); // to, from
-                    break;
+                    return 0;
                 case NPY_INT32:
                     TRANSFER_SCALARS(npy_int64, npy_int32); // to, from
-                    break;
+                    return 0;
                 case NPY_INT16:
                     TRANSFER_SCALARS(npy_int64, npy_int16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_int64, npy_int8); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT32:
                     TRANSFER_SCALARS(npy_int64, npy_uint32); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_int64, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_int64, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_INT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT32:
                     TRANSFER_SCALARS(npy_int32, npy_int32); // to, from
-                    break;
+                    return 0;
                 case NPY_INT16:
                     TRANSFER_SCALARS(npy_int32, npy_int16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_int32, npy_int8); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_int32, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_int32, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_INT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT16:
                     TRANSFER_SCALARS(npy_int16, npy_int16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_int16, npy_int8); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_int16, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_INT8:
             TRANSFER_SCALARS(npy_int8, npy_int8); // to, from
-            break;
+            return 0;
         case NPY_UINT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT64:
                     TRANSFER_SCALARS(npy_uint64, npy_uint64); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT32:
                     TRANSFER_SCALARS(npy_uint64, npy_uint32); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_uint64, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_uint64, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_UINT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT32:
                     TRANSFER_SCALARS(npy_uint32, npy_uint32); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_uint32, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_uint32, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_UINT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_uint16, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_uint16, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_UINT8:
             TRANSFER_SCALARS(npy_uint8, npy_uint8); // to, from
-            break;
+            return 0;
         case NPY_FLOAT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT64:
                     TRANSFER_SCALARS(npy_float64, npy_float64); // to, from
-                    break;
+                    return 0;
                 case NPY_FLOAT32:
                     TRANSFER_SCALARS(npy_float64, npy_float32); // to, from
-                    break;
+                    return 0;
                 case NPY_FLOAT16:
                     TRANSFER_SCALARS(npy_float64, npy_float16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT64:
                     TRANSFER_SCALARS(npy_float64, npy_int64); // to, from
-                    break;
+                    return 0;
                 case NPY_INT32:
                     TRANSFER_SCALARS(npy_float64, npy_int32); // to, from
-                    break;
+                    return 0;
                 case NPY_INT16:
                     TRANSFER_SCALARS(npy_float64, npy_int16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_float64, npy_int8); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT64:
                     TRANSFER_SCALARS(npy_float64, npy_uint64); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT32:
                     TRANSFER_SCALARS(npy_float64, npy_uint32); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_float64, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_float64, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_FLOAT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT32:
                     TRANSFER_SCALARS(npy_float32, npy_float32); // to, from
-                    break;
+                    return 0;
                 case NPY_FLOAT16:
                     TRANSFER_SCALARS(npy_float32, npy_float16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT16:
                     TRANSFER_SCALARS(npy_float32, npy_int16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_float32, npy_int8); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_float32, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_float32, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_FLOAT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT16:
                     TRANSFER_SCALARS(npy_float16, npy_float16); // to, from
-                    break;
+                    return 0;
                 case NPY_INT8:
                     TRANSFER_SCALARS(npy_float16, npy_int8); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT16:
                     TRANSFER_SCALARS(npy_float16, npy_uint16); // to, from
-                    break;
+                    return 0;
                 case NPY_UINT8:
                     TRANSFER_SCALARS(npy_float16, npy_uint8); // to, from
-                    break;
+                    return 0;
             }
-            break;
+            break; // fall through to cast
         case NPY_UNICODE: {
-            TRANSFER_FLEXIBLE(Py_UCS4);
-            break;
+            switch (PyArray_TYPE(array_from)) {
+                case NPY_UNICODE:
+                    TRANSFER_FLEXIBLE(Py_UCS4);
+                    return 0;
+            }
+            break; // fall through to cast
         }
         case NPY_STRING: {
             TRANSFER_FLEXIBLE(char);
-            break;
+            return 0;
         }
         // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
         case NPY_OBJECT: {
@@ -6383,15 +6387,12 @@ AK_TM_transfer(TriMapObject* tm,
                     }
                 }
             }
-            break;
+            return 0;
         }
-        default:
-            // NOTE: full support for scalar to complex requires assigning within complex struct
-            // better to use PyArray_CastToType
-            PyErr_SetString(PyExc_TypeError, "No handling for types");
-            return -1;
     }
-    return 0;
+    // better to use PyArray_CastToType
+    PyErr_SetString(PyExc_TypeError, "No handling for types");
+    return -1; // fall through to cast
 }
 
 // Returns NULL on error.
