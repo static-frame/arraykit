@@ -901,3 +901,22 @@ class TestUnit(unittest.TestCase):
 
         post_dst = tm.map_dst_no_fill(dst)
         self.assertEqual(post_dst.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
+
+    #---------------------------------------------------------------------------
+
+    def test_tri_map_map_unicode_a(self) -> None:
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+
+        post_src = tm.map_src_no_fill(src)
+        self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
+
+        post_dst = tm.map_dst_fill(dst, '====', np.array('====').dtype)
+        self.assertEqual(post_dst.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
+
