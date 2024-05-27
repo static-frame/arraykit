@@ -5721,6 +5721,9 @@ typedef struct TriMapObject {
     PyObject* dst_match; // array object
     npy_bool* dst_match_data; // contiguous C array
 
+    // npy_bool* final_fill_src; // contiguous C array
+    // npy_bool* final_fill_dst; // contiguous C array
+
     // register one
     TriMapOne* src_one;
     Py_ssize_t src_one_count;
@@ -5847,6 +5850,14 @@ TriMap_dealloc(TriMapObject *self) {
         }
         PyMem_Free(self->many_from);
     }
+    // the are only optionally set
+    // if (self->final_fill_src != NULL) {
+    //     PyMem_Free(self->final_fill_src);
+    // }
+    // if (self->final_fill_dst != NULL) {
+    //     PyMem_Free(self->final_fill_dst);
+    // }
+
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -5954,6 +5965,7 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
         if (!dst_unmatched) {
             return NULL;
         }
+        // derive indices for unmatched locations, call each with register_one
         PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
         // borrow ref to array in 1-element tuple
         PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
@@ -5973,7 +5985,7 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
     Py_RETURN_NONE;
 }
 
-// Given an integer (for the src) and an array of integers (for the dst), store mappings from src to final and dest to final.
+// Given an integer (for the src) and an array of integers (for the dst), store mappings from src to final and dst to final.
 static PyObject*
 TriMap_register_many(TriMapObject *self, PyObject *args) {
     Py_ssize_t src_from;
@@ -5994,7 +6006,6 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
 
     if (AK_UNLIKELY(self->many_count == self->many_capacity)) {
         self->many_capacity <<= 1; // get 2x the capacity
-
         self->many_to = PyMem_Realloc(self->many_to,
                 sizeof(TriMapManyTo) * self->many_capacity);
         if (self->many_to == NULL) {
@@ -6008,8 +6019,10 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
             return NULL;
         }
     }
+    // store structs on arrays
     self->many_to[self->many_count] = (TriMapManyTo){self->len, self->len + increment};
-    Py_INCREF((PyObject*)dst_from); // decref on dealloc
+
+    Py_INCREF((PyObject*)dst_from); // decrefs on dealloc
     self->many_from[self->many_count] = (TriMapManyFrom){src_from, dst_from};
     self->many_count += 1;
 
@@ -6019,7 +6032,6 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
         npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i); // always int64
         self->dst_match_data[pos] = NPY_TRUE;
     }
-
     self->src_connected += increment;
     self->dst_connected += increment;
     self->len += increment;
@@ -6053,78 +6065,86 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     Py_RETURN_FALSE;
 }
 
+# define TRANSFER_SCALARS(npy_type_to, npy_type_from) {                \
+    npy_type_to* array_to_data = (npy_type_to*)PyArray_DATA(array_to); \
+    for (Py_ssize_t i = 0; i < one_count; i++) {                       \
+        array_to_data[one_pairs[i].to] = (npy_type_to)                 \
+                *(npy_type_from*)PyArray_GETPTR1(                      \
+                array_from, one_pairs[i].from);                        \
+    }                                                                  \
+    npy_type_to* t;                                                    \
+    npy_type_to* t_end;                                                \
+    npy_type_to f;                                                     \
+    npy_int64 f_pos;                                                   \
+    npy_intp dst_pos;                                                  \
+    PyArrayObject* dst;                                                \
+    for (Py_ssize_t i = 0; i < tm->many_count; i++) {                  \
+        t = array_to_data + tm->many_to[i].start;                      \
+        t_end = array_to_data + tm->many_to[i].stop;                   \
+        if (from_src) {                                                \
+            f = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1(         \
+                    array_from, tm->many_from[i].src);                 \
+            while (t < t_end) {                                        \
+                *t++ = f;                                              \
+            }                                                          \
+        }                                                              \
+        else {                                                         \
+            dst_pos = 0;                                               \
+            dst = tm->many_from[i].dst;                                \
+            while (t < t_end) {                                        \
+                f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);    \
+                *t++ = (npy_type_to)                                   \
+                        *(npy_type_from*)PyArray_GETPTR1(              \
+                        array_from, f_pos);                            \
+                dst_pos++;                                             \
+            }                                                          \
+        }                                                              \
+    }                                                                  \
+}                                                                      \
 
-# define TRANSFER_SCALARS(npy_type_to, npy_type_from) {                                 \
-    npy_type_to* array_to_data = (npy_type_to*)PyArray_DATA(array_to);                  \
-    for (Py_ssize_t i = 0; i < one_count; i++) {                                        \
-        array_to_data[one_pairs[i].to] = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1( \
-                array_from, one_pairs[i].from);                                         \
-    }                                                                                   \
-    npy_type_to* t;                                                                     \
-    npy_type_to* t_end;                                                                 \
-    npy_type_to f;                                                                      \
-    npy_int64 f_pos;                                                                    \
-    npy_intp dst_pos;                                                                   \
-    PyArrayObject* dst;                                                                 \
-    for (Py_ssize_t i = 0; i < tm->many_count; i++) {                                   \
-        t = array_to_data + tm->many_to[i].start;                                       \
-        t_end = array_to_data + tm->many_to[i].stop;                                    \
-        if (from_src) {                                                                 \
-            f = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1(                          \
-                    array_from, tm->many_from[i].src);                                  \
-            while (t < t_end) {                                                         \
-                *t++ = f;                                                               \
-            }                                                                           \
-        }                                                                               \
-        else {                                                                          \
-            dst_pos = 0;                                                                \
-            dst = tm->many_from[i].dst;                                                 \
-            while (t < t_end) {                                                         \
-                f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);                     \
-                *t++ = (npy_type_to)*(npy_type_from*)PyArray_GETPTR1(array_from, f_pos);\
-                dst_pos++;                                                              \
-            }                                                                           \
-        }                                                                               \
-    }                                                                                   \
-}                                                                                       \
-
-#define TRANSFER_FLEXIBLE(c_type) {                                           \
-    npy_intp t_element_size = PyArray_DESCR(array_to)->elsize;                \
-    npy_intp t_element_cp = t_element_size / sizeof(c_type);                  \
-    npy_intp f_element_size = PyArray_DESCR(array_from)->elsize;              \
-    c_type* array_to_data = (c_type*)PyArray_DATA(array_to);                  \
-    c_type* f;                                                                \
-    c_type* t;                                                                \
-    c_type* t_end;                                                            \
-    npy_intp dst_pos;                                                         \
-    npy_int64 f_pos;                                                          \
-    PyArrayObject* dst;                                                       \
-    for (Py_ssize_t i = 0; i < one_count; i++) {                              \
-        f = (c_type*)PyArray_GETPTR1(array_from, one_pairs[i].from);          \
-        t = array_to_data + t_element_cp * one_pairs[i].to;                   \
-        memcpy(t, f, f_element_size);                                         \
-    }                                                                         \
-    for (Py_ssize_t i = 0; i < tm->many_count; i++) {                         \
-        t = array_to_data + t_element_cp * tm->many_to[i].start;              \
-        t_end = array_to_data + t_element_cp * tm->many_to[i].stop;           \
-        if (from_src) {                                                       \
-            f = (c_type*)PyArray_GETPTR1(array_from, tm->many_from[i].src);   \
-            for (; t < t_end; t += t_element_cp) {                            \
-                memcpy(t, f, f_element_size);                                 \
-            }                                                                 \
-        }                                                                     \
-        else {                                                                \
-            dst_pos = 0;                                                      \
-            dst = tm->many_from[i].dst;                                       \
-            for (; t < t_end; t += t_element_cp) {                            \
-                f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);           \
-                f = (c_type*)PyArray_GETPTR1(array_from, f_pos);              \
-                memcpy(t, f, f_element_size);                                 \
-                dst_pos++;                                                    \
-            }                                                                 \
-        }                                                                     \
-    }                                                                         \
-}                                                                             \
+// The elsize of the `to` array will be equal to or greater than the from array
+#define TRANSFER_FLEXIBLE(c_type) {                                        \
+    npy_intp t_element_size = PyArray_DESCR(array_to)->elsize;             \
+    npy_intp t_element_cp = t_element_size / sizeof(c_type);               \
+    npy_intp f_element_size = PyArray_DESCR(array_from)->elsize;           \
+    npy_intp f_element_cp = f_element_size / sizeof(c_type);               \
+    npy_intp gap = t_element_size - f_element_size;                        \
+    c_type* array_to_data = (c_type*)PyArray_DATA(array_to);               \
+    c_type* f;                                                             \
+    c_type* t;                                                             \
+    c_type* t_end;                                                         \
+    npy_intp dst_pos;                                                      \
+    npy_int64 f_pos;                                                       \
+    PyArrayObject* dst;                                                    \
+    for (Py_ssize_t i = 0; i < one_count; i++) {                           \
+        f = (c_type*)PyArray_GETPTR1(array_from, one_pairs[i].from);       \
+        t = array_to_data + t_element_cp * one_pairs[i].to;                \
+        memcpy(t, f, f_element_size);                                      \
+        memset(t + f_element_cp, '\0', gap);                               \
+    }                                                                      \
+    for (Py_ssize_t i = 0; i < tm->many_count; i++) {                      \
+        t = array_to_data + t_element_cp * tm->many_to[i].start;           \
+        t_end = array_to_data + t_element_cp * tm->many_to[i].stop;        \
+        if (from_src) {                                                    \
+            f = (c_type*)PyArray_GETPTR1(array_from, tm->many_from[i].src);\
+            for (; t < t_end; t += t_element_cp) {                         \
+                memcpy(t, f, f_element_size);                              \
+                memset(t + f_element_cp, '\0', gap);                       \
+            }                                                              \
+        }                                                                  \
+        else {                                                             \
+            dst_pos = 0;                                                   \
+            dst = tm->many_from[i].dst;                                    \
+            for (; t < t_end; t += t_element_cp) {                         \
+                f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);        \
+                f = (c_type*)PyArray_GETPTR1(array_from, f_pos);           \
+                memcpy(t, f, f_element_size);                              \
+                memset(t + f_element_cp, '\0', gap);                       \
+                dst_pos++;                                                 \
+            }                                                              \
+        }                                                                  \
+    }                                                                      \
+}                                                                          \
 
 
 // Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error. This only needs to match to / from type combinations that are possible from `resolve_dtype`, i.e., bool never goes to integer.
@@ -6164,7 +6184,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_int64, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_INT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT32:
@@ -6183,7 +6203,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_int32, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_INT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT16:
@@ -6196,7 +6216,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_int16, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_INT8:
             TRANSFER_SCALARS(npy_int8, npy_int8); // to, from
             return 0;
@@ -6215,7 +6235,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_uint64, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_UINT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT32:
@@ -6228,7 +6248,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_uint32, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_UINT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT16:
@@ -6238,7 +6258,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_uint16, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_UINT8:
             TRANSFER_SCALARS(npy_uint8, npy_uint8); // to, from
             return 0;
@@ -6278,7 +6298,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_float64, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_FLOAT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT32:
@@ -6300,7 +6320,7 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_float32, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_FLOAT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT16:
@@ -6316,16 +6336,16 @@ AK_TM_transfer(TriMapObject* tm,
                     TRANSFER_SCALARS(npy_float16, npy_uint8); // to, from
                     return 0;
             }
-            break; // fall through to cast
+            break;
         case NPY_UNICODE: {
-            AK_DEBUG_MSG_OBJ("unicode array_from", (PyObject*)array_from);
-            AK_DEBUG_MSG_OBJ("unicode array_to", (PyObject*)array_to);
+            // AK_DEBUG_MSG_OBJ("unicode array_from", (PyObject*)array_from);
+            // AK_DEBUG_MSG_OBJ("unicode array_to", (PyObject*)array_to);
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UNICODE:
                     TRANSFER_FLEXIBLE(Py_UCS4);
                     return 0;
             }
-            break; // fall through to cast
+            break;
         }
         case NPY_STRING: {
             TRANSFER_FLEXIBLE(char);
@@ -6396,6 +6416,16 @@ AK_TM_transfer(TriMapObject* tm,
     PyErr_SetString(PyExc_TypeError, "No handling for types");
     return -1; // fall through to cast
 }
+
+// Optionally set Booleans in `final_match_data` to determine where values will be set for source and ddst
+// static void
+// AK_TM_final_match(TriMapObject* tm) {
+//     // only do this
+//     tm->final_fill_src = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
+//     tm->final_fill_dst = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
+//     // run accross all assignments and set True where there is no match?
+// }
+
 
 // Returns NULL on error.
 static inline PyObject*
@@ -6477,38 +6507,38 @@ AK_TM_map_fill(TriMapObject* tm,
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    int t_is_flexible = PyArray_ISFLEXIBLE(array_to);
-    if (!t_is_flexible) {
+    // int t_is_flexible = PyArray_ISFLEXIBLE(array_to);
+    // if (!t_is_flexible) {
         // we assume this increfs object fill_valus correctly
-        if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
-            Py_DECREF((PyObject*)array_to);
-            return NULL;
-        }
+    if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
+        Py_DECREF((PyObject*)array_to);
+        return NULL;
     }
+    // }
     if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
         Py_DECREF((PyObject*)array_to);
         return NULL;
     }
-    if (t_is_flexible) {
-        // insert fill values
-        Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
-        npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
-        Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
-        Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
-        // NOTE: matches do not tell where a fill is needed
-        npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
-        npy_bool* d_end = d + count;
-        while (d < d_end) {
-            if (*d == NPY_FALSE) {
-                if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
-                    Py_DECREF((PyObject*)array_to);
-                    return NULL;
-                }
-            }
-            t += t_cp;
-            d++;
-        }
-    }
+    // if (t_is_flexible) {
+    //     // insert fill values
+    //     Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
+    //     npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
+    //     Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
+    //     Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
+    //     // NOTE: matches do not tell where a fill is needed
+    //     npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
+    //     npy_bool* d_end = d + count;
+    //     while (d < d_end) {
+    //         if (*d == NPY_FALSE) {
+    //             if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
+    //                 Py_DECREF((PyObject*)array_to);
+    //                 return NULL;
+    //             }
+    //         }
+    //         t += t_cp;
+    //         d++;
+    //     }
+    // }
 
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
