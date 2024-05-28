@@ -940,13 +940,14 @@ class TestUnit(unittest.TestCase):
         post_src = tm.map_src_fill(src, nat, np.dtype('datetime64'))
         self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
         # string to permit NaN comparison
-        self.assertEqual(str(post_src),
-        "['2022-01' '2022-01' '2022-01' '1954-03' '1743-09' '1743-09' '1988-12'\n     'NaT']")
+        self.assertEqual([str(dt) for dt in post_src],
+        ['2022-01', '2022-01', '2022-01', '1954-03', '1743-09', '1743-09', '1988-12', 'NaT'])
 
         post_dst = tm.map_dst_fill(dst, nat, np.dtype('datetime64'))
         self.assertEqual(post_dst.dtype, np.dtype('datetime64[M]'))
-        self.assertEqual(str(post_dst),
-        "['2022-01' '2022-01' '2022-01'     'NaT' '1743-09' '1743-09'     'NaT'\n '2005-11']")
+        self.assertEqual([str(dt) for dt in post_dst],
+        ['2022-01', '2022-01', '2022-01', 'NaT', '1743-09', '1743-09', 'NaT', '2005-11'])
+
         # import ipdb; ipdb.set_trace()
         # self.assertEqual(tuple(post_dst),
         #         (dt64('2022-01'), dt64('2022-01'), dt64('2022-01'), dt64('1954-03'), dt64('1743-09'),
