@@ -6513,7 +6513,7 @@ AK_TM_map_fill(TriMapObject* tm,
                 AK_dt_unit_from_array(array_from) != AK_dt_unit_from_array(array_to)
                 ) {
             // if trying to cast into a dt64 array, need to pre-convert; array_from is originally borrowed; calling cast sets it to new ref
-            dtype = PyArray_DESCR(array_to);
+            dtype = PyArray_DESCR(array_to); // borrowed ref
             Py_INCREF(dtype);
             array_from = (PyArrayObject*)PyArray_CastToType(array_from, dtype, 0);
         }
@@ -6526,8 +6526,6 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-
-
     // we assume this increfs object fill_values correctly
     if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
         Py_DECREF((PyObject*)array_to);
@@ -6539,7 +6537,7 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    Py_DECREF((PyObject*)array_from);
+    Py_DECREF((PyObject*)array_from); // ref inc for this function
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
