@@ -6351,6 +6351,10 @@ AK_TM_transfer(TriMapObject* tm,
             TRANSFER_FLEXIBLE(char);
             return 0;
         }
+        case NPY_DATETIME: {
+            TRANSFER_SCALARS(npy_int64, npy_int64); // to, from
+            return 0;
+        }
         // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
         case NPY_OBJECT: {
             bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
