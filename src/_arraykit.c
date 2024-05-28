@@ -6158,6 +6158,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 static inline int
 AK_TM_transfer(TriMapObject* tm,
         bool from_src,
+        bool is_filled,
         PyArrayObject* array_from,
         PyArrayObject* array_to) {
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
@@ -6371,6 +6372,9 @@ AK_TM_transfer(TriMapObject* tm,
                 else {
                     pyo = PyArray_GETITEM(array_from, f);
                 }
+                if (is_filled) {
+                    Py_DECREF(array_to_data[one_pairs[i].to]);
+                }
                 array_to_data[one_pairs[i].to] = pyo;
             }
             PyObject** t;
@@ -6455,7 +6459,7 @@ AK_TM_map_no_fill(TriMapObject* tm,
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
+    if (AK_TM_transfer(tm, from_src, false, array_from, array_to)) {
         Py_DECREF((PyObject*)array_to);
         return NULL;
     }
@@ -6526,13 +6530,14 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
+    // Most simple is to fill with scalar, then overwrite values as needed; for flexilbe sized dtypes this might be very inefficient. Alternative is to discover sites that need fill values and write them, though that will require a bunch of type branching
     // we assume this increfs object fill_values correctly
     if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
         Py_DECREF((PyObject*)array_to);
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
+    if (AK_TM_transfer(tm, from_src, true, array_from, array_to)) {
         Py_DECREF((PyObject*)array_to);
         Py_DECREF((PyObject*)array_from);
         return NULL;
