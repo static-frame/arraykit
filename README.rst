@@ -29,13 +29,19 @@ Dependencies
 
 ArrayKit requires the following:
 
-- Python>=3.8
+- Python>=3.9
 - numpy>=1.19.5
 
 
 
 What is New in ArrayKit
 -------------------------
+
+0.6.0
+............
+
+Added ``TriMap`` utility class for join optimization.
+
 
 0.5.1
 ............

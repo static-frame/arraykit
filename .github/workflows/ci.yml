@@ -48,7 +48,6 @@ jobs:
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 8,  req_build: 'requirements-build-3_08.txt', req_test: 'requirements-dev-3_08.txt'}
             - {minor: 9,  req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
@@ -63,7 +62,7 @@ jobs:
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: startsWith(matrix.os, 'windows-')
 
-      - uses: pypa/cibuildwheel@v2.16.2
+      - uses: pypa/cibuildwheel@v2.18.0
         if: matrix.os != 'macos-13-xlarge'
         with:
           output-dir: dist
@@ -77,7 +76,7 @@ jobs:
 
       - run: pip install pipx
         if: matrix.os == 'macos-13-xlarge'
-      - uses: pypa/cibuildwheel@v2.16.2
+      - uses: pypa/cibuildwheel@v2.18.0
         if: matrix.os == 'macos-13-xlarge'
         with:
           output-dir: dist

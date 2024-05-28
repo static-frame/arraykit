@@ -3,6 +3,7 @@
 # pylint: disable=C0414
 
 from ._arraykit import __version__
+from ._arraykit import TriMap as TriMap
 from ._arraykit import ArrayGO as ArrayGO
 from ._arraykit import BlockIndex as BlockIndex
 from ._arraykit import ErrorInitTypeBlocks as ErrorInitTypeBlocks
