@@ -88,6 +88,13 @@ const static size_t UCS4_SIZE = sizeof(Py_UCS4);
 // C-level utility functions
 //------------------------------------------------------------------------------
 
+NPY_DATETIMEUNIT
+AK_dt_unit_from_array(PyArrayObject* a) {
+    // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
+    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
+    return dma->base;
+}
+
 // Takes and returns a PyArrayObject, optionally copying a mutable array and setting it as immutable
 PyArrayObject *
 AK_ImmutableFilter(PyArrayObject *a)
@@ -6158,201 +6165,195 @@ AK_TM_transfer(TriMapObject* tm,
 
     switch(PyArray_TYPE(array_to)){
         case NPY_BOOL:
-            TRANSFER_SCALARS(npy_bool, npy_bool); // to, from
+            TRANSFER_SCALARS(npy_bool, npy_bool);
             return 0;
         case NPY_INT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT64:
-                    TRANSFER_SCALARS(npy_int64, npy_int64); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_int64);
                     return 0;
                 case NPY_INT32:
-                    TRANSFER_SCALARS(npy_int64, npy_int32); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_int32);
                     return 0;
                 case NPY_INT16:
-                    TRANSFER_SCALARS(npy_int64, npy_int16); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_int16);
                     return 0;
                 case NPY_INT8:
-                    TRANSFER_SCALARS(npy_int64, npy_int8); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_int8);
                     return 0;
                 case NPY_UINT32:
-                    TRANSFER_SCALARS(npy_int64, npy_uint32); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_uint32);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_int64, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_int64, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_int64, npy_uint8);
                     return 0;
             }
             break;
         case NPY_INT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT32:
-                    TRANSFER_SCALARS(npy_int32, npy_int32); // to, from
+                    TRANSFER_SCALARS(npy_int32, npy_int32);
                     return 0;
                 case NPY_INT16:
-                    TRANSFER_SCALARS(npy_int32, npy_int16); // to, from
+                    TRANSFER_SCALARS(npy_int32, npy_int16);
                     return 0;
                 case NPY_INT8:
-                    TRANSFER_SCALARS(npy_int32, npy_int8); // to, from
+                    TRANSFER_SCALARS(npy_int32, npy_int8);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_int32, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_int32, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_int32, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_int32, npy_uint8);
                     return 0;
             }
             break;
         case NPY_INT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_INT16:
-                    TRANSFER_SCALARS(npy_int16, npy_int16); // to, from
+                    TRANSFER_SCALARS(npy_int16, npy_int16);
                     return 0;
                 case NPY_INT8:
-                    TRANSFER_SCALARS(npy_int16, npy_int8); // to, from
+                    TRANSFER_SCALARS(npy_int16, npy_int8);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_int16, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_int16, npy_uint8);
                     return 0;
             }
             break;
         case NPY_INT8:
-            TRANSFER_SCALARS(npy_int8, npy_int8); // to, from
+            TRANSFER_SCALARS(npy_int8, npy_int8);
             return 0;
         case NPY_UINT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT64:
-                    TRANSFER_SCALARS(npy_uint64, npy_uint64); // to, from
+                    TRANSFER_SCALARS(npy_uint64, npy_uint64);
                     return 0;
                 case NPY_UINT32:
-                    TRANSFER_SCALARS(npy_uint64, npy_uint32); // to, from
+                    TRANSFER_SCALARS(npy_uint64, npy_uint32);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_uint64, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_uint64, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_uint64, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_uint64, npy_uint8);
                     return 0;
             }
             break;
         case NPY_UINT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT32:
-                    TRANSFER_SCALARS(npy_uint32, npy_uint32); // to, from
+                    TRANSFER_SCALARS(npy_uint32, npy_uint32);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_uint32, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_uint32, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_uint32, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_uint32, npy_uint8);
                     return 0;
             }
             break;
         case NPY_UINT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_uint16, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_uint16, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_uint16, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_uint16, npy_uint8);
                     return 0;
             }
             break;
         case NPY_UINT8:
-            TRANSFER_SCALARS(npy_uint8, npy_uint8); // to, from
+            TRANSFER_SCALARS(npy_uint8, npy_uint8);
             return 0;
         case NPY_FLOAT64:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT64:
-                    TRANSFER_SCALARS(npy_float64, npy_float64); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_float64);
                     return 0;
                 case NPY_FLOAT32:
-                    TRANSFER_SCALARS(npy_float64, npy_float32); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_float32);
                     return 0;
                 case NPY_FLOAT16:
-                    TRANSFER_SCALARS(npy_float64, npy_float16); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_float16);
                     return 0;
                 case NPY_INT64:
-                    TRANSFER_SCALARS(npy_float64, npy_int64); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_int64);
                     return 0;
                 case NPY_INT32:
-                    TRANSFER_SCALARS(npy_float64, npy_int32); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_int32);
                     return 0;
                 case NPY_INT16:
-                    TRANSFER_SCALARS(npy_float64, npy_int16); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_int16);
                     return 0;
                 case NPY_INT8:
-                    TRANSFER_SCALARS(npy_float64, npy_int8); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_int8);
                     return 0;
                 case NPY_UINT64:
-                    TRANSFER_SCALARS(npy_float64, npy_uint64); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_uint64);
                     return 0;
                 case NPY_UINT32:
-                    TRANSFER_SCALARS(npy_float64, npy_uint32); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_uint32);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_float64, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_float64, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_float64, npy_uint8);
                     return 0;
             }
             break;
         case NPY_FLOAT32:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT32:
-                    TRANSFER_SCALARS(npy_float32, npy_float32); // to, from
+                    TRANSFER_SCALARS(npy_float32, npy_float32);
                     return 0;
                 case NPY_FLOAT16:
-                    TRANSFER_SCALARS(npy_float32, npy_float16); // to, from
+                    TRANSFER_SCALARS(npy_float32, npy_float16);
                     return 0;
                 case NPY_INT16:
-                    TRANSFER_SCALARS(npy_float32, npy_int16); // to, from
+                    TRANSFER_SCALARS(npy_float32, npy_int16);
                     return 0;
                 case NPY_INT8:
-                    TRANSFER_SCALARS(npy_float32, npy_int8); // to, from
+                    TRANSFER_SCALARS(npy_float32, npy_int8);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_float32, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_float32, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_float32, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_float32, npy_uint8);
                     return 0;
             }
             break;
         case NPY_FLOAT16:
             switch (PyArray_TYPE(array_from)) {
                 case NPY_FLOAT16:
-                    TRANSFER_SCALARS(npy_float16, npy_float16); // to, from
+                    TRANSFER_SCALARS(npy_float16, npy_float16);
                     return 0;
                 case NPY_INT8:
-                    TRANSFER_SCALARS(npy_float16, npy_int8); // to, from
+                    TRANSFER_SCALARS(npy_float16, npy_int8);
                     return 0;
                 case NPY_UINT16:
-                    TRANSFER_SCALARS(npy_float16, npy_uint16); // to, from
+                    TRANSFER_SCALARS(npy_float16, npy_uint16);
                     return 0;
                 case NPY_UINT8:
-                    TRANSFER_SCALARS(npy_float16, npy_uint8); // to, from
+                    TRANSFER_SCALARS(npy_float16, npy_uint8);
                     return 0;
             }
             break;
         case NPY_UNICODE: {
-            // AK_DEBUG_MSG_OBJ("unicode array_from", (PyObject*)array_from);
-            // AK_DEBUG_MSG_OBJ("unicode array_to", (PyObject*)array_to);
-            switch (PyArray_TYPE(array_from)) {
-                case NPY_UNICODE:
-                    TRANSFER_FLEXIBLE(Py_UCS4);
-                    return 0;
-            }
-            break;
+            TRANSFER_FLEXIBLE(Py_UCS4);
+            return 0;
         }
         case NPY_STRING: {
             TRANSFER_FLEXIBLE(char);
             return 0;
         }
         case NPY_DATETIME: {
-            TRANSFER_SCALARS(npy_int64, npy_int64); // to, from
+            TRANSFER_SCALARS(npy_int64, npy_int64);
             return 0;
         }
         // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
@@ -6418,7 +6419,7 @@ AK_TM_transfer(TriMapObject* tm,
         }
     }
     PyErr_SetString(PyExc_TypeError, "No handling for types");
-    return -1; // fall through to cast
+    return -1;
 }
 
 // Optionally set Booleans in `final_match_data` to determine where values will be set for source and ddst
@@ -6503,50 +6504,67 @@ AK_TM_map_fill(TriMapObject* tm,
     if (dtype->type_num == NPY_OBJECT) {
         Py_DECREF(dtype); // not needed
         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
+        Py_INCREF(array_from); // normalize refs when casting
     }
     else {
         array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+        if (PyArray_TYPE(array_from) == NPY_DATETIME &&
+                PyArray_TYPE(array_to) == NPY_DATETIME &&
+                AK_dt_unit_from_array(array_from) != AK_dt_unit_from_array(array_to)
+                ) {
+            // if trying to cast into a dt64 array, need to pre-convert; array_from is originally borrowed; calling cast sets it to new ref
+            dtype = PyArray_DESCR(array_to);
+            Py_INCREF(dtype);
+            array_from = (PyArrayObject*)PyArray_CastToType(array_from, dtype, 0);
+        }
+        else {
+            Py_INCREF(array_from); // normalize refs when casting
+        }
     }
     if (array_to == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
+        Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    // int t_is_flexible = PyArray_ISFLEXIBLE(array_to);
-    // if (!t_is_flexible) {
-        // we assume this increfs object fill_valus correctly
+
+
+    // we assume this increfs object fill_values correctly
     if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
         Py_DECREF((PyObject*)array_to);
+        Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    // }
     if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
         Py_DECREF((PyObject*)array_to);
+        Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    // if (t_is_flexible) {
-    //     // insert fill values
-    //     Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
-    //     npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
-    //     Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
-    //     Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
-    //     // NOTE: matches do not tell where a fill is needed
-    //     npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
-    //     npy_bool* d_end = d + count;
-    //     while (d < d_end) {
-    //         if (*d == NPY_FALSE) {
-    //             if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
-    //                 Py_DECREF((PyObject*)array_to);
-    //                 return NULL;
-    //             }
-    //         }
-    //         t += t_cp;
-    //         d++;
-    //     }
-    // }
-
+    Py_DECREF((PyObject*)array_from);
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
+
+// this manually inserts string
+// if (t_is_flexible) {
+//     // insert fill values
+//     Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
+//     npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
+//     Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
+//     Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
+//     // NOTE: matches do not tell where a fill is needed
+//     npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
+//     npy_bool* d_end = d + count;
+//     while (d < d_end) {
+//         if (*d == NPY_FALSE) {
+//             if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
+//                 Py_DECREF((PyObject*)array_to);
+//                 return NULL;
+//             }
+//         }
+//         t += t_cp;
+//         d++;
+//     }
+// }
 
 static PyObject*
 TriMap_map_src_fill(TriMapObject *self, PyObject *args) {

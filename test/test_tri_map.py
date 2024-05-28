@@ -948,8 +948,67 @@ class TestUnit(unittest.TestCase):
         self.assertEqual([str(dt) for dt in post_dst],
         ['2022-01', '2022-01', '2022-01', 'NaT', '1743-09', '1743-09', 'NaT', '2005-11'])
 
-        # import ipdb; ipdb.set_trace()
-        # self.assertEqual(tuple(post_dst),
-        #         (dt64('2022-01'), dt64('2022-01'), dt64('2022-01'), dt64('1954-03'), dt64('1743-09'),
-        #         dt64('1743-09'), dt64('1988-12'), dt64('NaT')))
 
+    def test_tri_map_map_dt64_b(self) -> None:
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
+        dst = np.array(['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'], dtype=np.datetime64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, '1999-12', np.dtype('datetime64'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
+        self.assertEqual([str(dt) for dt in post_src],
+        ['2022-01', '2022-01', '2022-01', '1954-03', '1743-09', '1743-09', '1988-12', '1999-12'])
+
+        post_dst = tm.map_dst_fill(dst, '1999-12', np.dtype('datetime64'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[M]'))
+        self.assertEqual([str(dt) for dt in post_dst],
+        ['2022-01', '2022-01', '2022-01', '1999-12', '1743-09', '1743-09', '1999-12', '2005-11'])
+
+    def test_tri_map_map_dt64_c(self) -> None:
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
+        dst = np.array(['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'], dtype=np.datetime64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, '1999', np.dtype('datetime64[Y]'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
+        # NOTE: the year dtype is "fit" within the year-mo by defaulting to the first month; we might not want to permit this
+        self.assertEqual([str(dt) for dt in post_src],
+            ['2022-01', '2022-01', '2022-01', '1954-03', '1743-09', '1743-09', '1988-12', '1999-01'])
+
+        post_dst = tm.map_dst_fill(dst, '1999', np.dtype('datetime64[Y]'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[M]'))
+        self.assertEqual([str(dt) for dt in post_dst],
+            ['2022-01', '2022-01', '2022-01', '1999-01', '1743-09', '1743-09', '1999-01', '2005-11'])
+
+    def test_tri_map_map_dt64_d(self) -> None:
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
+        dst = np.array(['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'], dtype=np.datetime64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+
+        post_src = tm.map_src_fill(src, '1999-09-09', np.dtype('datetime64[D]'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[D]'))
+        self.assertEqual([str(dt) for dt in post_src],
+            ['2022-01-01', '2022-01-01', '2022-01-01', '1954-03-01', '1743-09-01', '1743-09-01', '1988-12-01', '1999-09-09'])
+
+        post_dst = tm.map_dst_fill(dst, '1999-09-09', np.dtype('datetime64[D]'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[D]'))
+        self.assertEqual([str(dt) for dt in post_dst],
+            ['2022-01-01', '2022-01-01', '2022-01-01', '1999-09-09', '1743-09-01', '1743-09-01', '1999-09-09', '2005-11-01'])
