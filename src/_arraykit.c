@@ -5722,14 +5722,15 @@ typedef struct TriMapObject {
     Py_ssize_t src_connected;
     Py_ssize_t dst_connected;
     bool is_many;
+    bool finalized;
 
     PyObject* src_match; // array object
     npy_bool* src_match_data; // contiguous C array
     PyObject* dst_match; // array object
     npy_bool* dst_match_data; // contiguous C array
 
-    // npy_bool* final_fill_src; // contiguous C array
-    // npy_bool* final_fill_dst; // contiguous C array
+    npy_bool* final_fill_src; // contiguous C array
+    npy_bool* final_fill_dst; // contiguous C array
 
     // register one
     TriMapOne* src_one;
@@ -5779,6 +5780,7 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     tm->src_len = src_len;
     tm->dst_len = dst_len;
     tm->is_many = false;
+    tm->finalized = false;
     tm->len = 0;
     tm->src_connected = 0;
     tm->dst_connected = 0;
@@ -5857,13 +5859,12 @@ TriMap_dealloc(TriMapObject *self) {
         }
         PyMem_Free(self->many_from);
     }
-    // the are only optionally set
-    // if (self->final_fill_src != NULL) {
-    //     PyMem_Free(self->final_fill_src);
-    // }
-    // if (self->final_fill_dst != NULL) {
-    //     PyMem_Free(self->final_fill_dst);
-    // }
+    if (self->final_fill_src != NULL) {
+        PyMem_Free(self->final_fill_src);
+    }
+    if (self->final_fill_dst != NULL) {
+        PyMem_Free(self->final_fill_dst);
+    }
 
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -6046,6 +6047,21 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+//------------------------------------------------------------------------------
+// Optionally set Booleans in `final_match_data` to determine where values will be set for source and ddst
+static PyObject *
+TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
+    TriMapObject* tm = (TriMapObject*)self;
+
+    tm->final_fill_src = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
+    tm->final_fill_dst = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
+    // run across all assignments and set True where there is no match?
+
+    tm->finalized = true;
+    Py_RETURN_NONE;
+}
+
+
 static PyObject *
 TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->is_many) {
@@ -6158,7 +6174,6 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 static inline int
 AK_TM_transfer(TriMapObject* tm,
         bool from_src,
-        bool is_filled,
         PyArrayObject* array_from,
         PyArrayObject* array_to) {
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
@@ -6372,9 +6387,9 @@ AK_TM_transfer(TriMapObject* tm,
                 else {
                     pyo = PyArray_GETITEM(array_from, f);
                 }
-                if (is_filled) {
-                    Py_DECREF(array_to_data[one_pairs[i].to]);
-                }
+                // if (is_filled) { // TODO: need to not pre-set objects
+                //     Py_DECREF(array_to_data[one_pairs[i].to]);
+                // }
                 array_to_data[one_pairs[i].to] = pyo;
             }
             PyObject** t;
@@ -6426,15 +6441,6 @@ AK_TM_transfer(TriMapObject* tm,
     return -1;
 }
 
-// Optionally set Booleans in `final_match_data` to determine where values will be set for source and ddst
-// static void
-// AK_TM_final_match(TriMapObject* tm) {
-//     // only do this
-//     tm->final_fill_src = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
-//     tm->final_fill_dst = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
-//     // run accross all assignments and set True where there is no match?
-// }
-
 
 // Returns NULL on error.
 static inline PyObject*
@@ -6459,7 +6465,7 @@ AK_TM_map_no_fill(TriMapObject* tm,
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    if (AK_TM_transfer(tm, from_src, false, array_from, array_to)) {
+    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
         Py_DECREF((PyObject*)array_to);
         return NULL;
     }
@@ -6537,7 +6543,7 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    if (AK_TM_transfer(tm, from_src, true, array_from, array_to)) {
+    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
         Py_DECREF((PyObject*)array_to);
         Py_DECREF((PyObject*)array_from);
         return NULL;
