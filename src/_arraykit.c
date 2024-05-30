@@ -5728,8 +5728,8 @@ typedef struct TriMapObject {
     PyObject* dst_match; // array object
     npy_bool* dst_match_data; // contiguous C array
 
-    PyObject* final_src_match; // array object
-    PyObject* final_dst_match; // array object
+    PyObject* final_src_fill; // array object
+    PyObject* final_dst_fill; // array object
 
     // register one
     TriMapOne* src_one;
@@ -5840,8 +5840,8 @@ TriMap_dealloc(TriMapObject *self) {
     // NOTE: we use XDECREF incase init fails before these objects get allocated
     Py_XDECREF(self->src_match);
     Py_XDECREF(self->dst_match);
-    Py_XDECREF(self->final_src_match);
-    Py_XDECREF(self->final_dst_match);
+    Py_XDECREF(self->final_src_fill);
+    Py_XDECREF(self->final_dst_fill);
 
     if (self->src_one != NULL) {
         PyMem_Free(self->src_one);
@@ -6066,7 +6066,18 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     npy_bool *final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_dst_match);
 
     // run across all assignments and set True where there is no match?
-
+    TriMapOne* o;
+    TriMapOne* o_end;
+    o = tm->src_one;
+    o_end = o + tm->src_one_count;
+    for (; o < o_end; o++) {
+        final_src_match_data[o->to] = NPY_TRUE;
+    }
+    o = tm->dst_one;
+    o_end = o + tm->dst_one_count;
+    for (; o < o_end; o++) {
+        final_dst_match_data[o->to] = NPY_TRUE;
+    }
 
 
     Py_DECREF(final_src_match);
@@ -6105,10 +6116,12 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
 # define TRANSFER_SCALARS(npy_type_to, npy_type_from) {                \
     npy_type_to* array_to_data = (npy_type_to*)PyArray_DATA(array_to); \
-    for (Py_ssize_t i = 0; i < one_count; i++) {                       \
-        array_to_data[one_pairs[i].to] = (npy_type_to)                 \
+    TriMapOne* o = one_pairs;                                          \
+    TriMapOne* o_end = o + one_count;                                  \
+    for (; o < o_end; o++) {                                           \
+        array_to_data[o->to] = (npy_type_to)                           \
                 *(npy_type_from*)PyArray_GETPTR1(                      \
-                array_from, one_pairs[i].from);                        \
+                array_from, o->from);                                  \
     }                                                                  \
     npy_type_to* t;                                                    \
     npy_type_to* t_end;                                                \
@@ -6154,9 +6167,11 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     npy_intp dst_pos;                                                      \
     npy_int64 f_pos;                                                       \
     PyArrayObject* dst;                                                    \
-    for (Py_ssize_t i = 0; i < one_count; i++) {                           \
-        f = (c_type*)PyArray_GETPTR1(array_from, one_pairs[i].from);       \
-        t = array_to_data + t_element_cp * one_pairs[i].to;                \
+    TriMapOne* o = one_pairs;                                              \
+    TriMapOne* o_end = o + one_count;                                      \
+    for (; o < o_end; o++) {                                               \
+        f = (c_type*)PyArray_GETPTR1(array_from, o->from);                 \
+        t = array_to_data + t_element_cp * o->to;                          \
         memcpy(t, f, f_element_size);                                      \
         memset(t + f_element_cp, '\0', gap);                               \
     }                                                                      \
