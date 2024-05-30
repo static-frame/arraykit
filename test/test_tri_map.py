@@ -46,7 +46,8 @@ class TestUnit(unittest.TestCase):
 
     def test_tri_map_register_one_c(self) -> None:
         tm = TriMap(20, 30)
-        self.assertFalse(tm.is_many())
+        with self.assertRaises(RuntimeError):
+            self.assertFalse(tm.is_many())
 
         with self.assertRaises(ValueError):
             tm.register_one(22, 0)
@@ -55,6 +56,7 @@ class TestUnit(unittest.TestCase):
 
         tm.register_one(19, 29)
         tm.register_one(18, 29)
+        tm.finalize()
         self.assertTrue(tm.is_many())
 
 
@@ -63,6 +65,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(0, 0)
         tm.register_one(1, 1)
         tm.register_one(2, -1)
+        tm.finalize()
         self.assertTrue(tm.src_no_fill())
         self.assertFalse(tm.dst_no_fill())
 
@@ -703,6 +706,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])

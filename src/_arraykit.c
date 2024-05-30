@@ -5942,6 +5942,10 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
             &dst_from)) {
         return NULL;
     }
+    if (self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Cannot register post finalization");
+        return NULL;
+    }
     if (AK_TM_register_one(self, src_from, dst_from)) {
         return NULL;
     }
@@ -5950,13 +5954,17 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
 
 static PyObject*
 TriMap_register_unmatched_dst(TriMapObject *self) {
+    if (self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Cannot register post finalization");
+        return NULL;
+    }
     PyArrayObject* dst_match_array = (PyArrayObject *)self->dst_match;
     PyObject* sum_scalar = PyArray_Sum(
             dst_match_array,
             0,
             NPY_INT64, // this converts before sum; not sure this is necessary
             NULL);
-    if (!sum_scalar) {
+    if (sum_scalar == NULL) {
         return NULL;
     }
     // for a 1D array PyArray_SUM returns a scalar
@@ -5968,11 +5976,15 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
                 self->dst_match, // PyObject
                 "__invert__",
                 NULL);
-        if (!dst_unmatched) {
+        if (dst_unmatched == NULL) {
             return NULL;
         }
         // derive indices for unmatched locations, call each with register_one
         PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
+        if (nonzero == NULL) {
+            Py_DECREF((PyObject*)dst_unmatched);
+            return NULL;
+        }
         // borrow ref to array in 1-element tuple
         PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
         npy_intp *index_data = (npy_intp *)PyArray_DATA(indices);
@@ -5996,11 +6008,14 @@ static PyObject*
 TriMap_register_many(TriMapObject *self, PyObject *args) {
     Py_ssize_t src_from;
     PyArrayObject* dst_from;
-
     if (!PyArg_ParseTuple(args,
             "nO!:register_many",
             &src_from,
             &PyArray_Type, &dst_from)) {
+        return NULL;
+    }
+    if (self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Cannot register post finalization");
         return NULL;
     }
     int dst_from_type = PyArray_TYPE(dst_from);
@@ -6046,20 +6061,28 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
 }
 
 //------------------------------------------------------------------------------
-// Optionally set Booleans in `final_match_data` to determine where values will be set for source and ddst
+// Determine, for src and dst, which indices will need fill values, and store those indices as an integer array in final_src_fill, final_dst_fill
 static PyObject *
 TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     TriMapObject* tm = (TriMapObject*)self;
 
+    // predefine all PyObjects to use goto error
+    PyObject* final_src_match = NULL;
+    PyObject* final_dst_match = NULL;
+    PyObject* final_src_unmatched = NULL;
+    PyObject* final_dst_unmatched = NULL;
+    PyObject* nonzero_dst = NULL;
+    PyObject* nonzero_src = NULL;
+
     npy_intp dims[] = {tm->len};
 
-    PyObject* final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
+    final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
     if (final_src_match == NULL) {
-        return NULL;
+        goto error;
     }
-    PyObject* final_dst_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
+    final_dst_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
     if (final_dst_match == NULL) {
-        return NULL;
+        goto error;
     }
 
     npy_bool* final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_src_match);
@@ -6086,31 +6109,76 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     TriMapManyTo* m_end = m + tm->many_count;
 
     for (; m < m_end; m++) {
-        s = final_src_match_data + m->start;
         d = final_dst_match_data + m->start;
+        s = final_src_match_data + m->start;
         end = final_src_match_data + m->stop;
         while (s < end) {
             *s++ = NPY_TRUE;
             *d++ = NPY_TRUE;
         }
     }
+    // NOTE: could sum first to see if nonzero call is necessary; would skip invert and nonzero calls
+    final_src_unmatched = PyObject_CallMethod(
+            final_src_match, // PyObject
+            "__invert__",
+            NULL);
+    if (final_src_unmatched == NULL) {
+        goto error;
+    }
 
+    final_dst_unmatched = PyObject_CallMethod(
+            final_dst_match, // PyObject
+            "__invert__",
+            NULL);
+    if (final_dst_unmatched == NULL) {
+        goto error;
+    }
 
+    nonzero_src = PyArray_Nonzero((PyArrayObject*)final_src_unmatched);
+    if (nonzero_src == NULL) {
+        goto error;
+    }
+    nonzero_dst = PyArray_Nonzero((PyArrayObject*)final_dst_unmatched);
+    if (nonzero_dst == NULL) {
+        goto error;
+    }
 
-    // AK_DEBUG_MSG_OBJ("final_src_match", final_src_match);
-    // AK_DEBUG_MSG_OBJ("final_dst_match", final_dst_match);
+    // get borrwed ref; incref as will be decref on instacde dealloc
+    tm->final_src_fill = PyTuple_GET_ITEM(nonzero_src, 0);
+    Py_INCREF(tm->final_src_fill);
+
+    tm->final_dst_fill = PyTuple_GET_ITEM(nonzero_dst, 0);
+    Py_INCREF(tm->final_dst_fill);
 
 
     Py_DECREF(final_src_match);
     Py_DECREF(final_dst_match);
+    Py_DECREF(final_src_unmatched);
+    Py_DECREF(final_dst_unmatched);
+    Py_DECREF(nonzero_src);
+    Py_DECREF(nonzero_dst);
 
+    // AK_DEBUG_MSG_OBJ("final_src_unmatched", tm->final_src_fill);
+    // AK_DEBUG_MSG_OBJ("final_dst_unmatched", tm->final_dst_fill);
     tm->finalized = true;
     Py_RETURN_NONE;
+error: // all PyObject initialized to NULL, no more than 1 ref
+    Py_XDECREF(final_src_match);
+    Py_XDECREF(final_dst_match);
+    Py_XDECREF(final_src_unmatched);
+    Py_XDECREF(final_dst_unmatched);
+    Py_XDECREF(nonzero_src);
+    Py_XDECREF(nonzero_dst);
+    return NULL;
 }
 
 
 static PyObject*
 TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
     if (self->is_many) {
         Py_RETURN_TRUE;
     }
@@ -6120,6 +6188,10 @@ TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 // Return True if the `src` will not need a fill. This is only correct of `src` is binding to a left join or an inner join.
 static PyObject*
 TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
     if (self->src_connected == self->len) {
         Py_RETURN_TRUE;
     }
@@ -6129,6 +6201,10 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 // Return True if the `dst` will not need a fill. This is only correct of `dst` is binding to a left join or an inner join.
 static PyObject*
 TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
     if (self->dst_connected == self->len) {
         Py_RETURN_TRUE;
     }
