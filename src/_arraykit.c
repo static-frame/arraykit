@@ -6053,27 +6053,31 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
     npy_intp dims[] = {tm->len};
 
-    tm->final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
-    if (tm->final_src_match == NULL) {
+    PyObject* final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
+    if (final_src_match == NULL) {
         return NULL;
     }
-    tm->final_dst_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
-    if (tm->final_dst_match == NULL) {
+    PyObject* final_dst_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
+    if (final_dst_match == NULL) {
         return NULL;
     }
 
-    npy_bool *final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->final_src_match);
-    npy_bool *final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->final_dst_match);
+    npy_bool *final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_src_match);
+    npy_bool *final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_dst_match);
 
     // run across all assignments and set True where there is no match?
 
+
+
+    Py_DECREF(final_src_match);
+    Py_DECREF(final_dst_match);
 
     tm->finalized = true;
     Py_RETURN_NONE;
 }
 
 
-static PyObject *
+static PyObject*
 TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->is_many) {
         Py_RETURN_TRUE;
@@ -6082,7 +6086,7 @@ TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 // Return True if the `src` will not need a fill. This is only correct of `src` is binding to a left join or an inner join.
-static PyObject *
+static PyObject*
 TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->src_connected == self->len) {
         Py_RETURN_TRUE;
@@ -6091,7 +6095,7 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 // Return True if the `dst` will not need a fill. This is only correct of `dst` is binding to a left join or an inner join.
-static PyObject *
+static PyObject*
 TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (self->dst_connected == self->len) {
         Py_RETURN_TRUE;
