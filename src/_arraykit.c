@@ -5741,8 +5741,8 @@ typedef struct TriMapObject {
     Py_ssize_t dst_one_capacity;
 
     // register_many
-    TriMapManyTo* many_to; // two integers
-    TriMapManyFrom* many_from; // int and array
+    TriMapManyTo* many_to; // two integers for contiguous assignment region
+    TriMapManyFrom* many_from; // int and array, for src and dst (together)
     Py_ssize_t many_count;
     Py_ssize_t many_capacity;
 
@@ -6025,7 +6025,7 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
             return NULL;
         }
     }
-    // store structs on arrays
+    // define contiguous region in final to map to
     self->many_to[self->many_count] = (TriMapManyTo){self->len, self->len + increment};
 
     Py_INCREF((PyObject*)dst_from); // decrefs on dealloc
@@ -6062,10 +6062,9 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         return NULL;
     }
 
-    npy_bool *final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_src_match);
-    npy_bool *final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_dst_match);
+    npy_bool* final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_src_match);
+    npy_bool* final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_dst_match);
 
-    // run across all assignments and set True where there is no match?
     TriMapOne* o;
     TriMapOne* o_end;
     o = tm->src_one;
@@ -6078,6 +6077,28 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     for (; o < o_end; o++) {
         final_dst_match_data[o->to] = NPY_TRUE;
     }
+
+    // many assign from src and dst into the same final positions
+    npy_bool* s;
+    npy_bool* d;
+    npy_bool* end;
+    TriMapManyTo* m = tm->many_to;
+    TriMapManyTo* m_end = m + tm->many_count;
+
+    for (; m < m_end; m++) {
+        s = final_src_match_data + m->start;
+        d = final_dst_match_data + m->start;
+        end = final_src_match_data + m->stop;
+        while (s < end) {
+            *s++ = NPY_TRUE;
+            *d++ = NPY_TRUE;
+        }
+    }
+
+
+
+    // AK_DEBUG_MSG_OBJ("final_src_match", final_src_match);
+    // AK_DEBUG_MSG_OBJ("final_dst_match", final_dst_match);
 
 
     Py_DECREF(final_src_match);

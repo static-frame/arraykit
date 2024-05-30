@@ -379,6 +379,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(1, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
         tm.register_one(2, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, None, np.dtype(np.object_))
         del src
@@ -885,6 +886,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint8))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -958,6 +960,8 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, -1)
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
+
+        tm.finalize()
 
         post_dst1 = tm.map_dst_fill(dst, 3, np.dtype(object))
         self.assertEqual(post_dst1.tolist(), ['a', 'a', 'a', 3, 'cc', 'cc', 3])
