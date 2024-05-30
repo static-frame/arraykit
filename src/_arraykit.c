@@ -6066,6 +6066,11 @@ static PyObject *
 TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     TriMapObject* tm = (TriMapObject*)self;
 
+    if (self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Cannot call finalize twice");
+        return NULL;
+    }
+
     // predefine all PyObjects to use goto error
     PyObject* final_src_match = NULL;
     PyObject* final_dst_match = NULL;
@@ -6606,6 +6611,10 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
         PyErr_SetString(PyExc_TypeError, "Must provide an array");
         return NULL;
     }
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
     PyArrayObject* array_from = (PyArrayObject*)arg;
     bool from_src = true;
     return AK_TM_map_no_fill(self, from_src, array_from);
@@ -6615,6 +6624,10 @@ static PyObject*
 TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
     if (!PyArray_Check(arg)) {
         PyErr_SetString(PyExc_TypeError, "Must provide an array");
+        return NULL;
+    }
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
         return NULL;
     }
     PyArrayObject* array_from = (PyArrayObject*)arg;
@@ -6716,6 +6729,10 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
             )) {
         return NULL;
     }
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
     bool from_src = true;
     return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
 }
@@ -6732,6 +6749,10 @@ TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
             &fill_value,
             &PyArrayDescr_Type, &fill_value_dtype
             )) {
+        return NULL;
+    }
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
         return NULL;
     }
     bool from_src = false;

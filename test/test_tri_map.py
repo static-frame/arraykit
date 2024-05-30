@@ -20,6 +20,13 @@ class TestUnit(unittest.TestCase):
         tm = TriMap(10_000, 20_000)
         self.assertEqual(str(tm), '<arraykit.TriMap(len: 0, src_connected: 0, dst_connected: 0, is_many: false, is_finalized: false)>')
 
+    def test_tri_map_finalize_a(self) -> None:
+
+        tm = TriMap(10, 20)
+        tm.finalize()
+        with self.assertRaises(RuntimeError):
+            tm.finalize()
+
 
     def test_tri_map_register_one_a(self) -> None:
         tm = TriMap(500, 200)
@@ -131,6 +138,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, -1)
         tm.register_many(2, np.array([0, 1], dtype=np.int64))
         tm.register_many(3, np.array([2, 3], dtype=np.int64))
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         self.assertFalse(post_src.flags.writeable)
@@ -149,6 +157,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, 1)
         tm.register_one(2, 2)
         tm.register_one(3, 3)
+        tm.finalize()
 
         post = tm.map_src_no_fill(src)
         del src
@@ -161,6 +170,7 @@ class TestUnit(unittest.TestCase):
         tm = TriMap(4, 4)
         tm.register_many(0, np.array([1, 3], dtype=np.int64))
         tm.register_many(1, np.array([0, 2], dtype=np.int64))
+        tm.finalize()
 
         post = tm.map_src_no_fill(src)
         del src
@@ -175,6 +185,8 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, 1)
         tm.register_one(2, 2)
         tm.register_one(3, 3)
+        tm.finalize()
+
         post = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post.flags.writeable)
@@ -186,6 +198,7 @@ class TestUnit(unittest.TestCase):
         tm = TriMap(4, 4)
         tm.register_many(0, np.array([1, 3], dtype=np.int64))
         tm.register_many(1, np.array([0, 2], dtype=np.int64))
+        tm.finalize()
 
         post = tm.map_src_no_fill(src)
         del src
@@ -205,6 +218,8 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 2)
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
+
         post = tm.map_src_fill(src, -1, np.dtype(np.int64))
         self.assertFalse(post.flags.writeable)
         self.assertEqual(post.tolist(), [10, 20, 30, 40, -1, -1])
@@ -219,6 +234,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 2)
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post = tm.map_src_fill(src, 'na', np.dtype(str))
         self.assertFalse(post.flags.writeable)
@@ -233,6 +249,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 2)
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post = tm.map_src_fill(src, 'na', np.dtype(str))
         self.assertFalse(post.flags.writeable)
@@ -249,6 +266,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, -1)
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         del src
@@ -271,6 +289,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, 1)
         tm.register_one(4, 2)
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         del src
@@ -292,6 +311,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, 1)
         tm.register_one(4, 2)
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         del src
@@ -312,7 +332,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(1, np.array([1, 3], dtype=np.dtype(np.int64)))
         tm.register_many(2, np.array([0, 2, 4], dtype=np.dtype(np.int64)))
         tm.register_many(3, np.array([0, 2, 4], dtype=np.dtype(np.int64)))
-
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         del src
@@ -338,6 +358,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(3, -1)
         tm.register_one(4, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, -20, np.dtype(np.int64))
         del src
@@ -360,6 +381,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, 2)
         tm.register_one(2, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, None, np.dtype(np.object_))
         del src
@@ -406,6 +428,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(0, -1)
         tm.register_many(1, np.array([0, 1, 2], dtype=np.dtype(np.int64)))
         tm.register_one(2, -1)
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, None, np.dtype(np.object_))
         self.assertEqual(post_src.tolist(), [True, False, False, False, True])
@@ -423,6 +446,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(0, -1)
         tm.register_many(1, np.array([0, 1, 2], dtype=np.dtype(np.int64)))
         tm.register_one(2, -1)
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, False, np.dtype(np.bool_))
         self.assertEqual(post_src.tolist(), [True, False, False, False, True])
@@ -442,6 +466,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, -10, np.dtype(np.int8))
         del src
@@ -464,6 +489,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, -10, np.dtype(np.int8))
         del src
@@ -487,6 +513,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, -10, np.dtype(np.int8))
         del src
@@ -510,6 +537,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint8))
         del src
@@ -533,6 +561,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint32))
         del src
@@ -556,6 +585,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint64))
         del src
@@ -579,6 +609,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int16))
         del src
@@ -602,6 +633,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int32))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -623,6 +655,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int32))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -643,6 +676,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -663,6 +697,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -684,6 +719,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -728,6 +764,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -749,6 +786,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -769,6 +807,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.float64))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -789,6 +828,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int8))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -809,6 +849,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.uint16))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -829,6 +870,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.float32))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -849,6 +891,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.float16))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -870,6 +913,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 3)
         tm.register_one(3, 3)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, 17, np.dtype(np.int8))
         self.assertEqual(post_src.tolist(), [0, 20, 20, 8, 8, 17])
@@ -910,6 +954,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, 1)
         tm.register_one(4, 2)
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         self.assertEqual(post_src.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
@@ -928,6 +973,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, -1)
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
@@ -945,6 +991,7 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, -1)
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
+        tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
         self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
@@ -964,7 +1011,6 @@ class TestUnit(unittest.TestCase):
         tm.register_one(1, -1)
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
-
         tm.finalize()
 
         post_dst1 = tm.map_dst_fill(dst, 3, np.dtype(object))
@@ -983,6 +1029,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, nat, np.dtype('datetime64'))
         self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
@@ -1006,6 +1053,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, '1999-12', np.dtype('datetime64'))
         self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
@@ -1027,6 +1075,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, '1999', np.dtype('datetime64[Y]'))
         self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
@@ -1049,6 +1098,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, -1)
         tm.register_unmatched_dst()
+        tm.finalize()
 
         post_src = tm.map_src_fill(src, '1999-09-09', np.dtype('datetime64[D]'))
         self.assertEqual(post_src.dtype, np.dtype('datetime64[D]'))
