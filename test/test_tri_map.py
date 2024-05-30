@@ -18,7 +18,19 @@ class TestUnit(unittest.TestCase):
 
     def test_tri_map_repr_a(self) -> None:
         tm = TriMap(10_000, 20_000)
-        self.assertEqual(str(tm), '<arraykit.TriMap(len: 0, src_connected: 0, dst_connected: 0, is_many: false, is_finalized: false)>')
+        self.assertEqual(str(tm), '<arraykit.TriMap(len: 0, src_fill: -1, dst_fill: -1, is_many: false, is_finalized: false)>')
+
+    def test_tri_map_repr_b(self) -> None:
+        tm = TriMap(6, 6)
+        tm.register_many(0, np.array([0, 1], dtype=np.int64))
+        tm.register_one(1, -1)
+        tm.register_one(2, -1)
+        tm.register_one(3, -1)
+        tm.register_one(4, -1)
+        tm.register_one(5, -1)
+        tm.finalize()
+        self.assertEqual(str(tm), '<arraykit.TriMap(len: 7, src_fill: 0, dst_fill: 5, is_many: true, is_finalized: true)>')
+
 
     def test_tri_map_finalize_a(self) -> None:
 
@@ -49,7 +61,7 @@ class TestUnit(unittest.TestCase):
         for i in range(2000):
             tm.register_one(i, i)
         tm.finalize()
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 2000, src_connected: 2000, dst_connected: 2000, is_many: false, is_finalized: true)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 2000, src_fill: 0, dst_fill: 0, is_many: false, is_finalized: true)>')
 
     def test_tri_map_register_one_c(self) -> None:
         tm = TriMap(20, 30)
@@ -83,10 +95,10 @@ class TestUnit(unittest.TestCase):
         tm.register_one(2, 2)
         tm.register_unmatched_dst()
 
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 8, src_connected: 3, dst_connected: 8, is_many: false, is_finalized: false)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 8, src_fill: -1, dst_fill: -1, is_many: false, is_finalized: false)>')
 
         tm.finalize()
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 8, src_connected: 3, dst_connected: 8, is_many: false, is_finalized: true)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 8, src_fill: 5, dst_fill: 0, is_many: false, is_finalized: true)>')
 
 
     def test_tri_map_register_many_a(self) -> None:
@@ -111,21 +123,21 @@ class TestUnit(unittest.TestCase):
         tm = TriMap(100, 50)
         tm.register_many(3, np.array([2, 5, 8], dtype=np.int64))
         tm.finalize()
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 3, src_connected: 3, dst_connected: 3, is_many: true, is_finalized: true)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 3, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>')
 
     def test_tri_map_register_many_d1(self) -> None:
         tm = TriMap(100, 50)
         for i in range(100):
             tm.register_many(i, np.array([3, 20], dtype=np.int64))
         tm.finalize()
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true, is_finalized: true)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>')
 
     def test_tri_map_register_many_d2(self) -> None:
         tm = TriMap(100, 50)
         for i in range(100):
             tm.register_many(i, np.array([3, 20], dtype=np.int64))
         tm.finalize()
-        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_connected: 200, dst_connected: 200, is_many: true, is_finalized: true)>')
+        self.assertEqual(repr(tm), '<arraykit.TriMap(len: 200, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>')
 
     #---------------------------------------------------------------------------
 
@@ -597,6 +609,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post_dst.dtype, np.dtype(np.uint64))
         self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
 
+        self.assertEqual(str(tm), '<arraykit.TriMap(len: 6, src_fill: 1, dst_fill: 1, is_many: true, is_finalized: true)>')
 
     def test_tri_map_map_uint_d(self) -> None:
         src = np.array([0, 20, 8, 8], dtype=np.uint8)
@@ -1016,6 +1029,7 @@ class TestUnit(unittest.TestCase):
         post_dst1 = tm.map_dst_fill(dst, 3, np.dtype(object))
         self.assertEqual(post_dst1.tolist(), ['a', 'a', 'a', 3, 'cc', 'cc', 3])
 
+        self.assertEqual(str(tm), '<arraykit.TriMap(len: 7, src_fill: 0, dst_fill: 2, is_many: true, is_finalized: true)>')
 
     #---------------------------------------------------------------------------
 

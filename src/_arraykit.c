@@ -5718,8 +5718,8 @@ typedef struct TriMapObject {
     Py_ssize_t src_len;
     Py_ssize_t dst_len;
     Py_ssize_t len;
-    Py_ssize_t src_connected;
-    Py_ssize_t dst_connected;
+    // Py_ssize_t src_connected;
+    // Py_ssize_t dst_connected;
     bool is_many;
     bool finalized;
 
@@ -5781,8 +5781,8 @@ TriMap_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     tm->is_many = false;
     tm->finalized = false;
     tm->len = 0;
-    tm->src_connected = 0;
-    tm->dst_connected = 0;
+    // tm->src_connected = 0;
+    // tm->dst_connected = 0;
 
     // we create arrays, and also pre-extract pointers to array data for fast insertion; we keep the array for optimal summing routines
     npy_intp dims_src_len[] = {src_len};
@@ -5869,11 +5869,22 @@ TriMap_repr(TriMapObject *self) {
     const char *is_many = self->is_many ? "true" : "false";
     const char *is_finalized = self->finalized ? "true" : "false";
 
-    return PyUnicode_FromFormat("<%s(len: %i, src_connected: %i, dst_connected: %i, is_many: %s, is_finalized: %s)>",
+    npy_intp src_fill;
+    npy_intp dst_fill;
+    if (self->finalized) {
+        src_fill = PyArray_SIZE((PyArrayObject*)self->final_src_fill);
+        dst_fill = PyArray_SIZE((PyArrayObject*)self->final_dst_fill);
+    }
+    else {
+        src_fill = -1;
+        dst_fill = -1;
+    }
+
+    return PyUnicode_FromFormat("<%s(len: %i, src_fill: %i, dst_fill: %i, is_many: %s, is_finalized: %s)>",
             Py_TYPE(self)->tp_name,
             self->len,
-            self->src_connected,
-            self->dst_connected,
+            src_fill,
+            dst_fill,
             is_many,
             is_finalized);
 }
@@ -5901,7 +5912,7 @@ AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
         }
         tm->src_one[tm->src_one_count] = (TriMapOne){src_from, tm->len};
         tm->src_one_count += 1;
-        tm->src_connected += 1;
+        // tm->src_connected += 1;
     }
     if (dst_matched) {
         if (AK_UNLIKELY(tm->dst_one_count == tm->dst_one_capacity)) {
@@ -5915,7 +5926,7 @@ AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
         }
         tm->dst_one[tm->dst_one_count] = (TriMapOne){dst_from, tm->len};
         tm->dst_one_count += 1;
-        tm->dst_connected += 1;
+        // tm->dst_connected += 1;
     }
     if (src_matched && dst_matched) {
         if (!tm->is_many) {
@@ -6053,8 +6064,8 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
         npy_int64 pos = *(npy_int64*)PyArray_GETPTR1(dst_from, i); // always int64
         self->dst_match_data[pos] = NPY_TRUE;
     }
-    self->src_connected += increment;
-    self->dst_connected += increment;
+    // self->src_connected += increment;
+    // self->dst_connected += increment;
     self->len += increment;
     self->is_many = true;
     Py_RETURN_NONE;
@@ -6155,7 +6166,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     tm->final_dst_fill = PyTuple_GET_ITEM(nonzero_dst, 0);
     Py_INCREF(tm->final_dst_fill);
 
-
     Py_DECREF(final_src_match);
     Py_DECREF(final_dst_match);
     Py_DECREF(final_src_unmatched);
@@ -6197,7 +6207,7 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
         return NULL;
     }
-    if (self->src_connected == self->len) {
+    if (PyArray_SIZE((PyArrayObject*)self->final_src_fill) == 0) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
@@ -6210,7 +6220,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
         return NULL;
     }
-    if (self->dst_connected == self->len) {
+    if (PyArray_SIZE((PyArrayObject*)self->final_dst_fill) == 0) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
