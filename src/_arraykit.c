@@ -6061,7 +6061,12 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (tm->final_dst_match == NULL) {
         return NULL;
     }
+
+    npy_bool *final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->final_src_match);
+    npy_bool *final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)tm->final_dst_match);
+
     // run across all assignments and set True where there is no match?
+
 
     tm->finalized = true;
     Py_RETURN_NONE;
