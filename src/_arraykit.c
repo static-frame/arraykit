@@ -1574,7 +1574,6 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     // initialize all values to False
     PyObject *array = PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
     if (array == NULL) {
-        // expected array to steal dtype reference
         return NULL;
     }
 
@@ -5729,8 +5728,8 @@ typedef struct TriMapObject {
     PyObject* dst_match; // array object
     npy_bool* dst_match_data; // contiguous C array
 
-    npy_bool* final_fill_src; // contiguous C array
-    npy_bool* final_fill_dst; // contiguous C array
+    PyObject* final_src_match; // array object
+    PyObject* final_dst_match; // array object
 
     // register one
     TriMapOne* src_one;
@@ -5841,6 +5840,8 @@ TriMap_dealloc(TriMapObject *self) {
     // NOTE: we use XDECREF incase init fails before these objects get allocated
     Py_XDECREF(self->src_match);
     Py_XDECREF(self->dst_match);
+    Py_XDECREF(self->final_src_match);
+    Py_XDECREF(self->final_dst_match);
 
     if (self->src_one != NULL) {
         PyMem_Free(self->src_one);
@@ -5859,12 +5860,6 @@ TriMap_dealloc(TriMapObject *self) {
         }
         PyMem_Free(self->many_from);
     }
-    if (self->final_fill_src != NULL) {
-        PyMem_Free(self->final_fill_src);
-    }
-    if (self->final_fill_dst != NULL) {
-        PyMem_Free(self->final_fill_dst);
-    }
 
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -5872,12 +5867,15 @@ TriMap_dealloc(TriMapObject *self) {
 static PyObject *
 TriMap_repr(TriMapObject *self) {
     const char *is_many = self->is_many ? "true" : "false";
-    return PyUnicode_FromFormat("<%s(len: %i, src_connected: %i, dst_connected: %i, is_many: %s)>",
+    const char *is_finalized = self->finalized ? "true" : "false";
+
+    return PyUnicode_FromFormat("<%s(len: %i, src_connected: %i, dst_connected: %i, is_many: %s, is_finalized: %s)>",
             Py_TYPE(self)->tp_name,
             self->len,
             self->src_connected,
             self->dst_connected,
-            is_many);
+            is_many,
+            is_finalized);
 }
 
 // Provide the integer positions connecting the `src` to the `dst`. If there is no match to `src` or `dst`, the unmatched position can be provided with -1. From each side, a connection is documented to the current `len`. Each time this is called `len` is incremented, indicating the inrease in position of th `final`. Return NULL on error
@@ -6053,8 +6051,16 @@ static PyObject *
 TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     TriMapObject* tm = (TriMapObject*)self;
 
-    tm->final_fill_src = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
-    tm->final_fill_dst = (npy_bool*)PyMem_Malloc(sizeof(npy_bool) * tm->len);
+    npy_intp dims[] = {tm->len};
+
+    tm->final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
+    if (tm->final_src_match == NULL) {
+        return NULL;
+    }
+    tm->final_dst_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
+    if (tm->final_dst_match == NULL) {
+        return NULL;
+    }
     // run across all assignments and set True where there is no match?
 
     tm->finalized = true;
@@ -6616,6 +6622,7 @@ static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
     {"register_unmatched_dst", (PyCFunction)TriMap_register_unmatched_dst, METH_NOARGS, NULL},
     {"register_many", (PyCFunction)TriMap_register_many, METH_VARARGS, NULL},
+    {"finalize", (PyCFunction)TriMap_finalize, METH_NOARGS, NULL},
     {"is_many", (PyCFunction)TriMap_is_many, METH_NOARGS, NULL},
     {"src_no_fill", (PyCFunction)TriMap_src_no_fill, METH_NOARGS, NULL},
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
@@ -6636,7 +6643,7 @@ static PyTypeObject TriMapType = {
     .tp_name = "arraykit.TriMap",
     .tp_new = TriMap_new,
     .tp_init = TriMap_init,
-    .tp_repr = (reprfunc) TriMap_repr,
+    .tp_repr = (reprfunc)TriMap_repr,
 };
 
 
