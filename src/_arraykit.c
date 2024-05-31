@@ -6081,7 +6081,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         PyErr_SetString(PyExc_RuntimeError, "Cannot call finalize twice");
         return NULL;
     }
-
     // predefine all PyObjects to use goto error
     PyObject* final_src_match = NULL;
     PyObject* final_dst_match = NULL;
@@ -6173,8 +6172,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     Py_DECREF(nonzero_src);
     Py_DECREF(nonzero_dst);
 
-    // AK_DEBUG_MSG_OBJ("final_src_unmatched", tm->final_src_fill);
-    // AK_DEBUG_MSG_OBJ("final_dst_unmatched", tm->final_dst_fill);
     tm->finalized = true;
     Py_RETURN_NONE;
 error: // all PyObject initialized to NULL, no more than 1 ref
@@ -6514,14 +6511,69 @@ AK_TM_transfer(TriMapObject* tm,
             TRANSFER_SCALARS(npy_int64, npy_int64);
             return 0;
         }
-        // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
-        case NPY_OBJECT: {
-            bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
-            PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to); // contiguous
-            PyObject* pyo;
-            void* f;
-            for (Py_ssize_t i = 0; i < one_count; i++) {
-                f = PyArray_GETPTR1(array_from, one_pairs[i].from);
+    }
+    PyErr_SetString(PyExc_TypeError, "No handling for types");
+    return -1;
+}
+
+
+static inline int
+AK_TM_transfer_object(TriMapObject* tm,
+        bool from_src,
+        PyArrayObject* array_from,
+        PyArrayObject* array_to
+        ) {
+    Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
+    TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
+
+    // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
+    bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
+
+    // the passed in object array is assumed to be contiguous and have NULL (not None) in each position
+    PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
+    PyObject* pyo;
+    void* f;
+    for (Py_ssize_t i = 0; i < one_count; i++) {
+        f = PyArray_GETPTR1(array_from, one_pairs[i].from);
+        if (f_is_obj) {
+            pyo = *(PyObject**)f;
+            Py_INCREF(pyo);
+        }
+        else {
+            pyo = PyArray_GETITEM(array_from, f);
+        }
+        array_to_data[one_pairs[i].to] = pyo;
+    }
+    PyObject** t;
+    PyObject** t_end;
+    npy_intp dst_pos;
+    npy_int64 f_pos;
+    PyArrayObject* dst;
+    for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+        t = array_to_data + tm->many_to[i].start;
+        t_end = array_to_data + tm->many_to[i].stop;
+
+        if (from_src) {
+            f = PyArray_GETPTR1(array_from, tm->many_from[i].src);
+            if (f_is_obj) {
+                pyo = *(PyObject**)f;
+                Py_INCREF(pyo); // pre add new ref so equal to PyArray_GETITEM
+            }
+            else {
+                pyo = PyArray_GETITEM(array_from, f); // given a new ref
+            }
+            while (t < t_end) {
+                Py_INCREF(pyo); // one more than we need
+                *t++ = pyo;
+            }
+            Py_DECREF(pyo); // remove the extra one
+        }
+        else { // from_dst, dst is an array
+            dst_pos = 0;
+            dst = tm->many_from[i].dst;
+            while (t < t_end) {
+                f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
+                f = PyArray_GETPTR1(array_from, f_pos);
                 if (f_is_obj) {
                     pyo = *(PyObject**)f;
                     Py_INCREF(pyo);
@@ -6529,60 +6581,15 @@ AK_TM_transfer(TriMapObject* tm,
                 else {
                     pyo = PyArray_GETITEM(array_from, f);
                 }
-                // if (is_filled) { // TODO: need to not pre-set objects
-                //     Py_DECREF(array_to_data[one_pairs[i].to]);
-                // }
-                array_to_data[one_pairs[i].to] = pyo;
+                *t++ = pyo;
+                dst_pos++;
             }
-            PyObject** t;
-            PyObject** t_end;
-            npy_intp dst_pos;
-            npy_int64 f_pos;
-            PyArrayObject* dst;
-            for (Py_ssize_t i = 0; i < tm->many_count; i++) {
-                t = array_to_data + tm->many_to[i].start;
-                t_end = array_to_data + tm->many_to[i].stop;
-
-                if (from_src) {
-                    f = PyArray_GETPTR1(array_from, tm->many_from[i].src);
-                    if (f_is_obj) {
-                        pyo = *(PyObject**)f;
-                        Py_INCREF(pyo); // pre add new ref so equal to PyArray_GETITEM
-                    }
-                    else {
-                        pyo = PyArray_GETITEM(array_from, f); // given a new ref
-                    }
-                    while (t < t_end) {
-                        Py_INCREF(pyo); // one more than we need
-                        *t++ = pyo;
-                    }
-                    Py_DECREF(pyo); // remove the extra one
-                }
-                else { // from_dst, dst is an array
-                    dst_pos = 0;
-                    dst = tm->many_from[i].dst;
-                    while (t < t_end) {
-                        f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
-                        f = PyArray_GETPTR1(array_from, f_pos);
-                        if (f_is_obj) {
-                            pyo = *(PyObject**)f;
-                            Py_INCREF(pyo);
-                        }
-                        else {
-                            pyo = PyArray_GETITEM(array_from, f);
-                        }
-                        *t++ = pyo;
-                        dst_pos++;
-                    }
-                }
-            }
-            return 0;
         }
     }
-    PyErr_SetString(PyExc_TypeError, "No handling for types");
-    return -1;
-}
 
+    // TODO: insert fill value at all fill locations
+    return 0;
+}
 
 // Returns NULL on error.
 static inline PyObject*
@@ -6658,11 +6665,13 @@ AK_TM_map_fill(TriMapObject* tm,
     }
     // passing a borrowed ref; returns a new ref
     PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
+    bool dtype_is_obj = dtype->type_num == NPY_OBJECT;
 
     npy_intp dims[] = {tm->len};
     PyArrayObject* array_to;
-    if (dtype->type_num == NPY_OBJECT) {
+    if (dtype_is_obj) {
         Py_DECREF(dtype); // not needed
+        // will initialize to NULL, not None
         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
         Py_INCREF(array_from); // normalize refs when casting
     }
@@ -6686,18 +6695,27 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    // Most simple is to fill with scalar, then overwrite values as needed; for flexilbe sized dtypes this might be very inefficient. Alternative is to discover sites that need fill values and write them, though that will require a bunch of type branching
-    // we assume this increfs object fill_values correctly
-    if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
-        Py_DECREF((PyObject*)array_to);
-        Py_DECREF((PyObject*)array_from);
-        return NULL;
+    // Most simple is to fill with scalar, then overwrite values as needed; for flexilbe sized dtypes this might be very inefficient.
+    if (dtype_is_obj) {
+        if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            Py_DECREF((PyObject*)array_from);
+            return NULL;
+        }
     }
-    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
-        Py_DECREF((PyObject*)array_to);
-        Py_DECREF((PyObject*)array_from);
-        return NULL;
+    else {
+        if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
+            Py_DECREF((PyObject*)array_to);
+            Py_DECREF((PyObject*)array_from);
+            return NULL;
+        }
+        if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            Py_DECREF((PyObject*)array_from);
+            return NULL;
+        }
     }
+
     Py_DECREF((PyObject*)array_from); // ref inc for this function
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
