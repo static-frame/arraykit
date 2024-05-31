@@ -6512,6 +6512,8 @@ AK_TM_transfer(TriMapObject* tm,
             return 0;
         }
     }
+    AK_DEBUG_MSG_OBJ("array_to", (PyObject*)array_to);
+    AK_DEBUG_MSG_OBJ("array_from", (PyObject*)array_from);
     PyErr_SetString(PyExc_TypeError, "No handling for types");
     return -1;
 }
@@ -6591,6 +6593,18 @@ AK_TM_transfer_object(TriMapObject* tm,
     return 0;
 }
 
+// Returns -1 on error.
+static inline int
+AK_TM_fill_object(TriMapObject* tm,
+        bool from_src,
+        PyArrayObject* array_to,
+        PyObject* fill_value) {
+    Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
+    TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
+    // TODO
+    return 0;
+}
+
 // Returns NULL on error.
 static inline PyObject*
 AK_TM_map_no_fill(TriMapObject* tm,
@@ -6602,7 +6616,9 @@ AK_TM_map_no_fill(TriMapObject* tm,
     }
     npy_intp dims[] = {tm->len};
     PyArrayObject* array_to;
-    if (PyArray_TYPE(array_from) == NPY_OBJECT) { // initializes values to NULL
+    bool dtype_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
+    // create to array
+    if (dtype_is_obj) { // initializes values to NULL
         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
     }
     else {
@@ -6614,9 +6630,18 @@ AK_TM_map_no_fill(TriMapObject* tm,
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
-    if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
-        Py_DECREF((PyObject*)array_to);
-        return NULL;
+    // transfer values
+    if (dtype_is_obj) {
+        if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            return NULL;
+        }
+    }
+    else {
+        if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            return NULL;
+        }
     }
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
@@ -6681,7 +6706,7 @@ AK_TM_map_fill(TriMapObject* tm,
                 PyArray_TYPE(array_to) == NPY_DATETIME &&
                 AK_dt_unit_from_array(array_from) != AK_dt_unit_from_array(array_to)
                 ) {
-            // if trying to cast into a dt64 array, need to pre-convert; array_from is originally borrowed; calling cast sets it to new ref
+            // if trying to cast into a dt64 array, need to pre-convert; array_from is originally borrowed; calling cast sets it to a new ref
             dtype = PyArray_DESCR(array_to); // borrowed ref
             Py_INCREF(dtype);
             array_from = (PyArrayObject*)PyArray_CastToType(array_from, dtype, 0);
@@ -6695,15 +6720,20 @@ AK_TM_map_fill(TriMapObject* tm,
         Py_DECREF((PyObject*)array_from);
         return NULL;
     }
-    // Most simple is to fill with scalar, then overwrite values as needed; for flexilbe sized dtypes this might be very inefficient.
     if (dtype_is_obj) {
         if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
             Py_DECREF((PyObject*)array_to);
             Py_DECREF((PyObject*)array_from);
             return NULL;
         }
+        if (AK_TM_fill_object(tm, from_src, array_to, fill_value)) {
+            Py_DECREF((PyObject*)array_to);
+            Py_DECREF((PyObject*)array_from);
+            return NULL;
+        }
     }
     else {
+        // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obbligates us to decref the filled value when assigning
         if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
             Py_DECREF((PyObject*)array_to);
             Py_DECREF((PyObject*)array_from);
