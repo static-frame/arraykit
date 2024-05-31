@@ -6535,8 +6535,8 @@ AK_TM_transfer_object(TriMapObject* tm,
     PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
     PyObject* pyo;
     void* f;
-    TriMapOne* o = one_pairs;                                          \
-    TriMapOne* o_end = o + one_count;                                  \
+    TriMapOne* o = one_pairs;
+    TriMapOne* o_end = o + one_count;
 
     for (; o < o_end; o++) {
         f = PyArray_GETPTR1(array_from, o->from);
