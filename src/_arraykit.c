@@ -6535,16 +6535,19 @@ AK_TM_transfer_object(TriMapObject* tm,
     PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
     PyObject* pyo;
     void* f;
-    for (Py_ssize_t i = 0; i < one_count; i++) {
-        f = PyArray_GETPTR1(array_from, one_pairs[i].from);
+    TriMapOne* o = one_pairs;                                          \
+    TriMapOne* o_end = o + one_count;                                  \
+
+    for (; o < o_end; o++) {
+        f = PyArray_GETPTR1(array_from, o->from);
         if (f_is_obj) {
             pyo = *(PyObject**)f;
             Py_INCREF(pyo);
         }
-        else {
+        else { // will convert any value to an object
             pyo = PyArray_GETITEM(array_from, f);
         }
-        array_to_data[one_pairs[i].to] = pyo;
+        array_to_data[o->to] = pyo;
     }
     PyObject** t;
     PyObject** t_end;
