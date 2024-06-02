@@ -6518,7 +6518,7 @@ AK_TM_transfer(TriMapObject* tm,
     return -1;
 }
 
-
+// Returns -1 on error. Specialized transfer from any type of an array to an object array.
 static inline int
 AK_TM_transfer_object(TriMapObject* tm,
         bool from_src,
@@ -6537,7 +6537,6 @@ AK_TM_transfer_object(TriMapObject* tm,
     void* f;
     TriMapOne* o = one_pairs;
     TriMapOne* o_end = o + one_count;
-
     for (; o < o_end; o++) {
         f = PyArray_GETPTR1(array_from, o->from);
         if (f_is_obj) {
@@ -6591,8 +6590,6 @@ AK_TM_transfer_object(TriMapObject* tm,
             }
         }
     }
-
-    // TODO: insert fill value at all fill locations
     return 0;
 }
 
@@ -6602,9 +6599,26 @@ AK_TM_fill_object(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
         PyObject* fill_value) {
-    Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
-    TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
-    // TODO
+
+    PyArrayObject* final_fill = (PyArrayObject*)(from_src
+            ? tm->final_src_fill : tm->final_dst_fill);
+
+    // not sure on windows this will be an int64
+    if (PyArray_TYPE(final_fill) != NPY_INT64) {
+        PyErr_SetString(PyExc_TypeError, "found non int64");
+        return -1;
+    }
+    PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
+    npy_int64* p = (npy_int64*)PyArray_DATA(final_fill);
+    npy_int64* p_end = p + PyArray_SIZE(final_fill);
+    PyObject** target;
+    // npy_int64 pos;
+    while (p < p_end) {
+        target = array_to_data + *p++;
+        Py_INCREF(fill_value);
+        *target = fill_value;
+    }
+
     return 0;
 }
 
