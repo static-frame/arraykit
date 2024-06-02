@@ -3535,6 +3535,93 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
+#define NONZERO_APPEND_INDEX {                                               \
+    if (AK_UNLIKELY(count == capacity)) {                                    \
+        capacity <<= 1;                                                      \
+        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+        if (indices == NULL) {                                               \
+            return NULL;                                                     \
+        }                                                                    \
+    }                                                                        \
+    indices[count++] = p - p_start;                                          \
+}                                                                            \
+
+// Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
+static inline PyObject*
+AK_nonzero_1d(PyArrayObject* array) {
+    // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
+    npy_intp count_max = PyArray_SIZE(array);
+    lldiv_t size_div = lldiv((long long)count_max, 4); // quot, rem
+
+    Py_ssize_t count = 0;
+    Py_ssize_t capacity = count_max <= 32 ? count_max : 16;
+
+    npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
+
+    // array is contiguous, 1d, boolean
+    npy_bool* p_start = (npy_bool*)PyArray_DATA(array);
+    npy_bool* p = p_start;
+    npy_bool* p_end = p + count_max;
+    npy_bool* p_end_roll = p_end - size_div.rem;
+
+    while (p < p_end_roll) {
+        if (*p) {
+            NONZERO_APPEND_INDEX;
+        }
+        p++;
+        if (*p) {
+            NONZERO_APPEND_INDEX;
+        }
+        p++;
+        if (*p) {
+            NONZERO_APPEND_INDEX;
+        }
+        p++;
+        if (*p) {
+            NONZERO_APPEND_INDEX;
+        }
+        p++;
+    }
+    while (p < p_end) {
+        if (*p) {
+            NONZERO_APPEND_INDEX;
+        };
+        p++;
+    }
+
+    npy_intp dims = {count};
+    PyObject* final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
+    if (!final) {
+        free(indices);
+        return NULL;
+    }
+    PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
+    return final;
+}
+
+#undef NONZERO_APPEND_INDEX
+
+static PyObject*
+nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
+    AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject* array = (PyArrayObject*)a;
+    if (PyArray_NDIM(array) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(array) != NPY_BOOL) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(array)) {
+        PyErr_SetString(PyExc_ValueError, "Array must be contiguous");
+        return NULL;
+    }
+    return AK_nonzero_1d(array);
+}
+
+
+
 static char *first_true_1d_kwarg_names[] = {
     "array",
     "forward",
@@ -3580,12 +3667,14 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     Py_ssize_t position = -1;
     npy_bool *p;
     npy_bool *p_end;
+    npy_bool *p_end_roll;
 
     if (forward) {
         p = array_buffer;
         p_end = p + size;
+        p_end_roll = p_end - size_div.rem;
 
-        while (p < p_end - size_div.rem) {
+        while (p < p_end_roll) {
             if (*(npy_uint64*)p != 0) {
                 break; // found a true within lookahead
             }
@@ -3599,7 +3688,9 @@ first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     else {
         p = array_buffer + size - 1;
         p_end = array_buffer - 1;
-        while (p > p_end + size_div.rem) {
+        p_end_roll = p_end + size_div.rem;
+
+        while (p > p_end_roll) {
             if (*(npy_uint64*)(p - lookahead + 1) != 0) {
                 break; // found a true within lookahead
             }
@@ -6518,6 +6609,9 @@ AK_TM_transfer(TriMapObject* tm,
     return -1;
 }
 
+#undef TRANSFER_SCALARS
+#undef TRANSFER_FLEXIBLE
+
 // Returns -1 on error. Specialized transfer from any type of an array to an object array.
 static inline int
 AK_TM_transfer_object(TriMapObject* tm,
@@ -7166,6 +7260,7 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
+    {"nonzero_1d", nonzero_1d, METH_O, NULL},
     {"isna_element",
             (PyCFunction)isna_element,
             METH_VARARGS | METH_KEYWORDS,
