@@ -3535,16 +3535,16 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define NONZERO_APPEND_INDEX {                                               \
-    if (AK_UNLIKELY(count == capacity)) {                                    \
-        capacity <<= 1;                                                      \
-        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
-        if (indices == NULL) {                                               \
-            return NULL;                                                     \
-        }                                                                    \
-    }                                                                        \
-    indices[count++] = p - p_start;                                          \
-}                                                                            \
+// #define NONZERO_APPEND_INDEX {                                               \
+//     if (AK_UNLIKELY(count == capacity)) {                                    \
+//         capacity <<= 1;                                                      \
+//         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+//         if (indices == NULL) {                                               \
+//             return NULL;                                                     \
+//         }                                                                    \
+//     }                                                                        \
+//     indices[count++] = p - p_start;                                          \
+// }                                                                            \
 
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
 static inline PyObject*
@@ -3565,27 +3565,32 @@ AK_nonzero_1d(PyArrayObject* array) {
     npy_bool* p_end_roll = p_end - size_div.rem;
 
     while (p < p_end_roll) {
-        if (*p) {
-            NONZERO_APPEND_INDEX;
+        if (AK_UNLIKELY(count + 4 >= capacity)) {
+            capacity <<= 1;
+            indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+            if (indices == NULL) {
+                return NULL;
+            }
         }
+        if (*p) {indices[count++] = p - p_start;}
         p++;
-        if (*p) {
-            NONZERO_APPEND_INDEX;
-        }
+        if (*p) {indices[count++] = p - p_start;}
         p++;
-        if (*p) {
-            NONZERO_APPEND_INDEX;
-        }
+        if (*p) {indices[count++] = p - p_start;}
         p++;
-        if (*p) {
-            NONZERO_APPEND_INDEX;
-        }
+        if (*p) {indices[count++] = p - p_start;}
         p++;
     }
+    // at most three more indices remain
+    if (AK_UNLIKELY(count + 3 >= capacity)) {
+        capacity <<= 1;
+        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+        if (indices == NULL) {
+            return NULL;
+        }
+    }
     while (p < p_end) {
-        if (*p) {
-            NONZERO_APPEND_INDEX;
-        };
+        if (*p) {indices[count++] = p - p_start;}
         p++;
     }
 
@@ -3600,7 +3605,7 @@ AK_nonzero_1d(PyArrayObject* array) {
     return final;
 }
 
-#undef NONZERO_APPEND_INDEX
+// #undef NONZERO_APPEND_INDEX
 
 static PyObject*
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
