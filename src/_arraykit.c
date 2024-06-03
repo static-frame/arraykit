@@ -97,7 +97,7 @@ AK_dt_unit_from_array(PyArrayObject* a) {
 
 // Takes and returns a PyArrayObject, optionally copying a mutable array and setting it as immutable
 PyArrayObject *
-AK_ImmutableFilter(PyArrayObject *a)
+AK_immutable_filter(PyArrayObject *a)
 {
     // https://numpy.org/devdocs/reference/c-api/array.html#array-flags
     if (PyArray_FLAGS(a) & NPY_ARRAY_WRITEABLE) {
@@ -112,7 +112,7 @@ AK_ImmutableFilter(PyArrayObject *a)
 
 // Returns NULL on error.
 PyArray_Descr*
-AK_ResolveDTypes(PyArray_Descr *d1, PyArray_Descr *d2)
+AK_resolve_dtype(PyArray_Descr *d1, PyArray_Descr *d2)
 {
     if (PyArray_EquivTypes(d1, d2)) {
         Py_INCREF(d1);
@@ -162,7 +162,7 @@ AK_ResolveDTypeIter(PyObject *dtypes)
             resolved = dtype;
             continue;
         }
-        Py_SETREF(resolved, AK_ResolveDTypes(resolved, dtype));
+        Py_SETREF(resolved, AK_resolve_dtype(resolved, dtype));
         Py_DECREF(dtype);
         if (!resolved || PyDataType_ISOBJECT(resolved)) {
             break;
@@ -3257,7 +3257,7 @@ mloc(PyObject *Py_UNUSED(m), PyObject *a)
 static PyObject *
 immutable_filter(PyObject *Py_UNUSED(m), PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
-    return (PyObject *)AK_ImmutableFilter((PyArrayObject *)a);
+    return (PyObject *)AK_immutable_filter((PyArrayObject *)a);
 }
 
 
@@ -3524,7 +3524,7 @@ resolve_dtype(PyObject *Py_UNUSED(m), PyObject *args)
             &PyArrayDescr_Type, &d2)) {
         return NULL;
     }
-    return (PyObject *)AK_ResolveDTypes(d1, d2);
+    return (PyObject *)AK_resolve_dtype(d1, d2);
 }
 
 static PyObject *
@@ -5433,7 +5433,7 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
         self->dtype = dt;
     }
     else if (!PyDataType_ISOBJECT(self->dtype)) { // if object cannot resolve further
-        PyArray_Descr* dtr = AK_ResolveDTypes(self->dtype, dt); // new ref
+        PyArray_Descr* dtr = AK_resolve_dtype(self->dtype, dt); // new ref
         if (dtr == NULL) {
             return NULL;
         }
@@ -6812,7 +6812,7 @@ AK_TM_map_fill(TriMapObject* tm,
         return NULL;
     }
     // passing a borrowed ref; returns a new ref
-    PyArray_Descr* dtype = AK_ResolveDTypes(PyArray_DESCR(array_from), fill_value_dtype);
+    PyArray_Descr* dtype = AK_resolve_dtype(PyArray_DESCR(array_from), fill_value_dtype);
     bool dtype_is_obj = dtype->type_num == NPY_OBJECT;
 
     npy_intp dims[] = {tm->len};
@@ -7058,7 +7058,7 @@ ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
             return (PyObject *)self;
         }
         // ArrayGO(np.array(...))
-        self->array = (PyObject *)AK_ImmutableFilter((PyArrayObject *)iterable);
+        self->array = (PyObject *)AK_immutable_filter((PyArrayObject *)iterable);
         if (!self->array) {
             Py_CLEAR(self);
         }
