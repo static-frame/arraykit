@@ -3535,22 +3535,30 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-// #define NONZERO_APPEND_INDEX {                                               \
-//     if (AK_UNLIKELY(count == capacity)) {                                    \
-//         capacity <<= 1;                                                      \
-//         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
-//         if (indices == NULL) {                                               \
-//             return NULL;                                                     \
-//         }                                                                    \
-//     }                                                                        \
-//     indices[count++] = p - p_start;                                          \
-// }                                                                            \
+#define NONZERO_APPEND_INDEX {                                               \
+    if (AK_UNLIKELY(count == capacity)) {                                    \
+        capacity <<= 1;                                                      \
+        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+        if (indices == NULL) {                                               \
+            return NULL;                                                     \
+        }                                                                    \
+    }                                                                        \
+    indices[count++] = p - p_start;                                          \
+}                                                                            \
 
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
     // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
+    PyObject* final;
     npy_intp count_max = PyArray_SIZE(array);
+
+    if (count_max == 0) { // return empty array
+        npy_intp dims = {count_max};
+        final = PyArray_SimpleNew(1, &dims, NPY_INT64);
+        PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+        return final;
+    }
     lldiv_t size_div = lldiv((long long)count_max, 4); // quot, rem
 
     Py_ssize_t count = 0;
@@ -3595,17 +3603,18 @@ AK_nonzero_1d(PyArrayObject* array) {
     }
 
     npy_intp dims = {count};
-    PyObject* final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
+    final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
     if (!final) {
         free(indices);
         return NULL;
     }
     // This ensures that the array frees the indices array; this has been tested by calling free(indices) and observing segfault
     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
+    PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
 }
 
-// #undef NONZERO_APPEND_INDEX
+#undef NONZERO_APPEND_INDEX
 
 static PyObject*
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
