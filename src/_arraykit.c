@@ -6702,11 +6702,6 @@ AK_TM_fill_object(TriMapObject* tm,
     PyArrayObject* final_fill = (PyArrayObject*)(from_src
             ? tm->final_src_fill : tm->final_dst_fill);
 
-    // not sure on windows this will be an int64
-    if (PyArray_TYPE(final_fill) != NPY_INT64) {
-        PyErr_SetString(PyExc_TypeError, "found non int64");
-        return -1;
-    }
     PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
     npy_int64* p = (npy_int64*)PyArray_DATA(final_fill);
     npy_int64* p_end = p + PyArray_SIZE(final_fill);
@@ -6717,7 +6712,6 @@ AK_TM_fill_object(TriMapObject* tm,
         Py_INCREF(fill_value);
         *target = fill_value;
     }
-
     return 0;
 }
 
