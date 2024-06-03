@@ -3559,10 +3559,20 @@ AK_nonzero_1d(PyArrayObject* array) {
         PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
         return final;
     }
-    lldiv_t size_div = lldiv((long long)count_max, 4); // quot, rem
+    lldiv_t size_div = lldiv((long long)count_max, 8); // quot, rem
 
     Py_ssize_t count = 0;
-    Py_ssize_t capacity = count_max <= 32 ? count_max : 16;
+    Py_ssize_t capacity = count_max;
+    // Py_ssize_t capacity = 16;
+    // if (count_max <= 32) {
+    //     capacity = count_max;
+    // }
+    // else if (count_max > 32768) {
+    //     capacity = 16384;
+    // }
+    // else if (count_max > 2048) {
+    //     capacity = 1024;
+    // }
 
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
@@ -3572,35 +3582,68 @@ AK_nonzero_1d(PyArrayObject* array) {
     npy_bool* p_end = p + count_max;
     npy_bool* p_end_roll = p_end - size_div.rem;
 
+
     while (p < p_end_roll) {
-        if (AK_UNLIKELY(count + 4 >= capacity)) {
-            capacity <<= 1;
-            indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
-            if (indices == NULL) {
-                return NULL;
-            }
+        if (*(npy_uint64*)p == 0) {
+            p += 8; // no true within this 8 byte roll region
+            continue;
         }
-        if (*p) {indices[count++] = p - p_start;}
+        if (*p) {NONZERO_APPEND_INDEX;}
         p++;
-        if (*p) {indices[count++] = p - p_start;}
+        if (*p) {NONZERO_APPEND_INDEX;}
         p++;
-        if (*p) {indices[count++] = p - p_start;}
+        if (*p) {NONZERO_APPEND_INDEX;}
         p++;
-        if (*p) {indices[count++] = p - p_start;}
+        if (*p) {NONZERO_APPEND_INDEX;}
+        p++;
+        if (*p) {NONZERO_APPEND_INDEX;}
+        p++;
+        if (*p) {NONZERO_APPEND_INDEX;}
+        p++;
+        if (*p) {NONZERO_APPEND_INDEX;}
+        p++;
+        if (*p) {NONZERO_APPEND_INDEX;}
         p++;
     }
     // at most three more indices remain
-    if (AK_UNLIKELY(count + 3 >= capacity)) {
-        capacity <<= 1;
-        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
-        if (indices == NULL) {
-            return NULL;
-        }
-    }
     while (p < p_end) {
-        if (*p) {indices[count++] = p - p_start;}
+        if (*p) {NONZERO_APPEND_INDEX;}
         p++;
     }
+
+    // while (p < p_end_roll) {
+    //     if (*(npy_uint64*)p == 0) {
+    //         p += 4; // no true within this roll region
+    //         continue;
+    //     }
+    //     if (AK_UNLIKELY(count + 4 >= capacity)) {
+    //         capacity <<= 1;
+    //         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+    //         if (indices == NULL) {
+    //             return NULL;
+    //         }
+    //     }
+    //     if (*p) {indices[count++] = p - p_start;}
+    //     p++;
+    //     if (*p) {indices[count++] = p - p_start;}
+    //     p++;
+    //     if (*p) {indices[count++] = p - p_start;}
+    //     p++;
+    //     if (*p) {indices[count++] = p - p_start;}
+    //     p++;
+    // }
+    // // at most three more indices remain
+    // if (AK_UNLIKELY(count + 3 >= capacity)) {
+    //     capacity <<= 1;
+    //     indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+    //     if (indices == NULL) {
+    //         return NULL;
+    //     }
+    // }
+    // while (p < p_end) {
+    //     if (*p) {indices[count++] = p - p_start;}
+    //     p++;
+    // }
 
     npy_intp dims = {count};
     final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
@@ -6252,22 +6295,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (final_dst_unmatched == NULL) {
         goto error;
     }
-
-    // nonzero_src = PyArray_Nonzero((PyArrayObject*)final_src_unmatched);
-    // if (nonzero_src == NULL) {
-    //     goto error;
-    // }
-    // nonzero_dst = PyArray_Nonzero((PyArrayObject*)final_dst_unmatched);
-    // if (nonzero_dst == NULL) {
-    //     goto error;
-    // }
-
-    // // get borrwed ref; incref as will be decref on instacde dealloc
-    // tm->final_src_fill = PyTuple_GET_ITEM(nonzero_src, 0);
-    // Py_INCREF(tm->final_src_fill);
-
-    // tm->final_dst_fill = PyTuple_GET_ITEM(nonzero_dst, 0);
-    // Py_INCREF(tm->final_dst_fill);
 
     tm->final_src_fill = AK_nonzero_1d((PyArrayObject*)final_src_unmatched);
     if (tm->final_src_fill == NULL) {

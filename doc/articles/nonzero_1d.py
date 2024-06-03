@@ -5,9 +5,8 @@ import os
 import sys
 import timeit
 import typing as tp
-from itertools import repeat
 
-from arraykit import first_true_1d
+from arraykit import nonzero_1d
 import arraykit as ak
 
 import matplotlib.pyplot as plt
@@ -26,47 +25,30 @@ class ArrayProcessor:
         self.array = array
 
 #-------------------------------------------------------------------------------
-class AKFirstTrue(ArrayProcessor):
-    NAME = 'ak.first_true_1d()'
+class AKNonZero(ArrayProcessor):
+    NAME = 'ak.nonzero_1d()'
     SORT = 0
 
     def __call__(self):
-        _ = first_true_1d(self.array, forward=True)
-
-class PYLoop(ArrayProcessor):
-    NAME = 'Python Loop'
-    SORT = 0
-
-    def __call__(self):
-        for i, e in enumerate(self.array):
-            if e == True:
-                break
-
+        _ = nonzero_1d(self.array)
 
 class NPNonZero(ArrayProcessor):
     NAME = 'np.nonzero()'
-    SORT = 3
-
-    def __call__(self):
-        _ = np.nonzero(self.array)[0][0]
-
-class NPArgMax(ArrayProcessor):
-    NAME = 'np.argmax()'
     SORT = 1
 
     def __call__(self):
-        _ = np.argmax(self.array)
+        _ = np.nonzero(self.array)[0]
 
-class NPNotAnyArgMax(ArrayProcessor):
-    NAME = 'np.any(), np.argmax()'
-    SORT = 2
+class NPNonZeroInt64Convert(ArrayProcessor):
+    NAME = 'np.nonzero().astype(np.int64)'
+    SORT = 3
 
     def __call__(self):
-        _ = not np.any(self.array)
-        _ = np.argmax(self.array)
+        _ = np.nonzero(self.array)[0].astype(np.int64)
+
 
 #-------------------------------------------------------------------------------
-NUMBER = 200
+NUMBER = 100
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -86,12 +68,13 @@ def plot_performance(frame):
     # cmap = plt.get_cmap('terrain')
     cmap = plt.get_cmap('plasma')
 
-    color = cmap(np.arange(processor_total) / processor_total)
+    color = cmap(np.arange(processor_total) / max(processor_total, 3))
 
     # category is the size of the array
     for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
-        for fixture_count, (fixture_label, fixture) in enumerate(
-                cat.groupby('fixture')):
+        # each fixture is a collection of tests for one display
+        fixtures = {fixture_label: fixture for fixture_label, fixture in cat.groupby('fixture')}
+        for fixture_count, (fixture_label, fixture) in enumerate(fixtures.items()):
             ax = axes[cat_count][fixture_count]
 
             # set order
@@ -104,9 +87,9 @@ def plot_performance(frame):
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
-            density, position = fixture_label.split('-')
+            # density, position = fixture_label.split('-')
             # cat_label is the size of the array
-            title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[density]}\n{FixtureFactory.POSITION_TO_DISPLAY[position]}'
+            title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[fixture_label]}'
 
             ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.75) # makes taller tan wide
@@ -125,10 +108,10 @@ def plot_performance(frame):
                     labelbottom=False,
                     )
 
-    fig.set_size_inches(9, 3.5) # width, height
-    fig.legend(post, names_display, loc='center right', fontsize=8)
+    fig.set_size_inches(9, 4) # width, height
+    fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(.05, .96, f'first_true_1d() Performance: {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'nonzero_1d() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
     fp = '/tmp/first_true.png'
@@ -137,8 +120,8 @@ def plot_performance(frame):
             bottom=0.05,
             right=0.80,
             top=0.85,
-            wspace=1, # width
-            hspace=0.1,
+            wspace=0.9, # width
+            hspace=0.2,
             )
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
@@ -160,14 +143,14 @@ class FixtureFactory:
 
     def _get_array_filled(
             size: int,
-            start_third: int, # 1 or 2
+            start_third: int, #0, 1 or 2
             density: float, # less than 1
             ) -> np.ndarray:
         a = FixtureFactory.get_array(size)
         count = size * density
         start = int(len(a) * (start_third/3))
         length = len(a) - start
-        step = int(length / count)
+        step = max(int(length / count), 1)
         fill = np.arange(start, len(a), step)
         a[fill] = True
         return a
@@ -179,65 +162,47 @@ class FixtureFactory:
 
     DENSITY_TO_DISPLAY = {
         'single': '1 True',
-        'tenth': '10% True',
-        'third': '33% True',
+        'quarter': '25% True',
+        'half': '50% True',
+        'full': '100% True',
     }
 
-    POSITION_TO_DISPLAY = {
-        'first_third': 'Fill 1/3 to End',
-        'second_third': 'Fill 2/3 to End',
-    }
+    # POSITION_TO_DISPLAY = {
+    #     'first_third': 'Fill 1/3 to End',
+    #     'second_third': 'Fill 2/3 to End',
+    # }
 
 
-class FFSingleFirstThird(FixtureFactory):
-    NAME = 'single-first_third'
+class FFSingle(FixtureFactory):
+    NAME = 'single'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
         a = FixtureFactory.get_array(size)
-        a[int(len(a) * (1/3))] = True
+        a[len(a) // 2] = True
         return a
 
-class FFSingleSecondThird(FixtureFactory):
-    NAME = 'single-second_third'
-
-    @staticmethod
-    def get_array(size: int) -> np.ndarray:
-        a = FixtureFactory.get_array(size)
-        a[int(len(a) * (2/3))] = True
-        return a
-
-
-class FFTenthPostFirstThird(FixtureFactory):
-    NAME = 'tenth-first_third'
+class FFQuarter(FixtureFactory):
+    NAME = 'quarter'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=1, density=.1)
+        return cls._get_array_filled(size, start_third=0, density=0.25)
 
-
-class FFTenthPostSecondThird(FixtureFactory):
-    NAME = 'tenth-second_third'
-
-    @classmethod
-    def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=2, density=.1)
-
-
-class FFThirdPostFirstThird(FixtureFactory):
-    NAME = 'third-first_third'
+class FFHalf(FixtureFactory):
+    NAME = 'half'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=1, density=1/3)
+        return cls._get_array_filled(size, start_third=0, density=0.5)
 
 
-class FFThirdPostSecondThird(FixtureFactory):
-    NAME = 'third-second_third'
+class FFFull(FixtureFactory):
+    NAME = 'full'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=2, density=1/3)
+        return cls._get_array_filled(size, start_third=0, density=1)
 
 
 def get_versions() -> str:
@@ -246,20 +211,16 @@ def get_versions() -> str:
 
 
 CLS_PROCESSOR = (
-    AKFirstTrue,
+    AKNonZero,
     NPNonZero,
-    NPArgMax,
-    NPNotAnyArgMax,
-    # PYLoop,
+    NPNonZeroInt64Convert,
     )
 
 CLS_FF = (
-    FFSingleFirstThird,
-    FFSingleSecondThird,
-    FFTenthPostFirstThird,
-    FFTenthPostSecondThird,
-    FFThirdPostFirstThird,
-    FFThirdPostSecondThird,
+    FFSingle,
+    FFQuarter,
+    FFHalf,
+    FFFull,
 )
 
 
