@@ -3595,6 +3595,7 @@ AK_nonzero_1d(PyArrayObject* array) {
         free(indices);
         return NULL;
     }
+    // This ensures that the array frees the indices array; this has been tested by calling free(indices) and observing segfault
     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
     return final;
 }
