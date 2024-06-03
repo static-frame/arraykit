@@ -6083,25 +6083,26 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
             return NULL;
         }
         // derive indices for unmatched locations, call each with register_one
-        PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
-        if (nonzero == NULL) {
+        // PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
+        PyArrayObject* indices = (PyArrayObject*)AK_nonzero_1d(dst_unmatched);
+        if (indices == NULL) {
             Py_DECREF((PyObject*)dst_unmatched);
             return NULL;
         }
         // borrow ref to array in 1-element tuple
-        PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
-        npy_intp *index_data = (npy_intp *)PyArray_DATA(indices);
+        // PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
+        npy_int64 *index_data = (npy_int64 *)PyArray_DATA(indices);
         npy_intp index_len = PyArray_SIZE(indices);
 
         for (npy_intp i = 0; i < index_len; i++) {
             if (AK_TM_register_one(self, -1, index_data[i])) {
-                Py_DECREF(nonzero);
                 Py_DECREF((PyObject*)dst_unmatched);
+                Py_DECREF((PyObject*)indices);
                 return NULL;
             }
         }
-        Py_DECREF(nonzero);
         Py_DECREF((PyObject*)dst_unmatched);
+        Py_DECREF((PyObject*)indices);
     }
     Py_RETURN_NONE;
 }
