@@ -3546,6 +3546,18 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
     indices[count++] = p - p_start;                                          \
 }                                                                            \
 
+#define NONZERO_APPEND_OFFSET(offset) {                                      \
+    if (AK_UNLIKELY(count == capacity)) {                                    \
+        capacity <<= 1;                                                      \
+        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+        if (indices == NULL) {                                               \
+            return NULL;                                                     \
+        }                                                                    \
+    }                                                                        \
+    indices[count++] = p + offset - p_start;                                 \
+}                                                                            \
+
+
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
@@ -3601,6 +3613,24 @@ AK_nonzero_1d(PyArrayObject* array) {
     //     p++;
     // }
 
+    // while (p < p_end_roll) {
+    //     npy_uint64 roll = *(npy_uint64*)p;
+    //     if (roll == 0) {
+    //         p += 8; // no true within this 8 byte roll region
+    //         continue;
+    //     }
+    //     if (roll >> 56 & 0xFF) {NONZERO_APPEND_OFFSET(0);}
+    //     if (roll >> 48 & 0xFF) {NONZERO_APPEND_OFFSET(1);}
+    //     if (roll >> 40 & 0xFF) {NONZERO_APPEND_OFFSET(2);}
+    //     if (roll >> 32 & 0xFF) {NONZERO_APPEND_OFFSET(3);}
+    //     if (roll >> 24 & 0xFF) {NONZERO_APPEND_OFFSET(4);}
+    //     if (roll >> 16 & 0xFF) {NONZERO_APPEND_OFFSET(5);}
+    //     if (roll >> 8 & 0xFF) {NONZERO_APPEND_OFFSET(6);}
+    //     if (roll >> 0 & 0xFF) {NONZERO_APPEND_OFFSET(7);}
+    // while (p < p_end) {
+    //     if (*p) {NONZERO_APPEND_OFFSET(0);}
+    //     p++;
+    // }
 
     while (p < p_end_roll) {
         if (*(npy_uint64*)p == 0) {
