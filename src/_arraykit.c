@@ -6179,8 +6179,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     PyObject* final_dst_match = NULL;
     PyObject* final_src_unmatched = NULL;
     PyObject* final_dst_unmatched = NULL;
-    PyObject* nonzero_dst = NULL;
-    PyObject* nonzero_src = NULL;
 
     npy_intp dims[] = {tm->len};
 
@@ -6242,28 +6240,35 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         goto error;
     }
 
-    nonzero_src = PyArray_Nonzero((PyArrayObject*)final_src_unmatched);
-    if (nonzero_src == NULL) {
+    // nonzero_src = PyArray_Nonzero((PyArrayObject*)final_src_unmatched);
+    // if (nonzero_src == NULL) {
+    //     goto error;
+    // }
+    // nonzero_dst = PyArray_Nonzero((PyArrayObject*)final_dst_unmatched);
+    // if (nonzero_dst == NULL) {
+    //     goto error;
+    // }
+
+    // // get borrwed ref; incref as will be decref on instacde dealloc
+    // tm->final_src_fill = PyTuple_GET_ITEM(nonzero_src, 0);
+    // Py_INCREF(tm->final_src_fill);
+
+    // tm->final_dst_fill = PyTuple_GET_ITEM(nonzero_dst, 0);
+    // Py_INCREF(tm->final_dst_fill);
+
+    tm->final_src_fill = AK_nonzero_1d((PyArrayObject*)final_src_unmatched);
+    if (tm->final_src_fill == NULL) {
         goto error;
     }
-    nonzero_dst = PyArray_Nonzero((PyArrayObject*)final_dst_unmatched);
-    if (nonzero_dst == NULL) {
+    tm->final_dst_fill = AK_nonzero_1d((PyArrayObject*)final_dst_unmatched);
+    if (tm->final_dst_fill == NULL) {
         goto error;
     }
-
-    // get borrwed ref; incref as will be decref on instacde dealloc
-    tm->final_src_fill = PyTuple_GET_ITEM(nonzero_src, 0);
-    Py_INCREF(tm->final_src_fill);
-
-    tm->final_dst_fill = PyTuple_GET_ITEM(nonzero_dst, 0);
-    Py_INCREF(tm->final_dst_fill);
 
     Py_DECREF(final_src_match);
     Py_DECREF(final_dst_match);
     Py_DECREF(final_src_unmatched);
     Py_DECREF(final_dst_unmatched);
-    Py_DECREF(nonzero_src);
-    Py_DECREF(nonzero_dst);
 
     tm->finalized = true;
     Py_RETURN_NONE;
@@ -6272,8 +6277,6 @@ error: // all PyObject initialized to NULL, no more than 1 ref
     Py_XDECREF(final_dst_match);
     Py_XDECREF(final_src_unmatched);
     Py_XDECREF(final_dst_unmatched);
-    Py_XDECREF(nonzero_src);
-    Py_XDECREF(nonzero_dst);
     return NULL;
 }
 
