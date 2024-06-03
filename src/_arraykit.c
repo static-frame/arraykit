@@ -5952,7 +5952,6 @@ TriMap_dealloc(TriMapObject *self) {
         }
         PyMem_Free(self->many_from);
     }
-
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
