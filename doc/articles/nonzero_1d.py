@@ -48,7 +48,7 @@ class NPNonZeroInt64Convert(ArrayProcessor):
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 100
+NUMBER = 200
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -114,7 +114,7 @@ def plot_performance(frame):
     fig.text(.05, .96, f'nonzero_1d() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
-    fp = '/tmp/first_true.png'
+    fp = '/tmp/nonzero.png'
     plt.subplots_adjust(
             left=0.075,
             bottom=0.05,
