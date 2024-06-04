@@ -84,3 +84,9 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(nonzero_1d(a1).tolist(), [999, 9_999_999])
         a1[0] = True
         self.assertEqual(nonzero_1d(a1).tolist(), [0, 999, 9_999_999])
+
+    def test_nonzero_1d_f(self) -> None:
+        a1 = np.arange(20).reshape(4, 5) % 3 == 0
+        a2 = a1[:, 4]
+        post = nonzero_1d(a2)
+

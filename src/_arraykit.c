@@ -3547,6 +3547,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 }                                                                            \
 
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
+// Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help. Using bit masks does not improve perforamnce over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy befits from first counting the nonzeros, then allocating only enough data for the expexted number.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
     // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
@@ -3567,16 +3568,13 @@ AK_nonzero_1d(PyArrayObject* array) {
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
     // array is contiguous, 1d, boolean
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
+
     npy_bool* p_start = (npy_bool*)PyArray_DATA(array);
     npy_bool* p = p_start;
     npy_bool* p_end = p + count_max;
     npy_bool* p_end_roll = p_end - size_div.rem;
-
-    NPY_BEGIN_THREADS_DEF;
-    NPY_BEGIN_THREADS;
-    // Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help.
-    // Using bit masks does not improve perforamnce over pointer arithmetic.
-    // Prescanning for all empty is very effective.
 
     while (p < p_end_roll) {
         if (*(npy_uint64*)p == 0) {
@@ -3606,71 +3604,6 @@ AK_nonzero_1d(PyArrayObject* array) {
     }
     NPY_END_THREADS;
 
-    // npy_uint64 roll;
-    // while (p < p_end_roll) {
-    //     roll = *(npy_uint64*)p;
-    //     if (roll == 0) {
-    //         p += 8; // no true within this 8 byte roll region
-    //         continue;
-    //     }
-    //     // this order depends on byte order
-    //     if (roll & 0xFF) {NONZERO_APPEND_OFFSET(0);}
-    //     if (roll & 0xFF00) {NONZERO_APPEND_OFFSET(1);}
-    //     if (roll & 0xFF0000) {NONZERO_APPEND_OFFSET(2);}
-    //     if (roll & 0xFF000000) {NONZERO_APPEND_OFFSET(3);}
-    //     if (roll & 0xFF00000000) {NONZERO_APPEND_OFFSET(4);}
-    //     if (roll & 0xFF0000000000) {NONZERO_APPEND_OFFSET(5);}
-    //     if (roll & 0xFF000000000000) {NONZERO_APPEND_OFFSET(6);}
-    //     if (roll & 0xFF00000000000000) {NONZERO_APPEND_OFFSET(7);}
-    //     p += 8;
-    // }
-    // while (p < p_end) {
-    //     if (*p) {NONZERO_APPEND_OFFSET(0);}
-    //     p++;
-    // }
-
-
-    // while (p < p_end_roll) {
-    //     if (*(npy_uint64*)p == 0) {
-    //         p += 8; // no true within this roll region
-    //         continue;
-    //     }
-    //     if (AK_UNLIKELY(count + 8 >= capacity)) {
-    //         capacity <<= 1;
-    //         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
-    //         if (indices == NULL) {
-    //             return NULL;
-    //         }
-    //     }
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    // }
-    // // at most three more indices remain
-    // if (AK_UNLIKELY(count + 7 >= capacity)) {
-    //     capacity <<= 1;
-    //     indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
-    //     if (indices == NULL) {
-    //         return NULL;
-    //     }
-    // }
-    // while (p < p_end) {
-    //     if (*p) {indices[count++] = p - p_start;}
-    //     p++;
-    // }
 
     npy_intp dims = {count};
     final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
