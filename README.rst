@@ -37,6 +37,14 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.6.1
+............
+
+Enhancements and optimizations to ``TriMap``.
+
+Added ``nonzero_1d()``.
+
+
 0.6.0
 ............
 
