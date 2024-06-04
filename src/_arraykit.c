@@ -3546,18 +3546,6 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
     indices[count++] = p - p_start;                                          \
 }                                                                            \
 
-#define NONZERO_APPEND_OFFSET(offset) do {                                   \
-    if (AK_UNLIKELY(count == capacity)) {                                    \
-        capacity <<= 1;                                                      \
-        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
-        if (indices == NULL) {                                               \
-            return NULL;                                                     \
-        }                                                                    \
-    }                                                                        \
-    indices[count++] = p + offset - p_start;                                 \
-} while(0)                                                                   \
-
-
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
@@ -3575,8 +3563,7 @@ AK_nonzero_1d(PyArrayObject* array) {
 
     Py_ssize_t count = 0;
     // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
-    Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 2;
-
+    Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
     // array is contiguous, 1d, boolean
@@ -3585,9 +3572,10 @@ AK_nonzero_1d(PyArrayObject* array) {
     npy_bool* p_end = p + count_max;
     npy_bool* p_end_roll = p_end - size_div.rem;
 
-
+    NPY_BEGIN_THREADS_DEF;
+    NPY_BEGIN_THREADS;
     // Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help.
-    // Doing esoteric things with bit masks does not generally improve perforamnce.
+    // Using bit masks does not improve perforamnce over pointer arithmetic.
     // Prescanning for all empty is very effective.
 
     while (p < p_end_roll) {
@@ -3616,6 +3604,7 @@ AK_nonzero_1d(PyArrayObject* array) {
         if (*p) {NONZERO_APPEND_INDEX;}
         p++;
     }
+    NPY_END_THREADS;
 
     // npy_uint64 roll;
     // while (p < p_end_roll) {
@@ -3694,7 +3683,6 @@ AK_nonzero_1d(PyArrayObject* array) {
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
 }
-
 #undef NONZERO_APPEND_INDEX
 
 static PyObject*
@@ -3715,7 +3703,6 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
     }
     return AK_nonzero_1d(array);
 }
-
 
 
 static char *first_true_1d_kwarg_names[] = {
@@ -5862,28 +5849,6 @@ static PyTypeObject BlockIndexType = {
 // TriMap
 //------------------------------------------------------------------------------
 
-// NOTE: slice selection and assignment is much faster than array selection
-// >>> a1 = np.arange(100_000)
-// >>> slc = slice(50_000, 60_000)
-// >>> alc = np.arange(50_000, 60_000)
-// >>> %timeit a1[slc]
-// 45.6 ns ± 0.133 ns per loop (mean ± std. dev. of 7 runs, 10,000,000 loops each)
-// >>> %timeit a1[alc]
-// 4.98 µs ± 12.2 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-// >>> %timeit a1[slc] = alc
-// 873 ns ± 3.33 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
-// >>> %timeit a1[alc] = alc
-// 6.3 µs ± 25.7 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-
-// -- array of integers
-// self._src_many_from: tp.List[int] = []
-// -- normal lists of objects?
-// self._src_many_to: tp.List[slice] = [] // could be int-pairs
-
-// self._dst_many_from: tp.List[TNDArrayInt] = []
-// self._dst_many_to: tp.List[slice] = [] // could be int-pairs
-
-
 typedef struct TriMapOne {
     Py_ssize_t from; // signed
     Py_ssize_t to;
@@ -5898,7 +5863,6 @@ typedef struct TriMapManyFrom {
     npy_intp src;
     PyArrayObject* dst;
 } TriMapManyFrom;
-
 
 typedef struct TriMapObject {
     PyObject_HEAD
@@ -6285,8 +6249,10 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         goto error;
     }
 
-    npy_bool* final_src_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_src_match);
-    npy_bool* final_dst_match_data = (npy_bool*)PyArray_DATA((PyArrayObject*)final_dst_match);
+    npy_bool* final_src_match_data = (npy_bool*)PyArray_DATA(
+            (PyArrayObject*)final_src_match);
+    npy_bool* final_dst_match_data = (npy_bool*)PyArray_DATA(
+            (PyArrayObject*)final_dst_match);
 
     TriMapOne* o;
     TriMapOne* o_end;
@@ -6300,7 +6266,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     for (; o < o_end; o++) {
         final_dst_match_data[o->to] = NPY_TRUE;
     }
-
     // many assign from src and dst into the same final positions
     npy_bool* s;
     npy_bool* d;
@@ -6333,7 +6298,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (final_dst_unmatched == NULL) {
         goto error;
     }
-
     tm->final_src_fill = AK_nonzero_1d((PyArrayObject*)final_src_unmatched);
     if (tm->final_src_fill == NULL) {
         goto error;
@@ -6342,7 +6306,6 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (tm->final_dst_fill == NULL) {
         goto error;
     }
-
     Py_DECREF(final_src_match);
     Py_DECREF(final_dst_match);
     Py_DECREF(final_src_unmatched);
@@ -6357,7 +6320,6 @@ error: // all PyObject initialized to NULL, no more than 1 ref
     Py_XDECREF(final_dst_unmatched);
     return NULL;
 }
-
 
 static PyObject*
 TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
@@ -6481,7 +6443,6 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
         }                                                                  \
     }                                                                      \
 }                                                                          \
-
 
 // Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error. This only needs to match to / from type combinations that are possible from `resolve_dtype`, i.e., bool never goes to integer.
 static inline int
@@ -6686,8 +6647,8 @@ AK_TM_transfer(TriMapObject* tm,
             return 0;
         }
     }
-    AK_DEBUG_MSG_OBJ("array_to", (PyObject*)array_to);
-    AK_DEBUG_MSG_OBJ("array_from", (PyObject*)array_from);
+    // AK_DEBUG_MSG_OBJ("array_to", (PyObject*)array_to);
+    // AK_DEBUG_MSG_OBJ("array_from", (PyObject*)array_from);
     PyErr_SetString(PyExc_TypeError, "No handling for types");
     return -1;
 }
@@ -6792,6 +6753,30 @@ AK_TM_fill_object(TriMapObject* tm,
     }
     return 0;
 }
+
+// TODO: AK_TM_fill_flexible
+// this manually inserts string
+// if (t_is_flexible) {
+//     // insert fill values
+//     Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
+//     npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
+//     Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
+//     Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
+//     // NOTE: matches do not tell where a fill is needed
+//     npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
+//     npy_bool* d_end = d + count;
+//     while (d < d_end) {
+//         if (*d == NPY_FALSE) {
+//             if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
+//                 Py_DECREF((PyObject*)array_to);
+//                 return NULL;
+//             }
+//         }
+//         t += t_cp;
+//         d++;
+//     }
+// }
+
 
 // Returns NULL on error.
 static inline PyObject*
@@ -6920,6 +6905,7 @@ AK_TM_map_fill(TriMapObject* tm,
             return NULL;
         }
     }
+    // TODO: add special hanldig for unicode/bytes
     else {
         // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obbligates us to decref the filled value when assigning
         if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
@@ -6938,28 +6924,6 @@ AK_TM_map_fill(TriMapObject* tm,
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
-
-// this manually inserts string
-// if (t_is_flexible) {
-//     // insert fill values
-//     Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
-//     npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
-//     Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
-//     Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
-//     // NOTE: matches do not tell where a fill is needed
-//     npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
-//     npy_bool* d_end = d + count;
-//     while (d < d_end) {
-//         if (*d == NPY_FALSE) {
-//             if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
-//                 Py_DECREF((PyObject*)array_to);
-//                 return NULL;
-//             }
-//         }
-//         t += t_cp;
-//         d++;
-//     }
-// }
 
 static PyObject*
 TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
