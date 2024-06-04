@@ -48,7 +48,7 @@ class NPNonZeroInt64Convert(ArrayProcessor):
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 400
+NUMBER = 100
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER

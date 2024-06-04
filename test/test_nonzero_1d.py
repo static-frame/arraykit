@@ -86,7 +86,16 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(nonzero_1d(a1).tolist(), [0, 999, 9_999_999])
 
     def test_nonzero_1d_f(self) -> None:
+        # non-contiguous
+        a1 = np.arange(40).reshape(10, 4) % 3 == 0
+        a2 = a1[:, 3]
+        self.assertEqual(nonzero_1d(a2).tolist(), [0, 3, 6, 9])
+
+        a3 = a1[:, 1]
+        self.assertEqual(nonzero_1d(a3).tolist(), [2, 5, 8])
+
+    def test_nonzero_1d_g(self) -> None:
         a1 = np.arange(20).reshape(4, 5) % 3 == 0
         a2 = a1[:, 4]
-        post = nonzero_1d(a2)
-
+        # array([False,  True, False, False])
+        self.assertEqual(nonzero_1d(a2).tolist(), [1])

@@ -3535,7 +3535,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define NONZERO_APPEND_INDEX {                                               \
+#define NONZERO_APPEND_INDEX_RELATIVE {                                      \
     if (AK_UNLIKELY(count == capacity)) {                                    \
         capacity <<= 1;                                                      \
         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
@@ -3544,6 +3544,17 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
         }                                                                    \
     }                                                                        \
     indices[count++] = p - p_start;                                          \
+}                                                                            \
+
+#define NONZERO_APPEND_INDEX_ABSOLUTE {                                      \
+    if (AK_UNLIKELY(count == capacity)) {                                    \
+        capacity <<= 1;                                                      \
+        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+        if (indices == NULL) {                                               \
+            return NULL;                                                     \
+        }                                                                    \
+    }                                                                        \
+    indices[count++] = i;                                                    \
 }                                                                            \
 
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
@@ -3567,43 +3578,70 @@ AK_nonzero_1d(PyArrayObject* array) {
     Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
-    // array is contiguous, 1d, boolean
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
 
-    npy_bool* p_start = (npy_bool*)PyArray_DATA(array);
-    npy_bool* p = p_start;
-    npy_bool* p_end = p + count_max;
-    npy_bool* p_end_roll = p_end - size_div.rem;
+    if (PyArray_IS_C_CONTIGUOUS(array)) {
+        npy_bool* p_start = (npy_bool*)PyArray_DATA(array);
+        npy_bool* p = p_start;
+        npy_bool* p_end = p + count_max;
+        npy_bool* p_end_roll = p_end - size_div.rem;
 
-    while (p < p_end_roll) {
-        if (*(npy_uint64*)p == 0) {
-            p += 8; // no true within this 8 byte roll region
-            continue;
+        while (p < p_end_roll) {
+            if (*(npy_uint64*)p == 0) {
+                p += 8; // no true within this 8 byte roll region
+                continue;
+            }
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
         }
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
+        while (p < p_end) {
+            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            p++;
+        }
     }
-    while (p < p_end) {
-        if (*p) {NONZERO_APPEND_INDEX;}
-        p++;
+    else {
+        npy_intp i = 0; // position within Boolean array
+        npy_intp i_end = count_max;
+        npy_intp i_end_roll = count_max - size_div.rem;
+        while (i < i_end_roll) {
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+        }
+        while (i < i_end) {
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            i++;
+        }
     }
     NPY_END_THREADS;
-
 
     npy_intp dims = {count};
     final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
@@ -3616,7 +3654,7 @@ AK_nonzero_1d(PyArrayObject* array) {
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
 }
-#undef NONZERO_APPEND_INDEX
+#undef NONZERO_APPEND_INDEX_RELATIVE
 
 static PyObject*
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
@@ -3628,10 +3666,6 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
     }
     if (PyArray_TYPE(array) != NPY_BOOL) {
         PyErr_SetString(PyExc_ValueError, "Array must be of type bool");
-        return NULL;
-    }
-    if (!PyArray_IS_C_CONTIGUOUS(array)) {
-        PyErr_SetString(PyExc_ValueError, "Array must be contiguous");
         return NULL;
     }
     return AK_nonzero_1d(array);
