@@ -3557,8 +3557,7 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
     indices[count++] = i;                                                    \
 }                                                                            \
 
-// Given a Boolean, contiguous 1D array, return the index positions in an int64 array.
-// Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help. Using bit masks does not improve perforamnce over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy befits from first counting the nonzeros, then allocating only enough data for the expexted number.
+// Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help. Using bit masks does not improve perforamnce over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy befits from first counting the nonzeros, then allocating only enough data for the expexted number.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
     // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
@@ -3655,6 +3654,7 @@ AK_nonzero_1d(PyArrayObject* array) {
     return final;
 }
 #undef NONZERO_APPEND_INDEX_RELATIVE
+#undef NONZERO_APPEND_INDEX_ABSOLUTE
 
 static PyObject*
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
