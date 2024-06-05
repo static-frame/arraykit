@@ -6736,36 +6736,22 @@ AK_TM_fill_flexible(TriMapObject* tm,
 
     bool decref_fill_value = false;
     if (PyBytes_Check(fill_value)) {
-        AK_DEBUG_MSG_OBJ("pre unicode", fill_value);
-        Py_ssize_t byte_length;
-        char *byte_data;
-        if (PyBytes_AsStringAndSize(fill_value, &byte_data, &byte_length)) {
-            return -1;
-        }
-
-        PyObject* fill_value = PyUnicode_DecodeASCII(byte_data, byte_length, "strict");
-        // original fill_value is a borrowed ref; replace it with a new ref
+        fill_value = PyUnicode_FromEncodedObject(fill_value, "utf-8", NULL);
         if (fill_value == NULL) {
             return -1;
         }
-        AK_DEBUG_MSG_OBJ("as unicode", fill_value);
         decref_fill_value = true;
     }
     else if (!PyUnicode_Check(fill_value)) {
         return -1;
     }
     Py_ssize_t fill_cp = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
-    AK_DEBUG_MSG_OBJ("fill_cp", PyLong_FromSsize_t(fill_cp));
 
     // p is the index position to fill
     npy_int64* p = (npy_int64*)PyArray_DATA(final_fill);
     npy_int64* p_end = p + PyArray_SIZE(final_fill);
-
     Py_UCS4* target;
     while (p < p_end) {
-        AK_DEBUG_MSG_OBJ("p iteration", PyLong_FromSsize_t(*p));
-        AK_DEBUG_MSG_OBJ("shift", PyLong_FromSsize_t(*p * cp));
-
         target = array_to_data + (*p * cp);
         // disabling copying a null
         if (PyUnicode_AsUCS4(fill_value, target, fill_cp, 0) == NULL) {
