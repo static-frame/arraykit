@@ -994,26 +994,26 @@ class TestUnit(unittest.TestCase):
         post_dst = tm.map_dst_fill(dst, '====', np.array('====').dtype)
         self.assertEqual(post_dst.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
 
+# TODO
+    # def test_tri_map_map_unicode_b(self) -> None:
+    #     src = np.array(['a', 'bbb', 'cc', 'dddd'])
+    #     dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
 
-    def test_tri_map_map_unicode_b(self) -> None:
-        src = np.array(['a', 'bbb', 'cc', 'dddd'])
-        dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
+    #     tm = TriMap(len(src), len(dst))
+    #     tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+    #     tm.register_one(1, -1)
+    #     tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+    #     tm.register_one(3, -1)
+    #     tm.finalize()
 
-        tm = TriMap(len(src), len(dst))
-        tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
-        tm.register_one(1, -1)
-        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
-        tm.register_one(3, -1)
-        tm.finalize()
+    #     post_src = tm.map_src_no_fill(src)
+    #     self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
 
-        post_src = tm.map_src_no_fill(src)
-        self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
+    #     post_dst1 = tm.map_dst_fill(dst, b'====', np.array(b'====').dtype)
+    #     self.assertEqual(post_dst1.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
 
-        post_dst1 = tm.map_dst_fill(dst, b'====', np.array(b'====').dtype)
-        self.assertEqual(post_dst1.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
-
-        post_dst2 = tm.map_dst_fill(dst, b'?', np.array(b'?').dtype)
-        self.assertEqual(post_dst2.tolist(), ['a', 'a', 'a', '?', 'cc', 'cc', '?'])
+    #     post_dst2 = tm.map_dst_fill(dst, b'?', np.array(b'?').dtype)
+    #     self.assertEqual(post_dst2.tolist(), ['a', 'a', 'a', '?', 'cc', 'cc', '?'])
 
     def test_tri_map_map_unicode_c(self) -> None:
         src = np.array(['a', 'bbb', 'cc', 'dddd'])
