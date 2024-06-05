@@ -6367,6 +6367,8 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
 // The elsize of the `to` array will be equal to or greater than the from array
 #define TRANSFER_FLEXIBLE(c_type) {                                        \
+    Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;\
+    TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;           \
     npy_intp t_element_size = PyArray_DESCR(array_to)->elsize;             \
     npy_intp t_element_cp = t_element_size / sizeof(c_type);               \
     npy_intp f_element_size = PyArray_DESCR(array_from)->elsize;           \
@@ -6601,10 +6603,10 @@ AK_TM_transfer(TriMapObject* tm,
                     return 0;
             }
             break;
-        case NPY_UNICODE: {
-            TRANSFER_FLEXIBLE(Py_UCS4);
-            return 0;
-        }
+        // case NPY_UNICODE: {
+        //     TRANSFER_FLEXIBLE(Py_UCS4);
+        //     return 0;
+        // }
         case NPY_STRING: {
             TRANSFER_FLEXIBLE(char);
             return 0;
@@ -6621,7 +6623,6 @@ AK_TM_transfer(TriMapObject* tm,
 }
 
 #undef TRANSFER_SCALARS
-#undef TRANSFER_FLEXIBLE
 
 // Returns -1 on error. Specialized transfer from any type of an array to an object array.
 static inline int
@@ -6712,7 +6713,6 @@ AK_TM_fill_object(TriMapObject* tm,
     npy_int64* p = (npy_int64*)PyArray_DATA(final_fill);
     npy_int64* p_end = p + PyArray_SIZE(final_fill);
     PyObject** target;
-    // npy_int64 pos;
     while (p < p_end) {
         target = array_to_data + *p++;
         Py_INCREF(fill_value);
@@ -6721,29 +6721,36 @@ AK_TM_fill_object(TriMapObject* tm,
     return 0;
 }
 
-// TODO: AK_TM_fill_flexible
-// this manually inserts string
-// if (t_is_flexible) {
-//     // insert fill values
-//     Py_UCS4* t = (Py_UCS4*)PyArray_DATA(array_to);
-//     npy_intp t_cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
-//     Py_ssize_t len = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
-//     Py_ssize_t count = from_src ? tm->src_len : tm->dst_len;
-//     // NOTE: matches do not tell where a fill is needed
-//     npy_bool* d = from_src ? tm->src_match_data : tm->dst_match_data;
-//     npy_bool* d_end = d + count;
-//     while (d < d_end) {
-//         if (*d == NPY_FALSE) {
-//             if (PyUnicode_AsUCS4(fill_value, t, len, 0) == NULL) {
-//                 Py_DECREF((PyObject*)array_to);
-//                 return NULL;
-//             }
-//         }
-//         t += t_cp;
-//         d++;
-//     }
-// }
+// Returns -1 on error.
+static inline int
+AK_TM_fill_flexible(TriMapObject* tm,
+        bool from_src,
+        PyArrayObject* array_to,
+        PyObject* fill_value) {
 
+    PyArrayObject* final_fill = (PyArrayObject*)(from_src
+            ? tm->final_src_fill : tm->final_dst_fill);
+
+    Py_UCS4* array_to_data = (Py_UCS4*)PyArray_DATA(array_to);
+    // code points per element
+    npy_intp cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
+    Py_ssize_t fill_cp = PyUnicode_GET_LENGTH(fill_value) * UCS4_SIZE; // code points
+
+    // p is the index position to fill
+    npy_int64* p = (npy_int64*)PyArray_DATA(final_fill);
+    npy_int64* p_end = p + PyArray_SIZE(final_fill);
+
+    Py_UCS4* target;
+    while (p < p_end) {
+        target = array_to_data + *p * cp;
+        // disabling copying a null
+        // if (PyUnicode_AsUCS4(fill_value, target, fill_cp, 0) == NULL) {
+        //     return -1;
+        // }
+        p++;
+    }
+    return 0;
+}
 
 // Returns NULL on error.
 static inline PyObject*
@@ -6757,6 +6764,8 @@ AK_TM_map_no_fill(TriMapObject* tm,
     npy_intp dims[] = {tm->len};
     PyArrayObject* array_to;
     bool dtype_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
+    bool dtype_is_unicode = PyArray_TYPE(array_from) == NPY_UNICODE;
+
     // create to array
     if (dtype_is_obj) { // initializes values to NULL
         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
@@ -6776,6 +6785,9 @@ AK_TM_map_no_fill(TriMapObject* tm,
             Py_DECREF((PyObject*)array_to);
             return NULL;
         }
+    }
+    else if (dtype_is_unicode) {
+        TRANSFER_FLEXIBLE(Py_UCS4);
     }
     else {
         if (AK_TM_transfer(tm, from_src, array_from, array_to)) {
@@ -6831,6 +6843,7 @@ AK_TM_map_fill(TriMapObject* tm,
     // passing a borrowed ref; returns a new ref
     PyArray_Descr* dtype = AK_resolve_dtype(PyArray_DESCR(array_from), fill_value_dtype);
     bool dtype_is_obj = dtype->type_num == NPY_OBJECT;
+    bool dtype_is_unicode = dtype->type_num == NPY_UNICODE;
 
     npy_intp dims[] = {tm->len};
     PyArrayObject* array_to;
@@ -6872,7 +6885,14 @@ AK_TM_map_fill(TriMapObject* tm,
             return NULL;
         }
     }
-    // TODO: add special hanldig for unicode/bytes
+    else if (dtype_is_unicode) {
+        TRANSFER_FLEXIBLE(Py_UCS4);
+        if (AK_TM_fill_flexible(tm, from_src, array_to, fill_value)) {
+            Py_DECREF((PyObject*)array_to);
+            Py_DECREF((PyObject*)array_from);
+            return NULL;
+        }
+    }
     else {
         // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obbligates us to decref the filled value when assigning
         if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
@@ -6891,6 +6911,8 @@ AK_TM_map_fill(TriMapObject* tm,
     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
     return (PyObject*)array_to;
 }
+#undef TRANSFER_FLEXIBLE
+
 
 static PyObject*
 TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
