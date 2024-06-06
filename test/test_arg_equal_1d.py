@@ -27,3 +27,21 @@ class TestUnit(unittest.TestCase):
     def test_arg_equal_1d_int_c(self) -> None:
         a = np.array([4, 0, 4, 0, 5, 8, 0])
         self.assertEqual(arg_equal_1d(a, 20).tolist(), [])
+
+    def test_arg_equal_1d_int_d(self) -> None:
+        a = np.array([4, 0, 4, 0, 5, 8, 0])
+        self.assertEqual(arg_equal_1d(a, "foo").tolist(), [])
+
+    def test_arg_equal_1d_int_d(self) -> None:
+        a = np.array([4, 0, 4, 0, 5, 8, 0])
+        self.assertEqual(arg_equal_1d(a, None).tolist(), [])
+
+    def test_arg_equal_1d_int_e(self) -> None:
+        # NOTE: this is consistent with numpy
+        a = np.array([4, 0, 4, 0, 5, 8, 0])
+        self.assertEqual(arg_equal_1d(a, False).tolist(), [1, 3, 6])
+
+    def test_arg_equal_1d_int_e(self) -> None:
+        # NOTE: this is consistent with numpy
+        a = np.array([4, 0, 4, 0, 5, 8, 1])
+        self.assertEqual(arg_equal_1d(a, True).tolist(), [6])

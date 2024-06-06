@@ -3684,6 +3684,7 @@ static npy_int64
 AK_obj_to_int(PyObject* obj, bool* error) {
     npy_int64 v = 0;
     *error = false;
+
     if (PyArray_IsScalar(obj, LongLong)) {
         v = (npy_int64)PyArrayScalar_VAL(obj, LongLong);
     }
