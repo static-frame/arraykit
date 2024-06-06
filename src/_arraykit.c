@@ -3562,13 +3562,11 @@ static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
     // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
     PyObject* final;
+    npy_intp dims[1] = {0}; // update later
     npy_intp count_max = PyArray_SIZE(array);
 
     if (count_max == 0) { // return empty array
-        npy_intp dims = {count_max};
-        final = PyArray_SimpleNew(1, &dims, NPY_INT64);
-        PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
-        return final;
+        goto empty;
     }
     lldiv_t size_div = lldiv((long long)count_max, 8); // quot, rem
 
@@ -3642,14 +3640,22 @@ AK_nonzero_1d(PyArrayObject* array) {
     }
     NPY_END_THREADS;
 
-    npy_intp dims = {count};
-    final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
+    if (count == 0) {
+        free(indices);
+        goto empty;
+    }
+    dims[0] = count;
+    final = PyArray_SimpleNewFromData(1, dims, NPY_INT64, (void*)indices);
     if (!final) {
         free(indices);
         return NULL;
     }
     // This ensures that the array frees the indices array; this has been tested by calling free(indices) and observing segfault
     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
+    PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+    return final;
+empty:
+    final = PyArray_SimpleNew(1, dims, NPY_INT64);
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
 }
@@ -3674,28 +3680,93 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
 
 //------------------------------------------------------------------------------
 
-#define NONZERO_APPEND_INDEX_RELATIVE {                                      \
-    if (AK_UNLIKELY(count == capacity)) {                                    \
-        capacity <<= 1;                                                      \
-        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
-        if (indices == NULL) {                                               \
-            return NULL;                                                     \
-        }                                                                    \
-    }                                                                        \
-    indices[count++] = p - p_start;                                          \
-}                                                                            \
-
-
+static npy_int64
+AK_obj_to_int(PyObject* obj, bool* error) {
+    npy_int64 v = 0;
+    *error = false;
+    if (PyArray_IsScalar(obj, LongLong)) {
+        v = (npy_int64)PyArrayScalar_VAL(obj, LongLong);
+    }
+    else if (PyArray_IsScalar(obj, Long)) {
+        v = (npy_int64)PyArrayScalar_VAL(obj, Long);
+    }
+    else if (PyLong_Check(obj)) {
+        v = PyLong_AsLongLong(obj);
+        if (v == -1 && PyErr_Occurred()) {
+            PyErr_Clear();
+            *error = true;
+        }
+    }
+    else if (PyArray_IsScalar(obj, Double)) {
+        double dv = PyArrayScalar_VAL(obj, Double);
+        if (floor(dv) != dv) {
+            *error = true;
+        }
+        v = (npy_int64)dv;
+    }
+    else if (PyFloat_Check(obj)) {
+        double dv = PyFloat_AsDouble(obj);
+        if (dv == -1.0 && PyErr_Occurred()) {
+            PyErr_Clear();
+            *error = true;
+        }
+        v = (npy_int64)dv; // truncate to integer
+        if (v != dv) {
+            *error = true;
+        }
+    }
+    else if (PyArray_IsScalar(obj, ULongLong)) {
+        v = (npy_int64)PyArrayScalar_VAL(obj, ULongLong);
+    }
+    else if (PyArray_IsScalar(obj, ULong)) {
+        v = (npy_int64)PyArrayScalar_VAL(obj, ULong);
+    }
+    else if (PyArray_IsScalar(obj, Int)) {
+        v = (npy_int64)PyArrayScalar_VAL(obj, Int);
+    }
+    else if (PyArray_IsScalar(obj, UInt)) {
+        v = (npy_int64)PyArrayScalar_VAL(obj, UInt);
+    }
+    else if (PyArray_IsScalar(obj, Float)) {
+        double dv = (double)PyArrayScalar_VAL(obj, Float);
+        if (floor(dv) != dv) {
+            *error = true;
+        }
+        v = (npy_int64)dv;
+    }
+    else if (PyArray_IsScalar(obj, Half)) {
+        double dv = npy_half_to_double(PyArrayScalar_VAL(obj, Half));
+        if (floor(dv) != dv) {
+            *error = true;
+        }
+        v = (npy_int64)dv;
+    }
+    else if (PyBool_Check(obj)) {
+        v = PyObject_IsTrue(obj);
+    }
+    else if (PyNumber_Check(obj)) {
+        // NOTE: we handle PyArray Scalar Byte, Short, UByte, UShort with PyNumber_Check, below, saving four branches here
+        // NOTE: this returns a Py_ssize_t, which might be 32 bit. This can be used for PyArray_Scalars <= ssize_t.
+        v = (npy_int64)PyNumber_AsSsize_t(obj, PyExc_OverflowError);
+        if (v == -1 && PyErr_Occurred()) {
+            *error = true;
+        }
+    }
+    else {
+        *error = true;
+    }
+    return v;
+}
 
 static inline PyObject*
 AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
     PyObject* final;
+    npy_intp dims[1] = {0}; // update later
     npy_intp count_max = PyArray_SIZE(array);
+    bool error;
+
     if (count_max == 0) { // return empty array
-        npy_intp dims = {count_max};
-        final = PyArray_SimpleNew(1, &dims, NPY_INT64);
-        PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
-        return final;
+        goto empty;
     }
 
     // lldiv_t size_div = lldiv((long long)size, 8); // quot, rem
@@ -3706,9 +3777,13 @@ AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
 
     switch (PyArray_TYPE(array)) { // type of passed in array
         case NPY_INT64: {
-            npy_intp i = 0; // position within Boolean array
+            // try to convert the object to an int; if not possible, no matches
+            npy_int64 v = AK_obj_to_int(value, &error);
+            if (error) {
+                goto empty;
+            }
             for (npy_intp i = 0; i < count_max; i++) {
-                if (*(npy_int64*)PyArray_GETPTR1(array, i) == 0) {
+                if (*(npy_int64*)PyArray_GETPTR1(array, i) == v) {
                     if (AK_UNLIKELY(count == capacity)) {
                         capacity <<= 1;
                         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
@@ -3721,9 +3796,12 @@ AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
             }
         }
     }
-
-    npy_intp dims = {count};
-    final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
+    if (count == 0) {
+        free(indices);
+        goto empty;
+    }
+    dims[0] = count;
+    final = PyArray_SimpleNewFromData(1, dims, NPY_INT64, (void*)indices);
     if (!final) {
         free(indices);
         return NULL;
@@ -3732,7 +3810,10 @@ AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
-
+empty:
+    final = PyArray_SimpleNew(1, dims, NPY_INT64); // dims set to 0
+    PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+    return final;
 }
 
 
