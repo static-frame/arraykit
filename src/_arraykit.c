@@ -3674,9 +3674,65 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
 
 //------------------------------------------------------------------------------
 
+#define NONZERO_APPEND_INDEX_RELATIVE {                                      \
+    if (AK_UNLIKELY(count == capacity)) {                                    \
+        capacity <<= 1;                                                      \
+        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+        if (indices == NULL) {                                               \
+            return NULL;                                                     \
+        }                                                                    \
+    }                                                                        \
+    indices[count++] = p - p_start;                                          \
+}                                                                            \
+
+
+
 static inline PyObject*
 AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
-    Py_RETURN_NONE;
+    PyObject* final;
+    npy_intp count_max = PyArray_SIZE(array);
+    if (count_max == 0) { // return empty array
+        npy_intp dims = {count_max};
+        final = PyArray_SimpleNew(1, &dims, NPY_INT64);
+        PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+        return final;
+    }
+
+    // lldiv_t size_div = lldiv((long long)size, 8); // quot, rem
+    Py_ssize_t count = 0;
+    // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
+    Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
+    npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
+
+    switch (PyArray_TYPE(array)) { // type of passed in array
+        case NPY_INT64: {
+            npy_intp i = 0; // position within Boolean array
+            for (npy_intp i = 0; i < count_max; i++) {
+                if (*(npy_int64*)PyArray_GETPTR1(array, i) == 0) {
+                    if (AK_UNLIKELY(count == capacity)) {
+                        capacity <<= 1;
+                        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+                        if (indices == NULL) {
+                            return NULL;
+                        }
+                    }
+                    indices[count++] = i;
+                }
+            }
+        }
+    }
+
+    npy_intp dims = {count};
+    final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
+    if (!final) {
+        free(indices);
+        return NULL;
+    }
+    // This ensures that the array frees the indices array; this has been tested by calling free(indices) and observing segfault
+    PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
+    PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+    return final;
+
 }
 
 
