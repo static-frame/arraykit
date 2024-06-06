@@ -975,6 +975,21 @@ class TestUnit(unittest.TestCase):
         post_dst = tm.map_dst_no_fill(dst)
         self.assertEqual(post_dst.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
 
+    def test_tri_map_map_bytes_a(self) -> None:
+        src = np.array([b'a', b'bbb', b'cc'], dtype=np.bytes_)
+        dst = np.array([b'cc', b'dddd', b'eee'], dtype=np.bytes_)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_one(1, -1)
+        tm.register_one(2, 0)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post_src = tm.map_src_fill(src, b'--', np.dtype(np.bytes_))
+        post_dst = tm.map_dst_fill(dst, b'--', np.dtype(np.bytes_))
+        self.assertEqual(post_src.tolist(), [b'a', b'bbb', b'cc', b'--', b'--'])
+        self.assertEqual(post_dst.tolist(), [b'--', b'--', b'cc', b'dddd', b'eee'])
     #---------------------------------------------------------------------------
 
     def test_tri_map_map_unicode_a(self) -> None:
@@ -993,7 +1008,6 @@ class TestUnit(unittest.TestCase):
 
         post_dst = tm.map_dst_fill(dst, '====', np.array('====').dtype)
         self.assertEqual(post_dst.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
-
 
     def test_tri_map_map_unicode_b(self) -> None:
         src = np.array(['a', 'bbb', 'cc', 'dddd'])
