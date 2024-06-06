@@ -3672,6 +3672,36 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
 }
 
 
+//------------------------------------------------------------------------------
+
+static inline PyObject*
+AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
+    Py_RETURN_NONE;
+}
+
+
+static PyObject*
+arg_equal_1d(PyObject *Py_UNUSED(m), PyObject *args) {
+    PyArrayObject* array;
+    PyObject* value;
+    if (!PyArg_ParseTuple(args,
+            "O!O:arg_equal_1d",
+            &PyArray_Type, &array,
+            &value)) {
+        return NULL;
+    }
+
+    if (PyArray_NDIM(array) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
+    return AK_arg_equal_1d(array, value);
+}
+
+
+
+//------------------------------------------------------------------------------
+
 static char *first_true_1d_kwarg_names[] = {
     "array",
     "forward",
@@ -7310,6 +7340,7 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"nonzero_1d", nonzero_1d, METH_O, NULL},
+    {"arg_equal_1d", arg_equal_1d, METH_VARARGS, NULL},
     {"isna_element",
             (PyCFunction)isna_element,
             METH_VARARGS | METH_KEYWORDS,

@@ -29,3 +29,4 @@ from ._arraykit import first_true_1d as first_true_1d
 from ._arraykit import first_true_2d as first_true_2d
 from ._arraykit import slice_to_ascending_slice as slice_to_ascending_slice
 from ._arraykit import nonzero_1d as nonzero_1d
+from ._arraykit import arg_equal_1d as arg_equal_1d
