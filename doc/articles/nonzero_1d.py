@@ -40,7 +40,7 @@ class NPNonZero(ArrayProcessor):
         _ = np.nonzero(self.array)[0]
 
 class NPNonZeroInt64Convert(ArrayProcessor):
-    NAME = 'np.nonzero().astype(np.int64)'
+    NAME = 'np.nonzero()\n.astype(np.int64)'
     SORT = 3
 
     def __call__(self):
@@ -48,7 +48,7 @@ class NPNonZeroInt64Convert(ArrayProcessor):
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 100
+NUMBER = 10
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -92,13 +92,13 @@ def plot_performance(frame):
             title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[fixture_label]}'
 
             ax.set_title(title, fontsize=6)
-            ax.set_box_aspect(0.75) # makes taller tan wide
+            ax.set_box_aspect(0.75) # makes taller than wide
             time_max = fixture['time'].max()
             ax.set_yticks([0, time_max * 0.5, time_max])
             ax.set_yticklabels(['',
                     seconds_to_display(time_max * .5),
                     seconds_to_display(time_max),
-                    ], fontsize=6)
+                    ], fontsize=4)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
                     axis='x',
@@ -108,7 +108,7 @@ def plot_performance(frame):
                     labelbottom=False,
                     )
 
-    fig.set_size_inches(9, 4) # width, height
+    fig.set_size_inches(10, 4) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
     fig.text(.05, .96, f'nonzero_1d() Performance: {NUMBER} Iterations', fontsize=10)
@@ -116,12 +116,12 @@ def plot_performance(frame):
 
     fp = '/tmp/nonzero.png'
     plt.subplots_adjust(
-            left=0.075,
+            left=0.05,
             bottom=0.05,
-            right=0.80,
+            right=0.85,
             top=0.85,
             wspace=0.9, # width
-            hspace=0.2,
+            hspace=0.0,
             )
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
@@ -138,15 +138,19 @@ class FixtureFactory:
     NAME = ''
 
     @staticmethod
-    def get_array(size: int) -> np.ndarray:
-        return np.full(size, False, dtype=bool)
+    def get_array(size: int, contiguous: bool = True) -> np.ndarray:
+        if contiguous:
+            return np.full(size, False, dtype=bool)
+        # take every other value to force non-contigous data
+        return np.full(size * 2, False, dtype=bool)[::2]
 
     def _get_array_filled(
             size: int,
             start_third: int, #0, 1 or 2
             density: float, # less than 1
+            contiguous: bool,
             ) -> np.ndarray:
-        a = FixtureFactory.get_array(size)
+        a = FixtureFactory.get_array(size, contiguous)
         count = size * density
         start = int(len(a) * (start_third/3))
         length = len(a) - start
@@ -161,10 +165,14 @@ class FixtureFactory:
         return cls.NAME, array
 
     DENSITY_TO_DISPLAY = {
-        'single': '1 True',
-        'quarter': '25% True',
-        'half': '50% True',
-        'full': '100% True',
+        'single-c': '1 True C',
+        'quarter-c': '25% True C',
+        'half-c': '50% True C',
+        'full-c': '100% True C',
+        'single-nc': '1 True NC',
+        'quarter-nc': '25% True NC',
+        'half-nc': '50% True NC',
+        'full-nc': '100% True NC',
     }
 
     # POSITION_TO_DISPLAY = {
@@ -174,35 +182,68 @@ class FixtureFactory:
 
 
 class FFSingle(FixtureFactory):
-    NAME = 'single'
+    NAME = 'single-c'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
-        a = FixtureFactory.get_array(size)
+        a = FixtureFactory.get_array(size, contiguous=True)
+        a[len(a) // 2] = True
+        return a
+
+class FFSingleNC(FixtureFactory):
+    NAME = 'single-nc'
+
+    @staticmethod
+    def get_array(size: int) -> np.ndarray:
+        a = FixtureFactory.get_array(size, contiguous=False)
         a[len(a) // 2] = True
         return a
 
 class FFQuarter(FixtureFactory):
-    NAME = 'quarter'
+    NAME = 'quarter-c'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=0, density=0.25)
+        return cls._get_array_filled(size, start_third=0, density=0.25, contiguous=True)
+
+class FFQuarterNC(FixtureFactory):
+    NAME = 'quarter-nc'
+
+    @classmethod
+    def get_array(cls, size: int) -> np.ndarray:
+        return cls._get_array_filled(size, start_third=0, density=0.25, contiguous=False)
+
 
 class FFHalf(FixtureFactory):
-    NAME = 'half'
+    NAME = 'half-c'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=0, density=0.5)
+        return cls._get_array_filled(size, start_third=0, density=0.5, contiguous=True)
+
+class FFHalfNC(FixtureFactory):
+    NAME = 'half-nc'
+
+    @classmethod
+    def get_array(cls, size: int) -> np.ndarray:
+        return cls._get_array_filled(size, start_third=0, density=0.5, contiguous=False)
+
 
 
 class FFFull(FixtureFactory):
-    NAME = 'full'
+    NAME = 'full-c'
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=0, density=1)
+        return cls._get_array_filled(size, start_third=0, density=1, contiguous=True)
+
+
+class FFFullNC(FixtureFactory):
+    NAME = 'full-nc'
+
+    @classmethod
+    def get_array(cls, size: int) -> np.ndarray:
+        return cls._get_array_filled(size, start_third=0, density=1, contiguous=False)
 
 
 def get_versions() -> str:
@@ -218,15 +259,20 @@ CLS_PROCESSOR = (
 
 CLS_FF = (
     FFSingle,
+    FFSingleNC,
     FFQuarter,
+    FFQuarterNC,
     FFHalf,
+    FFHalfNC,
     FFFull,
+    FFFullNC,
+
 )
 
 
 def run_test():
     records = []
-    for size in (100_000, 1_000_000, 10_000_000):
+    for size in (10_000, 100_000, 1_000_000, 10_000_000):
         for ff in CLS_FF:
             fixture_label, fixture = ff.get_label_array(size)
             for cls in CLS_PROCESSOR:
