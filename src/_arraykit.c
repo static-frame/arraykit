@@ -3535,6 +3535,19 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
+static npy_uint32
+AK_next_power(npy_uint32 v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+
 #define NONZERO_APPEND_INDEX_RELATIVE {                                      \
     if (AK_UNLIKELY(count == capacity)) {                                    \
         capacity <<= 1;                                                      \
@@ -3572,7 +3585,7 @@ AK_nonzero_1d(PyArrayObject* array) {
 
     Py_ssize_t count = 0;
     // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
-    Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
+    Py_ssize_t capacity = count_max < 512 ? 512 : AK_next_power((npy_uint32)(count_max / 8));
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
     NPY_BEGIN_THREADS_DEF;
@@ -3680,7 +3693,7 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
 
 //------------------------------------------------------------------------------
 
-static npy_int64
+static inline npy_int64
 AK_obj_to_int(PyObject* obj, bool* error) {
     npy_int64 v = 0;
     *error = false;
@@ -3773,30 +3786,67 @@ AK_arg_equal_1d(PyArrayObject* array, PyObject* value) {
     // lldiv_t size_div = lldiv((long long)size, 8); // quot, rem
     Py_ssize_t count = 0;
     // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
-    Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
+    Py_ssize_t capacity = count_max < 1024 ? 1024 : AK_next_power((npy_uint32)(count_max / 8));
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
+
+    NpyIter *iter = NpyIter_New(
+            array,                                      // array
+            NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP, // iter flags
+            NPY_KEEPORDER,                              // order
+            NPY_NO_CASTING,                             // casting
+            NULL                                        // dtype
+            );
+    if (iter == NULL) {
+        free(indices);
+        return NULL;
+    }
+    NpyIter_IterNextFunc *iter_next = NpyIter_GetIterNext(iter, NULL);
+    if (iter_next == NULL) {
+        free(indices);
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+    char **data_ptr = NpyIter_GetDataPtrArray(iter);
+    char* data;
+    npy_intp *stride_ptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp stride;
+    npy_intp *inner_size_ptr = NpyIter_GetInnerLoopSizePtr(iter);
+    npy_intp inner_size;
+    npy_int64 i = 0;
 
     switch (PyArray_TYPE(array)) { // type of passed in array
         case NPY_INT64: {
             // try to convert the object to an int; if not possible, no matches
             npy_int64 v = AK_obj_to_int(value, &error);
             if (error) {
+                free(indices);
+                NpyIter_Deallocate(iter);
                 goto empty;
             }
-            for (npy_intp i = 0; i < count_max; i++) {
-                if (*(npy_int64*)PyArray_GETPTR1(array, i) == v) {
-                    if (AK_UNLIKELY(count == capacity)) {
-                        capacity <<= 1;
-                        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
-                        if (indices == NULL) {
-                            return NULL;
+
+            do {
+                data = *data_ptr;
+                stride = *stride_ptr;
+                inner_size = *inner_size_ptr;
+                while (inner_size--) {
+                    if (*(npy_int64*)data == v) {
+                        if (AK_UNLIKELY(count == capacity)) {
+                            capacity <<= 1;
+                            indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+                            if (indices == NULL) {
+                                NpyIter_Deallocate(iter);
+                                return NULL;
+                            }
                         }
+                        indices[count++] = i;
                     }
-                    indices[count++] = i;
+                    i++;
+                    data += stride;
                 }
-            }
+            } while(iter_next(iter));
         }
     }
+    NpyIter_Deallocate(iter);
     if (count == 0) {
         free(indices);
         goto empty;
@@ -3835,7 +3885,6 @@ arg_equal_1d(PyObject *Py_UNUSED(m), PyObject *args) {
     }
     return AK_arg_equal_1d(array, value);
 }
-
 
 
 //------------------------------------------------------------------------------
