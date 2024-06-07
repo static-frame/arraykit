@@ -3535,17 +3535,17 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-static npy_uint32
-AK_next_power(npy_uint32 v) {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
+// static npy_uint32
+// AK_next_power(npy_uint32 v) {
+//     v--;
+//     v |= v >> 1;
+//     v |= v >> 2;
+//     v |= v >> 4;
+//     v |= v >> 8;
+//     v |= v >> 16;
+//     v++;
+//     return v;
+// }
 
 
 #define NONZERO_APPEND_INDEX_RELATIVE {                                      \
@@ -3641,6 +3641,7 @@ AK_nonzero_1d(PyArrayObject* array) {
 
     Py_ssize_t count = 0;
     // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
+    // Py_ssize_t capacity = count_max < 1024 ? count_max : (Py_ssize_t)AK_next_power((npy_uint32)(count_max / 8));
     Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
