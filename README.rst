@@ -37,10 +37,16 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.6.3
+............
+
+Optimized memory allocation strategy for ``nonzero_1d()``.
+
+
 0.6.2
 ............
 
-Extended ``nonzero_1d()`` to support non-contiguous arrays,
+Extended ``nonzero_1d()`` to support non-contiguous arrays.
 
 Optimizations to ``TriMap`` when mapping to object and flexible dtypes.
 
