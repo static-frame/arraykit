@@ -3572,58 +3572,6 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 
 
 
-
-    // NpyIter *iter = NpyIter_New(
-    //         array,                                      // array
-    //         NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP, // iter flags
-    //         NPY_KEEPORDER,                              // order
-    //         NPY_NO_CASTING,                             // casting
-    //         NULL                                        // dtype
-    //         );
-    // if (iter == NULL) {
-    //     free(indices);
-    //     return NULL;
-    // }
-    // NpyIter_IterNextFunc *iter_next = NpyIter_GetIterNext(iter, NULL);
-    // if (iter_next == NULL) {
-    //     free(indices);
-    //     NpyIter_Deallocate(iter);
-    //     return NULL;
-    // }
-    // char **data_ptr = NpyIter_GetDataPtrArray(iter);
-    // char* data;
-    // npy_intp *stride_ptr = NpyIter_GetInnerStrideArray(iter);
-    // npy_intp stride;
-    // npy_intp *inner_size_ptr = NpyIter_GetInnerLoopSizePtr(iter);
-    // npy_intp inner_size;
-    // npy_int64 i = 0;
-
-
-    // do {
-    //     data = *data_ptr;
-    //     stride = *stride_ptr;
-    //     inner_size = *inner_size_ptr;
-    //     while (inner_size--) {
-    //         if (*(npy_bool*)data) {
-    //             if (AK_UNLIKELY(count == capacity)) {
-    //                 capacity <<= 1;
-    //                 indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
-    //                 if (indices == NULL) {
-    //                     NpyIter_Deallocate(iter);
-    //                     return NULL;
-    //                 }
-    //             }
-    //             indices[count++] = i;
-    //         }
-    //         i++;
-    //         data += stride;
-    //     }
-    // } while(iter_next(iter));
-    // NpyIter_Deallocate(iter);
-
-
-
-
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help. Using bit masks does not improve perforamnce over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy befits from first counting the nonzeros, then allocating only enough data for the expexted number.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
@@ -3681,6 +3629,53 @@ AK_nonzero_1d(PyArrayObject* array) {
             p++;
         }
     }
+    // else {
+    //     NpyIter *iter = NpyIter_New(
+    //             array,                                      // array
+    //             NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP, // iter flags
+    //             NPY_KEEPORDER,                              // order
+    //             NPY_NO_CASTING,                             // casting
+    //             NULL                                        // dtype
+    //             );
+    //     if (iter == NULL) {
+    //         free(indices);
+    //         return NULL;
+    //     }
+    //     NpyIter_IterNextFunc *iter_next = NpyIter_GetIterNext(iter, NULL);
+    //     if (iter_next == NULL) {
+    //         free(indices);
+    //         NpyIter_Deallocate(iter);
+    //         return NULL;
+    //     }
+    //     char **data_ptr = NpyIter_GetDataPtrArray(iter);
+    //     char* data;
+    //     npy_intp *stride_ptr = NpyIter_GetInnerStrideArray(iter);
+    //     npy_intp stride;
+    //     npy_intp *inner_size_ptr = NpyIter_GetInnerLoopSizePtr(iter);
+    //     npy_intp inner_size;
+    //     npy_int64 i = 0;
+    //     do {
+    //         data = *data_ptr;
+    //         stride = *stride_ptr;
+    //         inner_size = *inner_size_ptr;
+    //         while (inner_size--) {
+    //             if (*(npy_bool*)data) {
+    //                 if (AK_UNLIKELY(count == capacity)) {
+    //                     capacity <<= 1;
+    //                     indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+    //                     if (indices == NULL) {
+    //                         NpyIter_Deallocate(iter);
+    //                         return NULL;
+    //                     }
+    //                 }
+    //                 indices[count++] = i;
+    //             }
+    //             i++;
+    //             data += stride;
+    //         }
+    //     } while(iter_next(iter));
+    //     NpyIter_Deallocate(iter);
+    // }
     else {
         npy_intp i = 0; // position within Boolean array
         npy_intp i_end = count_max;
