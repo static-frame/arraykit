@@ -3804,7 +3804,6 @@ AK_nonzero_1d(PyArrayObject* array) {
     return final;
 }
 
-
 static PyObject*
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
@@ -6251,14 +6250,12 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
             return NULL;
         }
         // derive indices for unmatched locations, call each with register_one
-        // PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
         PyArrayObject* indices = (PyArrayObject*)AK_nonzero_1d(dst_unmatched);
         if (indices == NULL) {
             Py_DECREF((PyObject*)dst_unmatched);
             return NULL;
         }
         // borrow ref to array in 1-element tuple
-        // PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
         npy_int64 *index_data = (npy_int64 *)PyArray_DATA(indices);
         npy_intp index_len = PyArray_SIZE(indices);
 
