@@ -836,9 +836,9 @@ AK_TP_ResolveLineResetField(AK_TypeParser* tp,
 static char* TRUE_LOWER = "true";
 static char* TRUE_UPPER = "TRUE";
 
-#define ERROR_NO_DIGITS 1
-#define ERROR_OVERFLOW 2
-#define ERROR_INVALID_CHARS 3
+#define AK_ERROR_NO_DIGITS 1
+#define AK_ERROR_OVERFLOW 2
+#define AK_ERROR_INVALID_CHARS 3
 
 // Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets `error` to values greater than 0 on error; never sets error on success.
 static inline npy_int64
@@ -866,7 +866,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 
     // Check that there is a first digit.
     if (!AK_is_digit(*p)) {
-        *error = ERROR_NO_DIGITS;
+        *error = AK_ERROR_NO_DIGITS;
         return 0;
     }
     if (isneg) {
@@ -891,7 +891,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
                     if (p >= end) return number;
                     d = *p;
                 } else {
-                    *error = ERROR_OVERFLOW;
+                    *error = AK_ERROR_OVERFLOW;
                     return 0;
                 }
             }
@@ -904,7 +904,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
                     if (p >= end) return number;
                     d = *p;
                 } else {
-                    *error = ERROR_OVERFLOW;
+                    *error = AK_ERROR_OVERFLOW;
                     return 0;
                 }
             }
@@ -931,7 +931,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
                     if (p >= end) return number;
                     d = *p;
                 } else {
-                    *error = ERROR_OVERFLOW;
+                    *error = AK_ERROR_OVERFLOW;
                     return 0;
                 }
             }
@@ -944,7 +944,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
                     if (p >= end) return number;
                     d = *p;
                 } else {
-                    *error = ERROR_OVERFLOW;
+                    *error = AK_ERROR_OVERFLOW;
                     return 0;
                 }
             }
@@ -952,7 +952,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
     }
     while (p < end) {
         if (!AK_is_space(*p)) {
-            *error = ERROR_INVALID_CHARS;
+            *error = AK_ERROR_INVALID_CHARS;
             return 0;
         }
         p++;
@@ -975,7 +975,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
         if (p >= end) return number;
     }
     if (*p == '-') {
-        *error = ERROR_INVALID_CHARS;
+        *error = AK_ERROR_INVALID_CHARS;
         return 0;
     } else if (*p == '+') {
         p++;
@@ -984,7 +984,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 
     // Check that there is a first digit.
     if (!AK_is_digit(*p)) {
-        *error = ERROR_NO_DIGITS;
+        *error = AK_ERROR_NO_DIGITS;
         return 0;
     }
     // If number is less than pre_max, at least one more digit can be processed without overflowing.
@@ -1006,7 +1006,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
                 if (p >= end) return number;
                 d = *p;
             } else {
-                *error = ERROR_OVERFLOW;
+                *error = AK_ERROR_OVERFLOW;
                 return 0;
             }
         }
@@ -1019,14 +1019,14 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
                 if (p >= end) return number;
                 d = *p;
             } else {
-                *error = ERROR_OVERFLOW;
+                *error = AK_ERROR_OVERFLOW;
                 return 0;
             }
         }
     }
     while (p < end) {
         if (!AK_is_space(*p)) {
-            *error = ERROR_INVALID_CHARS;
+            *error = AK_ERROR_INVALID_CHARS;
             return 0;
         }
         p++;
@@ -3535,32 +3535,182 @@ resolve_dtype_iter(PyObject *Py_UNUSED(m), PyObject *arg) {
 //------------------------------------------------------------------------------
 // general utility
 
-#define NONZERO_APPEND_INDEX_RELATIVE {                                      \
-    if (AK_UNLIKELY(count == capacity)) {                                    \
-        capacity <<= 1;                                                      \
-        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
-        if (indices == NULL) {                                               \
-            return NULL;                                                     \
-        }                                                                    \
-    }                                                                        \
-    indices[count++] = p - p_start;                                          \
-}                                                                            \
 
-#define NONZERO_APPEND_INDEX_ABSOLUTE {                                      \
-    if (AK_UNLIKELY(count == capacity)) {                                    \
-        capacity <<= 1;                                                      \
-        indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
-        if (indices == NULL) {                                               \
-            return NULL;                                                     \
-        }                                                                    \
-    }                                                                        \
-    indices[count++] = i;                                                    \
-}                                                                            \
+// #define NONZERO_APPEND_INDEX_RELATIVE {                                      \
+//     if (AK_UNLIKELY(count == capacity)) {                                    \
+//         capacity <<= 1;                                                      \
+//         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+//         if (indices == NULL) {                                               \
+//             return NULL;                                                     \
+//         }                                                                    \
+//     }                                                                        \
+//     indices[count++] = p - p_start;                                          \
+// }                                                                            \
 
-// Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help. Using bit masks does not improve perforamnce over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy befits from first counting the nonzeros, then allocating only enough data for the expexted number.
+// #define NONZERO_APPEND_INDEX_ABSOLUTE {                                      \
+//     if (AK_UNLIKELY(count == capacity)) {                                    \
+//         capacity <<= 1;                                                      \
+//         indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);\
+//         if (indices == NULL) {                                               \
+//             return NULL;                                                     \
+//         }                                                                    \
+//     }                                                                        \
+//     indices[count++] = i;                                                    \
+// }                                                                            \
+
+
+
+// // Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory does not permit outperforming NumPy at 10_000_000 scale; but doing less optimizations does help. Using bit masks does not improve perforamnce over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy befits from first counting the nonzeros, then allocating only enough data for the expexted number.
+// static inline PyObject*
+// AK_nonzero_1d(PyArrayObject* array) {
+//     // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
+//     PyObject* final;
+//     npy_intp count_max = PyArray_SIZE(array);
+
+//     if (count_max == 0) { // return empty array
+//         npy_intp dims = {count_max};
+//         final = PyArray_SimpleNew(1, &dims, NPY_INT64);
+//         PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+//         return final;
+//     }
+//     lldiv_t size_div = lldiv((long long)count_max, 8); // quot, rem
+
+//     Py_ssize_t count = 0;
+//     // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
+//     // Py_ssize_t capacity = count_max < 1024 ? count_max : (Py_ssize_t)AK_next_power((npy_uint32)(count_max / 8));
+//     Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
+//     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
+
+//     NPY_BEGIN_THREADS_DEF;
+//     NPY_BEGIN_THREADS;
+
+//     if (PyArray_IS_C_CONTIGUOUS(array)) {
+//         npy_bool* p_start = (npy_bool*)PyArray_DATA(array);
+//         npy_bool* p = p_start;
+//         npy_bool* p_end = p + count_max;
+//         npy_bool* p_end_roll = p_end - size_div.rem;
+
+//         while (p < p_end_roll) {
+//             if (*(npy_uint64*)p == 0) {
+//                 p += 8; // no true within this 8 byte roll region
+//                 continue;
+//             }
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//         }
+//         while (p < p_end) {
+//             if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+//             p++;
+//         }
+//     }
+//     // else {
+//     //     NpyIter *iter = NpyIter_New(
+//     //             array,                                      // array
+//     //             NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP, // iter flags
+//     //             NPY_KEEPORDER,                              // order
+//     //             NPY_NO_CASTING,                             // casting
+//     //             NULL                                        // dtype
+//     //             );
+//     //     if (iter == NULL) {
+//     //         free(indices);
+//     //         return NULL;
+//     //     }
+//     //     NpyIter_IterNextFunc *iter_next = NpyIter_GetIterNext(iter, NULL);
+//     //     if (iter_next == NULL) {
+//     //         free(indices);
+//     //         NpyIter_Deallocate(iter);
+//     //         return NULL;
+//     //     }
+//     //     char **data_ptr = NpyIter_GetDataPtrArray(iter);
+//     //     char* data;
+//     //     npy_intp *stride_ptr = NpyIter_GetInnerStrideArray(iter);
+//     //     npy_intp stride;
+//     //     npy_intp *inner_size_ptr = NpyIter_GetInnerLoopSizePtr(iter);
+//     //     npy_intp inner_size;
+//     //     npy_int64 i = 0;
+//     //     do {
+//     //         data = *data_ptr;
+//     //         stride = *stride_ptr;
+//     //         inner_size = *inner_size_ptr;
+//     //         while (inner_size--) {
+//     //             if (*(npy_bool*)data) {
+//     //                 if (AK_UNLIKELY(count == capacity)) {
+//     //                     capacity <<= 1;
+//     //                     indices = (npy_int64*)realloc(indices, sizeof(npy_int64) * capacity);
+//     //                     if (indices == NULL) {
+//     //                         NpyIter_Deallocate(iter);
+//     //                         return NULL;
+//     //                     }
+//     //                 }
+//     //                 indices[count++] = i;
+//     //             }
+//     //             i++;
+//     //             data += stride;
+//     //         }
+//     //     } while(iter_next(iter));
+//     //     NpyIter_Deallocate(iter);
+//     // }
+//     else {
+//         npy_intp i = 0; // position within Boolean array
+//         npy_intp i_end = count_max;
+//         npy_intp i_end_roll = count_max - size_div.rem;
+//         while (i < i_end_roll) {
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//         }
+//         while (i < i_end) {
+//             if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+//             i++;
+//         }
+//     }
+//     NPY_END_THREADS;
+
+//     npy_intp dims = {count};
+//     final = PyArray_SimpleNewFromData(1, &dims, NPY_INT64, (void*)indices);
+//     if (!final) {
+//         free(indices);
+//         return NULL;
+//     }
+//     // This ensures that the array frees the indices array; this has been tested by calling free(indices) and observing segfault
+//     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
+//     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
+//     return final;
+// }
+// #undef NONZERO_APPEND_INDEX_RELATIVE
+// #undef NONZERO_APPEND_INDEX_ABSOLUTE
+
+
+// Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory provides the best performance at all scales. Using NpyIter, or using, bit masks does not improve performance over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy benefits from first counting the nonzeros, then allocating only enough data for the expexted number of indices.
 static inline PyObject*
 AK_nonzero_1d(PyArrayObject* array) {
-    // the maxiumum number of indices we could return is the size of the array; if this is under a certain number, probably better to just allocate that rather than reallocate
     PyObject* final;
     npy_intp count_max = PyArray_SIZE(array);
 
@@ -3573,8 +3723,8 @@ AK_nonzero_1d(PyArrayObject* array) {
     lldiv_t size_div = lldiv((long long)count_max, 8); // quot, rem
 
     Py_ssize_t count = 0;
-    // the maximum number of collected integers is equal to or less than count_max; for small count_max, we can just set that value; for large size, we set it to half the size
-    Py_ssize_t capacity = count_max < 1024 ? count_max : count_max / 8;
+    // the maximum number of collected integers is equal to or less than count_max
+    Py_ssize_t capacity = count_max;
     npy_int64* indices = (npy_int64*)malloc(sizeof(npy_int64) * capacity);
 
     NPY_BEGIN_THREADS_DEF;
@@ -3591,25 +3741,25 @@ AK_nonzero_1d(PyArrayObject* array) {
                 p += 8; // no true within this 8 byte roll region
                 continue;
             }
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
         }
         while (p < p_end) {
-            if (*p) {NONZERO_APPEND_INDEX_RELATIVE;}
+            if (*p) {indices[count++] = p - p_start;}
             p++;
         }
     }
@@ -3618,25 +3768,25 @@ AK_nonzero_1d(PyArrayObject* array) {
         npy_intp i_end = count_max;
         npy_intp i_end_roll = count_max - size_div.rem;
         while (i < i_end_roll) {
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
         }
         while (i < i_end) {
-            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {NONZERO_APPEND_INDEX_ABSOLUTE;}
+            if (*(npy_bool*)PyArray_GETPTR1(array, i)) {indices[count++] = i;}
             i++;
         }
     }
@@ -3653,8 +3803,6 @@ AK_nonzero_1d(PyArrayObject* array) {
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
 }
-#undef NONZERO_APPEND_INDEX_RELATIVE
-#undef NONZERO_APPEND_INDEX_ABSOLUTE
 
 static PyObject*
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
@@ -6102,14 +6250,12 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
             return NULL;
         }
         // derive indices for unmatched locations, call each with register_one
-        // PyObject* nonzero = PyArray_Nonzero(dst_unmatched);
         PyArrayObject* indices = (PyArrayObject*)AK_nonzero_1d(dst_unmatched);
         if (indices == NULL) {
             Py_DECREF((PyObject*)dst_unmatched);
             return NULL;
         }
         // borrow ref to array in 1-element tuple
-        // PyArrayObject *indices = (PyArrayObject*)PyTuple_GET_ITEM(nonzero, 0);
         npy_int64 *index_data = (npy_int64 *)PyArray_DATA(indices);
         npy_intp index_len = PyArray_SIZE(indices);
 
