@@ -3534,38 +3534,45 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
     npy_intp num_rows = PyArray_DIM(input_array, 0);
     npy_intp num_cols = PyArray_DIM(input_array, 1);
 
-    npy_intp dims[1] = {num_rows};
-    PyObject* output_array = PyArray_SimpleNew(1, dims, NPY_OBJECT);
-    if (output_array == NULL) {
+    npy_intp dims[] = {num_rows};
+    // NOTE: this initializes values to NULL, not None
+    PyObject* output = PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    if (output == NULL) {
         return NULL;
     }
 
-    for (npy_intp i = 0; i < num_rows; ++i) {
+    PyObject** output_data = (PyObject**)PyArray_DATA((PyArrayObject*)output);
+    PyObject** p = output_data;
+    PyObject** p_end = p + num_rows;
+    npy_intp i;
+
+    while (p < p_end) {
         PyObject* tuple = PyTuple_New(num_cols);
         if (!tuple) {
-            Py_DECREF(output_array);
-            return NULL;
+            goto error;
         }
-
+        i = p - output_data;
         for (npy_intp j = 0; j < num_cols; ++j) {
+            // cannot assume input_array is contiguous
             PyObject* item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
-            // PyObject* item = PyArray_GETITEM(input_array, PyArray_GETPTR2(input_array, i, j));
             if (!item) {
                 Py_DECREF(tuple);
-                Py_DECREF(output_array); // TODO: need to decrer object compmonents
-                return NULL;
+                goto error;
             }
-            PyTuple_SET_ITEM(tuple, j, item);
+            PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
         }
-
-        PyArray_SETITEM((PyArrayObject*)output_array, PyArray_GETPTR1((PyArrayObject*)output_array, i), tuple);
-        Py_DECREF(tuple); // JTODO: check
+        *p++ = tuple; // assign with new ref, no incr needed
     }
-
-    PyArray_CLEARFLAGS((PyArrayObject *)output_array, NPY_ARRAY_WRITEABLE);
-
-    // Py_INCREF(a); // JTODO: check if this is necessary
-    return output_array;
+    PyArray_CLEARFLAGS((PyArrayObject *)output, NPY_ARRAY_WRITEABLE);
+    return output;
+error:
+    p = output_data;
+    p_end = p + num_rows;
+    while (p < p_end) { // decref all tuples within array
+        Py_XDECREF(*p++); // xdec as might be NULL
+    }
+    Py_DECREF(output);
+    return NULL;
 }
 
 //------------------------------------------------------------------------------
@@ -6001,7 +6008,6 @@ TriMap_dealloc(TriMapObject *self) {
     if (self->many_from != NULL) {
         // decref all arrays before freeing
         for (Py_ssize_t i = 0; i < self->many_count; i++) {
-            // NOTE: using dot to get to pointer?
             Py_DECREF((PyObject*)self->many_from[i].dst);
         }
         PyMem_Free(self->many_from);
