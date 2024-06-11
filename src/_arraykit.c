@@ -3523,23 +3523,21 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
     return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
-// JTODO: here
+
 // Reshape if necessary a row that might be 2D or 1D is returned as a 1D array.
 static PyObject *
 array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY_2D(a); // JTODO: should we allow 1D arrays?
+    AK_CHECK_NUMPY_ARRAY_2D(a);
     PyArrayObject *input_array = (PyArrayObject *)a;
-    
-    // get array dimensions
+
     npy_intp num_rows = PyArray_DIM(input_array, 0);
     npy_intp num_cols = PyArray_DIM(input_array, 1);
 
-    // create output array
     npy_intp dims[1] = {num_rows};
     PyObject* output_array = PyArray_SimpleNew(1, dims, NPY_OBJECT);
-    if (!output_array) {
-        return NULL; // JTODO: check if this is the correct error handling
+    if (output_array == NULL) {
+        return NULL;
     }
 
     for (npy_intp i = 0; i < num_rows; ++i) {
@@ -3550,10 +3548,11 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
         }
 
         for (npy_intp j = 0; j < num_cols; ++j) {
-            PyObject* item = PyArray_GETITEM(input_array, PyArray_GETPTR2(input_array, i, j));
+            PyObject* item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
+            // PyObject* item = PyArray_GETITEM(input_array, PyArray_GETPTR2(input_array, i, j));
             if (!item) {
                 Py_DECREF(tuple);
-                Py_DECREF(output_array);
+                Py_DECREF(output_array); // TODO: need to decrer object compmonents
                 return NULL;
             }
             PyTuple_SET_ITEM(tuple, j, item);

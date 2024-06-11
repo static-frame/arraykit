@@ -286,27 +286,32 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_array2d_to_array1d_dummy(self) -> None:
-        # JTODO: remove
         a1 = np.arange(10)
         with self.assertRaises(NotImplementedError):
             # 1 dimensional
             _ = array2d_to_array1d(a1)
 
     def test_array2d_to_array1d_b(self) -> None:
-        # def py_array2d_to_array1d(array: np.ndarray) -> np.ndarray:
-        #     post: np.ndarray = np.empty(array.shape[0], dtype=object)
-        #     for i, row in enumerate(array):
-        #         post[i] = tuple(row)
-        #     post.flags.writeable = False
-        #     return post
-
         a1 = np.arange(10).reshape(5, 2)
-
         result = array2d_to_array1d(a1)
         assert isinstance(result[0], tuple)
         assert result[0] == (0, 1)
-        assert tuple(result) == ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9))
-        
+        self.assertIs(type(result[0][0]), np.int64)
+        self.assertFalse(result.flags.writeable)
+        self.assertEqual(tuple(result), ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9)))
+
+
+    def test_array2d_to_array1d_c(self) -> None:
+        a1 = np.array([["a", "b"], ["ccc", "ddd"], ["ee", "ff"]])
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(a2.tolist(), [('a', 'b'), ('ccc', 'ddd'), ('ee', 'ff')])
+
+    def test_array2d_to_array1d_d(self) -> None:
+        a1 = np.array([[3, 5], [10, 20], [7, 2]], dtype=np.uint8)
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(a2.tolist(), [(3, 5), (10, 20), (7, 2)])
+        self.assertIs(type(a2[0][0]), np.uint8)
+
 
 
     #---------------------------------------------------------------------------
