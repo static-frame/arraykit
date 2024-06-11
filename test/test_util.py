@@ -292,7 +292,7 @@ class TestUnit(unittest.TestCase):
             _ = array2d_to_array1d(a1)
 
     def test_array2d_to_array1d_b(self) -> None:
-        a1 = np.arange(10).reshape(5, 2)
+        a1 = np.arange(10, dtype=np.int64).reshape(5, 2)
         result = array2d_to_array1d(a1)
         assert isinstance(result[0], tuple)
         assert result[0] == (0, 1)
