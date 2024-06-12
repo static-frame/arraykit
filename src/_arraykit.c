@@ -3524,6 +3524,8 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 }
 
 
+# define AK_A2D1D_
+
 // Reshape if necessary a row that might be 2D or 1D is returned as a 1D array.
 static PyObject *
 array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
@@ -3544,17 +3546,18 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
     PyObject** output_data = (PyObject**)PyArray_DATA((PyArrayObject*)output);
     PyObject** p = output_data;
     PyObject** p_end = p + num_rows;
-    npy_intp i;
+    npy_intp i = 0;
+    PyObject* tuple;
+    PyObject* item;
 
     while (p < p_end) {
-        PyObject* tuple = PyTuple_New(num_cols);
-        if (!tuple) {
+        tuple = PyTuple_New(num_cols);
+        if (tuple == NULL) {
             goto error;
         }
-        i = p - output_data;
         for (npy_intp j = 0; j < num_cols; ++j) {
             // cannot assume input_array is contiguous
-            PyObject* item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
+            item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
             if (item == NULL) {
                 Py_DECREF(tuple);
                 goto error;
@@ -3562,6 +3565,7 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
             PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
         }
         *p++ = tuple; // assign with new ref, no incr needed
+        i++;
     }
     PyArray_CLEARFLAGS((PyArrayObject *)output, NPY_ARRAY_WRITEABLE);
     return output;
