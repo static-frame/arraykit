@@ -3547,6 +3547,7 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
     PyObject** p = output_data;
     PyObject** p_end = p + num_rows;
     npy_intp i = 0;
+    npy_intp j;
     PyObject* tuple;
     PyObject* item;
 
@@ -3555,7 +3556,7 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
         if (tuple == NULL) {
             goto error;
         }
-        for (npy_intp j = 0; j < num_cols; ++j) {
+        for (j = 0; j < num_cols; ++j) {
             // cannot assume input_array is contiguous
             item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
             if (item == NULL) {

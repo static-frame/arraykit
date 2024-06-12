@@ -312,7 +312,10 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a2.tolist(), [(3, 5), (10, 20), (7, 2)])
         self.assertIs(type(a2[0][0]), np.uint8)
 
-
+    def test_array2d_to_array1d_e(self) -> None:
+        a1 = np.arange(20, dtype=np.int64).reshape(4, 5)
+        result = array2d_to_array1d(a1)
+        self.assertEqual(result.tolist(), [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9), (10, 11, 12, 13, 14), (15, 16, 17, 18, 19)])
 
     #---------------------------------------------------------------------------
 

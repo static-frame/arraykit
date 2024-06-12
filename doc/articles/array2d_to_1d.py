@@ -137,7 +137,7 @@ class FixtureFactory:
 
     @staticmethod
     def get_array(size: int, width_ratio: int) -> np.ndarray:
-        return np.arange(size).reshape(width_ratio, size // width_ratio)
+        return np.arange(size).reshape(size // width_ratio, width_ratio)
 
     @classmethod
     def get_label_array(cls, size: int) -> tp.Tuple[str, np.ndarray]:
