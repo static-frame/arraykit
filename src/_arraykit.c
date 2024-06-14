@@ -7,7 +7,7 @@
 
 # include "array_go.h"
 # include "block_index.h"
-//# include "file_parsing.h"
+# include "file_parsing.h"
 # include "methods.h"
 # include "tri_map.h"
 
@@ -34,18 +34,18 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)first_true_2d,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
-    // {"delimited_to_arrays",
-    //         (PyCFunction)delimited_to_arrays,
-    //         METH_VARARGS | METH_KEYWORDS,
-    //         NULL},
-    // {"iterable_str_to_array_1d",
-    //         (PyCFunction)iterable_str_to_array_1d,
-    //         METH_VARARGS | METH_KEYWORDS,
-    //         NULL},
-    // {"split_after_count",
-    //         (PyCFunction)split_after_count,
-    //         METH_VARARGS | METH_KEYWORDS,
-    //         NULL},
+    {"delimited_to_arrays",
+            (PyCFunction)delimited_to_arrays,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
+    {"iterable_str_to_array_1d",
+            (PyCFunction)iterable_str_to_array_1d,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
+    {"split_after_count",
+            (PyCFunction)split_after_count,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"nonzero_1d", nonzero_1d, METH_O, NULL},
     {"isna_element",

@@ -1,11 +1,14 @@
 # include "Python.h"
 # include "stdbool.h"
 
+# define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
+# define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
 # include "numpy/arrayobject.h"
 # include "numpy/halffloat.h"
 
-# include "utilities.h"
 # include "file_parsing.h"
+# include "utilities.h"
 
 #define AK_is_digit(c) (((unsigned)(c) - '0') < 10u)
 #define AK_is_space(c) (((c) == ' ') || (((unsigned)(c) - '\t') < 5))
@@ -26,10 +29,12 @@
 #define AK_is_t(c) (((c) == 't') || ((c) == 'T'))
 #define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
 
+static const size_t UCS4_SIZE = sizeof(Py_UCS4);
+
 //------------------------------------------------------------------------------
 // Utility setters of C types from possibly NULL PyObject*; all return -1 on error.
 
-int
+static inline int
 AK_set_bool(const char *name,
         bool *target,
         PyObject *src,
@@ -45,7 +50,7 @@ AK_set_bool(const char *name,
     return 0;
 }
 
-int
+static inline int
 AK_set_int(const char *name,
         int *target,
         PyObject *src,
@@ -72,7 +77,7 @@ AK_set_int(const char *name,
 }
 
 // Set a character from `src` on `target`; if src is NULL use default. Returns -1 on error, else 0. If a None is given, a null char will be assigned.
-int
+static inline int
 AK_set_char(const char *name,
         Py_UCS4 *target,
         PyObject *src,
