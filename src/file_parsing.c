@@ -148,7 +148,7 @@ typedef enum AK_TypeParserState {
 } AK_TypeParserState;
 
 // Given previous and new parser states, return a next parser state. Does not error.
-AK_TypeParserState
+static inline AK_TypeParserState
 AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     // unlikely case
     if (new == TPS_UNKNOWN) return TPS_STRING;
@@ -183,7 +183,7 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
 }
 
 // Given a TypeParser state, return a dtype. Returns NULL on error.
-PyArray_Descr *
+static inline PyArray_Descr *
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
 
@@ -244,7 +244,8 @@ typedef struct AK_TypeParser {
 } AK_TypeParser;
 
 // Initialize all state. This returns no error. This is called once per field for each field in a code point line: this is why parsed_field is reset, but parsed_line is not.
-void AK_TP_reset_field(AK_TypeParser* tp)
+static inline void
+AK_TP_reset_field(AK_TypeParser* tp)
 {
     tp->previous_numeric = false;
     tp->contiguous_numeric = false;
@@ -269,7 +270,7 @@ void AK_TP_reset_field(AK_TypeParser* tp)
     // NOTE: do not reset parsed_line
 }
 
-AK_TypeParser *
+static inline AK_TypeParser *
 AK_TP_New(Py_UCS4 tsep, Py_UCS4 decc)
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
@@ -281,7 +282,7 @@ AK_TP_New(Py_UCS4 tsep, Py_UCS4 decc)
     return tp;
 }
 
-void
+static inline void
 AK_TP_Free(AK_TypeParser* tp)
 {
     PyMem_Free(tp);
@@ -290,7 +291,7 @@ AK_TP_Free(AK_TypeParser* tp)
 //------------------------------------------------------------------------------
 
 // Given a type parse, process a single character and update the type parser state in `parsed_field`. Return true when processing should continue, false when no further processing is necessary. `pos` is the raw position within the current field.
-bool
+static inline bool
 AK_TP_ProcessChar(AK_TypeParser* tp,
         Py_UCS4 c,
         Py_ssize_t pos)
@@ -479,7 +480,7 @@ AK_TP_ProcessChar(AK_TypeParser* tp,
 }
 
 // This private function is used by AK_TP_ResolveLineResetField to evaluate the state of the AK_TypeParser and determine the resolved AK_TypeParserState.
-AK_TypeParserState
+static inline AK_TypeParserState
 AK_TP_resolve_field(AK_TypeParser* tp,
         Py_ssize_t count)
 {
@@ -587,7 +588,7 @@ AK_TP_resolve_field(AK_TypeParser* tp,
 }
 
 // After field is complete, call AK_TP_ResolveLineResetField to evaluate and set the current parsed_line. All TypeParse field attributes are reset after this is called. Returns true if the line still needs to be evaluated.
-bool
+static inline bool
 AK_TP_ResolveLineResetField(AK_TypeParser* tp,
         Py_ssize_t count)
 {
@@ -611,7 +612,7 @@ static char * TRUE_UPPER = "TRUE";
 #define AK_ERROR_INVALID_CHARS 3
 
 // Convert a Py_UCS4 array to a signed integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets `error` to values greater than 0 on error; never sets error on success.
-npy_int64
+static inline npy_int64
 AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 {
     npy_int64 int_min = NPY_MIN_INT64;
@@ -731,7 +732,7 @@ AK_UCS4_to_int64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 }
 
 // Convert a Py_UCS4 array to an unsigned integer. Extended from pandas/_libs/src/parser/tokenizer.c. Sets error to > 0 on error; never sets error on success.
-npy_uint64
+static inline npy_uint64
 AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 {
     npy_uint64 pre_max = NPY_MAX_UINT64 / 10;
@@ -805,7 +806,7 @@ AK_UCS4_to_uint64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep)
 }
 
 // Based on precise_xstrtod from pandas/_libs/src/parser/tokenizer.c.
-npy_float64
+static inline npy_float64
 AK_UCS4_to_float64(Py_UCS4 *p_item, Py_UCS4 *end, int *error, char tsep, char decc)
 {
     // Cache powers of 10 in memory.
@@ -1018,7 +1019,7 @@ typedef struct AK_CodePointLine{
 } AK_CodePointLine;
 
 // Returns NULL on error.
-AK_CodePointLine *
+static inline AK_CodePointLine *
 AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
@@ -1063,7 +1064,7 @@ AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
     return cpl;
 }
 
-void
+static inline void
 AK_CPL_Free(AK_CodePointLine* cpl)
 {
     PyMem_Free(cpl->buffer);
@@ -1078,7 +1079,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
 // CodePointLine: Mutation
 
 // Returns 0 on success, -1 on failure.
-int
+static inline int
 AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment) {
     Py_ssize_t target = cpl->buffer_count + increment;
     if (AK_UNLIKELY(target >= cpl->buffer_capacity)) {
@@ -1096,7 +1097,7 @@ AK_CPL_resize_buffer(AK_CodePointLine* cpl, Py_ssize_t increment) {
 }
 
 // NOTE: we only add one offset at time, so this does not need to take an increment argument.
-int
+static inline int
 AK_CPL_resize_offsets(AK_CodePointLine* cpl) {
     // increment by at most one, so only need to check if equal
     if (AK_UNLIKELY(cpl->offsets_count == cpl->offsets_capacity)) {
@@ -1112,7 +1113,7 @@ AK_CPL_resize_offsets(AK_CodePointLine* cpl) {
 }
 
 // Given a PyUnicode PyObject representing a complete field, load the string content into the CPL. Used for iterable_str_to_array_1d. Returns 0 on success, -1 on error.
-int
+static inline int
 AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
 {
     if (!PyUnicode_Check(field)) { // NOTE: this permits subclasses, consider
@@ -1163,7 +1164,7 @@ AK_CPL_AppendField(AK_CodePointLine* cpl, PyObject* field)
 }
 
 // Add a single point (or character) to a line. This does not update offsets. This is valid when updating a character. Returns 0 on success, -1 on error.
-int
+static inline int
 AK_CPL_AppendPoint(AK_CodePointLine* cpl,
         Py_UCS4 p,
         Py_ssize_t pos)
@@ -1186,7 +1187,7 @@ AK_CPL_AppendPoint(AK_CodePointLine* cpl,
 }
 
 // Append to offsets. This does not update buffer lines. This is called when closing a field. Return -1 on failure, 0 on success.
-int
+static inline int
 AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 {
     // this will update cpl->offsets if necessary
@@ -1212,7 +1213,7 @@ AK_CPL_AppendOffset(AK_CodePointLine* cpl, Py_ssize_t offset)
 // CodePointLine: Constructors
 
 // Given an iterable of unicode objects, load them into a AK_CodePointLine. Used for iterable_str_to_array_1d. Return NULL on error.
-AK_CodePointLine*
+static inline AK_CodePointLine *
 AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
     PyObject *iter = PyObject_GetIter(iterable);
@@ -1244,7 +1245,7 @@ AK_CPL_FromIterable(PyObject* iterable, bool type_parse, Py_UCS4 tsep, Py_UCS4 d
 // CodePointLine: Navigation
 
 // Cannot error.
-void
+static inline void
 AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 {
     cpl->buffer_current_ptr = cpl->buffer;
@@ -1252,7 +1253,7 @@ AK_CPL_CurrentReset(AK_CodePointLine* cpl)
 }
 
 // Advance the current position by the current offset. Cannot error.
-void
+static inline void
 AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 {
     // use offsets_current_index, then increment
@@ -1260,7 +1261,7 @@ AK_CPL_CurrentAdvance(AK_CodePointLine* cpl)
 }
 
 // This will take any case of "TRUE" as True, while marking everything else as False; this is the same approach taken with genfromtxt when the dtype is given as bool. This will not fail for invalid true or false strings.
-npy_int8
+static inline npy_int8
 AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
     // must have at least 4 characters
     if (cpl->offsets[cpl->offsets_current_index] < 4) {
@@ -1286,7 +1287,7 @@ AK_CPL_current_to_bool(AK_CodePointLine* cpl) {
 }
 
 // NOTE: using PyOS_strtol was an alternative, but needed to be passed a null-terminated char, which would require copying the data out of the CPL. This approach reads directly from the CPL without copying.
-npy_int64
+static inline npy_int64
 AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error, char tsep)
 {
     Py_UCS4 *p = cpl->buffer_current_ptr;
@@ -1295,7 +1296,7 @@ AK_CPL_current_to_int64(AK_CodePointLine* cpl, int *error, char tsep)
 }
 
 // Provide start and end buffer positions to provide a range of bytes to read and transform into an integer. Returns 0 on error; does not set exception.
-npy_uint64
+static inline npy_uint64
 AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error, char tsep)
 {
     Py_UCS4 *p = cpl->buffer_current_ptr;
@@ -1303,7 +1304,7 @@ AK_CPL_current_to_uint64(AK_CodePointLine* cpl, int *error, char tsep)
     return AK_UCS4_to_uint64(p, end, error, tsep);
 }
 
-npy_float64
+static inline npy_float64
 AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep, char decc)
 {
     // interpret an empty field as NaN
@@ -1318,7 +1319,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep, char dec
 //------------------------------------------------------------------------------
 // CodePointLine: Exporters
 
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     npy_intp dims[] = {cpl->offsets_count};
@@ -1349,7 +1350,7 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 // Given a type of signed integer, return the corresponding array.
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1428,7 +1429,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
 }
 
 // Given a type of signed integer, return the corresponding array.
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1501,7 +1502,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 }
 
 // Given a type of signed integer, return the corresponding array. Return NULL on error.
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1572,7 +1573,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     return array;
 }
 
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1640,7 +1641,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 // Return NULL on error
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1704,7 +1705,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 // If we cannot directly convert bytes to values in a pre-loaded array, we can create a bytes or unicode array and then use PyArray_CastToType to use numpy to interpret it as a new a array and handle conversions. Note that we can use bytes for a smaller memory load if we are confident that the values are not unicode. This is a safe assumption for complex. For datetime64, we have to use Unicode to get errors on malformed inputs: using bytes causes a seg fault with these interfaces (the same is not observed with astyping a byte array in Python).
-PyObject *
+static inline PyObject *
 AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
         PyArray_Descr* dtype,
         int type_inter)
@@ -1739,7 +1740,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
 }
 
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
-PyObject *
+static inline PyObject *
 AK_CPL_ToArray(AK_CodePointLine* cpl,
         PyArray_Descr* dtype,
         char tsep,
@@ -1782,7 +1783,7 @@ AK_CPL_ToArray(AK_CodePointLine* cpl,
 //------------------------------------------------------------------------------
 // utility function used by CPG and DR
 
-int
+static inline int
 AK_line_select_keep(
         PyObject *line_select,
         bool axis_target,
@@ -1829,7 +1830,7 @@ typedef struct AK_CodePointGrid {
 } AK_CodePointGrid;
 
 // Create a new Code Point Grid; returns NULL on error. Missing `dtypes` has been normalized as NULL.
-AK_CodePointGrid*
+static inline AK_CodePointGrid *
 AK_CPG_New(PyObject *dtypes, Py_UCS4 tsep, Py_UCS4 decc)
 {
     // normalize dtypes to NULL or callable
@@ -1856,7 +1857,7 @@ AK_CPG_New(PyObject *dtypes, Py_UCS4 tsep, Py_UCS4 decc)
     return cpg;
 }
 
-void
+static inline void
 AK_CPG_Free(AK_CodePointGrid* cpg)
 {
     for (Py_ssize_t i=0; i < cpg->lines_count; ++i) {
@@ -1870,7 +1871,7 @@ AK_CPG_Free(AK_CodePointGrid* cpg)
 // CodePointGrid: Mutation
 
 // Determine if a new CPL needs to be created and add it if needed. Return 0 on succes, -1 on failure.
-int
+static inline int
 AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 {
     Py_ssize_t lines_count = cpg->lines_count;
@@ -1925,7 +1926,7 @@ AK_CPG_resize(AK_CodePointGrid* cpg, Py_ssize_t line)
 }
 
 // Append a point on the line; called for each character in a field. Return 0 on success, -1 on failure.
-int
+static inline int
 AK_CPG_AppendPointAtLine(
         AK_CodePointGrid* cpg,
         Py_ssize_t line, // number
@@ -1939,7 +1940,7 @@ AK_CPG_AppendPointAtLine(
 }
 
 // Append an offset in a line. Returns 0 on success, -1 on failure.
-int
+static inline int
 AK_CPG_AppendOffsetAtLine(
         AK_CodePointGrid* cpg,
         Py_ssize_t line,
@@ -1952,7 +1953,7 @@ AK_CPG_AppendOffsetAtLine(
 }
 
 // Given a fully-loaded CodePointGrid, process each CodePointLine into an array and return a new list of those arrays. Returns NULL on failure.
-PyObject *
+static inline PyObject *
 AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         int axis,
         PyObject* line_select,
@@ -2057,7 +2058,7 @@ typedef struct AK_DialectStyleDesc{
     const char *name;
 } AK_DialectStyleDesc;
 
-const AK_DialectStyleDesc AK_Dialect_quote_styles[] = {
+static const AK_DialectStyleDesc AK_Dialect_quote_styles[] = {
     { QUOTE_MINIMAL,    "QUOTE_MINIMAL" },
     { QUOTE_ALL,        "QUOTE_ALL" },
     { QUOTE_NONNUMERIC, "QUOTE_NONNUMERIC" },
@@ -2065,7 +2066,7 @@ const AK_DialectStyleDesc AK_Dialect_quote_styles[] = {
     { 0 }
 };
 
-int
+static inline int
 AK_Dialect_check_quoting(int quoting)
 {
     const AK_DialectStyleDesc *qs;
@@ -2094,7 +2095,7 @@ typedef struct AK_Dialect{
             goto error;                          \
     } while (0)                                  \
 
-AK_Dialect *
+static inline AK_Dialect *
 AK_Dialect_New(PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
@@ -2190,7 +2191,7 @@ error:
     return NULL;
 }
 
-void
+static inline void
 AK_Dialect_Free(AK_Dialect* dialect)
 {
     PyMem_Free(dialect); // might alrady be NULL
@@ -2225,7 +2226,7 @@ typedef struct AK_DelimitedReader{
 } AK_DelimitedReader;
 
 // Called once at the close of each field in a line. Returns 0 on success, -1 on failure
-int
+static inline int
 AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 {
     if (AK_CPG_AppendOffsetAtLine(cpg,
@@ -2238,7 +2239,7 @@ AK_DR_close_field(AK_DelimitedReader *dr, AK_CodePointGrid *cpg)
 }
 
 // Called once to add each character, appending that character to the CPL. Return 0 on success, -1 on failure.
-int
+static inline int
 AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     // NOTE: ideally we could use line_select here; however, we would need to cache the lookup in another container as this is called once per char and line_select is a Python function; further, we would need to increment the field_number separately from another counter, which is done in AK_DR_close_field
@@ -2251,7 +2252,7 @@ AK_DR_add_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 }
 
 // Process each char and update AK_DelimitedReader state. When appropriate, call AK_DR_add_char to accumulate field characters, AK_DR_close_field to end a field. Return -1 on failure, 0 on success.
-int
+static inline int
 AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 {
     AK_Dialect *dialect = dr->dialect;
@@ -2375,7 +2376,7 @@ AK_DR_process_char(AK_DelimitedReader *dr, AK_CodePointGrid *cpg, Py_UCS4 c)
 }
 
 // Called once at the start of processing each line in AK_DR_ProcessRecord. This cannot error.
-void
+static inline void
 AK_DR_line_reset(AK_DelimitedReader *dr)
 {
     dr->field_len = 0;
@@ -2384,7 +2385,7 @@ AK_DR_line_reset(AK_DelimitedReader *dr)
 }
 
 // Using AK_DelimitedReader's state, process one record (via next(input_iter)); call AK_DR_process_char on each char in that line, loading individual fields into AK_CodePointGrid. Returns 1 when there are more lines to process, 0 when there are no lines to process, and -1 for error.
-int
+static inline int
 AK_DR_ProcessRecord(AK_DelimitedReader *dr,
         AK_CodePointGrid *cpg,
         PyObject *line_select
@@ -2490,7 +2491,7 @@ AK_DR_ProcessRecord(AK_DelimitedReader *dr,
     return 1; // more lines to process
 }
 
-void
+static inline void
 AK_DR_Free(AK_DelimitedReader *dr)
 {
     if (dr->dialect) {
@@ -2501,7 +2502,7 @@ AK_DR_Free(AK_DelimitedReader *dr)
 }
 
 // The arguments to this constructor are validated before this function is valled. Returns NULL on error.
-AK_DelimitedReader *
+static inline AK_DelimitedReader *
 AK_DR_New(PyObject *iterable,
         int axis,
         PyObject *delimiter,
@@ -2554,7 +2555,7 @@ AK_DR_New(PyObject *iterable,
 //------------------------------------------------------------------------------
 
 // Convert an sequence of strings to a 1D array.
-PyObject *
+static inline PyObject *
 AK_IterableStrToArray1D(
     PyObject *sequence,
     PyObject *dtype_specifier,
