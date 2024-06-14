@@ -202,7 +202,7 @@ TriMap_repr(TriMapObject *self) {
 // Provide the integer positions connecting the `src` to the `dst`. If there is no match to `src` or `dst`, the unmatched position can be provided with -1. From each side, a connection is documented to the current `len`. Each time this is called `len` is incremented, indicating the inrease in position in the `final`. Return NULL on error.
 
 // Inner function for calling from C; returns 0 on success, -1 on error. Exceptions will be set on error.
-int
+static inline int
 AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
     bool src_matched = src_from >= 0;
     bool dst_matched = dst_from >= 0;
@@ -251,7 +251,7 @@ AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
 }
 
 // Public function for calling from Python.
-PyObject*
+PyObject *
 TriMap_register_one(TriMapObject *self, PyObject *args) {
     Py_ssize_t src_from;
     Py_ssize_t dst_from;
@@ -271,7 +271,7 @@ TriMap_register_one(TriMapObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
-PyObject*
+PyObject *
 TriMap_register_unmatched_dst(TriMapObject *self) {
     if (self->finalized) {
         PyErr_SetString(PyExc_RuntimeError, "Cannot register post finalization");
@@ -322,7 +322,7 @@ TriMap_register_unmatched_dst(TriMapObject *self) {
 }
 
 // Given an integer (for the src) and an array of integers (for the dst), store mappings from src to final and dst to final.
-PyObject*
+PyObject *
 TriMap_register_many(TriMapObject *self, PyObject *args) {
     Py_ssize_t src_from;
     PyArrayObject* dst_from;
@@ -378,7 +378,7 @@ TriMap_register_many(TriMapObject *self, PyObject *args) {
 
 //------------------------------------------------------------------------------
 // Determine, for src and dst, which indices will need fill values, and store those indices as an integer array in final_src_fill, final_dst_fill
-PyObject*
+PyObject *
 TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     TriMapObject* tm = (TriMapObject*)self;
 
@@ -475,7 +475,7 @@ error: // all PyObject initialized to NULL, no more than 1 ref
     return NULL;
 }
 
-PyObject*
+PyObject *
 TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (!self->finalized) {
         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
@@ -488,7 +488,7 @@ TriMap_is_many(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 // Return True if the `src` will not need a fill. This is only correct of `src` is binding to a left join or an inner join.
-PyObject*
+PyObject *
 TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (!self->finalized) {
         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
@@ -501,7 +501,7 @@ TriMap_src_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 // Return True if the `dst` will not need a fill. This is only correct of `dst` is binding to a left join or an inner join.
-PyObject*
+PyObject *
 TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
     if (!self->finalized) {
         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
@@ -553,7 +553,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 } while (0)                                                            \
 
 // Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error. This only needs to match to / from type combinations that are possible from `resolve_dtype`, i.e., bool never goes to integer.
-int
+static inline int
 AK_TM_transfer_scalar(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
@@ -753,7 +753,7 @@ AK_TM_transfer_scalar(TriMapObject* tm,
 #undef AK_TM_TRANSFER_SCALAR
 
 // Returns -1 on error. Specialized transfer from any type of an array to an object array.
-int
+static inline int
 AK_TM_transfer_object(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
@@ -828,7 +828,7 @@ AK_TM_transfer_object(TriMapObject* tm,
 }
 
 // Returns -1 on error.
-int
+static inline int
 AK_TM_fill_object(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
@@ -891,7 +891,7 @@ AK_TM_fill_object(TriMapObject* tm,
 } while (0)                                                                \
 
 // Returns -1 on error.
-int
+static inline int
 AK_TM_fill_unicode(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
@@ -934,7 +934,7 @@ AK_TM_fill_unicode(TriMapObject* tm,
 }
 
 // Returns -1 on error.
-int
+static inline int
 AK_TM_fill_string(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
@@ -961,7 +961,7 @@ AK_TM_fill_string(TriMapObject* tm,
 }
 
 // Returns NULL on error.
-PyObject*
+static inline PyObject *
 AK_TM_map_no_fill(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from) {
@@ -1011,7 +1011,7 @@ AK_TM_map_no_fill(TriMapObject* tm,
     return (PyObject*)array_to;
 }
 
-PyObject*
+PyObject *
 TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
     if (!PyArray_Check(arg)) {
         PyErr_SetString(PyExc_TypeError, "Must provide an array");
@@ -1026,7 +1026,7 @@ TriMap_map_src_no_fill(TriMapObject *self, PyObject *arg) {
     return AK_TM_map_no_fill(self, from_src, array_from);
 }
 
-PyObject*
+PyObject *
 TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
     if (!PyArray_Check(arg)) {
         PyErr_SetString(PyExc_TypeError, "Must provide an array");
@@ -1042,7 +1042,7 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 }
 
 // Returns NULL on error.
-PyObject*
+static inline PyObject *
 AK_TM_map_fill(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
@@ -1131,7 +1131,7 @@ error:
 }
 #undef AK_TM_TRANSFER_FLEXIBLE
 
-PyObject*
+PyObject *
 TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
     PyArrayObject* array_from;
     PyObject* fill_value;
@@ -1152,7 +1152,7 @@ TriMap_map_src_fill(TriMapObject *self, PyObject *args) {
     return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
 }
 
-PyObject*
+PyObject *
 TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
     PyArrayObject* array_from;
     PyObject* fill_value;
