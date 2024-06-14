@@ -120,17 +120,7 @@ name_filter(PyObject *Py_UNUSED(m), PyObject *n) {
 PyObject *
 mloc(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    printf("HERE1!\n");
-    fflush(stdout);
-    //AK_CHECK_NUMPY_ARRAY(a);
-    if (!PyArray_Check(a)) {
-        printf("HERE2!\n");
-        fflush(stdout);
-        return PyErr_Format(PyExc_TypeError,
-                "Expected NumPy array, not %s.",
-                Py_TYPE(a)->tp_name);
-    }
-    printf("HERE3!\n");
+    AK_CHECK_NUMPY_ARRAY(a);
     return PyLong_FromVoidPtr(PyArray_DATA((PyArrayObject *)a));
 }
 

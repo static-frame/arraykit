@@ -5,11 +5,11 @@
 
 # include "numpy/arrayobject.h"
 
-//# include "array_go.h"
+# include "array_go.h"
 //# include "block_index.h"
 //# include "file_parsing.h"
 # include "methods.h"
-//# include "tri_map.h"
+# include "tri_map.h"
 
 static PyMethodDef arraykit_methods[] =  {
     {"immutable_filter", immutable_filter, METH_O, NULL},
@@ -102,11 +102,11 @@ PyInit__arraykit(void)
         // PyType_Ready(&BIIterBoolType) ||
         // PyType_Ready(&BIIterContiguousType) ||
         // PyType_Ready(&BIIterBlockType) ||
-        // PyType_Ready(&TriMapType) ||
-        // PyType_Ready(&ArrayGOType) ||
+        PyType_Ready(&TriMapType) ||
+        PyType_Ready(&ArrayGOType) ||
         // PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
-        // PyModule_AddObject(m, "TriMap", (PyObject *) &TriMapType) ||
-        // PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
+        PyModule_AddObject(m, "TriMap", (PyObject *) &TriMapType) ||
+        PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
         PyModule_AddObject(m, "deepcopy", deepcopy)
         // PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks)
     ){

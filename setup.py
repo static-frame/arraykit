@@ -34,11 +34,11 @@ ak_extension = Extension(
         name='arraykit._arraykit', # build into module
         sources=[
             'src/_arraykit.c',
-            # 'src/array_go.c',
+            'src/array_go.c',
             # 'src/block_index.c',
             # 'src/file_parsing.c',
             'src/methods.c',
-            # 'src/tri_map.c',
+            'src/tri_map.c',
             'src/utilities.c',
         ],
         include_dirs=get_ext_dir('numpy', 'core', 'include'),

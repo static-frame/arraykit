@@ -2,15 +2,16 @@
 # include "stdbool.h"
 # include "structmember.h"
 
+# define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
+# define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 
 # include "utilities.h"
 # include "tri_map.h"
 
-//------------------------------------------------------------------------------
-// TriMap
-//------------------------------------------------------------------------------
+static const size_t UCS4_SIZE = sizeof(Py_UCS4);
 
 typedef struct TriMapOne {
     Py_ssize_t from; // signed

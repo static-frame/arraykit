@@ -1,9 +1,12 @@
 # include "Python.h"
-# include "structmember.h"
+
+# define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
+# define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 # include "numpy/arrayobject.h"
 
 # include "array_go.h"
+# include "utilities.h"
 
 typedef struct ArrayGOObject {
     PyObject_HEAD
@@ -56,7 +59,7 @@ update_array_cache(ArrayGOObject *self)
 // ArrayGO Methods:
 static char * argnames[] = {"iterable", "own_iterable", NULL};
 
-static PyObject *
+PyObject *
 ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
 {
     PyObject *iterable;
@@ -107,7 +110,7 @@ ArrayGO_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
     return (PyObject *)self;
 }
 
-static PyObject *
+PyObject *
 ArrayGO_append(ArrayGOObject *self, PyObject *value)
 {
     if (!self->list) {
@@ -124,7 +127,7 @@ ArrayGO_append(ArrayGOObject *self, PyObject *value)
     Py_RETURN_NONE;
 }
 
-static PyObject *
+PyObject *
 ArrayGO_extend(ArrayGOObject *self, PyObject *values)
 {
     if (!self->list) {
@@ -141,7 +144,7 @@ ArrayGO_extend(ArrayGOObject *self, PyObject *values)
     Py_RETURN_NONE;
 }
 
-static PyObject *
+PyObject *
 ArrayGO_getnewargs(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
 {
     if (self->list && update_array_cache(self)) {
@@ -150,7 +153,7 @@ ArrayGO_getnewargs(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
     return PyTuple_Pack(1, self->array);
 }
 
-static PyObject *
+PyObject *
 ArrayGO_copy(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
 {
     ArrayGOObject *copy = PyObject_GC_New(ArrayGOObject, &ArrayGOType);
@@ -160,7 +163,7 @@ ArrayGO_copy(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
     return (PyObject *)copy;
 }
 
-static PyObject *
+PyObject *
 ArrayGO_iter(ArrayGOObject *self)
 {
     if (self->list && update_array_cache(self)) {
@@ -169,7 +172,7 @@ ArrayGO_iter(ArrayGOObject *self)
     return PyObject_GetIter(self->array);
 }
 
-static PyObject *
+PyObject *
 ArrayGO_mp_subscript(ArrayGOObject *self, PyObject *key)
 {
     if (self->list && update_array_cache(self)) {
@@ -178,14 +181,14 @@ ArrayGO_mp_subscript(ArrayGOObject *self, PyObject *key)
     return PyObject_GetItem(self->array, key);
 }
 
-static Py_ssize_t
+Py_ssize_t
 ArrayGO_mp_length(ArrayGOObject *self)
 {
     return ((self->array ? PyArray_SIZE((PyArrayObject *)self->array) : 0)
             + (self->list ? PyList_Size(self->list) : 0));
 }
 
-static PyObject *
+PyObject *
 ArrayGO_values_getter(ArrayGOObject *self, void* Py_UNUSED(closure))
 {
     if (self->list && update_array_cache(self)) {
@@ -195,7 +198,7 @@ ArrayGO_values_getter(ArrayGOObject *self, void* Py_UNUSED(closure))
     return self->array;
 }
 
-static int
+int
 ArrayGO_traverse(ArrayGOObject *self, visitproc visit, void *arg)
 {
     Py_VISIT(self->array);
@@ -203,7 +206,7 @@ ArrayGO_traverse(ArrayGOObject *self, visitproc visit, void *arg)
     return 0;
 }
 
-static int
+int
 ArrayGO_clear(ArrayGOObject *self)
 {
     Py_CLEAR(self->array);
@@ -211,7 +214,7 @@ ArrayGO_clear(ArrayGOObject *self)
     return 0;
 }
 
-static void
+void
 ArrayGO_dealloc(ArrayGOObject *self)
 {
     Py_XDECREF(self->array);
