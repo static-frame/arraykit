@@ -78,43 +78,28 @@
         PyObject_Print(obj, stderr, 0); \
     _AK_DEBUG_END()
 
-NPY_DATETIMEUNIT
-AK_dt_unit_from_array(PyArrayObject* a);
-
 // Takes and returns a PyArrayObject, optionally copying a mutable array and setting it as immutable
 PyArrayObject *
 AK_immutable_filter(PyArrayObject *a);
 
 // Returns NULL on error.
-PyArray_Descr*
+PyArray_Descr *
 AK_resolve_dtype(PyArray_Descr *d1, PyArray_Descr *d2);
 
-// Given a dtype_specifier, which might be a dtype, NULL, or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will not interpret a None dtype_specified as a float dtype. This will never set dtype_returned to None (only NULL). Returns a new reference.
-int
-AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned);
-
 // Returns NULL on error. Returns a new reference.
-PyObject*
+PyObject *
 AK_build_pair_ssize_t(Py_ssize_t a, Py_ssize_t b);
 
 // Returns a new ref; returns NULL on error. Any start or stop less than 0 will be set to NULL.
-PyObject*
+PyObject *
 AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step);
 
 // Utility function for converting slices; returns NULL on error; returns a new reference.
-PyObject*
+PyObject *
 AK_slice_to_ascending_slice(PyObject* slice, Py_ssize_t size);
 
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory provides the best performance at all scales. Using NpyIter, or using, bit masks does not improve performance over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy benefits from first counting the nonzeros, then allocating only enough data for the expexted number of indices.
-PyObject*
+PyObject *
 AK_nonzero_1d(PyArrayObject* array);
-
-// Returns NULL on error. Returns a new reference. Note that a reference is stolen from the PyObject argument.
-PyObject*
-AK_build_pair_ssize_t_pyo(Py_ssize_t a, PyObject* py_b);
-
-// Given inclusive start, end indices, returns a new reference to a slice. Returns NULL on error. If `reduce` is True, single width slices return an integer.
-PyObject*
-AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end, bool reduce);
 
 #endif  /* ARRAYKIT_SRC_UTILITIES_H_ */

@@ -110,6 +110,29 @@ AK_set_char(const char *name,
     return 0;
 }
 
+// Given a dtype_specifier, which might be a dtype, NULL, or None, assign a fresh dtype object (or NULL) to dtype_returned. Returns 0 on success, -1 on failure. This will not interpret a None dtype_specified as a float dtype. This will never set dtype_returned to None (only NULL). Returns a new reference.
+static inline int
+AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
+{
+    PyArray_Descr* dtype;
+    if (dtype_specifier == NULL) {
+        dtype = NULL; // propagate, cannot call into oncverter
+    }
+    else if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
+        dtype = (PyArray_Descr* )dtype_specifier;
+    }
+    else { // converter2 sets NULL for None
+        PyArray_DescrConverter2(dtype_specifier, &dtype);
+    }
+    // if not NULL, make a copy as we will give ownership to array and might mutate
+    if (dtype) {
+        dtype = PyArray_DescrNew(dtype);
+        if (dtype == NULL) return -1;
+    }
+    *dtype_returned = dtype;
+    return 0;
+}
+
 //------------------------------------------------------------------------------
 // TypeParser: Type, New, Destructor
 
@@ -160,7 +183,7 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
 }
 
 // Given a TypeParser state, return a dtype. Returns NULL on error.
-PyArray_Descr*
+PyArray_Descr *
 AK_TPS_ToDtype(AK_TypeParserState state) {
     PyArray_Descr *dtype = NULL;
 
@@ -246,7 +269,7 @@ void AK_TP_reset_field(AK_TypeParser* tp)
     // NOTE: do not reset parsed_line
 }
 
-AK_TypeParser*
+AK_TypeParser *
 AK_TP_New(Py_UCS4 tsep, Py_UCS4 decc)
 {
     AK_TypeParser *tp = (AK_TypeParser*)PyMem_Malloc(sizeof(AK_TypeParser));
@@ -995,7 +1018,7 @@ typedef struct AK_CodePointLine{
 } AK_CodePointLine;
 
 // Returns NULL on error.
-AK_CodePointLine*
+AK_CodePointLine *
 AK_CPL_New(bool type_parse, Py_UCS4 tsep, Py_UCS4 decc)
 {
     AK_CodePointLine *cpl = (AK_CodePointLine*)PyMem_Malloc(sizeof(AK_CodePointLine));
@@ -1295,7 +1318,7 @@ AK_CPL_current_to_float64(AK_CodePointLine* cpl, int *error, char tsep, char dec
 //------------------------------------------------------------------------------
 // CodePointLine: Exporters
 
-PyObject*
+PyObject *
 AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     npy_intp dims[] = {cpl->offsets_count};
@@ -1326,7 +1349,7 @@ AK_CPL_to_array_bool(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 // Given a type of signed integer, return the corresponding array.
-PyObject*
+PyObject *
 AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, char decc)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1405,7 +1428,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
 }
 
 // Given a type of signed integer, return the corresponding array.
-PyObject*
+PyObject *
 AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1478,7 +1501,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 }
 
 // Given a type of signed integer, return the corresponding array. Return NULL on error.
-PyObject*
+PyObject *
 AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1549,7 +1572,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     return array;
 }
 
-PyObject*
+PyObject *
 AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1617,7 +1640,7 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 // Return NULL on error
-PyObject*
+PyObject *
 AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 {
     Py_ssize_t count = cpl->offsets_count;
@@ -1681,7 +1704,7 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
 }
 
 // If we cannot directly convert bytes to values in a pre-loaded array, we can create a bytes or unicode array and then use PyArray_CastToType to use numpy to interpret it as a new a array and handle conversions. Note that we can use bytes for a smaller memory load if we are confident that the values are not unicode. This is a safe assumption for complex. For datetime64, we have to use Unicode to get errors on malformed inputs: using bytes causes a seg fault with these interfaces (the same is not observed with astyping a byte array in Python).
-PyObject*
+PyObject *
 AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
         PyArray_Descr* dtype,
         int type_inter)
@@ -1716,7 +1739,7 @@ AK_CPL_to_array_via_cast(AK_CodePointLine* cpl,
 }
 
 // Generic handler for converting a CPL to an array. The dtype given here must already be a fresh instance as it might be mutated. If passed dtype is NULL, must get dtype from type_parser-> parsed_line Might return NULL if array creation fails; an exception should be set. Will return NULL on error.
-PyObject*
+PyObject *
 AK_CPL_ToArray(AK_CodePointLine* cpl,
         PyArray_Descr* dtype,
         char tsep,
@@ -1929,7 +1952,8 @@ AK_CPG_AppendOffsetAtLine(
 }
 
 // Given a fully-loaded CodePointGrid, process each CodePointLine into an array and return a new list of those arrays. Returns NULL on failure.
-PyObject* AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
+PyObject *
+AK_CPG_ToArrayList(AK_CodePointGrid* cpg,
         int axis,
         PyObject* line_select,
         char tsep,
@@ -2070,7 +2094,7 @@ typedef struct AK_Dialect{
             goto error;                          \
     } while (0)                                  \
 
-AK_Dialect*
+AK_Dialect *
 AK_Dialect_New(PyObject *delimiter,
         PyObject *doublequote,
         PyObject *escapechar,
@@ -2477,7 +2501,7 @@ AK_DR_Free(AK_DelimitedReader *dr)
 }
 
 // The arguments to this constructor are validated before this function is valled. Returns NULL on error.
-AK_DelimitedReader*
+AK_DelimitedReader *
 AK_DR_New(PyObject *iterable,
         int axis,
         PyObject *delimiter,
@@ -2530,7 +2554,7 @@ AK_DR_New(PyObject *iterable,
 //------------------------------------------------------------------------------
 
 // Convert an sequence of strings to a 1D array.
-PyObject*
+PyObject *
 AK_IterableStrToArray1D(
     PyObject *sequence,
     PyObject *dtype_specifier,
@@ -2574,7 +2598,7 @@ static char *delimited_to_ararys_kwarg_names[] = {
 };
 
 // NOTE: implement skip_header, skip_footer in client Python, not here.
-PyObject*
+PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
     PyObject *file_like;

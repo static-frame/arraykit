@@ -1,5 +1,4 @@
 # include "Python.h"
-# include "stdbool.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -7,13 +6,6 @@
 # include "numpy/arrayobject.h"
 
 # include "utilities.h"
-
-NPY_DATETIMEUNIT
-AK_dt_unit_from_array(PyArrayObject* a) {
-    // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
-    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
-    return dma->base;
-}
 
 PyArrayObject *
 AK_immutable_filter(PyArrayObject *a)
@@ -27,28 +19,6 @@ AK_immutable_filter(PyArrayObject *a)
     }
     Py_INCREF(a);
     return a;
-}
-
-int
-AK_DTypeFromSpecifier(PyObject *dtype_specifier, PyArray_Descr **dtype_returned)
-{
-    PyArray_Descr* dtype;
-    if (dtype_specifier == NULL) {
-        dtype = NULL; // propagate, cannot call into oncverter
-    }
-    else if (PyObject_TypeCheck(dtype_specifier, &PyArrayDescr_Type)) {
-        dtype = (PyArray_Descr* )dtype_specifier;
-    }
-    else { // converter2 sets NULL for None
-        PyArray_DescrConverter2(dtype_specifier, &dtype);
-    }
-    // if not NULL, make a copy as we will give ownership to array and might mutate
-    if (dtype) {
-        dtype = PyArray_DescrNew(dtype);
-        if (dtype == NULL) return -1;
-    }
-    *dtype_returned = dtype;
-    return 0;
 }
 
 PyArray_Descr *
@@ -76,7 +46,7 @@ AK_resolve_dtype(PyArray_Descr *d1, PyArray_Descr *d2)
     return d;
 }
 
-PyObject*
+PyObject *
 AK_build_pair_ssize_t(Py_ssize_t a, Py_ssize_t b)
 {
     PyObject* t = PyTuple_New(2);
@@ -100,7 +70,7 @@ AK_build_pair_ssize_t(Py_ssize_t a, Py_ssize_t b)
     return t;
 }
 
-PyObject*
+PyObject *
 AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step)
 {
     PyObject* py_start = NULL;
@@ -131,7 +101,7 @@ AK_build_slice(Py_ssize_t start, Py_ssize_t stop, Py_ssize_t step)
     return new;
 }
 
-PyObject*
+PyObject *
 AK_slice_to_ascending_slice(PyObject* slice, Py_ssize_t size)
 {
     Py_ssize_t step_count = -1;
@@ -159,7 +129,7 @@ AK_slice_to_ascending_slice(PyObject* slice, Py_ssize_t size)
             -step);
 }
 
-PyObject*
+PyObject *
 AK_nonzero_1d(PyArrayObject* array) {
     PyObject* final;
     npy_intp count_max = PyArray_SIZE(array);
@@ -252,39 +222,4 @@ AK_nonzero_1d(PyArrayObject* array) {
     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
-}
-
-PyObject*
-AK_build_pair_ssize_t_pyo(Py_ssize_t a, PyObject* py_b)
-{
-    if (py_b == NULL) { // construction failed
-        return NULL;
-    }
-    PyObject* t = PyTuple_New(2);
-    if (t == NULL) {
-        return NULL;
-    }
-    PyObject* py_a = PyLong_FromSsize_t(a);
-    if (py_a == NULL) {
-        Py_DECREF(t);
-        return NULL;
-    }
-    // steals refs
-    PyTuple_SET_ITEM(t, 0, py_a);
-    PyTuple_SET_ITEM(t, 1, py_b);
-    return t;
-}
-
-PyObject*
-AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end, bool reduce)
-{
-    if (reduce && start == end) {
-        return PyLong_FromSsize_t(start); // new ref
-    }
-    // assert(start >= 0);
-    if (start <= end) {
-        return AK_build_slice(start, end + 1, 1);
-    }
-    // end of 0 goes to -1, gets converted to None
-    return AK_build_slice(start, end - 1, -1);
 }

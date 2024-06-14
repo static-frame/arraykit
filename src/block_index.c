@@ -11,6 +11,43 @@
 
 PyObject * ErrorInitTypeBlocks;
 
+// Returns NULL on error. Returns a new reference. Note that a reference is stolen from the PyObject argument.
+static inline PyObject *
+AK_build_pair_ssize_t_pyo(Py_ssize_t a, PyObject* py_b)
+{
+    if (py_b == NULL) { // construction failed
+        return NULL;
+    }
+    PyObject* t = PyTuple_New(2);
+    if (t == NULL) {
+        return NULL;
+    }
+    PyObject* py_a = PyLong_FromSsize_t(a);
+    if (py_a == NULL) {
+        Py_DECREF(t);
+        return NULL;
+    }
+    // steals refs
+    PyTuple_SET_ITEM(t, 0, py_a);
+    PyTuple_SET_ITEM(t, 1, py_b);
+    return t;
+}
+
+// Given inclusive start, end indices, returns a new reference to a slice. Returns NULL on error. If `reduce` is True, single width slices return an integer.
+static inline PyObject *
+AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end, bool reduce)
+{
+    if (reduce && start == end) {
+        return PyLong_FromSsize_t(start); // new ref
+    }
+    // assert(start >= 0);
+    if (start <= end) {
+        return AK_build_slice(start, end + 1, 1);
+    }
+    // end of 0 goes to -1, gets converted to None
+    return AK_build_slice(start, end - 1, -1);
+}
+
 // NOTE: we use platform size types here, which are appropriate for the values, but might pose issues if trying to pass pickles between 32 and 64 bit machines.
 typedef struct BlockIndexRecord {
     Py_ssize_t block; // signed
@@ -30,7 +67,7 @@ typedef struct BlockIndexObject {
 } BlockIndexObject;
 
 // Returns a new reference to tuple. Returns NULL on error. Python already wraps negative numbers up to negative length when used in the sequence slot
-PyObject*
+PyObject *
 AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
     if (!((size_t)i < (size_t)self->bir_count)) {
         PyErr_SetString(PyExc_IndexError, "index out of range");
@@ -69,7 +106,7 @@ BIIter_dealloc(BIIterObject *self) {
     PyObject_Del((PyObject*)self);
 }
 
-PyObject*
+PyObject *
 BIIter_iter(BIIterObject *self) {
     Py_INCREF(self);
     return (PyObject*)self;
@@ -156,7 +193,7 @@ BIIterSeq_dealloc(BIIterSeqObject *self) {
     PyObject_Del((PyObject*)self);
 }
 
-PyObject*
+PyObject *
 BIIterSeq_iter(BIIterSeqObject *self) {
     Py_INCREF(self);
     return (PyObject*)self;
@@ -294,7 +331,7 @@ BIIterSlice_dealloc(BIIterSliceObject *self) {
     PyObject_Del((PyObject*)self);
 }
 
-PyObject*
+PyObject *
 BIIterSlice_iter(BIIterSliceObject *self) {
     Py_INCREF(self);
     return (PyObject*)self;
@@ -372,7 +409,7 @@ BIIterBoolean_dealloc(BIIterBooleanObject *self) {
     PyObject_Del((PyObject*)self);
 }
 
-PyObject*
+PyObject *
 BIIterBoolean_iter(BIIterBooleanObject *self)
 {
     Py_INCREF(self);
@@ -495,7 +532,7 @@ BIIterContiguous_dealloc(BIIterContiguousObject *self)
 }
 
 // Simply incref this object and return it.
-PyObject*
+PyObject *
 BIIterContiguous_iter(BIIterContiguousObject *self)
 {
     Py_INCREF(self);
@@ -503,7 +540,7 @@ BIIterContiguous_iter(BIIterContiguousObject *self)
 }
 
 // Returns a new reference.
-PyObject*
+PyObject *
 BIIterContiguous_reversed(BIIterContiguousObject *self)
 {
     bool reversed = !self->reversed;
@@ -665,7 +702,7 @@ BIIterBlock_dealloc(BIIterBlockObject *self) {
     PyObject_Del((PyObject*)self);
 }
 
-PyObject*
+PyObject *
 BIIterBlock_iter(BIIterBlockObject *self) {
     Py_INCREF(self);
     return (PyObject*)self;
@@ -1095,7 +1132,7 @@ BlockIndex_register(BlockIndexObject *self, PyObject *value) {
 //------------------------------------------------------------------------------
 // exporters
 
-PyObject*
+PyObject *
 BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     PyObject* list = PyList_New(self->bir_count);
     if (list == NULL) {
@@ -1116,7 +1153,7 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 // Returns NULL on error
-PyObject*
+PyObject *
 AK_BI_to_bytes(BlockIndexObject *self) {
     Py_ssize_t size = self->bir_count * sizeof(BlockIndexRecord);
     // bytes might be null on error
@@ -1125,7 +1162,7 @@ AK_BI_to_bytes(BlockIndexObject *self) {
 }
 
 // Returns NULL on error
-PyObject*
+PyObject *
 BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
     return AK_BI_to_bytes(self);
 }
@@ -1134,7 +1171,7 @@ BlockIndex_to_bytes(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
 // pickle support
 
 // Returns NULL on error, PyObject* otherwise.
-PyObject*
+PyObject *
 BlockIndex_getstate(BlockIndexObject *self) {
     PyObject* bi = AK_BI_to_bytes(self);
     if (bi == NULL) {
@@ -1153,7 +1190,7 @@ BlockIndex_getstate(BlockIndexObject *self) {
 }
 
 // State returned here is a tuple of keys, suitable for usage as an `args` argument.
-PyObject*
+PyObject *
 BlockIndex_setstate(BlockIndexObject *self, PyObject *state)
 {
     if (!PyTuple_CheckExact(state) || !PyTuple_GET_SIZE(state)) {
@@ -1271,7 +1308,7 @@ BlockIndex_sizeof(BlockIndexObject *self) {
 }
 
 // Given an index, return just the block index.
-PyObject*
+PyObject *
 BlockIndex_get_block(BlockIndexObject *self, PyObject *key){
     if (PyNumber_Check(key)) {
         Py_ssize_t i = PyNumber_AsSsize_t(key, NULL);
@@ -1286,7 +1323,7 @@ BlockIndex_get_block(BlockIndexObject *self, PyObject *key){
 }
 
 // Given an index, return just the column index.
-PyObject*
+PyObject *
 BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
     if (PyNumber_Check(key)) {
         Py_ssize_t i = PyNumber_AsSsize_t(key, NULL);
@@ -1303,18 +1340,18 @@ BlockIndex_get_column(BlockIndexObject *self, PyObject *key){
 //------------------------------------------------------------------------------
 // iterators
 
-PyObject*
+PyObject *
 BlockIndex_iter(BlockIndexObject* self) {
     return BIIter_new(self, false);
 }
 
-PyObject*
+PyObject *
 BlockIndex_reversed(BlockIndexObject* self) {
     return BIIter_new(self, true);
 }
 
 // Given key, return an iterator of a selection.
-PyObject*
+PyObject *
 BlockIndex_iter_select(BlockIndexObject *self, PyObject *selector){
     return BIIterSelector_new(self, selector, false, BIIS_UNKNOWN, false);
 }
@@ -1327,7 +1364,7 @@ static char *iter_contiguous_kargs_names[] = {
 };
 
 // Given key, return an iterator of a selection.
-PyObject*
+PyObject *
 BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject* selector;
@@ -1352,7 +1389,7 @@ BlockIndex_iter_contiguous(BlockIndexObject *self, PyObject *args, PyObject *kwa
 }
 
 // Given key, return an iterator of a selection.
-PyObject*
+PyObject *
 BlockIndex_iter_block(BlockIndexObject *self){
     return BIIterBlock_new(self, false);
 }

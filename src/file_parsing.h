@@ -4,7 +4,7 @@
 # include "Python.h"
 
 // NOTE: implement skip_header, skip_footer in client Python, not here.
-PyObject*
+PyObject *
 delimited_to_arrays(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *

@@ -1,6 +1,5 @@
 # include "Python.h"
 # include "stdbool.h"
-# include "structmember.h"
 
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -8,10 +7,17 @@
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 
-# include "utilities.h"
 # include "tri_map.h"
+# include "utilities.h"
 
 static const size_t UCS4_SIZE = sizeof(Py_UCS4);
+
+static inline NPY_DATETIMEUNIT
+AK_dt_unit_from_array(PyArrayObject* a) {
+    // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
+    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
+    return dma->base;
+}
 
 typedef struct TriMapOne {
     Py_ssize_t from; // signed
