@@ -2,8 +2,6 @@ import sys
 
 import invoke
 
-
-
 ARTIFACTS = (
     '*.egg-info',
     '.hypothesis',
