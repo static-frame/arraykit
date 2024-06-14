@@ -1,10 +1,13 @@
 # include "Python.h"
 # include "structmember.h"
 
+# define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
+# define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
 # include "numpy/arrayobject.h"
 
-# include "utilities.h"
 # include "block_index.h"
+# include "utilities.h"
 
 PyObject * ErrorInitTypeBlocks;
 

@@ -6,7 +6,7 @@
 # include "numpy/arrayobject.h"
 
 # include "array_go.h"
-//# include "block_index.h"
+# include "block_index.h"
 //# include "file_parsing.h"
 # include "methods.h"
 # include "tri_map.h"
@@ -73,14 +73,14 @@ PyInit__arraykit(void)
 {
     import_array();
 
-//     ErrorInitTypeBlocks = PyErr_NewExceptionWithDoc(
-//             "arraykit.ErrorInitTypeBlocks",
-//             "RuntimeError error in block initialization.",
-//             PyExc_RuntimeError,
-//             NULL);
-//     if (ErrorInitTypeBlocks == NULL) {
-//         return NULL;
-//     }
+    ErrorInitTypeBlocks = PyErr_NewExceptionWithDoc(
+            "arraykit.ErrorInitTypeBlocks",
+            "RuntimeError error in block initialization.",
+            PyExc_RuntimeError,
+            NULL);
+    if (ErrorInitTypeBlocks == NULL) {
+        return NULL;
+    }
 
     PyObject *copy = PyImport_ImportModule("copy");
     if (copy == NULL) {
@@ -95,20 +95,20 @@ PyInit__arraykit(void)
     PyObject *m = PyModule_Create(&arraykit_module);
     if (!m ||
         PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AK_VERSION)) ||
-        // PyType_Ready(&BlockIndexType) ||
-        // PyType_Ready(&BIIterType) ||
-        // PyType_Ready(&BIIterSeqType) ||
-        // PyType_Ready(&BIIterSliceType) ||
-        // PyType_Ready(&BIIterBoolType) ||
-        // PyType_Ready(&BIIterContiguousType) ||
-        // PyType_Ready(&BIIterBlockType) ||
+        PyType_Ready(&BlockIndexType) ||
+        PyType_Ready(&BIIterType) ||
+        PyType_Ready(&BIIterSeqType) ||
+        PyType_Ready(&BIIterSliceType) ||
+        PyType_Ready(&BIIterBoolType) ||
+        PyType_Ready(&BIIterContiguousType) ||
+        PyType_Ready(&BIIterBlockType) ||
         PyType_Ready(&TriMapType) ||
         PyType_Ready(&ArrayGOType) ||
-        // PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
+        PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "TriMap", (PyObject *) &TriMapType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
-        PyModule_AddObject(m, "deepcopy", deepcopy)
-        // PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks)
+        PyModule_AddObject(m, "deepcopy", deepcopy) ||
+        PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks)
     ){
         Py_DECREF(deepcopy);
         Py_XDECREF(m);
