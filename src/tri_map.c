@@ -12,7 +12,7 @@
 
 static const size_t UCS4_SIZE = sizeof(Py_UCS4);
 
-static inline NPY_DATETIMEUNIT
+static NPY_DATETIMEUNIT
 AK_dt_unit_from_array(PyArrayObject* a) {
     // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
     PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
@@ -208,7 +208,7 @@ TriMap_repr(TriMapObject *self) {
 // Provide the integer positions connecting the `src` to the `dst`. If there is no match to `src` or `dst`, the unmatched position can be provided with -1. From each side, a connection is documented to the current `len`. Each time this is called `len` is incremented, indicating the inrease in position in the `final`. Return NULL on error.
 
 // Inner function for calling from C; returns 0 on success, -1 on error. Exceptions will be set on error.
-static inline int
+static int
 AK_TM_register_one(TriMapObject* tm, Py_ssize_t src_from, Py_ssize_t dst_from) {
     bool src_matched = src_from >= 0;
     bool dst_matched = dst_from >= 0;
@@ -559,7 +559,7 @@ TriMap_dst_no_fill(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 } while (0)                                                            \
 
 // Based on `tm` state, transfer from src or from dst (depending on `from_src`) to a `array_to`, a newly created contiguous array that is compatible with the values in `array_from`. Returns -1 on error. This only needs to match to / from type combinations that are possible from `resolve_dtype`, i.e., bool never goes to integer.
-static inline int
+static int
 AK_TM_transfer_scalar(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
@@ -759,7 +759,7 @@ AK_TM_transfer_scalar(TriMapObject* tm,
 #undef AK_TM_TRANSFER_SCALAR
 
 // Returns -1 on error. Specialized transfer from any type of an array to an object array.
-static inline int
+static int
 AK_TM_transfer_object(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
@@ -834,7 +834,7 @@ AK_TM_transfer_object(TriMapObject* tm,
 }
 
 // Returns -1 on error.
-static inline int
+static int
 AK_TM_fill_object(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
@@ -897,7 +897,7 @@ AK_TM_fill_object(TriMapObject* tm,
 } while (0)                                                                \
 
 // Returns -1 on error.
-static inline int
+static int
 AK_TM_fill_unicode(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
@@ -940,7 +940,7 @@ AK_TM_fill_unicode(TriMapObject* tm,
 }
 
 // Returns -1 on error.
-static inline int
+static int
 AK_TM_fill_string(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_to,
@@ -967,7 +967,7 @@ AK_TM_fill_string(TriMapObject* tm,
 }
 
 // Returns NULL on error.
-static inline PyObject *
+static PyObject *
 AK_TM_map_no_fill(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from) {
@@ -1048,7 +1048,7 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 }
 
 // Returns NULL on error.
-static inline PyObject *
+static PyObject *
 AK_TM_map_fill(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
