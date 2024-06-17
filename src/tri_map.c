@@ -1,6 +1,7 @@
 # include "Python.h"
 # include "stdbool.h"
 
+# define NO_IMPORT_ARRAY
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 

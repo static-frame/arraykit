@@ -1,5 +1,6 @@
 # include "Python.h"
 
+# define NO_IMPORT_ARRAY
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
@@ -980,7 +981,7 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
         // if not a n object dtype, we will force a copy (even if this is an immutable array) so as to not hold on to any references
         Py_INCREF(dtype); // PyArray_FromArray steals a reference
         array_new = PyArray_FromArray(
-                array,
+                (PyArrayObject*)array,
                 dtype,
                 NPY_ARRAY_ENSURECOPY);
         if (!array_new) {
