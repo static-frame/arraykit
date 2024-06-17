@@ -3,6 +3,6 @@
 
 # include "Python.h"
 
-PyTypeObject TriMapType;
+extern PyTypeObject TriMapType;
 
 # endif /* ARRAYKIT_SRC_TRI_MAP_H_ */

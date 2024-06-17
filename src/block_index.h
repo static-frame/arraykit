@@ -3,13 +3,13 @@
 
 # include "Python.h"
 
-PyTypeObject BlockIndexType;
-PyObject * ErrorInitTypeBlocks;
-PyTypeObject BIIterType;
-PyTypeObject BIIterSeqType;
-PyTypeObject BIIterSliceType;
-PyTypeObject BIIterBoolType;
-PyTypeObject BIIterContiguousType;
-PyTypeObject BIIterBlockType;
+extern PyTypeObject BlockIndexType;
+extern PyObject * ErrorInitTypeBlocks;
+extern PyTypeObject BIIterType;
+extern PyTypeObject BIIterSeqType;
+extern PyTypeObject BIIterSliceType;
+extern PyTypeObject BIIterBoolType;
+extern PyTypeObject BIIterContiguousType;
+extern PyTypeObject BIIterBlockType;
 
 # endif /* ARRAYKIT_SRC_BLOCK_INDEX_H_ */

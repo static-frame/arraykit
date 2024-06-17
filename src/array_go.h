@@ -3,6 +3,6 @@
 
 # include "Python.h"
 
-PyTypeObject ArrayGOType;
+extern PyTypeObject ArrayGOType;
 
 # endif /* ARRAYKIT_SRC_ARRAY_GO_H_ */
