@@ -88,7 +88,7 @@ typedef struct BIIterObject {
     Py_ssize_t pos; // current index state, mutated in-place
 } BIIterObject;
 
-PyObject *
+static inline PyObject *
 BIIter_new(BlockIndexObject *bi, bool reversed) {
     BIIterObject *bii = PyObject_New(BIIterObject, &BIIterType);
     if (!bii) {
@@ -169,7 +169,8 @@ typedef enum BIIterSelectorKind {
     BIIS_UNKNOWN
 } BIIterSelectorKind;
 
-PyObject *
+// Forward-def
+static inline PyObject *
 BIIterSelector_new(BlockIndexObject *bi,
         PyObject* selector,
         bool reversed,
@@ -201,7 +202,7 @@ BIIterSeq_iter(BIIterSeqObject *self) {
 }
 
 // Returns -1 on end of sequence; return -1 with exception set on
-Py_ssize_t
+static inline Py_ssize_t
 BIIterSeq_iternext_index(BIIterSeqObject *self)
 {
     Py_ssize_t i;
@@ -339,7 +340,7 @@ BIIterSlice_iter(BIIterSliceObject *self) {
 }
 
 // NOTE: this does not use `reversed`, as pos, step, and count are set in BIIterSelector_new
-Py_ssize_t
+static inline Py_ssize_t
 BIIterSlice_iternext_index(BIIterSliceObject *self)
 {
     if (self->len == 0 || self->count >= self->len) {
@@ -417,7 +418,7 @@ BIIterBoolean_iter(BIIterBooleanObject *self)
     return (PyObject*)self;
 }
 
-Py_ssize_t
+static inline Py_ssize_t
 BIIterBoolean_iternext_index(BIIterBooleanObject *self)
 {
     npy_bool v = 0;
@@ -499,7 +500,7 @@ typedef struct BIIterContiguousObject {
 } BIIterContiguousObject;
 
 // Create a new contiguous slice iterator. Return NULL on error. Steals a reference to PyObject* iter.
-PyObject *
+static inline PyObject *
 BIIterContiguous_new(BlockIndexObject *bi,
         bool reversed,
         PyObject* iter,
@@ -676,7 +677,7 @@ typedef struct BIIterBlockObject {
     PyObject* null_slice;
 } BIIterBlockObject;
 
-PyObject *
+static inline PyObject *
 BIIterBlock_new(BlockIndexObject *bi, bool reversed) {
     BIIterBlockObject *bii = PyObject_New(BIIterBlockObject, &BIIterBlockType);
     if (!bii) {
