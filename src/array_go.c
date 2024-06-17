@@ -34,7 +34,7 @@ PyDoc_STRVAR(ArrayGO_values_doc, "Return the immutable labels array\n");
 //------------------------------------------------------------------------------
 // ArrayGO utility functions
 
-static int
+static inline int
 update_array_cache(ArrayGOObject *self)
 {
     if (self->list) {

@@ -710,7 +710,7 @@ class SplitAfterCount(Perf):
         self.string = ''.join(['abcd,'] * 1000)
 
     def main(self):
-        post = self.entry(self.string, delimiter=',', count=20)
+        post = self.entry(self.string, ',', 20)
 
 class SplitAfterCountAK(SplitAfterCount):
     entry = staticmethod(split_after_count_ak)

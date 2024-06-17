@@ -12,7 +12,7 @@
 PyObject * ErrorInitTypeBlocks;
 
 // Returns NULL on error. Returns a new reference. Note that a reference is stolen from the PyObject argument.
-static PyObject *
+static inline PyObject *
 AK_build_pair_ssize_t_pyo(Py_ssize_t a, PyObject* py_b)
 {
     if (py_b == NULL) { // construction failed
@@ -34,7 +34,7 @@ AK_build_pair_ssize_t_pyo(Py_ssize_t a, PyObject* py_b)
 }
 
 // Given inclusive start, end indices, returns a new reference to a slice. Returns NULL on error. If `reduce` is True, single width slices return an integer.
-static PyObject *
+static inline PyObject *
 AK_build_slice_inclusive(Py_ssize_t start, Py_ssize_t end, bool reduce)
 {
     if (reduce && start == end) {
@@ -67,7 +67,7 @@ typedef struct BlockIndexObject {
 } BlockIndexObject;
 
 // Returns a new reference to tuple. Returns NULL on error. Python already wraps negative numbers up to negative length when used in the sequence slot
-static PyObject *
+static inline PyObject *
 AK_BI_item(BlockIndexObject* self, Py_ssize_t i) {
     if (!((size_t)i < (size_t)self->bir_count)) {
         PyErr_SetString(PyExc_IndexError, "index out of range");
@@ -939,7 +939,7 @@ error: // nothing shold be increfed when we get here
 // block index new, init, memory
 
 // Returns 0 on succes, -1 on error.
-static int
+static inline int
 AK_BI_BIR_new(BlockIndexObject* bi) {
     BlockIndexRecord* bir = (BlockIndexRecord*)PyMem_Malloc(
             sizeof(BlockIndexRecord) * bi->bir_capacity);
@@ -952,7 +952,7 @@ AK_BI_BIR_new(BlockIndexObject* bi) {
 }
 
 // Returns 0 on success, -1 on error
-static int
+static inline int
 AK_BI_BIR_resize(BlockIndexObject* bi, Py_ssize_t increment) {
     Py_ssize_t target = bi->bir_count + increment;
     Py_ssize_t capacity = bi->bir_capacity;
@@ -1153,7 +1153,7 @@ BlockIndex_to_list(BlockIndexObject *self, PyObject *Py_UNUSED(unused)) {
 }
 
 // Returns NULL on error
-static PyObject *
+static inline PyObject *
 AK_BI_to_bytes(BlockIndexObject *self) {
     Py_ssize_t size = self->bir_count * sizeof(BlockIndexRecord);
     // bytes might be null on error
