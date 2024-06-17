@@ -36,7 +36,7 @@ ak_extension = Extension(
             'src/_arraykit.c',
             'src/array_go.c',
             'src/block_index.c',
-            'src/file_parsing.c',
+            'src/delimited_to_arrays.c',
             'src/methods.c',
             'src/tri_map.c',
             'src/utilities.c',
