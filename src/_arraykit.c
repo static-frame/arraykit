@@ -3589,7 +3589,6 @@ typedef struct A2DTupleObject {
     npy_intp num_rows;
     npy_intp num_cols;
     Py_ssize_t pos; // current index state, mutated in-place
-
 } A2DTupleObject;
 
 static PyObject *
@@ -3616,7 +3615,6 @@ A2DTuple_dealloc(A2DTupleObject *self) {
 
 static PyObject*
 A2DTuple_iter(A2DTupleObject *self) {
-    // NOTE: why do we not need to incref components sof self?
     Py_INCREF(self);
     return (PyObject*)self;
 }
