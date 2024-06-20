@@ -3633,7 +3633,7 @@ A2DTuple_iternext(A2DTupleObject *self) {
             return NULL;
         }
         for (npy_intp j = 0; j < num_cols; ++j) {
-            // cannot assume input_array is contiguous
+            // cannot assume array is contiguous
             item = PyArray_ToScalar(PyArray_GETPTR2(array, i, j), array);
             if (item == NULL) {
                 Py_DECREF(tuple);

@@ -350,6 +350,28 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             reversed(it)
 
+    def test_array2d_tuple_iter_e(self) -> None:
+        a1 = np.array([[None, 'bb'], [None, 'dd'], [3, None]])
+        it = array2d_tuple_iter(a1)
+        del a1
+        self.assertEqual(list(it), [(None, 'bb'), (None, 'dd'), (3, None)])
+
+    def test_array2d_tuple_iter_f(self) -> None:
+        a1 = np.array([[None, 'bb'], [None, 'dd'], [3, None]])
+        it1 = array2d_tuple_iter(a1)
+        del a1
+        it2 = iter(it1)
+        self.assertEqual(list(it1), [(None, 'bb'), (None, 'dd'), (3, None)])
+        self.assertEqual(list(it2), []) # expected behavior
+
+    def test_array2d_tuple_iter_g(self) -> None:
+        a1 = np.array([[None, 'bb'], [None, 'dd'], [3, None]])
+        it1 = array2d_tuple_iter(a1)
+        it2 = array2d_tuple_iter(a1)
+        del a1
+        self.assertEqual(list(it1), [(None, 'bb'), (None, 'dd'), (3, None)])
+        self.assertEqual(list(it2), [(None, 'bb'), (None, 'dd'), (3, None)])
+
     #---------------------------------------------------------------------------
 
     def test_isna_element_a(self) -> None:
