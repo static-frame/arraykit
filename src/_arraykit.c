@@ -3523,10 +3523,8 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
     return AK_ArrayDeepCopy(m, (PyArrayObject*)array, memo);
 }
 
-
-# define AK_A2D1D_
-
-// Reshape if necessary a row that might be 2D or 1D is returned as a 1D array.
+//------------------------------------------------------------------------------
+// Given a 2D array, return a 1D object array of tuples.
 static PyObject *
 array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
 {
@@ -3579,6 +3577,96 @@ error:
     Py_DECREF(output);
     return NULL;
 }
+
+//------------------------------------------------------------------------------
+// Array2DTuple Iterator
+
+static PyTypeObject A2DTupleType;
+
+typedef struct A2DTupleObject {
+    PyObject_HEAD
+    PyArrayObject* array;
+    npy_intp num_rows;
+    npy_intp num_cols;
+    Py_ssize_t pos; // current index state, mutated in-place
+
+} A2DTupleObject;
+
+static PyObject *
+A2DTuple_new(PyArrayObject* array,
+        npy_intp num_rows,
+        npy_intp num_cols) {
+    A2DTupleObject* a2dt = PyObject_New(A2DTupleObject, &A2DTupleType);
+    if (!a2dt) {
+        return NULL;
+    }
+    Py_INCREF((PyObject*)array);
+    a2dt->array = array;
+    a2dt->num_rows = num_rows;
+    a2dt->num_cols = num_cols;
+    a2dt->pos = 0;
+    return (PyObject *)a2dt;
+}
+
+static void
+A2DTuple_dealloc(A2DTupleObject *self) {
+    Py_DECREF((PyObject*)self->array);
+    PyObject_Del((PyObject*)self);
+}
+
+static PyObject*
+A2DTuple_iter(A2DTupleObject *self) {
+    Py_INCREF(self);
+    return (PyObject*)self;
+}
+
+static PyObject *
+A2DTuple_iternext(A2DTupleObject *self) {
+    Py_ssize_t i = self->pos++;
+    if (i >= self->num_rows) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+// static PyObject *
+// A2DTuple_reversed(A2DTupleObject *self) {
+//     return A2DTuple_new(self->bi, !self->reversed);
+// }
+
+static PyObject *
+A2DTuple_length_hint(A2DTupleObject *self) {
+    Py_ssize_t len = Py_MAX(0, self->num_rows - self->pos);
+    return PyLong_FromSsize_t(len);
+}
+
+static PyMethodDef A2DTuple_methods[] = {
+    {"__length_hint__", (PyCFunction)A2DTuple_length_hint, METH_NOARGS, NULL},
+    // {"__reversed__", (PyCFunction)A2DTuple_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+static PyTypeObject A2DTupleType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(A2DTupleObject),
+    .tp_dealloc = (destructor) A2DTuple_dealloc,
+    .tp_iter = (getiterfunc) A2DTuple_iter,
+    .tp_iternext = (iternextfunc) A2DTuple_iternext,
+    .tp_methods = A2DTuple_methods,
+    .tp_name = "arraykit.A2DTupleIterator",
+};
+
+// Given a 2D array, return an iterator of row tuples.
+static PyObject *
+array2d_tuple_iter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_2D(a);
+    PyArrayObject* array = (PyArrayObject *)a;
+    npy_intp num_rows = PyArray_DIM(array, 0);
+    npy_intp num_cols = PyArray_DIM(array, 1);
+    return A2DTuple_new(array, num_rows, num_cols);
+}
+
 
 //------------------------------------------------------------------------------
 // type resolution
@@ -7328,6 +7416,7 @@ static PyMethodDef arraykit_methods[] =  {
             METH_VARARGS | METH_KEYWORDS,
             NULL},
     {"array2d_to_array1d", array2d_to_array1d, METH_O, NULL},
+    {"array2d_tuple_iter", array2d_tuple_iter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"first_true_1d",

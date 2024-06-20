@@ -23,6 +23,7 @@ from arraykit import first_true_1d
 from arraykit import first_true_2d
 from arraykit import slice_to_ascending_slice
 from arraykit import array2d_to_array1d
+from arraykit import array2d_tuple_iter
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -316,6 +317,12 @@ class TestUnit(unittest.TestCase):
         a1 = np.arange(20, dtype=np.int64).reshape(4, 5)
         result = array2d_to_array1d(a1)
         self.assertEqual(result.tolist(), [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9), (10, 11, 12, 13, 14), (15, 16, 17, 18, 19)])
+
+    #---------------------------------------------------------------------------
+    def test_array2d_tuple_iter_a(self) -> None:
+        a1 = np.arange(20, dtype=np.int64).reshape(4, 5)
+        result = array2d_tuple_iter(a1)
+        self.assertEqual(len(list(result)), 4)
 
     #---------------------------------------------------------------------------
 
