@@ -333,11 +333,22 @@ class TestUnit(unittest.TestCase):
     def test_array2d_tuple_iter_c(self) -> None:
         a1 = np.array([['aaa', 'bb'], ['c', 'dd'], ['ee', 'fffff']])
         it = array2d_tuple_iter(a1)
+        self.assertEqual(it.__length_hint__(), 3)
         self.assertEqual(next(it), ('aaa', 'bb'))
+        self.assertEqual(it.__length_hint__(), 2)
         self.assertEqual(next(it), ('c', 'dd'))
+        self.assertEqual(it.__length_hint__(), 1)
         self.assertEqual(next(it), ('ee', 'fffff'))
+        self.assertEqual(it.__length_hint__(), 0)
         with self.assertRaises(StopIteration):
             next(it)
+
+    def test_array2d_tuple_iter_d(self) -> None:
+        a1 = np.array([['aaa', 'bb'], ['c', 'dd'], ['ee', 'fffff']])
+        it = array2d_tuple_iter(a1)
+        # __reversed__ not implemented
+        with self.assertRaises(TypeError):
+            reversed(it)
 
     #---------------------------------------------------------------------------
 

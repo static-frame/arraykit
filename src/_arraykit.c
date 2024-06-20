@@ -3644,9 +3644,7 @@ A2DTuple_iternext(A2DTupleObject *self) {
         self->pos++;
         return tuple;
     }
-    else {
-        return NULL;
-    }
+    return NULL;
 }
 
 // static PyObject *
