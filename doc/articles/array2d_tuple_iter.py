@@ -3,7 +3,7 @@ import sys
 import timeit
 import typing as tp
 
-from arraykit import array2d_to_array1d
+from arraykit import array2d_tuple_iter
 import arraykit as ak
 
 import matplotlib.pyplot as plt
@@ -20,22 +20,48 @@ class ArrayProcessor:
         self.array = array
 
 #-------------------------------------------------------------------------------
-class AKArray2D1D(ArrayProcessor):
-    NAME = 'ak.array2d_to_array1d()'
+class AKArray2DTupleList(ArrayProcessor):
+    NAME = 'list(ak.array2d_tuple_iter(a2d))'
     SORT = 0
 
     def __call__(self):
-        _ = array2d_to_array1d(self.array)
+        _ = list(array2d_tuple_iter(self.array))
 
-class PyArray2D1D(ArrayProcessor):
-    NAME = 'Python construction'
+class AKArray2DTupleNext(ArrayProcessor):
+    NAME = 'next(ak.array2d_tuple_iter(a2d))'
     SORT = 1
 
     def __call__(self):
-        post = np.empty(self.array.shape[0], dtype=object)
-        for i, row in enumerate(self.array):
-            post[i] = tuple(row)
-        post.flags.writeable = False
+        it = array2d_tuple_iter(self.array)
+        while True:
+            try:
+                _ = next(it)
+            except StopIteration:
+                break
+
+class PyArray2DTupleMapList(ArrayProcessor):
+    NAME = 'list(map(tuple, a2d))'
+    SORT = 2
+
+    def __call__(self):
+        array = self.array
+        _ = list(map(tuple, array))
+
+class PyArray2DTupleIterNext(ArrayProcessor):
+    NAME = 'tuple(next(iter(a2d)))'
+    SORT = 3
+
+    def __call__(self):
+        it = iter(self.array)
+        while True:
+            try:
+                _ = tuple(next(it))
+            except StopIteration:
+                break
+
+
+
+
 
 #-------------------------------------------------------------------------------
 NUMBER = 200
@@ -102,16 +128,16 @@ def plot_performance(frame):
     fig.set_size_inches(8, 4) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(.05, .96, f'array2d_to_array1d() Performance: {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'array2d_tuple_iter() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
-    fp = '/tmp/array2d_to_array1d.png'
+    fp = '/tmp/array2d_tuple_iter.png'
     plt.subplots_adjust(
             left=0.05,
             bottom=0.05,
             right=0.8,
             top=0.85,
-            wspace=0.9, # width
+            wspace=0.1, # width
             hspace=0.5,
             )
     # plt.rcParams.update({'font.size': 22})
@@ -143,11 +169,6 @@ class FixtureFactory:
         'column-10': '10 Column',
         'column-20': '20 Column',
     }
-
-    # POSITION_TO_DISPLAY = {
-    #     'first_third': 'Fill 1/3 to End',
-    #     'second_third': 'Fill 2/3 to End',
-    # }
 
 
 class FFC2(FixtureFactory):
@@ -188,9 +209,12 @@ def get_versions() -> str:
 
 
 CLS_PROCESSOR = (
-    AKArray2D1D,
-    PyArray2D1D,
+    AKArray2DTupleList,
+    AKArray2DTupleNext,
+    PyArray2DTupleMapList,
+    PyArray2DTupleIterNext,
     )
+
 
 CLS_FF = (
     FFC2,
