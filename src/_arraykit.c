@@ -3616,17 +3616,37 @@ A2DTuple_dealloc(A2DTupleObject *self) {
 
 static PyObject*
 A2DTuple_iter(A2DTupleObject *self) {
+    // NOTE: why do we not need to incref components sof self?
     Py_INCREF(self);
     return (PyObject*)self;
 }
 
 static PyObject *
 A2DTuple_iternext(A2DTupleObject *self) {
-    Py_ssize_t i = self->pos++;
-    if (i >= self->num_rows) {
+    Py_ssize_t i = self->pos;
+    if (i < self->num_rows) {
+        npy_intp num_cols = self->num_cols;
+        PyArrayObject* array = self->array;
+        PyObject* tuple = PyTuple_New(num_cols);
+        PyObject* item;
+        if (tuple == NULL) {
+            return NULL;
+        }
+        for (npy_intp j = 0; j < num_cols; ++j) {
+            // cannot assume input_array is contiguous
+            item = PyArray_ToScalar(PyArray_GETPTR2(array, i, j), array);
+            if (item == NULL) {
+                Py_DECREF(tuple);
+                return NULL;
+            }
+            PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+        }
+        self->pos++;
+        return tuple;
+    }
+    else {
         return NULL;
     }
-    Py_RETURN_NONE;
 }
 
 // static PyObject *
