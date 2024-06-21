@@ -37,6 +37,18 @@ const static size_t UCS4_SIZE = sizeof(Py_UCS4);
         }                                                 \
     } while (0)
 
+// Given a PyObject, raise if not an array or is not two dimensional.
+# define AK_CHECK_NUMPY_ARRAY_2D(O)                       \
+    do {                                                  \
+        AK_CHECK_NUMPY_ARRAY(O)                           \
+        int ndim = PyArray_NDIM((PyArrayObject *)O);      \
+        if (ndim != 2) {                                  \
+            return PyErr_Format(PyExc_NotImplementedError,\
+                    "Expected a 2D array, not %i.",       \
+                    ndim);                                \
+        }                                                 \
+    } while (0)
+
 // Placeholder of not implemented pathways / debugging.
 # define AK_NOT_IMPLEMENTED(msg)                        \
     do {                                                \
@@ -3512,6 +3524,167 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 }
 
 //------------------------------------------------------------------------------
+// Given a 2D array, return a 1D object array of tuples.
+static PyObject *
+array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_2D(a);
+    PyArrayObject *input_array = (PyArrayObject *)a;
+
+    npy_intp num_rows = PyArray_DIM(input_array, 0);
+    npy_intp num_cols = PyArray_DIM(input_array, 1);
+
+    npy_intp dims[] = {num_rows};
+    // NOTE: this initializes values to NULL, not None
+    PyObject* output = PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    if (output == NULL) {
+        return NULL;
+    }
+
+    PyObject** output_data = (PyObject**)PyArray_DATA((PyArrayObject*)output);
+    PyObject** p = output_data;
+    PyObject** p_end = p + num_rows;
+    npy_intp i = 0;
+    npy_intp j;
+    PyObject* tuple;
+    PyObject* item;
+
+    while (p < p_end) {
+        tuple = PyTuple_New(num_cols);
+        if (tuple == NULL) {
+            goto error;
+        }
+        for (j = 0; j < num_cols; ++j) {
+            // cannot assume input_array is contiguous
+            item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
+            if (item == NULL) {
+                Py_DECREF(tuple);
+                goto error;
+            }
+            PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+        }
+        *p++ = tuple; // assign with new ref, no incr needed
+        i++;
+    }
+    PyArray_CLEARFLAGS((PyArrayObject *)output, NPY_ARRAY_WRITEABLE);
+    return output;
+error:
+    p = output_data;
+    p_end = p + num_rows;
+    while (p < p_end) { // decref all tuples within array
+        Py_XDECREF(*p++); // xdec as might be NULL
+    }
+    Py_DECREF(output);
+    return NULL;
+}
+
+//------------------------------------------------------------------------------
+// Array2DTuple Iterator
+
+static PyTypeObject A2DTupleType;
+
+typedef struct A2DTupleObject {
+    PyObject_HEAD
+    PyArrayObject* array;
+    npy_intp num_rows;
+    npy_intp num_cols;
+    Py_ssize_t pos; // current index state, mutated in-place
+} A2DTupleObject;
+
+static PyObject *
+A2DTuple_new(PyArrayObject* array,
+        npy_intp num_rows,
+        npy_intp num_cols) {
+    A2DTupleObject* a2dt = PyObject_New(A2DTupleObject, &A2DTupleType);
+    if (!a2dt) {
+        return NULL;
+    }
+    Py_INCREF((PyObject*)array);
+    a2dt->array = array;
+    a2dt->num_rows = num_rows;
+    a2dt->num_cols = num_cols;
+    a2dt->pos = 0;
+    return (PyObject *)a2dt;
+}
+
+static void
+A2DTuple_dealloc(A2DTupleObject *self) {
+    Py_DECREF((PyObject*)self->array);
+    PyObject_Del((PyObject*)self);
+}
+
+static PyObject*
+A2DTuple_iter(A2DTupleObject *self) {
+    Py_INCREF(self);
+    return (PyObject*)self;
+}
+
+static PyObject *
+A2DTuple_iternext(A2DTupleObject *self) {
+    Py_ssize_t i = self->pos;
+    if (i < self->num_rows) {
+        npy_intp num_cols = self->num_cols;
+        PyArrayObject* array = self->array;
+        PyObject* tuple = PyTuple_New(num_cols);
+        PyObject* item;
+        if (tuple == NULL) {
+            return NULL;
+        }
+        for (npy_intp j = 0; j < num_cols; ++j) {
+            // cannot assume array is contiguous
+            item = PyArray_ToScalar(PyArray_GETPTR2(array, i, j), array);
+            if (item == NULL) {
+                Py_DECREF(tuple);
+                return NULL;
+            }
+            PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+        }
+        self->pos++;
+        return tuple;
+    }
+    return NULL;
+}
+
+// static PyObject *
+// A2DTuple_reversed(A2DTupleObject *self) {
+//     return A2DTuple_new(self->bi, !self->reversed);
+// }
+
+static PyObject *
+A2DTuple_length_hint(A2DTupleObject *self) {
+    Py_ssize_t len = Py_MAX(0, self->num_rows - self->pos);
+    return PyLong_FromSsize_t(len);
+}
+
+static PyMethodDef A2DTuple_methods[] = {
+    {"__length_hint__", (PyCFunction)A2DTuple_length_hint, METH_NOARGS, NULL},
+    // {"__reversed__", (PyCFunction)A2DTuple_reversed, METH_NOARGS, NULL},
+    {NULL},
+};
+
+static PyTypeObject A2DTupleType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_basicsize = sizeof(A2DTupleObject),
+    .tp_dealloc = (destructor) A2DTuple_dealloc,
+    .tp_iter = (getiterfunc) A2DTuple_iter,
+    .tp_iternext = (iternextfunc) A2DTuple_iternext,
+    .tp_methods = A2DTuple_methods,
+    .tp_name = "arraykit.A2DTupleIterator",
+};
+
+// Given a 2D array, return an iterator of row tuples.
+static PyObject *
+array2d_tuple_iter(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_2D(a);
+    PyArrayObject* array = (PyArrayObject *)a;
+    npy_intp num_rows = PyArray_DIM(array, 0);
+    npy_intp num_cols = PyArray_DIM(array, 1);
+    return A2DTuple_new(array, num_rows, num_cols);
+}
+
+
+//------------------------------------------------------------------------------
 // type resolution
 
 static PyObject *
@@ -5944,7 +6117,6 @@ TriMap_dealloc(TriMapObject *self) {
     if (self->many_from != NULL) {
         // decref all arrays before freeing
         for (Py_ssize_t i = 0; i < self->many_count; i++) {
-            // NOTE: using dot to get to pointer?
             Py_DECREF((PyObject*)self->many_from[i].dst);
         }
         PyMem_Free(self->many_from);
@@ -7259,6 +7431,8 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"array2d_to_array1d", array2d_to_array1d, METH_O, NULL},
+    {"array2d_tuple_iter", array2d_tuple_iter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"first_true_1d",
