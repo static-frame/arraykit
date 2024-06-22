@@ -392,6 +392,24 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(list(it1), [(None, 'bb'), (None, 'dd'), (3, None)])
         self.assertEqual(list(it2), [(None, 'bb'), (None, 'dd'), (3, None)])
 
+    def test_array2d_tuple_iter_1d_a(self) -> None:
+        a1 = np.array(['bb', 'c', 'aaa'])
+        result = list(array2d_tuple_iter(a1))
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result, [('bb',), ('c',), ('aaa',)])
+
+    def test_array2d_tuple_iter_1d_b(self) -> None:
+        a1 = np.array([20, -1, 8])
+        result = list(array2d_tuple_iter(a1))
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result, [(20,), (-1,), (8,)])
+
+    def test_array2d_tuple_iter_1d_c(self) -> None:
+        a1 = np.array([('a', 4), ('c', -1), ('d', 8)], dtype=object)
+        result = list(array2d_tuple_iter(a1))
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result, [('a', 4), ('c', -1), ('d', 8)])
+
     #---------------------------------------------------------------------------
 
     def test_isna_element_a(self) -> None:
