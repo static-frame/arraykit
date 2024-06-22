@@ -45,26 +45,38 @@ class PyArray2DTupleMapList(ArrayProcessor):
 
     def __call__(self):
         array = self.array
-        _ = list(map(tuple, array))
+        if array.ndim == 2:
+            _ = list(map(tuple, array))
+        else:
+            _ = list(map(lambda e: (e,), array))
 
 class PyArray2DTupleIterNext(ArrayProcessor):
     NAME = 'tuple(next(iter(a2d)))'
     SORT = 3
 
     def __call__(self):
-        it = iter(self.array)
-        while True:
-            try:
-                _ = tuple(next(it))
-            except StopIteration:
-                break
+        array = self.array
+        it = iter(array)
+        if array.ndim == 2:
+            while True:
+                try:
+                    _ = tuple(next(it))
+                except StopIteration:
+                    break
+        else:
+            while True:
+                try:
+                    _ = (next(it),)
+                except StopIteration:
+                    break
+
 
 
 
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 200
+NUMBER = 100
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -156,7 +168,9 @@ class FixtureFactory:
 
     @staticmethod
     def get_array(size: int, width_ratio: int) -> np.ndarray:
-        return np.arange(size).reshape(size // width_ratio, width_ratio)
+        if width_ratio > 1:
+            return np.arange(size).reshape(size // width_ratio, width_ratio)
+        return np.arange(size) # return 1D array
 
     @classmethod
     def get_label_array(cls, size: int) -> tp.Tuple[str, np.ndarray]:
@@ -164,11 +178,21 @@ class FixtureFactory:
         return cls.NAME, array
 
     DENSITY_TO_DISPLAY = {
+        'column-1': '1 Column',
         'column-2': '2 Column',
         'column-5': '5 Column',
         'column-10': '10 Column',
         'column-20': '20 Column',
     }
+
+
+class FFC1(FixtureFactory):
+    NAME = 'column-1'
+
+    @staticmethod
+    def get_array(size: int) -> np.ndarray:
+        a = FixtureFactory.get_array(size, 1)
+        return a
 
 
 class FFC2(FixtureFactory):
@@ -217,6 +241,7 @@ CLS_PROCESSOR = (
 
 
 CLS_FF = (
+    FFC1,
     FFC2,
     FFC5,
     FFC10,
@@ -226,7 +251,7 @@ CLS_FF = (
 
 def run_test():
     records = []
-    for size in (1_000, 10_000, 100_000, 1_000_000):
+    for size in (1_000, 10_000, 100_000): #, 1_000_000):
         for ff in CLS_FF:
             fixture_label, fixture = ff.get_label_array(size)
             for cls in CLS_PROCESSOR:

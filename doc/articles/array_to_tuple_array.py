@@ -33,12 +33,16 @@ class PyArray2D1D(ArrayProcessor):
 
     def __call__(self):
         post = np.empty(self.array.shape[0], dtype=object)
-        for i, row in enumerate(self.array):
-            post[i] = tuple(row)
+        if self.array.ndim == 1:
+            for i, e in enumerate(self.array):
+                post[i] = (e,)
+        else:
+            for i, row in enumerate(self.array):
+                post[i] = tuple(row)
         post.flags.writeable = False
 
 #-------------------------------------------------------------------------------
-NUMBER = 200
+NUMBER = 1
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -111,7 +115,7 @@ def plot_performance(frame):
             bottom=0.05,
             right=0.8,
             top=0.85,
-            wspace=0.9, # width
+            wspace=1.0, # width
             hspace=0.5,
             )
     # plt.rcParams.update({'font.size': 22})
@@ -130,7 +134,9 @@ class FixtureFactory:
 
     @staticmethod
     def get_array(size: int, width_ratio: int) -> np.ndarray:
-        return np.arange(size).reshape(size // width_ratio, width_ratio)
+        if width_ratio > 1:
+            return np.arange(size).reshape(size // width_ratio, width_ratio)
+        return np.arange(size) # return 1D array
 
     @classmethod
     def get_label_array(cls, size: int) -> tp.Tuple[str, np.ndarray]:
@@ -138,6 +144,7 @@ class FixtureFactory:
         return cls.NAME, array
 
     DENSITY_TO_DISPLAY = {
+        'column-1': '1 Column',
         'column-2': '2 Column',
         'column-5': '5 Column',
         'column-10': '10 Column',
@@ -148,6 +155,15 @@ class FixtureFactory:
     #     'first_third': 'Fill 1/3 to End',
     #     'second_third': 'Fill 2/3 to End',
     # }
+
+
+class FFC1(FixtureFactory):
+    NAME = 'column-1'
+
+    @staticmethod
+    def get_array(size: int) -> np.ndarray:
+        a = FixtureFactory.get_array(size, 1)
+        return a
 
 
 class FFC2(FixtureFactory):
@@ -193,6 +209,7 @@ CLS_PROCESSOR = (
     )
 
 CLS_FF = (
+    FFC1,
     FFC2,
     FFC5,
     FFC10,
