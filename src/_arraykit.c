@@ -3603,23 +3603,23 @@ error:
 }
 
 //------------------------------------------------------------------------------
-// Array2DTuple Iterator
+// ArrayToTupleIterator
 
-static PyTypeObject A2DTupleType;
+static PyTypeObject ATTType;
 
-typedef struct A2DTupleObject {
+typedef struct ATTObject {
     PyObject_HEAD
     PyArrayObject* array;
     npy_intp num_rows;
     npy_intp num_cols;
     Py_ssize_t pos; // current index state, mutated in-place
-} A2DTupleObject;
+} ATTObject;
 
 static PyObject *
-A2DTuple_new(PyArrayObject* array,
+ATT_new(PyArrayObject* array,
         npy_intp num_rows,
         npy_intp num_cols) {
-    A2DTupleObject* a2dt = PyObject_New(A2DTupleObject, &A2DTupleType);
+    ATTObject* a2dt = PyObject_New(ATTObject, &ATTType);
     if (!a2dt) {
         return NULL;
     }
@@ -3632,19 +3632,19 @@ A2DTuple_new(PyArrayObject* array,
 }
 
 static void
-A2DTuple_dealloc(A2DTupleObject *self) {
+ATT_dealloc(ATTObject *self) {
     Py_DECREF((PyObject*)self->array);
     PyObject_Del((PyObject*)self);
 }
 
 static PyObject*
-A2DTuple_iter(A2DTupleObject *self) {
+ATT_iter(ATTObject *self) {
     Py_INCREF(self);
     return (PyObject*)self;
 }
 
 static PyObject *
-A2DTuple_iternext(A2DTupleObject *self) {
+ATT_iternext(ATTObject *self) {
     Py_ssize_t i = self->pos;
     if (i < self->num_rows) {
         npy_intp num_cols = self->num_cols;
@@ -3686,30 +3686,30 @@ A2DTuple_iternext(A2DTupleObject *self) {
 }
 
 // static PyObject *
-// A2DTuple_reversed(A2DTupleObject *self) {
-//     return A2DTuple_new(self->bi, !self->reversed);
+// ATT_reversed(ATTObject *self) {
+//     return ATT_new(self->bi, !self->reversed);
 // }
 
 static PyObject *
-A2DTuple_length_hint(A2DTupleObject *self) {
+ATT_length_hint(ATTObject *self) {
     Py_ssize_t len = Py_MAX(0, self->num_rows - self->pos);
     return PyLong_FromSsize_t(len);
 }
 
-static PyMethodDef A2DTuple_methods[] = {
-    {"__length_hint__", (PyCFunction)A2DTuple_length_hint, METH_NOARGS, NULL},
-    // {"__reversed__", (PyCFunction)A2DTuple_reversed, METH_NOARGS, NULL},
+static PyMethodDef ATT_methods[] = {
+    {"__length_hint__", (PyCFunction)ATT_length_hint, METH_NOARGS, NULL},
+    // {"__reversed__", (PyCFunction)ATT_reversed, METH_NOARGS, NULL},
     {NULL},
 };
 
-static PyTypeObject A2DTupleType = {
+static PyTypeObject ATTType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_basicsize = sizeof(A2DTupleObject),
-    .tp_dealloc = (destructor) A2DTuple_dealloc,
-    .tp_iter = (getiterfunc) A2DTuple_iter,
-    .tp_iternext = (iternextfunc) A2DTuple_iternext,
-    .tp_methods = A2DTuple_methods,
-    .tp_name = "arraykit.A2DTupleIterator",
+    .tp_basicsize = sizeof(ATTObject),
+    .tp_dealloc = (destructor) ATT_dealloc,
+    .tp_iter = (getiterfunc) ATT_iter,
+    .tp_iternext = (iternextfunc) ATT_iternext,
+    .tp_methods = ATT_methods,
+    .tp_name = "arraykit.ATTIterator",
 };
 
 // Given a 2D array, return an iterator of row tuples.
@@ -3729,9 +3729,8 @@ array_to_tuple_iter(PyObject *Py_UNUSED(m), PyObject *a)
     if (ndim == 2) {
         num_cols = PyArray_DIM(array, 1);
     }
-    return A2DTuple_new(array, num_rows, num_cols);
+    return ATT_new(array, num_rows, num_cols);
 }
-
 
 //------------------------------------------------------------------------------
 // type resolution
