@@ -3,7 +3,7 @@ import sys
 import timeit
 import typing as tp
 
-from arraykit import array2d_tuple_iter
+from arraykit import array_to_tuple_iter
 import arraykit as ak
 
 import matplotlib.pyplot as plt
@@ -21,18 +21,18 @@ class ArrayProcessor:
 
 #-------------------------------------------------------------------------------
 class AKArray2DTupleList(ArrayProcessor):
-    NAME = 'list(ak.array2d_tuple_iter(a2d))'
+    NAME = 'list(ak.array_to_tuple_iter(a2d))'
     SORT = 0
 
     def __call__(self):
-        _ = list(array2d_tuple_iter(self.array))
+        _ = list(array_to_tuple_iter(self.array))
 
 class AKArray2DTupleNext(ArrayProcessor):
-    NAME = 'next(ak.array2d_tuple_iter(a2d))'
+    NAME = 'next(ak.array_to_tuple_iter(a2d))'
     SORT = 1
 
     def __call__(self):
-        it = array2d_tuple_iter(self.array)
+        it = array_to_tuple_iter(self.array)
         while True:
             try:
                 _ = next(it)
@@ -45,19 +45,31 @@ class PyArray2DTupleMapList(ArrayProcessor):
 
     def __call__(self):
         array = self.array
-        _ = list(map(tuple, array))
+        if array.ndim == 2:
+            _ = list(map(tuple, array))
+        else:
+            _ = list(map(lambda e: (e,), array))
 
 class PyArray2DTupleIterNext(ArrayProcessor):
     NAME = 'tuple(next(iter(a2d)))'
     SORT = 3
 
     def __call__(self):
-        it = iter(self.array)
-        while True:
-            try:
-                _ = tuple(next(it))
-            except StopIteration:
-                break
+        array = self.array
+        it = iter(array)
+        if array.ndim == 2:
+            while True:
+                try:
+                    _ = tuple(next(it))
+                except StopIteration:
+                    break
+        else:
+            while True:
+                try:
+                    _ = (next(it),)
+                except StopIteration:
+                    break
+
 
 
 
@@ -128,10 +140,10 @@ def plot_performance(frame):
     fig.set_size_inches(8, 4) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(.05, .96, f'array2d_tuple_iter() Performance: {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'array_to_tuple_iter() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
-    fp = '/tmp/array2d_tuple_iter.png'
+    fp = '/tmp/array_to_tuple_iter.png'
     plt.subplots_adjust(
             left=0.05,
             bottom=0.05,
@@ -156,7 +168,9 @@ class FixtureFactory:
 
     @staticmethod
     def get_array(size: int, width_ratio: int) -> np.ndarray:
-        return np.arange(size).reshape(size // width_ratio, width_ratio)
+        if width_ratio > 1:
+            return np.arange(size).reshape(size // width_ratio, width_ratio)
+        return np.arange(size) # return 1D array
 
     @classmethod
     def get_label_array(cls, size: int) -> tp.Tuple[str, np.ndarray]:
@@ -164,11 +178,21 @@ class FixtureFactory:
         return cls.NAME, array
 
     DENSITY_TO_DISPLAY = {
+        'column-1': '1 Column',
         'column-2': '2 Column',
         'column-5': '5 Column',
         'column-10': '10 Column',
         'column-20': '20 Column',
     }
+
+
+class FFC1(FixtureFactory):
+    NAME = 'column-1'
+
+    @staticmethod
+    def get_array(size: int) -> np.ndarray:
+        a = FixtureFactory.get_array(size, 1)
+        return a
 
 
 class FFC2(FixtureFactory):
@@ -217,6 +241,7 @@ CLS_PROCESSOR = (
 
 
 CLS_FF = (
+    FFC1,
     FFC2,
     FFC5,
     FFC10,

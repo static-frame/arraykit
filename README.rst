@@ -40,9 +40,9 @@ What is New in ArrayKit
 0.7.0
 ............
 
-Added ``array2d_to_array1d()``.
+Added ``array_to_tuple_array()``.
 
-Added ``array2d_tuple_iter()``.
+Added ``array_to_tuple_iter()``.
 
 
 0.6.3
