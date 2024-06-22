@@ -3,7 +3,7 @@ import sys
 import timeit
 import typing as tp
 
-from arraykit import array2d_to_array1d
+from arraykit import array_to_tuple_array
 import arraykit as ak
 
 import matplotlib.pyplot as plt
@@ -21,11 +21,11 @@ class ArrayProcessor:
 
 #-------------------------------------------------------------------------------
 class AKArray2D1D(ArrayProcessor):
-    NAME = 'ak.array2d_to_array1d()'
+    NAME = 'ak.array_to_tuple_array()'
     SORT = 0
 
     def __call__(self):
-        _ = array2d_to_array1d(self.array)
+        _ = array_to_tuple_array(self.array)
 
 class PyArray2D1D(ArrayProcessor):
     NAME = 'Python construction'
@@ -102,10 +102,10 @@ def plot_performance(frame):
     fig.set_size_inches(8, 4) # width, height
     fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(.05, .96, f'array2d_to_array1d() Performance: {NUMBER} Iterations', fontsize=10)
+    fig.text(.05, .96, f'array_to_tuple_array() Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(.05, .90, get_versions(), fontsize=6)
 
-    fp = '/tmp/array2d_to_array1d.png'
+    fp = '/tmp/array_to_tuple_array.png'
     plt.subplots_adjust(
             left=0.05,
             bottom=0.05,

@@ -28,6 +28,6 @@ from ._arraykit import count_iteration as count_iteration
 from ._arraykit import first_true_1d as first_true_1d
 from ._arraykit import first_true_2d as first_true_2d
 from ._arraykit import slice_to_ascending_slice as slice_to_ascending_slice
-from ._arraykit import array2d_to_array1d as array2d_to_array1d
-from ._arraykit import array2d_tuple_iter as array2d_tuple_iter
+from ._arraykit import array_to_tuple_array as array_to_tuple_array
+from ._arraykit import array_to_tuple_iter as array_to_tuple_iter
 from ._arraykit import nonzero_1d as nonzero_1d

@@ -3524,9 +3524,9 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 }
 
 //------------------------------------------------------------------------------
-// Given a 2D array, return a 1D object array of tuples.
+// Given a 1D or 2D array, return a 1D object array of tuples.
 static PyObject *
-array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
+array_to_tuple_array(PyObject *Py_UNUSED(m), PyObject *a)
 {
     AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *input_array = (PyArrayObject *)a;
@@ -3714,7 +3714,7 @@ static PyTypeObject A2DTupleType = {
 
 // Given a 2D array, return an iterator of row tuples.
 static PyObject *
-array2d_tuple_iter(PyObject *Py_UNUSED(m), PyObject *a)
+array_to_tuple_iter(PyObject *Py_UNUSED(m), PyObject *a)
 {
     AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *array = (PyArrayObject *)a;
@@ -7480,8 +7480,8 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
-    {"array2d_to_array1d", array2d_to_array1d, METH_O, NULL},
-    {"array2d_tuple_iter", array2d_tuple_iter, METH_O, NULL},
+    {"array_to_tuple_array", array_to_tuple_array, METH_O, NULL},
+    {"array_to_tuple_iter", array_to_tuple_iter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"first_true_1d",
