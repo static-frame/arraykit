@@ -3626,7 +3626,7 @@ A2DTuple_new(PyArrayObject* array,
     Py_INCREF((PyObject*)array);
     a2dt->array = array;
     a2dt->num_rows = num_rows;
-    a2dt->num_cols = num_cols;
+    a2dt->num_cols = num_cols; // -1 for 1D array
     a2dt->pos = 0;
     return (PyObject *)a2dt;
 }
@@ -3649,19 +3649,35 @@ A2DTuple_iternext(A2DTupleObject *self) {
     if (i < self->num_rows) {
         npy_intp num_cols = self->num_cols;
         PyArrayObject* array = self->array;
-        PyObject* tuple = PyTuple_New(num_cols);
         PyObject* item;
-        if (tuple == NULL) {
-            return NULL;
+        PyObject* tuple;
+
+        if (num_cols > -1) { // ndim == 2
+            tuple = PyTuple_New(num_cols);
+            if (tuple == NULL) {
+                return NULL;
+            }
+            for (npy_intp j = 0; j < num_cols; ++j) {
+                // cannot assume array is contiguous
+                item = PyArray_ToScalar(PyArray_GETPTR2(array, i, j), array);
+                if (item == NULL) {
+                    Py_DECREF(tuple);
+                    return NULL;
+                }
+                PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+            }
         }
-        for (npy_intp j = 0; j < num_cols; ++j) {
-            // cannot assume array is contiguous
-            item = PyArray_ToScalar(PyArray_GETPTR2(array, i, j), array);
+        else { // ndim == 1
+            tuple = PyTuple_New(1);
+            if (tuple == NULL) {
+                return NULL;
+            }
+            item = PyArray_ToScalar(PyArray_GETPTR1(array, i), array);
             if (item == NULL) {
                 Py_DECREF(tuple);
                 return NULL;
             }
-            PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+            PyTuple_SET_ITEM(tuple, 0, item); // steals reference to item
         }
         self->pos++;
         return tuple;
@@ -3700,10 +3716,19 @@ static PyTypeObject A2DTupleType = {
 static PyObject *
 array2d_tuple_iter(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY_2D(a);
-    PyArrayObject* array = (PyArrayObject *)a;
+    AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject *array = (PyArrayObject *)a;
+    int ndim = PyArray_NDIM(array);
+    if (ndim != 1 && ndim != 2) {
+        return PyErr_Format(PyExc_NotImplementedError,
+                "Expected 1D or 2D array, not %i.",
+                ndim);
+    }
     npy_intp num_rows = PyArray_DIM(array, 0);
-    npy_intp num_cols = PyArray_DIM(array, 1);
+    npy_intp num_cols = -1; // indicate 1d
+    if (ndim == 2) {
+        num_cols = PyArray_DIM(array, 1);
+    }
     return A2DTuple_new(array, num_rows, num_cols);
 }
 
