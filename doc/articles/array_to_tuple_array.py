@@ -42,7 +42,7 @@ class PyArray2D1D(ArrayProcessor):
         post.flags.writeable = False
 
 #-------------------------------------------------------------------------------
-NUMBER = 1
+NUMBER = 200
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER

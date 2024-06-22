@@ -76,7 +76,7 @@ class PyArray2DTupleIterNext(ArrayProcessor):
 
 
 #-------------------------------------------------------------------------------
-NUMBER = 100
+NUMBER = 200
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
@@ -251,7 +251,7 @@ CLS_FF = (
 
 def run_test():
     records = []
-    for size in (1_000, 10_000, 100_000): #, 1_000_000):
+    for size in (1_000, 10_000, 100_000, 1_000_000):
         for ff in CLS_FF:
             fixture_label, fixture = ff.get_label_array(size)
             for cls in CLS_PROCESSOR:
