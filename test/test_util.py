@@ -286,11 +286,31 @@ class TestUnit(unittest.TestCase):
             a2 = array_deepcopy(a1, ())
 
     #---------------------------------------------------------------------------
-    def test_array2d_to_array1d_dummy(self) -> None:
+    def test_array2d_to_array1d_1d_a(self) -> None:
         a1 = np.arange(10)
-        with self.assertRaises(NotImplementedError):
-            # 1 dimensional
-            _ = array2d_to_array1d(a1)
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(a2.tolist(), [(0,), (1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,)])
+
+    def test_array2d_to_array1d_1d_b(self) -> None:
+        a1 = np.array(['aaa', 'b', 'ccc'])
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(a2.tolist(), [('aaa',), ('b',), ('ccc',)])
+
+    def test_array2d_to_array1d_1d_c(self) -> None:
+        a1 = np.array([None, 'b', 30])
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(a2.tolist(), [(None,), ('b',), (30,)])
+
+    def test_array2d_to_array1d_1d_d(self) -> None:
+        a1 = np.array([('a', 10), ('b', 30), ('c', 5)], dtype=object)
+        a2 = array2d_to_array1d(a1)
+        self.assertEqual(a2.tolist(), [('a', 10), ('b', 30), ('c', 5)])
+
+    def test_array2d_to_array1d_1d_e(self) -> None:
+        a1 = np.array([True, False, True], dtype=object)
+        a2 = array2d_to_array1d(a1)
+        self.assertIs(a2[0][0].__class__, bool)
+        self.assertEqual(a2.tolist(), [(True,), (False,), (True,)])
 
     def test_array2d_to_array1d_b(self) -> None:
         a1 = np.arange(10, dtype=np.int64).reshape(5, 2)

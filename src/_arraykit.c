@@ -3528,12 +3528,16 @@ array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
 static PyObject *
 array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
 {
-    AK_CHECK_NUMPY_ARRAY_2D(a);
+    AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject *input_array = (PyArrayObject *)a;
+    int ndim = PyArray_NDIM(input_array);
+    if (ndim != 1 && ndim != 2) {
+        return PyErr_Format(PyExc_NotImplementedError,
+                "Expected 1D or 2D array, not %i.",
+                ndim);
+    }
 
     npy_intp num_rows = PyArray_DIM(input_array, 0);
-    npy_intp num_cols = PyArray_DIM(input_array, 1);
-
     npy_intp dims[] = {num_rows};
     // NOTE: this initializes values to NULL, not None
     PyObject* output = PyArray_SimpleNew(1, dims, NPY_OBJECT);
@@ -3545,26 +3549,46 @@ array2d_to_array1d(PyObject *Py_UNUSED(m), PyObject *a)
     PyObject** p = output_data;
     PyObject** p_end = p + num_rows;
     npy_intp i = 0;
-    npy_intp j;
     PyObject* tuple;
     PyObject* item;
 
-    while (p < p_end) {
-        tuple = PyTuple_New(num_cols);
-        if (tuple == NULL) {
-            goto error;
+    if (ndim == 2) {
+        npy_intp num_cols = PyArray_DIM(input_array, 1);
+        npy_intp j;
+        while (p < p_end) {
+            tuple = PyTuple_New(num_cols);
+            if (tuple == NULL) {
+                goto error;
+            }
+            for (j = 0; j < num_cols; ++j) {
+                // cannot assume input_array is contiguous
+                item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
+                if (item == NULL) {
+                    Py_DECREF(tuple);
+                    goto error;
+                }
+                PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+            }
+            *p++ = tuple; // assign with new ref, no incr needed
+            i++;
         }
-        for (j = 0; j < num_cols; ++j) {
-            // cannot assume input_array is contiguous
-            item = PyArray_ToScalar(PyArray_GETPTR2(input_array, i, j), input_array);
+    }
+    else { // ndim == 1
+        while (p < p_end) {
+            tuple = PyTuple_New(1);
+            if (tuple == NULL) {
+                goto error;
+            }
+            // scalar returned in is native PyObject from object arrays
+            item = PyArray_ToScalar(PyArray_GETPTR1(input_array, i), input_array);
             if (item == NULL) {
                 Py_DECREF(tuple);
                 goto error;
             }
-            PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+            PyTuple_SET_ITEM(tuple, 0, item); // steals reference to item
+            *p++ = tuple; // assign with new ref, no incr needed
+            i++;
         }
-        *p++ = tuple; // assign with new ref, no incr needed
-        i++;
     }
     PyArray_CLEARFLAGS((PyArrayObject *)output, NPY_ARRAY_WRITEABLE);
     return output;
