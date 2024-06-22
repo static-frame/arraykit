@@ -37,6 +37,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.7.1
+............
+
+Extended ``array_to_tuple_array()`` and ``array_to_tuple_iter()`` to support 1D arrays.
+
+
 0.7.0
 ............
 
