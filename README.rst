@@ -38,6 +38,12 @@ What is New in ArrayKit
 -------------------------
 
 
+0.7.2
+............
+
+Improved ``array_to_tuple_array()`` and ``array_to_tuple_iter()`` to preserve ``tuple`` in 1D arrays.
+
+
 0.7.1
 ............
 
