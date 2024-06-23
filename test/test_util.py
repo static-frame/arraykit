@@ -303,8 +303,9 @@ class TestUnit(unittest.TestCase):
 
     def test_array2d_to_array1d_1d_d(self) -> None:
         a1 = np.array([('a', 10), ('b', 30), ('c', 5)], dtype=object)
-        a2 = array_to_tuple_array(a1)
-        self.assertEqual(a2.tolist(), [('a', 10), ('b', 30), ('c', 5)])
+        a2 = array_to_tuple_array(a1) # from 2d
+        a3 = array_to_tuple_array(a2) # from 1d
+        self.assertEqual(a3.tolist(), [('a', 10), ('b', 30), ('c', 5)])
 
     def test_array2d_to_array1d_1d_e(self) -> None:
         a1 = np.array([True, False, True], dtype=object)

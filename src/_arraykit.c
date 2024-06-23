@@ -3573,7 +3573,7 @@ array_to_tuple_array(PyObject *Py_UNUSED(m), PyObject *a)
             i++;
         }
     }
-    else { // ndim == 1
+    else if (PyArray_TYPE(input_array) != NPY_OBJECT) { // ndim == 1, not object
         while (p < p_end) {
             tuple = PyTuple_New(1);
             if (tuple == NULL) {
@@ -3590,6 +3590,22 @@ array_to_tuple_array(PyObject *Py_UNUSED(m), PyObject *a)
             i++;
         }
     }
+    else { // ndim == 1, object
+        while (p < p_end) {
+            tuple = PyTuple_New(1);
+            if (tuple == NULL) {
+                goto error;
+            }
+            // scalar returned in is native PyObject from object arrays
+            item = *(PyObject**)PyArray_GETPTR1(input_array, i);
+            Py_INCREF(item);
+            // TODO: identify tuple
+            PyTuple_SET_ITEM(tuple, 0, item); // steals reference to item
+            *p++ = tuple; // assign with new ref, no incr needed
+            i++;
+        }
+    }
+
     PyArray_CLEARFLAGS((PyArrayObject *)output, NPY_ARRAY_WRITEABLE);
     return output;
 error:
