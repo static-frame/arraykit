@@ -286,34 +286,47 @@ class TestUnit(unittest.TestCase):
             a2 = array_deepcopy(a1, ())
 
     #---------------------------------------------------------------------------
-    def test_array2d_to_array1d_1d_a(self) -> None:
+    def test_array_to_tuple_array_1d_a(self) -> None:
         a1 = np.arange(10)
         a2 = array_to_tuple_array(a1)
         self.assertEqual(a2.tolist(), [(0,), (1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,)])
 
-    def test_array2d_to_array1d_1d_b(self) -> None:
+    def test_array_to_tuple_array_1d_b(self) -> None:
         a1 = np.array(['aaa', 'b', 'ccc'])
         a2 = array_to_tuple_array(a1)
         self.assertEqual(a2.tolist(), [('aaa',), ('b',), ('ccc',)])
 
-    def test_array2d_to_array1d_1d_c(self) -> None:
+    def test_array_to_tuple_array_1d_c(self) -> None:
         a1 = np.array([None, 'b', 30])
         a2 = array_to_tuple_array(a1)
         self.assertEqual(a2.tolist(), [(None,), ('b',), (30,)])
 
-    def test_array2d_to_array1d_1d_d(self) -> None:
+    def test_array_to_tuple_array_1d_d(self) -> None:
         a1 = np.array([('a', 10), ('b', 30), ('c', 5)], dtype=object)
         a2 = array_to_tuple_array(a1) # from 2d
+        self.assertEqual(a2.tolist(), [('a', 10), ('b', 30), ('c', 5)])
         a3 = array_to_tuple_array(a2) # from 1d
         self.assertEqual(a3.tolist(), [('a', 10), ('b', 30), ('c', 5)])
 
-    def test_array2d_to_array1d_1d_e(self) -> None:
+    def test_array_to_tuple_array_1d_e(self) -> None:
         a1 = np.array([True, False, True], dtype=object)
         a2 = array_to_tuple_array(a1)
         self.assertIs(a2[0][0].__class__, bool)
         self.assertEqual(a2.tolist(), [(True,), (False,), (True,)])
 
-    def test_array2d_to_array1d_b(self) -> None:
+    def test_array_to_tuple_array_1d_f(self) -> None:
+        a1 = np.array([None, None, None], dtype=object)
+        a1[0] = 3
+        a1[1] = ('a', 30)
+        a1[2] = (None, True, 90000000)
+
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [(3,), ('a', 30), (None, True, 90000000)])
+
+        a3 = array_to_tuple_array(a2)
+        self.assertEqual(a3.tolist(), [(3,), ('a', 30), (None, True, 90000000)])
+
+    def test_array_to_tuple_array_b(self) -> None:
         a1 = np.arange(10, dtype=np.int64).reshape(5, 2)
         result = array_to_tuple_array(a1)
         assert isinstance(result[0], tuple)
@@ -323,18 +336,18 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(tuple(result), ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9)))
 
 
-    def test_array2d_to_array1d_c(self) -> None:
+    def test_array_to_tuple_array_c(self) -> None:
         a1 = np.array([["a", "b"], ["ccc", "ddd"], ["ee", "ff"]])
         a2 = array_to_tuple_array(a1)
         self.assertEqual(a2.tolist(), [('a', 'b'), ('ccc', 'ddd'), ('ee', 'ff')])
 
-    def test_array2d_to_array1d_d(self) -> None:
+    def test_array_to_tuple_array_d(self) -> None:
         a1 = np.array([[3, 5], [10, 20], [7, 2]], dtype=np.uint8)
         a2 = array_to_tuple_array(a1)
         self.assertEqual(a2.tolist(), [(3, 5), (10, 20), (7, 2)])
         self.assertIs(type(a2[0][0]), np.uint8)
 
-    def test_array2d_to_array1d_e(self) -> None:
+    def test_array_to_tuple_array_e(self) -> None:
         a1 = np.arange(20, dtype=np.int64).reshape(4, 5)
         result = array_to_tuple_array(a1)
         self.assertEqual(result.tolist(), [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9), (10, 11, 12, 13, 14), (15, 16, 17, 18, 19)])

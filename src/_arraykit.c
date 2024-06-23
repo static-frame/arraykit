@@ -3592,20 +3592,22 @@ array_to_tuple_array(PyObject *Py_UNUSED(m), PyObject *a)
     }
     else { // ndim == 1, object
         while (p < p_end) {
-            tuple = PyTuple_New(1);
-            if (tuple == NULL) {
-                goto error;
-            }
-            // scalar returned in is native PyObject from object arrays
             item = *(PyObject**)PyArray_GETPTR1(input_array, i);
-            Py_INCREF(item);
-            // TODO: identify tuple
-            PyTuple_SET_ITEM(tuple, 0, item); // steals reference to item
+            Py_INCREF(item); // always incref
+            if (PyTuple_Check(item)) {
+                tuple = item; // do not double pack
+            }
+            else {
+                tuple = PyTuple_New(1);
+                if (tuple == NULL) {
+                    goto error;
+                }
+                PyTuple_SET_ITEM(tuple, 0, item); // steals reference to item
+            }
             *p++ = tuple; // assign with new ref, no incr needed
             i++;
         }
     }
-
     PyArray_CLEARFLAGS((PyArrayObject *)output, NPY_ARRAY_WRITEABLE);
     return output;
 error:
@@ -3680,10 +3682,10 @@ ATT_iternext(ATTObject *self) {
                     Py_DECREF(tuple);
                     return NULL;
                 }
-                PyTuple_SET_ITEM(tuple, j, item); // steals reference to item
+                PyTuple_SET_ITEM(tuple, j, item); // steals ref
             }
         }
-        else { // ndim == 1
+        else if (PyArray_TYPE(array) != NPY_OBJECT) { // ndim == 1, not object
             tuple = PyTuple_New(1);
             if (tuple == NULL) {
                 return NULL;
@@ -3693,7 +3695,22 @@ ATT_iternext(ATTObject *self) {
                 Py_DECREF(tuple);
                 return NULL;
             }
-            PyTuple_SET_ITEM(tuple, 0, item); // steals reference to item
+            PyTuple_SET_ITEM(tuple, 0, item); // steals ref
+        }
+        else { // ndim == 1, object
+            item = *(PyObject**)PyArray_GETPTR1(array, i);
+            Py_INCREF(item); // always incref
+            if (PyTuple_Check(item)) {
+                tuple = item; // do not double pack
+            }
+            else {
+                tuple = PyTuple_New(1);
+                if (tuple == NULL) {
+                    Py_DECREF(item);
+                    return NULL;
+                }
+                PyTuple_SET_ITEM(tuple, 0, item); // steals ref
+            }
         }
         self->pos++;
         return tuple;
