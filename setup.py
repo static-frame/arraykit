@@ -32,7 +32,15 @@ def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
 
 ak_extension = Extension(
         name='arraykit._arraykit', # build into module
-        sources=['src/_arraykit.c'],
+        sources=[
+            'src/_arraykit.c',
+            'src/array_go.c',
+            'src/array_to_tuple.c',
+            'src/block_index.c',
+            'src/delimited_to_arrays.c',
+            'src/methods.c',
+            'src/tri_map.c',
+        ],
         include_dirs=get_ext_dir('numpy', 'core', 'include'),
         library_dirs=get_ext_dir('numpy', 'core', 'lib'),
         define_macros=[("AK_VERSION", AK_VERSION)],
