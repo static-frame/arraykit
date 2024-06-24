@@ -39,7 +39,6 @@ ak_extension = Extension(
             'src/delimited_to_arrays.c',
             'src/methods.c',
             'src/tri_map.c',
-            'src/utilities.c',
         ],
         include_dirs=get_ext_dir('numpy', 'core', 'include'),
         library_dirs=get_ext_dir('numpy', 'core', 'lib'),
