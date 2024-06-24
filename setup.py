@@ -35,6 +35,7 @@ ak_extension = Extension(
         sources=[
             'src/_arraykit.c',
             'src/array_go.c',
+            'src/array_to_tuple.c',
             'src/block_index.c',
             'src/delimited_to_arrays.c',
             'src/methods.c',

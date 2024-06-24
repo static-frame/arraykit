@@ -34,6 +34,17 @@
         }                                                 \
     } while (0)
 
+// Given a PyObject, raise if not an array or is not two dimensional.
+# define AK_CHECK_NUMPY_ARRAY_2D(O)                       \
+    do {                                                  \
+        AK_CHECK_NUMPY_ARRAY(O)                           \
+        int ndim = PyArray_NDIM((PyArrayObject *)O);      \
+        if (ndim != 2) {                                  \
+            return PyErr_Format(PyExc_NotImplementedError,\
+                    "Expected a 2D array, not %i.",       \
+                    ndim);                                \
+        }                                                 \
+    } while (0)
 
 # if defined __GNUC__ || defined __clang__
 # define AK_LIKELY(X) __builtin_expect(!!(X), 1)

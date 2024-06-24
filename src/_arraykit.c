@@ -6,6 +6,7 @@
 # include "numpy/arrayobject.h"
 
 # include "array_go.h"
+# include "array_to_tuple.h"
 # include "block_index.h"
 # include "delimited_to_arrays.h"
 # include "methods.h"
