@@ -22,6 +22,8 @@ from arraykit import count_iteration
 from arraykit import first_true_1d
 from arraykit import first_true_2d
 from arraykit import slice_to_ascending_slice
+from arraykit import array_to_tuple_array
+from arraykit import array_to_tuple_iter
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -282,6 +284,155 @@ class TestUnit(unittest.TestCase):
         a1 = np.arange(10)
         with self.assertRaises(TypeError):
             a2 = array_deepcopy(a1, ())
+
+    #---------------------------------------------------------------------------
+    def test_array_to_tuple_array_1d_a(self) -> None:
+        a1 = np.arange(10)
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [(0,), (1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,)])
+
+    def test_array_to_tuple_array_1d_b(self) -> None:
+        a1 = np.array(['aaa', 'b', 'ccc'])
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [('aaa',), ('b',), ('ccc',)])
+
+    def test_array_to_tuple_array_1d_c(self) -> None:
+        a1 = np.array([None, 'b', 30])
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [(None,), ('b',), (30,)])
+
+    def test_array_to_tuple_array_1d_d(self) -> None:
+        a1 = np.array([('a', 10), ('b', 30), ('c', 5)], dtype=object)
+        a2 = array_to_tuple_array(a1) # from 2d
+        self.assertEqual(a2.tolist(), [('a', 10), ('b', 30), ('c', 5)])
+        a3 = array_to_tuple_array(a2) # from 1d
+        self.assertEqual(a3.tolist(), [('a', 10), ('b', 30), ('c', 5)])
+
+    def test_array_to_tuple_array_1d_e(self) -> None:
+        a1 = np.array([True, False, True], dtype=object)
+        a2 = array_to_tuple_array(a1)
+        self.assertIs(a2[0][0].__class__, bool)
+        self.assertEqual(a2.tolist(), [(True,), (False,), (True,)])
+
+    def test_array_to_tuple_array_1d_f(self) -> None:
+        a1 = np.array([None, None, None], dtype=object)
+        a1[0] = 3
+        a1[1] = ('a', 30)
+        a1[2] = (None, True, 90000000)
+
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [(3,), ('a', 30), (None, True, 90000000)])
+
+        a3 = array_to_tuple_array(a2)
+        self.assertEqual(a3.tolist(), [(3,), ('a', 30), (None, True, 90000000)])
+
+    def test_array_to_tuple_array_b(self) -> None:
+        a1 = np.arange(10, dtype=np.int64).reshape(5, 2)
+        result = array_to_tuple_array(a1)
+        assert isinstance(result[0], tuple)
+        assert result[0] == (0, 1)
+        self.assertIs(type(result[0][0]), np.int64)
+        self.assertFalse(result.flags.writeable)
+        self.assertEqual(tuple(result), ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9)))
+
+
+    def test_array_to_tuple_array_c(self) -> None:
+        a1 = np.array([["a", "b"], ["ccc", "ddd"], ["ee", "ff"]])
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [('a', 'b'), ('ccc', 'ddd'), ('ee', 'ff')])
+
+    def test_array_to_tuple_array_d(self) -> None:
+        a1 = np.array([[3, 5], [10, 20], [7, 2]], dtype=np.uint8)
+        a2 = array_to_tuple_array(a1)
+        self.assertEqual(a2.tolist(), [(3, 5), (10, 20), (7, 2)])
+        self.assertIs(type(a2[0][0]), np.uint8)
+
+    def test_array_to_tuple_array_e(self) -> None:
+        a1 = np.arange(20, dtype=np.int64).reshape(4, 5)
+        result = array_to_tuple_array(a1)
+        self.assertEqual(result.tolist(), [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9), (10, 11, 12, 13, 14), (15, 16, 17, 18, 19)])
+
+    #---------------------------------------------------------------------------
+    def test_array_to_tuple_iter_a(self) -> None:
+        a1 = np.arange(20, dtype=np.int64).reshape(4, 5)
+        result = list(array_to_tuple_iter(a1))
+        self.assertEqual(len(result), 4)
+        self.assertEqual(result, [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9), (10, 11, 12, 13, 14), (15, 16, 17, 18, 19)])
+
+    def test_array_to_tuple_iter_b(self) -> None:
+        a1 = np.arange(20, dtype=np.int64).reshape(10, 2)
+        result = list(array_to_tuple_iter(a1))
+        self.assertEqual(result, [(0, 1), (2, 3), (4, 5), (6, 7), (8, 9), (10, 11), (12, 13), (14, 15), (16, 17), (18, 19)])
+
+    def test_array_to_tuple_iter_c(self) -> None:
+        a1 = np.array([['aaa', 'bb'], ['c', 'dd'], ['ee', 'fffff']])
+        it = array_to_tuple_iter(a1)
+        self.assertEqual(it.__length_hint__(), 3)
+        self.assertEqual(next(it), ('aaa', 'bb'))
+        self.assertEqual(it.__length_hint__(), 2)
+        self.assertEqual(next(it), ('c', 'dd'))
+        self.assertEqual(it.__length_hint__(), 1)
+        self.assertEqual(next(it), ('ee', 'fffff'))
+        self.assertEqual(it.__length_hint__(), 0)
+        with self.assertRaises(StopIteration):
+            next(it)
+
+    def test_array_to_tuple_iter_d(self) -> None:
+        a1 = np.array([['aaa', 'bb'], ['c', 'dd'], ['ee', 'fffff']])
+        it = array_to_tuple_iter(a1)
+        # __reversed__ not implemented
+        with self.assertRaises(TypeError):
+            reversed(it)
+
+    def test_array_to_tuple_iter_e(self) -> None:
+        a1 = np.array([[None, 'bb'], [None, 'dd'], [3, None]])
+        it = array_to_tuple_iter(a1)
+        del a1
+        self.assertEqual(list(it), [(None, 'bb'), (None, 'dd'), (3, None)])
+
+    def test_array_to_tuple_iter_f(self) -> None:
+        a1 = np.array([[None, 'bb'], [None, 'dd'], [3, None]])
+        it1 = array_to_tuple_iter(a1)
+        del a1
+        it2 = iter(it1)
+        self.assertEqual(list(it1), [(None, 'bb'), (None, 'dd'), (3, None)])
+        self.assertEqual(list(it2), []) # expected behavior
+
+    def test_array_to_tuple_iter_g(self) -> None:
+        a1 = np.array([[None, 'bb'], [None, 'dd'], [3, None]])
+        it1 = array_to_tuple_iter(a1)
+        it2 = array_to_tuple_iter(a1)
+        del a1
+        self.assertEqual(list(it1), [(None, 'bb'), (None, 'dd'), (3, None)])
+        self.assertEqual(list(it2), [(None, 'bb'), (None, 'dd'), (3, None)])
+
+    def test_array_to_tuple_iter_1d_a(self) -> None:
+        a1 = np.array(['bb', 'c', 'aaa'])
+        result = list(array_to_tuple_iter(a1))
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result, [('bb',), ('c',), ('aaa',)])
+
+    def test_array_to_tuple_iter_1d_b(self) -> None:
+        a1 = np.array([20, -1, 8])
+        result = list(array_to_tuple_iter(a1))
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result, [(20,), (-1,), (8,)])
+
+    def test_array_to_tuple_iter_1d_c(self) -> None:
+        a1 = np.array([('a', 4), ('c', -1), ('d', 8)], dtype=object)
+        a2 = list(array_to_tuple_iter(a1))
+        self.assertEqual(len(a2), 3)
+        self.assertEqual(a2, [('a', 4), ('c', -1), ('d', 8)])
+
+    def test_array_to_tuple_iter_1d_d(self) -> None:
+        a1 = np.array([None, None, None], dtype=object)
+        a1[0] = 3
+        a1[1] = ('a', 30)
+        a1[2] = (None, True, 90000000)
+
+        a2 = list(array_to_tuple_iter(a1))
+        self.assertEqual(a2, [(3,), ('a', 30), (None, True, 90000000)])
+
 
     #---------------------------------------------------------------------------
 

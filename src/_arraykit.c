@@ -24,6 +24,8 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)array_deepcopy,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"array_to_tuple_array", array_to_tuple_array, METH_O, NULL},
+    {"array_to_tuple_iter", array_to_tuple_iter, METH_O, NULL},
     {"resolve_dtype", resolve_dtype, METH_VARARGS, NULL},
     {"resolve_dtype_iter", resolve_dtype_iter, METH_O, NULL},
     {"first_true_1d",
@@ -116,3 +118,4 @@ PyInit__arraykit(void)
     }
     return m;
 }
+
