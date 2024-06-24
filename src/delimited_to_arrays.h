@@ -1,5 +1,5 @@
-# ifndef ARRAYKIT_SRC_FILE_PARSING_H_
-# define ARRAYKIT_SRC_FILE_PARSING_H_
+# ifndef ARRAYKIT_SRC_DELIMITED_TO_ARRAYS_H_
+# define ARRAYKIT_SRC_DELIMITED_TO_ARRAYS_H_
 
 # include "Python.h"
 
@@ -13,4 +13,4 @@ iterable_str_to_array_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwarg
 PyObject *
 split_after_count(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
-# endif /* ARRAYKIT_SRC_FILE_PARSING_H_ */
+# endif /* ARRAYKIT_SRC_DELIMITED_TO_ARRAYS_H_ */

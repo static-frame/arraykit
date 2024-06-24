@@ -11,8 +11,6 @@
 # include "tri_map.h"
 # include "utilities.h"
 
-static const size_t UCS4_SIZE = sizeof(Py_UCS4);
-
 static inline NPY_DATETIMEUNIT
 AK_dt_unit_from_array(PyArrayObject* a) {
     // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.

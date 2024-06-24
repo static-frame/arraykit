@@ -30,8 +30,6 @@
 #define AK_is_t(c) (((c) == 't') || ((c) == 'T'))
 #define AK_is_u(c) (((c) == 'u') || ((c) == 'U'))
 
-static const size_t UCS4_SIZE = sizeof(Py_UCS4);
-
 //------------------------------------------------------------------------------
 // Utility setters of C types from possibly NULL PyObject*; all return -1 on error.
 
