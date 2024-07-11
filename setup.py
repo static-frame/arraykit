@@ -41,8 +41,8 @@ ak_extension = Extension(
             'src/methods.c',
             'src/tri_map.c',
         ],
-        include_dirs=get_ext_dir('numpy', 'core', 'include'),
-        library_dirs=get_ext_dir('numpy', 'core', 'lib'),
+        include_dirs=get_ext_dir('numpy', '_core', 'include'),
+        library_dirs=get_ext_dir('numpy', '_core', 'lib'),
         define_macros=[("AK_VERSION", AK_VERSION)],
         libraries=['npymath'], # not including mlib at this time
         )
