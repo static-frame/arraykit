@@ -1364,7 +1364,7 @@ AK_CPL_to_array_float(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep, ch
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
-    int elsize = dtype->elsize;
+    int elsize = PyDataType_ELSIZE(dtype);
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -1442,7 +1442,7 @@ AK_CPL_to_array_int(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
-    int elsize = dtype->elsize;
+    int elsize = PyDataType_ELSIZE(dtype);
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -1515,7 +1515,7 @@ AK_CPL_to_array_uint(AK_CodePointLine* cpl, PyArray_Descr* dtype, char tsep)
     // initialize error code to 0; only update on error.
     int error = 0;
     bool matched_elsize = true;
-    int elsize = dtype->elsize;
+    int elsize = PyDataType_ELSIZE(dtype);
 
     NPY_BEGIN_THREADS_DEF;
     NPY_BEGIN_THREADS;
@@ -1583,15 +1583,15 @@ AK_CPL_to_array_unicode(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     bool capped_points;
 
     // mutate the passed dtype as it is new and will be stolen in array construction
-    if (dtype->elsize == 0) {
+    if (PyDataType_ELSIZE(dtype) == 0) {
         field_points = cpl->offset_max;
-        dtype->elsize = (int)(field_points * UCS4_SIZE);
+        // dtype->elsize = (int)(field_points * UCS4_SIZE);
+        PyDataType_SET_ELSIZE(dtype, (npy_intp)(field_points * UCS4_SIZE));
         capped_points = false;
     }
     else {
         // assume that elsize is already given in units of 4
-        // assert(dtype->elsize % UCS4_SIZE == 0);
-        field_points = dtype->elsize / UCS4_SIZE;
+        field_points = PyDataType_ELSIZE(dtype) / UCS4_SIZE;
         capped_points = true;
     }
 
@@ -1649,13 +1649,14 @@ AK_CPL_to_array_bytes(AK_CodePointLine* cpl, PyArray_Descr* dtype)
     Py_ssize_t field_points;
     bool capped_points;
 
-    if (dtype->elsize == 0) {
+    if (PyDataType_ELSIZE(dtype) == 0) {
         field_points = cpl->offset_max;
-        dtype->elsize = (int)field_points;
+        // dtype->elsize = (int)field_points;
+        PyDataType_SET_ELSIZE(dtype, (npy_intp)field_points);
         capped_points = false;
     }
     else {
-        field_points = dtype->elsize;
+        field_points = PyDataType_ELSIZE(dtype);
         capped_points = true;
     }
 
