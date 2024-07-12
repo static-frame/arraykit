@@ -560,16 +560,16 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
     }
     if (PyArray_IsScalar(element, Complex64)) {
         npy_cfloat val = PyArrayScalar_VAL(element, Complex64);
-        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+        return PyBool_FromLong(isnan(npy_crealf(val)) || isnan(npy_cimagf(val)));
     }
     if (PyArray_IsScalar(element, Complex128)) {
         npy_cdouble val = PyArrayScalar_VAL(element, Complex128);
-        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+        return PyBool_FromLong(isnan(npy_creal(val)) || isnan(npy_cimag(val)));
     }
     # ifdef PyComplex256ArrType_Type
     if (PyArray_IsScalar(element, Complex256)) {
         npy_clongdouble val = PyArrayScalar_VAL(element, Complex256);
-        return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
+        return PyBool_FromLong(isnan(npy_creall(val)) || isnan(npy_cimagl(val)));
     }
     # endif
 

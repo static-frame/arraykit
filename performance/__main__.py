@@ -507,9 +507,9 @@ class DtypeFromElementPerf(Perf):
         self.values = [
                 np.longlong(-1), np.int_(-1), np.intc(-1), np.short(-1), np.byte(-1),
                 np.ubyte(1), np.ushort(1), np.uintc(1), np.uint(1), np.ulonglong(1),
-                np.half(1.0), np.single(1.0), np.float_(1.0), np.longfloat(1.0),
-                np.csingle(1.0j), np.complex_(1.0j), np.clongfloat(1.0j),
-                np.bool_(0), np.str_('1'), np.unicode_('1'), np.void(1),
+                np.half(1.0), np.single(1.0), np.float64(1.0), np.longdouble(1.0),
+                np.csingle(1.0j), np.complex_(1.0j), np.clongdouble(1.0j),
+                np.bool_(0), np.str_('1'), np.str_('1'), np.void(1),
                 np.object(), np.datetime64('NaT'), np.timedelta64('NaT'), np.nan,
                 12, 12.0, True, None, float('NaN'), object(), (1, 2, 3),
                 NT(1, 2, 3), datetime.date(2020, 12, 31), datetime.timedelta(14),
