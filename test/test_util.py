@@ -527,11 +527,11 @@ class TestUnit(unittest.TestCase):
                 np.ulonglong,
                 np.half,
                 np.single,
-                np.float_,
-                np.longfloat,
+                np.float64,
+                np.longdouble,
                 np.csingle,
-                np.complex_,
-                np.clongfloat,
+                np.complex128,
+                np.clongdouble,
                 np.bool_,
         ]
         for dtype in dtypes:
@@ -540,12 +540,12 @@ class TestUnit(unittest.TestCase):
     def test_dtype_from_element_str_and_misc_dtypes(self) -> None:
         dtype_obj_pairs = [
                 (np.dtype('<U1'), np.str_('1')),
-                (np.dtype('<U1'), np.unicode_('1')),
+                (np.dtype('<U1'), np.str_('1')),
                 (np.dtype('V1'), np.void(1)),
                 (np.dtype('O'), object),
                 (np.dtype('<M8'), np.datetime64('NaT')),
                 (np.dtype('<m8'), np.timedelta64('NaT')),
-                (np.float_, np.nan),
+                (np.float64, np.nan),
         ]
         for dtype, obj in dtype_obj_pairs:
             self.assertEqual(dtype, dtype_from_element(obj))

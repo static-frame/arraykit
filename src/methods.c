@@ -558,7 +558,6 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs)
         Py_complex val = ((PyComplexObject*)element)->cval;
         return PyBool_FromLong(isnan(val.real) || isnan(val.imag));
     }
-    // TODO: fix!
     if (PyArray_IsScalar(element, Complex64)) {
         npy_cfloat val = PyArrayScalar_VAL(element, Complex64);
         return PyBool_FromLong(isnan(npy_creal(val)) || isnan(npy_cimag(val)));
