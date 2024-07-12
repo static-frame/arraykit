@@ -14,7 +14,9 @@
 static inline NPY_DATETIMEUNIT
 AK_dt_unit_from_array(PyArrayObject* a) {
     // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
-    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
+    PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
+    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyDataType_C_METADATA(dt))->meta);
+    // PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
     return dma->base;
 }
 
@@ -856,9 +858,9 @@ AK_TM_fill_object(TriMapObject* tm,
 #define AK_TM_TRANSFER_FLEXIBLE(c_type) do {                               \
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;\
     TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;           \
-    npy_intp t_element_size = PyArray_DESCR(array_to)->elsize;             \
+    npy_intp t_element_size = PyArray_ITEMSIZE(array_to);                  \
     npy_intp t_element_cp = t_element_size / sizeof(c_type);               \
-    npy_intp f_element_size = PyArray_DESCR(array_from)->elsize;           \
+    npy_intp f_element_size = PyArray_ITEMSIZE(array_from);                \
     c_type* array_to_data = (c_type*)PyArray_DATA(array_to);               \
     c_type* f;                                                             \
     c_type* t;                                                             \
@@ -906,7 +908,7 @@ AK_TM_fill_unicode(TriMapObject* tm,
 
     Py_UCS4* array_to_data = (Py_UCS4*)PyArray_DATA(array_to);
     // code points per element
-    npy_intp cp = PyArray_DESCR(array_to)->elsize / UCS4_SIZE;
+    npy_intp cp = PyArray_ITEMSIZE(array_to) / UCS4_SIZE;
 
     bool decref_fill_value = false;
     if (PyBytes_Check(fill_value)) {
@@ -948,7 +950,7 @@ AK_TM_fill_string(TriMapObject* tm,
             ? tm->final_src_fill : tm->final_dst_fill);
 
     char* array_to_data = (char*)PyArray_DATA(array_to);
-    npy_intp cp = PyArray_DESCR(array_to)->elsize;
+    npy_intp cp = PyArray_ITEMSIZE(array_to);
     if (!PyBytes_Check(fill_value)) {
         return -1;
     }

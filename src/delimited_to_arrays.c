@@ -1070,6 +1070,7 @@ AK_CPL_Free(AK_CodePointLine* cpl)
     PyMem_Free(cpl->offsets);
     if (cpl->type_parser) {
         PyMem_Free(cpl->type_parser);
+        // TODO: use AK_TP_Free
     }
     PyMem_Free(cpl);
 }
