@@ -37,6 +37,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+0.8.1
+............
+
+Updated build ``include_dirs`` configuration.
+
+
 0.8.0
 ............
 

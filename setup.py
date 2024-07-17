@@ -5,7 +5,7 @@ from setuptools import Extension  # type: ignore
 from setuptools import setup
 from pathlib import Path
 
-AK_VERSION = '0.8.0'
+AK_VERSION = '0.8.1'
 
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
@@ -41,7 +41,7 @@ ak_extension = Extension(
             'src/methods.c',
             'src/tri_map.c',
         ],
-        include_dirs=get_ext_dir('numpy', '_core', 'include'),
+        include_dirs=get_ext_dir('numpy', '_core', 'include') + ['src'],
         library_dirs=get_ext_dir('numpy', '_core', 'lib'),
         define_macros=[("AK_VERSION", AK_VERSION)],
         libraries=['npymath'], # not including mlib at this time
