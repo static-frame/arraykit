@@ -1048,6 +1048,24 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
     return AK_TM_map_no_fill(self, from_src, array_from);
 }
 
+
+// PyObject *
+// TriMap_map_merge_no_fill(TriMapObject *self, PyObject *arg) {
+//     if (!PyArray_Check(arg)) {
+//         PyErr_SetString(PyExc_TypeError, "Must provide an array");
+//         return NULL;
+//     }
+//     if (!self->finalized) {
+//         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+//         return NULL;
+//     }
+//     PyArrayObject* array_from = (PyArrayObject*)arg;
+//     bool from_src = false;
+//     return AK_TM_map_no_fill(self, from_src, array_from);
+// }
+
+
+
 // Returns NULL on error.
 static inline PyObject *
 AK_TM_map_fill(TriMapObject* tm,
@@ -1179,6 +1197,31 @@ TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
     bool from_src = false;
     return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
 }
+
+
+
+// PyObject *
+// TriMap_map_merge_fill(TriMapObject *self, PyObject *args) {
+//     PyArrayObject* array_from;
+//     PyObject* fill_value;
+//     PyArray_Descr* fill_value_dtype;
+//     if (!PyArg_ParseTuple(args,
+//             "O!OO!:map_dst_fill",
+//             &PyArray_Type, &array_from,
+//             &fill_value,
+//             &PyArrayDescr_Type, &fill_value_dtype
+//             )) {
+//         return NULL;
+//     }
+//     if (!self->finalized) {
+//         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+//         return NULL;
+//     }
+//     bool from_src = false;
+//     return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
+// }
+
+
 
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
