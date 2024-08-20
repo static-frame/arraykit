@@ -23,7 +23,7 @@ _TLabel = tp.Union[
         np.timedelta64,
         datetime.date,
         datetime.datetime,
-        tp.Tuple['_TLabel'],
+        tp.Tuple['_TLabel', ...],
 ]
 
 class ErrorInitTypeBlocks(RuntimeError):
