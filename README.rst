@@ -37,6 +37,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.8.3
+............
+
+Corrected incorrect component of ``_TLabel`` in ``__init__.pyi``.
+
 0.8.2
 ............
 
