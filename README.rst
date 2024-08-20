@@ -42,6 +42,7 @@ What is New in ArrayKit
 
 Corrected incorrect component of ``_TLabel`` in ``__init__.pyi``.
 
+
 0.8.2
 ............
 
