@@ -1150,6 +1150,10 @@ class TestUnit(unittest.TestCase):
         tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
         tm.register_one(3, 1)
         tm.register_one(4, 2)
+
+        with self.assertRaises(RuntimeError):
+            _ = tm.map_merge_no_fill(src, dst)
+
         tm.finalize()
 
         with self.assertRaises(TypeError):

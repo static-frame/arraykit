@@ -1049,21 +1049,6 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 }
 
 
-// PyObject *
-// TriMap_map_merge_no_fill(TriMapObject *self, PyObject *arg) {
-//     if (!PyArray_Check(arg)) {
-//         PyErr_SetString(PyExc_TypeError, "Must provide an array");
-//         return NULL;
-//     }
-//     if (!self->finalized) {
-//         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
-//         return NULL;
-//     }
-//     PyArrayObject* array_from = (PyArrayObject*)arg;
-//     bool from_src = false;
-//     return AK_TM_map_no_fill(self, from_src, array_from);
-// }
-
 static inline PyObject *
 TriMap_map_merge_no_fill(TriMapObject *self, PyObject *args)
 {
@@ -1089,29 +1074,52 @@ TriMap_map_merge_no_fill(TriMapObject *self, PyObject *args)
         PyErr_SetString(PyExc_TypeError, "Array dst must be 1D");
         return NULL;
     }
+
+    // passing a borrowed refs; returns a new ref
+    PyArray_Descr* dtype = AK_resolve_dtype(
+            PyArray_DESCR(array_src),
+            PyArray_DESCR(array_dst));
+    bool dtype_is_obj = dtype->type_num == NPY_OBJECT;
+    bool dtype_is_unicode = dtype->type_num == NPY_UNICODE;
+    bool dtype_is_string = dtype->type_num == NPY_STRING;
+
+    npy_intp dims[] = {self->len};
+
+    // create to array_to
+    PyArrayObject* array_to;
+    if (dtype_is_obj) {
+        Py_DECREF(dtype); // not needed
+        // will initialize to NULL, not None
+        array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
+        // Py_INCREF(array_from); // normalize refs when casting
+    }
+    else if (dtype_is_unicode || dtype_is_string) {
+        array_to = (PyArrayObject*)PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+        // Py_INCREF(array_from); // normalize refs when casting
+    }
+    else {
+        array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+        // if (PyArray_TYPE(array_from) == NPY_DATETIME &&
+        //         PyArray_TYPE(array_to) == NPY_DATETIME &&
+        //         AK_dt_unit_from_array(array_from) != AK_dt_unit_from_array(array_to)
+        //         ) {
+        //     // if trying to cast into a dt64 array, need to pre-convert; array_from is originally borrowed; calling cast sets it to a new ref
+        //     dtype = PyArray_DESCR(array_to); // borrowed ref
+        //     Py_INCREF(dtype);
+        //     array_from = (PyArrayObject*)PyArray_CastToType(array_from, dtype, 0);
+        // }
+        // else {
+        //     Py_INCREF(array_from); // normalize refs when casting
+        // }
+    }
+    if (array_to == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        // Py_DECREF((PyObject*)array_from);
+        return NULL;
+    }
+
     Py_RETURN_NONE;
 
-//     // TODO: resolve dtype from src, dst
-
-//     npy_intp dims[] = {tm->len};
-//     PyArrayObject* array_to;
-//     bool dtype_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
-//     bool dtype_is_unicode = PyArray_TYPE(array_from) == NPY_UNICODE;
-//     bool dtype_is_string = PyArray_TYPE(array_from) == NPY_STRING;
-
-//     // create to array
-//     if (dtype_is_obj) { // initializes values to NULL
-//         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
-//     }
-//     else {
-//         PyArray_Descr* dtype = PyArray_DESCR(array_from); // borowed ref
-//         Py_INCREF(dtype);
-//         array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
-//     }
-//     if (array_to == NULL) {
-//         PyErr_SetNone(PyExc_MemoryError);
-//         return NULL;
-//     }
 //     // transfer values
 //     if (dtype_is_obj) {
 //         if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
