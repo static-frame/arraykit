@@ -1064,18 +1064,35 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 //     return AK_TM_map_no_fill(self, from_src, array_from);
 // }
 
-// static inline PyObject *
-// TriMap_map_merge_no_fill(TriMapObject* self,
-//         PyArrayObject* array_from_src,
-//         PyArrayObject* array_from_dst
-//         ) {
+static inline PyObject *
+TriMap_map_merge_no_fill(TriMapObject *self, PyObject *args)
+{
+    PyArrayObject* array_src;
+    PyArrayObject* array_dst;
+
+    if (!PyArg_ParseTuple(args,
+            "O!O!:map_merge_no_fill",
+            &PyArray_Type, &array_src,
+            &PyArray_Type, &array_dst
+            )) {
+        return NULL;
+    }
+    if (!self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
+    if (!(PyArray_NDIM(array_src) == 1)) {
+        PyErr_SetString(PyExc_TypeError, "Array src must be 1D");
+        return NULL;
+    }
+    if (!(PyArray_NDIM(array_dst) == 1)) {
+        PyErr_SetString(PyExc_TypeError, "Array dst must be 1D");
+        return NULL;
+    }
+    Py_RETURN_NONE;
 
 //     // TODO: resolve dtype from src, dst
 
-//     if (!(PyArray_NDIM(array_from) == 1)) {
-//         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
-//         return NULL;
-//     }
 //     npy_intp dims[] = {tm->len};
 //     PyArrayObject* array_to;
 //     bool dtype_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
@@ -1116,7 +1133,7 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 //     }
 //     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
 //     return (PyObject*)array_to;
-// }
+}
 
 
 
@@ -1287,6 +1304,7 @@ static PyMethodDef TriMap_methods[] = {
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
     {"map_src_no_fill", (PyCFunction)TriMap_map_src_no_fill, METH_O, NULL},
     {"map_dst_no_fill", (PyCFunction)TriMap_map_dst_no_fill, METH_O, NULL},
+    {"map_merge_no_fill", (PyCFunction)TriMap_map_merge_no_fill, METH_VARARGS, NULL},
     {"map_src_fill", (PyCFunction)TriMap_map_src_fill, METH_VARARGS, NULL},
     {"map_dst_fill", (PyCFunction)TriMap_map_dst_fill, METH_VARARGS, NULL},
     {NULL},

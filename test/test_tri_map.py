@@ -1137,3 +1137,31 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post_dst.dtype, np.dtype('datetime64[D]'))
         self.assertEqual([str(dt) for dt in post_dst],
             ['2022-01-01', '2022-01-01', '2022-01-01', '1999-09-09', '1743-09-01', '1743-09-01', '1999-09-09', '2005-11-01'])
+
+    #---------------------------------------------------------------------------
+
+    def test_tri_map_map_c(self) -> None:
+        src = np.array([0, 200, 300, 400, 0], dtype=np.int64)
+        dst = np.array([300, 400, 0, 200, 300], dtype=np.int64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, 2)
+        tm.register_one(1, 3)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, 1)
+        tm.register_one(4, 2)
+        tm.finalize()
+
+        with self.assertRaises(TypeError):
+            _ = tm.map_merge_no_fill(3, dst)
+
+        with self.assertRaises(TypeError):
+            _ = tm.map_merge_no_fill(src, 3)
+
+        with self.assertRaises(TypeError):
+            _ = tm.map_merge_no_fill(src.reshape(5, 1), dst)
+
+        with self.assertRaises(TypeError):
+            _ = tm.map_merge_no_fill(src, dst.reshape(5, 1))
+
+
