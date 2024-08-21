@@ -1064,6 +1064,60 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 //     return AK_TM_map_no_fill(self, from_src, array_from);
 // }
 
+// static inline PyObject *
+// TriMap_map_merge_no_fill(TriMapObject* self,
+//         PyArrayObject* array_from_src,
+//         PyArrayObject* array_from_dst
+//         ) {
+
+//     // TODO: resolve dtype from src, dst
+
+//     if (!(PyArray_NDIM(array_from) == 1)) {
+//         PyErr_SetString(PyExc_TypeError, "Array must be 1D");
+//         return NULL;
+//     }
+//     npy_intp dims[] = {tm->len};
+//     PyArrayObject* array_to;
+//     bool dtype_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
+//     bool dtype_is_unicode = PyArray_TYPE(array_from) == NPY_UNICODE;
+//     bool dtype_is_string = PyArray_TYPE(array_from) == NPY_STRING;
+
+//     // create to array
+//     if (dtype_is_obj) { // initializes values to NULL
+//         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
+//     }
+//     else {
+//         PyArray_Descr* dtype = PyArray_DESCR(array_from); // borowed ref
+//         Py_INCREF(dtype);
+//         array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+//     }
+//     if (array_to == NULL) {
+//         PyErr_SetNone(PyExc_MemoryError);
+//         return NULL;
+//     }
+//     // transfer values
+//     if (dtype_is_obj) {
+//         if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
+//             Py_DECREF((PyObject*)array_to);
+//             return NULL;
+//         }
+//     }
+//     else if (dtype_is_unicode) {
+//         AK_TM_TRANSFER_FLEXIBLE(Py_UCS4);
+//     }
+//     else if (dtype_is_string) {
+//         AK_TM_TRANSFER_FLEXIBLE(char);
+//     }
+//     else {
+//         if (AK_TM_transfer_scalar(tm, from_src, array_from, array_to)) {
+//             Py_DECREF((PyObject*)array_to);
+//             return NULL;
+//         }
+//     }
+//     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
+//     return (PyObject*)array_to;
+// }
+
 
 
 // Returns NULL on error.
