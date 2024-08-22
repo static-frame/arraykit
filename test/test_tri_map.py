@@ -1229,3 +1229,48 @@ class TestUnit(unittest.TestCase):
 
         post = tm.map_merge(src, dst)
         self.assertEqual(post.tolist(), ['a', 'a', 'bbb', 'cc', 'cc', 'dddd', 'ee'])
+
+
+
+    def test_tri_map_merge_e(self) -> None:
+        src = np.array([None, False, -42, 'dddd'], dtype=object)
+        dst = np.array([-42, None, None, 'ee', -42], dtype=object)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [None, None, False, -42, -42, 'dddd', 'ee'])
+
+    def test_tri_map_merge_f(self) -> None:
+        src = np.array([None, False, -42,], dtype=object)
+        dst = np.array([True, 'ee', 88], dtype=object)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_one(1, -1)
+        tm.register_one(2, -1)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [None, False, -42, True, 'ee', 88])
+
+    def test_tri_map_merge_g(self) -> None:
+        src = np.array([None, False, -42,], dtype=object)
+        dst = np.array([None, False, -42, 'ee', 'ff'], dtype=object)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, 0)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [None, False, -42, 'ee', 'ff'])
