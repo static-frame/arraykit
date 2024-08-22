@@ -37,6 +37,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+0.9.0
+............
+
+Added ``TriMap.map_merge()``.
+
+
 0.8.3
 ............
 
