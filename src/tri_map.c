@@ -401,6 +401,7 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
     npy_intp dims[] = {tm->len};
 
+    // initialize all to False
     final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
     if (final_src_match == NULL) {
         goto error;
@@ -772,7 +773,7 @@ AK_TM_transfer_object(TriMapObject* tm,
     // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
     bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
 
-    // the passed in object array is assumed to be contiguous and have NULL (not None) in each position
+    // the passed in object array is contiguous and have NULL (not None) in each position
     PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
     PyObject* pyo;
     void* f;
@@ -811,7 +812,7 @@ AK_TM_transfer_object(TriMapObject* tm,
                 Py_INCREF(pyo); // one more than we need
                 *t++ = pyo;
             }
-            Py_DECREF(pyo); // remove the extra one
+            Py_DECREF(pyo); // remove the extra ref
         }
         else { // from_dst, dst is an array
             dst_pos = 0;
@@ -828,6 +829,92 @@ AK_TM_transfer_object(TriMapObject* tm,
                 }
                 *t++ = pyo;
                 dst_pos++;
+            }
+        }
+    }
+    return 0;
+}
+
+// Returns -1 on error. Specialized transfer from any type of an array to an object array. For usage with merge, Will only transfer if the destination is not NULL.
+static inline int
+AK_TM_transfer_object_if_null(TriMapObject* tm,
+        bool from_src,
+        PyArrayObject* array_from,
+        PyArrayObject* array_to
+        ) {
+    Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
+    TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
+
+    // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
+    bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
+
+    // the passed in object array is contiguous and have NULL (not None) in each position
+    PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
+    PyObject* pyo;
+    void* f;
+    TriMapOne* o = one_pairs;
+    TriMapOne* o_end = o + one_count;
+    for (; o < o_end; o++) {
+        if (array_to_data[o->to] == NULL) {
+            f = PyArray_GETPTR1(array_from, o->from);
+            if (f_is_obj) {
+                pyo = *(PyObject**)f;
+                Py_INCREF(pyo);
+            }
+            else { // will convert any value to an object
+                pyo = PyArray_GETITEM(array_from, f);
+            }
+            array_to_data[o->to] = pyo;
+        }
+    }
+    PyObject** t;
+    PyObject** t_end;
+    npy_intp dst_pos;
+    npy_int64 f_pos;
+    PyArrayObject* dst;
+    for (Py_ssize_t i = 0; i < tm->many_count; i++) {
+        t = array_to_data + tm->many_to[i].start;
+        t_end = array_to_data + tm->many_to[i].stop;
+
+        if (from_src) {
+            while (t < t_end) {
+                if (*t == NULL) {
+                    f = PyArray_GETPTR1(array_from, tm->many_from[i].src);
+                    if (f_is_obj) {
+                        pyo = *(PyObject**)f;
+                        Py_INCREF(pyo);
+                    }
+                    else {
+                        pyo = PyArray_GETITEM(array_from, f); // given a new ref
+                    }
+                    *t++ = pyo;
+                }
+                else {
+                    t++;
+                }
+            }
+        }
+        else { // from_dst, dst is an array
+            dst_pos = 0;
+            dst = tm->many_from[i].dst;
+            while (t < t_end) {
+                if (*t == NULL) {
+                    f_pos = *(npy_int64*)PyArray_GETPTR1(dst, dst_pos);
+                    f = PyArray_GETPTR1(array_from, f_pos);
+                    if (f_is_obj) {
+                        pyo = *(PyObject**)f;
+                        Py_INCREF(pyo);
+                    }
+                    else {
+                        pyo = PyArray_GETITEM(array_from, f);
+                    }
+                    *t++ = pyo;
+                    dst_pos++;
+                }
+                else {
+                    t++;
+                    dst_pos++;
+                }
             }
         }
     }
@@ -855,7 +942,7 @@ AK_TM_fill_object(TriMapObject* tm,
     return 0;
 }
 
-#define AK_TM_TRANSFER_FLEXIBLE(c_type) do {                               \
+#define AK_TM_TRANSFER_FLEXIBLE(c_type, from_src, array_from, array_to) do {\
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;\
     TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;           \
     npy_intp t_element_size = PyArray_ITEMSIZE(array_to);                  \
@@ -1003,10 +1090,10 @@ AK_TM_map_no_fill(TriMapObject* tm,
         }
     }
     else if (dtype_is_unicode) {
-        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4);
+        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, from_src, array_from, array_to);
     }
     else if (dtype_is_string) {
-        AK_TM_TRANSFER_FLEXIBLE(char);
+        AK_TM_TRANSFER_FLEXIBLE(char, from_src, array_from, array_to);
     }
     else {
         if (AK_TM_transfer_scalar(tm, from_src, array_from, array_to)) {
@@ -1046,6 +1133,102 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
     PyArrayObject* array_from = (PyArrayObject*)arg;
     bool from_src = false;
     return AK_TM_map_no_fill(self, from_src, array_from);
+}
+
+static inline PyObject *
+TriMap_map_merge(TriMapObject *tm, PyObject *args)
+{
+    // both are "from_" arrays
+    PyArrayObject* array_src;
+    PyArrayObject* array_dst;
+
+    if (!PyArg_ParseTuple(args,
+            "O!O!:map_merge",
+            &PyArray_Type, &array_src,
+            &PyArray_Type, &array_dst
+            )) {
+        return NULL;
+    }
+    if (!tm->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
+        return NULL;
+    }
+    if (!(PyArray_NDIM(array_src) == 1)) {
+        PyErr_SetString(PyExc_TypeError, "Array src must be 1D");
+        return NULL;
+    }
+    if (!(PyArray_NDIM(array_dst) == 1)) {
+        PyErr_SetString(PyExc_TypeError, "Array dst must be 1D");
+        return NULL;
+    }
+    // passing a borrowed refs; returns a new ref
+    PyArray_Descr* dtype = AK_resolve_dtype(
+            PyArray_DESCR(array_src),
+            PyArray_DESCR(array_dst));
+    bool dtype_is_obj = dtype->type_num == NPY_OBJECT;
+    bool dtype_is_unicode = dtype->type_num == NPY_UNICODE;
+    bool dtype_is_string = dtype->type_num == NPY_STRING;
+
+    npy_intp dims[] = {tm->len};
+
+    // create to array_to
+    PyArrayObject* array_to;
+    if (dtype_is_obj) {
+        Py_DECREF(dtype); // not needed
+        // will initialize to NULL, not None
+        array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    }
+    else if (dtype_is_unicode || dtype_is_string) {
+        array_to = (PyArrayObject*)PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
+    }
+    else {
+        array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
+    }
+    if (array_to == NULL) {
+        PyErr_SetNone(PyExc_MemoryError);
+        return NULL;
+    }
+
+    // if we have fill values in src, we need to transfer from dst
+    bool transfer_from_dst = PyArray_SIZE((PyArrayObject*)tm->final_src_fill) != 0;
+
+    if (dtype_is_obj) {
+        if (AK_TM_transfer_object(tm, true, array_src, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            return NULL;
+        }
+        if (transfer_from_dst) {
+            if (AK_TM_transfer_object_if_null(tm, false, array_dst, array_to)) {
+                Py_DECREF((PyObject*)array_to);
+                return NULL;
+            }
+        }
+    }
+    else if (dtype_is_unicode) {
+        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, true, array_src, array_to);
+        if (transfer_from_dst) {
+            AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, false, array_dst, array_to);
+        }
+    }
+    else if (dtype_is_string) {
+        AK_TM_TRANSFER_FLEXIBLE(char, true, array_src, array_to);
+        if (transfer_from_dst) {
+            AK_TM_TRANSFER_FLEXIBLE(char, false, array_dst, array_to);
+        }
+    }
+    else {
+        if (AK_TM_transfer_scalar(tm, true, array_src, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            return NULL;
+        }
+        if (transfer_from_dst) {
+            if (AK_TM_transfer_scalar(tm, false, array_dst, array_to)) {
+                Py_DECREF((PyObject*)array_to);
+                return NULL;
+            }
+        }
+    }
+    return (PyObject*)array_to;
 }
 
 // Returns NULL on error.
@@ -1108,19 +1291,19 @@ AK_TM_map_fill(TriMapObject* tm,
         }
     }
     else if (dtype_is_unicode) {
-        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4);
+        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, from_src, array_from, array_to);
         if (AK_TM_fill_unicode(tm, from_src, array_to, fill_value)) {
             goto error;
         }
     }
     else if (dtype_is_string) {
-        AK_TM_TRANSFER_FLEXIBLE(char);
+        AK_TM_TRANSFER_FLEXIBLE(char, from_src, array_from, array_to);
         if (AK_TM_fill_string(tm, from_src, array_to, fill_value)) {
             goto error;
         }
     }
     else {
-        // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obbligates us to decref the filled value when assigning
+        // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obligates us to decref the filled value when assigning
         if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
             goto error;
         }
@@ -1180,6 +1363,8 @@ TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
     return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
 }
 
+
+
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
     {"register_unmatched_dst", (PyCFunction)TriMap_register_unmatched_dst, METH_NOARGS, NULL},
@@ -1192,6 +1377,7 @@ static PyMethodDef TriMap_methods[] = {
     {"map_dst_no_fill", (PyCFunction)TriMap_map_dst_no_fill, METH_O, NULL},
     {"map_src_fill", (PyCFunction)TriMap_map_src_fill, METH_VARARGS, NULL},
     {"map_dst_fill", (PyCFunction)TriMap_map_dst_fill, METH_VARARGS, NULL},
+    {"map_merge", (PyCFunction)TriMap_map_merge, METH_VARARGS, NULL},
     {NULL},
 };
 
