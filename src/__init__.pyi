@@ -56,10 +56,6 @@ class TriMap:
     def dst_no_fill(self) -> bool: ...
     def map_src_no_fill(self, /, array_from: np.ndarray) -> np.ndarray: ...
     def map_dst_no_fill(self, /, array_from: np.ndarray) -> np.ndarray: ...
-    def map_merge_no_fill(self, /,
-            array_from_src: np.ndarray,
-            array_from_dst: np.ndarray,
-            ) -> np.ndarray: ...
     def map_src_fill(self, /,
             array_from: np.ndarray,
             fill_value: tp.Any,
@@ -69,6 +65,10 @@ class TriMap:
             array_from: np.ndarray,
             fill_value: tp.Any,
             fill_value_dtype: np.dtype
+            ) -> np.ndarray: ...
+    def map_merge(self, /,
+            array_from_src: np.ndarray,
+            array_from_dst: np.ndarray,
             ) -> np.ndarray: ...
 
 class BlockIndex:

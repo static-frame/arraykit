@@ -1140,7 +1140,7 @@ class TestUnit(unittest.TestCase):
 
     #---------------------------------------------------------------------------
 
-    def test_tri_map_map_c(self) -> None:
+    def test_tri_map_merge_a(self) -> None:
         src = np.array([0, 200, 300, 400, 0], dtype=np.int64)
         dst = np.array([300, 400, 0, 200, 300], dtype=np.int64)
 
@@ -1152,20 +1152,80 @@ class TestUnit(unittest.TestCase):
         tm.register_one(4, 2)
 
         with self.assertRaises(RuntimeError):
-            _ = tm.map_merge_no_fill(src, dst)
+            _ = tm.map_merge(src, dst)
 
         tm.finalize()
 
         with self.assertRaises(TypeError):
-            _ = tm.map_merge_no_fill(3, dst)
+            _ = tm.map_merge(3, dst)
 
         with self.assertRaises(TypeError):
-            _ = tm.map_merge_no_fill(src, 3)
+            _ = tm.map_merge(src, 3)
 
         with self.assertRaises(TypeError):
-            _ = tm.map_merge_no_fill(src.reshape(5, 1), dst)
+            _ = tm.map_merge(src.reshape(5, 1), dst)
 
         with self.assertRaises(TypeError):
-            _ = tm.map_merge_no_fill(src, dst.reshape(5, 1))
+            _ = tm.map_merge(src, dst.reshape(5, 1))
 
 
+    def test_tri_map_merge_a(self) -> None:
+        src = np.array([0, 200, 300, 400, 0], dtype=np.int64)
+        dst = np.array([300, 400, 0, 200, 300, 50, 50], dtype=np.int64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, 2)
+        tm.register_one(1, 3)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, 1)
+        tm.register_one(4, 2)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [0, 200, 300, 300, 400, 0, 50, 50])
+
+    def test_tri_map_merge_b(self) -> None:
+        src = np.array([0, 200, 300, 400], dtype=np.int64)
+        dst = np.array([50, 80, 200, 300, 0, 200, 300, 70, 80], dtype=np.int32)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, 4)
+        tm.register_many(1, np.array([2, 5], dtype=np.dtype(np.int64)))
+        tm.register_many(2, np.array([3, 6], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [0, 200, 200, 300, 300, 400, 50, 80, 70, 80])
+
+    def test_tri_map_merge_c(self) -> None:
+        src = np.array([0, 200, 300, 400], dtype=np.int64)
+        dst = np.array([400, 200, 300], dtype=np.int64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, -1)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_one(3, 0)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [0, 200, 300, 400])
+
+    def test_tri_map_merge_d(self) -> None:
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'ee', 'cc'])
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), ['a', 'a', 'bbb', 'cc', 'cc', 'dddd', 'ee'])

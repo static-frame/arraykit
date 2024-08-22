@@ -401,6 +401,7 @@ TriMap_finalize(TriMapObject *self, PyObject *Py_UNUSED(unused)) {
 
     npy_intp dims[] = {tm->len};
 
+    // initialize all to False
     final_src_match = PyArray_ZEROS(1, dims, NPY_BOOL, 0);
     if (final_src_match == NULL) {
         goto error;
@@ -855,7 +856,7 @@ AK_TM_fill_object(TriMapObject* tm,
     return 0;
 }
 
-#define AK_TM_TRANSFER_FLEXIBLE(c_type) do {                               \
+#define AK_TM_TRANSFER_FLEXIBLE(c_type, from_src, array_from, array_to) do {\
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;\
     TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;           \
     npy_intp t_element_size = PyArray_ITEMSIZE(array_to);                  \
@@ -1003,10 +1004,10 @@ AK_TM_map_no_fill(TriMapObject* tm,
         }
     }
     else if (dtype_is_unicode) {
-        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4);
+        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, from_src, array_from, array_to);
     }
     else if (dtype_is_string) {
-        AK_TM_TRANSFER_FLEXIBLE(char);
+        AK_TM_TRANSFER_FLEXIBLE(char, from_src, array_from, array_to);
     }
     else {
         if (AK_TM_transfer_scalar(tm, from_src, array_from, array_to)) {
@@ -1050,19 +1051,19 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
 
 
 static inline PyObject *
-TriMap_map_merge_no_fill(TriMapObject *self, PyObject *args)
+TriMap_map_merge(TriMapObject *tm, PyObject *args)
 {
     PyArrayObject* array_src;
     PyArrayObject* array_dst;
 
     if (!PyArg_ParseTuple(args,
-            "O!O!:map_merge_no_fill",
+            "O!O!:map_merge",
             &PyArray_Type, &array_src,
             &PyArray_Type, &array_dst
             )) {
         return NULL;
     }
-    if (!self->finalized) {
+    if (!tm->finalized) {
         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
         return NULL;
     }
@@ -1083,7 +1084,7 @@ TriMap_map_merge_no_fill(TriMapObject *self, PyObject *args)
     bool dtype_is_unicode = dtype->type_num == NPY_UNICODE;
     bool dtype_is_string = dtype->type_num == NPY_STRING;
 
-    npy_intp dims[] = {self->len};
+    npy_intp dims[] = {tm->len};
 
     // create to array_to
     PyArrayObject* array_to;
@@ -1118,7 +1119,41 @@ TriMap_map_merge_no_fill(TriMapObject *self, PyObject *args)
         return NULL;
     }
 
-    Py_RETURN_NONE;
+    // if we have fill values in src, we need to transfer from dst
+    bool transfer_from_dst = PyArray_SIZE((PyArrayObject*)tm->final_src_fill) != 0;
+
+    if (dtype_is_obj) {
+        if (AK_TM_transfer_object(tm, true, array_src, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            return NULL;
+        }
+    }
+    else if (dtype_is_unicode) {
+        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, true, array_src, array_to);
+        if (transfer_from_dst) {
+            AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, false, array_dst, array_to);
+        }
+    }
+    else if (dtype_is_string) {
+        AK_TM_TRANSFER_FLEXIBLE(char, true, array_src, array_to);
+        if (transfer_from_dst) {
+            AK_TM_TRANSFER_FLEXIBLE(char, false, array_dst, array_to);
+        }
+    }
+    else {
+        if (AK_TM_transfer_scalar(tm, true, array_src, array_to)) {
+            Py_DECREF((PyObject*)array_to);
+            return NULL;
+        }
+        if (transfer_from_dst) {
+            if (AK_TM_transfer_scalar(tm, false, array_dst, array_to)) {
+                Py_DECREF((PyObject*)array_to);
+                return NULL;
+            }
+        }
+    }
+
+    return (PyObject*)array_to;
 
 //     // transfer values
 //     if (dtype_is_obj) {
@@ -1205,19 +1240,19 @@ AK_TM_map_fill(TriMapObject* tm,
         }
     }
     else if (dtype_is_unicode) {
-        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4);
+        AK_TM_TRANSFER_FLEXIBLE(Py_UCS4, from_src, array_from, array_to);
         if (AK_TM_fill_unicode(tm, from_src, array_to, fill_value)) {
             goto error;
         }
     }
     else if (dtype_is_string) {
-        AK_TM_TRANSFER_FLEXIBLE(char);
+        AK_TM_TRANSFER_FLEXIBLE(char, from_src, array_from, array_to);
         if (AK_TM_fill_string(tm, from_src, array_to, fill_value)) {
             goto error;
         }
     }
     else {
-        // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obbligates us to decref the filled value when assigning
+        // Most simple is to fill with scalar, then overwrite values as needed; for object and flexible dtypes this is not efficient; for object dtypes, this obligates us to decref the filled value when assigning
         if (PyArray_FillWithScalar(array_to, fill_value)) { // -1 on error
             goto error;
         }
@@ -1279,29 +1314,6 @@ TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
 
 
 
-// PyObject *
-// TriMap_map_merge_fill(TriMapObject *self, PyObject *args) {
-//     PyArrayObject* array_from;
-//     PyObject* fill_value;
-//     PyArray_Descr* fill_value_dtype;
-//     if (!PyArg_ParseTuple(args,
-//             "O!OO!:map_dst_fill",
-//             &PyArray_Type, &array_from,
-//             &fill_value,
-//             &PyArrayDescr_Type, &fill_value_dtype
-//             )) {
-//         return NULL;
-//     }
-//     if (!self->finalized) {
-//         PyErr_SetString(PyExc_RuntimeError, "Finalization is required");
-//         return NULL;
-//     }
-//     bool from_src = false;
-//     return AK_TM_map_fill(self, from_src, array_from, fill_value, fill_value_dtype);
-// }
-
-
-
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
     {"register_unmatched_dst", (PyCFunction)TriMap_register_unmatched_dst, METH_NOARGS, NULL},
@@ -1312,9 +1324,9 @@ static PyMethodDef TriMap_methods[] = {
     {"dst_no_fill", (PyCFunction)TriMap_dst_no_fill, METH_NOARGS, NULL},
     {"map_src_no_fill", (PyCFunction)TriMap_map_src_no_fill, METH_O, NULL},
     {"map_dst_no_fill", (PyCFunction)TriMap_map_dst_no_fill, METH_O, NULL},
-    {"map_merge_no_fill", (PyCFunction)TriMap_map_merge_no_fill, METH_VARARGS, NULL},
     {"map_src_fill", (PyCFunction)TriMap_map_src_fill, METH_VARARGS, NULL},
     {"map_dst_fill", (PyCFunction)TriMap_map_dst_fill, METH_VARARGS, NULL},
+    {"map_merge", (PyCFunction)TriMap_map_merge, METH_VARARGS, NULL},
     {NULL},
 };
 
