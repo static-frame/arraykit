@@ -1135,7 +1135,6 @@ TriMap_map_dst_no_fill(TriMapObject *self, PyObject *arg) {
     return AK_TM_map_no_fill(self, from_src, array_from);
 }
 
-
 static inline PyObject *
 TriMap_map_merge(TriMapObject *tm, PyObject *args)
 {
@@ -1178,30 +1177,15 @@ TriMap_map_merge(TriMapObject *tm, PyObject *args)
         Py_DECREF(dtype); // not needed
         // will initialize to NULL, not None
         array_to = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_OBJECT);
-        // Py_INCREF(array_from); // normalize refs when casting
     }
     else if (dtype_is_unicode || dtype_is_string) {
         array_to = (PyArrayObject*)PyArray_Zeros(1, dims, dtype, 0); // steals dtype ref
-        // Py_INCREF(array_from); // normalize refs when casting
     }
     else {
         array_to = (PyArrayObject*)PyArray_Empty(1, dims, dtype, 0); // steals dtype ref
-        // if (PyArray_TYPE(array_from) == NPY_DATETIME &&
-        //         PyArray_TYPE(array_to) == NPY_DATETIME &&
-        //         AK_dt_unit_from_array(array_from) != AK_dt_unit_from_array(array_to)
-        //         ) {
-        //     // if trying to cast into a dt64 array, need to pre-convert; array_from is originally borrowed; calling cast sets it to a new ref
-        //     dtype = PyArray_DESCR(array_to); // borrowed ref
-        //     Py_INCREF(dtype);
-        //     array_from = (PyArrayObject*)PyArray_CastToType(array_from, dtype, 0);
-        // }
-        // else {
-        //     Py_INCREF(array_from); // normalize refs when casting
-        // }
     }
     if (array_to == NULL) {
         PyErr_SetNone(PyExc_MemoryError);
-        // Py_DECREF((PyObject*)array_from);
         return NULL;
     }
 

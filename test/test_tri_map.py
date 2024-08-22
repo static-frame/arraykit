@@ -1274,3 +1274,42 @@ class TestUnit(unittest.TestCase):
 
         post = tm.map_merge(src, dst)
         self.assertEqual(post.tolist(), [None, False, -42, 'ee', 'ff'])
+
+    def test_tri_map_merge_h(self) -> None:
+        src = np.array([0, 200, 300, 40], dtype=np.int64)
+        dst = np.array([0, 200, 300, 40, 50], dtype=np.int64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_one(0, 0)
+        tm.register_one(1, 1)
+        tm.register_one(2, 2)
+        tm.register_one(3, 3)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(post.tolist(), [0, 200, 300, 40, 50])
+
+    def test_tri_map_merge_i(self) -> None:
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
+        dst = np.array(['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'], dtype=np.datetime64)
+
+        tm = TriMap(len(src), len(dst))
+        tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
+        tm.register_one(1, -1)
+        tm.register_many(2, np.array([0, 4], dtype=np.dtype(np.int64)))
+        tm.register_one(3, -1)
+        tm.register_unmatched_dst()
+        tm.finalize()
+
+        post = tm.map_merge(src, dst)
+        self.assertEqual(list(post),
+            [np.datetime64('2022-01'),
+             np.datetime64('2022-01'),
+             np.datetime64('2022-01'),
+             np.datetime64('1954-03'),
+             np.datetime64('1743-09'),
+             np.datetime64('1743-09'),
+             np.datetime64('1988-12'),
+             np.datetime64('2005-11')]
+             )
