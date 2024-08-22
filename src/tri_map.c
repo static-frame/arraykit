@@ -765,7 +765,8 @@ static inline int
 AK_TM_transfer_object(TriMapObject* tm,
         bool from_src,
         PyArrayObject* array_from,
-        PyArrayObject* array_to
+        PyArrayObject* array_to,
+        bool clear_target
         ) {
     Py_ssize_t one_count = from_src ? tm->src_one_count : tm->dst_one_count;
     TriMapOne* one_pairs = from_src ? tm->src_one : tm->dst_one;
@@ -773,7 +774,7 @@ AK_TM_transfer_object(TriMapObject* tm,
     // NOTE: could use PyArray_Scalar instead of PyArray_GETITEM if we wanted to store scalars instead of Python objects; however, that is pretty uncommon for object arrays to store PyArray_Scalars
     bool f_is_obj = PyArray_TYPE(array_from) == NPY_OBJECT;
 
-    // the passed in object array is assumed to be contiguous and have NULL (not None) in each position
+    // the passed in object array is contiguous and have NULL (not None) in each position
     PyObject** array_to_data = (PyObject**)PyArray_DATA(array_to);
     PyObject* pyo;
     void* f;
@@ -787,6 +788,9 @@ AK_TM_transfer_object(TriMapObject* tm,
         }
         else { // will convert any value to an object
             pyo = PyArray_GETITEM(array_from, f);
+        }
+        if (clear_target) {
+            Py_XDECREF(array_to_data[o->to]);
         }
         array_to_data[o->to] = pyo;
     }
@@ -810,9 +814,12 @@ AK_TM_transfer_object(TriMapObject* tm,
             }
             while (t < t_end) {
                 Py_INCREF(pyo); // one more than we need
+                if (clear_target) {
+                    Py_XDECREF(*t);
+                }
                 *t++ = pyo;
             }
-            Py_DECREF(pyo); // remove the extra one
+            Py_DECREF(pyo); // remove the extra ref
         }
         else { // from_dst, dst is an array
             dst_pos = 0;
@@ -826,6 +833,9 @@ AK_TM_transfer_object(TriMapObject* tm,
                 }
                 else {
                     pyo = PyArray_GETITEM(array_from, f);
+                }
+                if (clear_target) {
+                    Py_XDECREF(*t);
                 }
                 *t++ = pyo;
                 dst_pos++;
@@ -998,7 +1008,7 @@ AK_TM_map_no_fill(TriMapObject* tm,
     }
     // transfer values
     if (dtype_is_obj) {
-        if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
+        if (AK_TM_transfer_object(tm, from_src, array_from, array_to, false)) {
             Py_DECREF((PyObject*)array_to);
             return NULL;
         }
@@ -1123,9 +1133,15 @@ TriMap_map_merge(TriMapObject *tm, PyObject *args)
     bool transfer_from_dst = PyArray_SIZE((PyArrayObject*)tm->final_src_fill) != 0;
 
     if (dtype_is_obj) {
-        if (AK_TM_transfer_object(tm, true, array_src, array_to)) {
+        if (AK_TM_transfer_object(tm, true, array_src, array_to, false)) {
             Py_DECREF((PyObject*)array_to);
             return NULL;
+        }
+        if (transfer_from_dst) {
+            if (AK_TM_transfer_object(tm, false, array_dst, array_to, true)) {
+                Py_DECREF((PyObject*)array_to);
+                return NULL;
+            }
         }
     }
     else if (dtype_is_unicode) {
@@ -1152,33 +1168,8 @@ TriMap_map_merge(TriMapObject *tm, PyObject *args)
             }
         }
     }
-
     return (PyObject*)array_to;
-
-//     // transfer values
-//     if (dtype_is_obj) {
-//         if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
-//             Py_DECREF((PyObject*)array_to);
-//             return NULL;
-//         }
-//     }
-//     else if (dtype_is_unicode) {
-//         AK_TM_TRANSFER_FLEXIBLE(Py_UCS4);
-//     }
-//     else if (dtype_is_string) {
-//         AK_TM_TRANSFER_FLEXIBLE(char);
-//     }
-//     else {
-//         if (AK_TM_transfer_scalar(tm, from_src, array_from, array_to)) {
-//             Py_DECREF((PyObject*)array_to);
-//             return NULL;
-//         }
-//     }
-//     PyArray_CLEARFLAGS(array_to, NPY_ARRAY_WRITEABLE);
-//     return (PyObject*)array_to;
 }
-
-
 
 // Returns NULL on error.
 static inline PyObject *
@@ -1232,7 +1223,7 @@ AK_TM_map_fill(TriMapObject* tm,
     }
     // array_from, array_to inc refed and dec refed on error
     if (dtype_is_obj) {
-        if (AK_TM_transfer_object(tm, from_src, array_from, array_to)) {
+        if (AK_TM_transfer_object(tm, from_src, array_from, array_to, false)) {
             goto error;
         }
         if (AK_TM_fill_object(tm, from_src, array_to, fill_value)) {
