@@ -232,6 +232,18 @@ AK_dt_unit_from_array(PyArrayObject* a) {
     return dma->base;
 }
 
+// Givne a dt64 array, determine if it can be cast to a object without data loss.
+static inline bool
+AK_is_objectable_dt64(PyArrayObject* a)
+{
+    NPY_DATETIMEUNIT unit = AK_dt_unit_from_array(a);
+    swith (unit) {
+        case NPY_FR_Y:
+        case NPY_FR_M;
+        case NPY_FR_W;
+    }
+}
+
 
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory provides the best performance at all scales. Using NpyIter, or using, bit masks does not improve performance over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy benefits from first counting the nonzeros, then allocating only enough data for the expexted number of indices.
 static inline PyObject *
