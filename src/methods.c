@@ -201,6 +201,15 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
     return AK_nonzero_1d(array);
 }
 
+PyObject *
+is_objectable_dt64(PyObject *Py_UNUSED(m), PyObject *a) {
+    AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject* array = (PyArrayObject*)a;
+    AK_is_objectable_dt64(array);
+    Py_RETURN_FALSE;
+}
+
+
 static char *first_true_1d_kwarg_names[] = {
     "array",
     "forward",
