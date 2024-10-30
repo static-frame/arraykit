@@ -222,6 +222,17 @@ AK_slice_to_ascending_slice(PyObject* slice, Py_ssize_t size)
             -step);
 }
 
+
+static inline NPY_DATETIMEUNIT
+AK_dt_unit_from_array(PyArrayObject* a) {
+    // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
+    PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
+    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyDataType_C_METADATA(dt))->meta);
+    // PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
+    return dma->base;
+}
+
+
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory provides the best performance at all scales. Using NpyIter, or using, bit masks does not improve performance over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy benefits from first counting the nonzeros, then allocating only enough data for the expexted number of indices.
 static inline PyObject *
 AK_nonzero_1d(PyArrayObject* array) {
