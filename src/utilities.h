@@ -222,6 +222,66 @@ AK_slice_to_ascending_slice(PyObject* slice, Py_ssize_t size)
             -step);
 }
 
+
+static inline NPY_DATETIMEUNIT
+AK_dt_unit_from_array(PyArrayObject* a) {
+    // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
+    PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
+    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyDataType_C_METADATA(dt))->meta);
+    // PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
+    return dma->base;
+}
+
+// Givne a dt64 array, determine if it can be cast to a object without data loss.
+static inline bool
+AK_is_objectable_dt64(PyArrayObject* a)
+{
+    NPY_DATETIMEUNIT unit = AK_dt_unit_from_array(a);
+    switch (unit) {
+        case NPY_FR_ERROR:
+        case NPY_FR_Y:
+        case NPY_FR_M:
+        case NPY_FR_W:
+            return false;
+        case NPY_FR_D:
+        case NPY_FR_h:
+        case NPY_FR_m:
+        case NPY_FR_s:
+        case NPY_FR_ms:
+        case NPY_FR_us:
+            break;
+        case NPY_FR_ns:
+        case NPY_FR_ps:
+        case NPY_FR_fs:
+        case NPY_FR_as:
+        case NPY_FR_GENERIC:
+            return false;
+    }
+
+    PyArray_Descr* dt_year = PyArray_DescrFromType(NPY_DATETIME);
+    if (dt_year == NULL) {
+        return NULL;
+    }
+    // TODO: not sure how to do this
+    // dt_year->metadata = Py_BuildValue("{s:i}", "unit", NPY_FR_Y);
+    PyObject* a_year = PyArray_CastToType(a, dt_year, 0);
+    Py_DECREF(dt_year);
+
+    Py_DECREF(a_year);
+    return false;
+
+    // years = array[~np.isnat(array)].astype(DT64_YEAR).astype(DTYPE_INT_DEFAULT) + 1970
+    // if np.any(years < datetime.MINYEAR):
+    //     return False
+    // if np.any(years > datetime.MAXYEAR):
+    //     return False
+    // return True
+
+}
+
+
+
+
 // Given a Boolean, contiguous 1D array, return the index positions in an int64 array. Through experimentation it has been verified that doing full-size allocation of memory provides the best performance at all scales. Using NpyIter, or using, bit masks does not improve performance over pointer arithmetic. Prescanning for all empty is very effective. Note that NumPy benefits from first counting the nonzeros, then allocating only enough data for the expexted number of indices.
 static inline PyObject *
 AK_nonzero_1d(PyArrayObject* array) {

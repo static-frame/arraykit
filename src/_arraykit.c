@@ -51,6 +51,7 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"nonzero_1d", nonzero_1d, METH_O, NULL},
+    {"is_objectable_dt64", is_objectable_dt64, METH_O, NULL},
     {"isna_element",
             (PyCFunction)isna_element,
             METH_VARARGS | METH_KEYWORDS,

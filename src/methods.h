@@ -48,6 +48,9 @@ PyObject *
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a);
 
 PyObject *
+is_objectable_dt64(PyObject *Py_UNUSED(m), PyObject *a);
+
+PyObject *
 first_true_1d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *
