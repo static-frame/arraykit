@@ -11,6 +11,7 @@
 # include "delimited_to_arrays.h"
 # include "methods.h"
 # include "tri_map.h"
+# include "auto_map.h"
 
 static PyMethodDef arraykit_methods[] =  {
     {"immutable_filter", immutable_filter, METH_O, NULL},
@@ -85,6 +86,15 @@ PyInit__arraykit(void)
         return NULL;
     }
 
+    NonUniqueError = PyErr_NewExceptionWithDoc(
+            "arraykit.NonUniqueError",
+            "ValueError for non-unique values.",
+            PyExc_ValueError,
+            NULL);
+    if (NonUniqueError == NULL) {
+        return NULL;
+    }
+
     PyObject *copy = PyImport_ImportModule("copy");
     if (copy == NULL) {
         return NULL;
@@ -107,12 +117,19 @@ PyInit__arraykit(void)
         PyType_Ready(&BIIterBlockType) ||
         PyType_Ready(&TriMapType) ||
         PyType_Ready(&ArrayGOType) ||
+        PyType_Ready(&AMType) ||
+        PyType_Ready(&FAMIType) ||
+        PyType_Ready(&FAMVType) ||
+        PyType_Ready(&FAMType) ||
         PyModule_AddObject(m, "BlockIndex", (PyObject *) &BlockIndexType) ||
         PyModule_AddObject(m, "TriMap", (PyObject *) &TriMapType) ||
         PyModule_AddObject(m, "ArrayGO", (PyObject *) &ArrayGOType) ||
         PyModule_AddObject(m, "deepcopy", deepcopy) ||
-        PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks)
-    ){
+        PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks) ||
+        PyModule_AddObject(m, "AutoMap", (PyObject *)&AMType) ||
+        PyModule_AddObject(m, "FrozenAutoMap", (PyObject *)&FAMType) ||
+        PyModule_AddObject(m, "NonUniqueError", NonUniqueError)
+){
         Py_DECREF(deepcopy);
         Py_XDECREF(m);
         return NULL;
