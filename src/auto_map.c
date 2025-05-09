@@ -549,7 +549,7 @@ PyTypeObject FAMIType = {
     .tp_iter = (getiterfunc) fami_iter,
     .tp_iternext = (iternextfunc) fami_iternext,
     .tp_methods = fami_methods,
-    .tp_name = "arraymap.FrozenAutoMapIterator",
+    .tp_name = "arraykit.FrozenAutoMapIterator",
 };
 
 static PyObject *
@@ -708,7 +708,7 @@ PyTypeObject FAMVType = {
     .tp_dealloc = (destructor) famv_dealloc,
     .tp_iter = (getiterfunc) famv_fami_new,
     .tp_methods = famv_methods,
-    .tp_name = "arraymap.FrozenAutoMapView",
+    .tp_name = "arraykit.FrozenAutoMapView",
     .tp_richcompare = (richcmpfunc) famv_richcompare,
 };
 
@@ -2643,7 +2643,7 @@ PyTypeObject FAMType = {
     .tp_hash = (hashfunc) fam_hash,
     .tp_iter = (getiterfunc) fam_iter,
     .tp_methods = fam_methods,
-    .tp_name = "arraymap.FrozenAutoMap",
+    .tp_name = "arraykit.FrozenAutoMap",
     .tp_new = fam_new,
     .tp_init = fam_init,
     .tp_repr = (reprfunc) fam_repr,
@@ -2708,51 +2708,7 @@ PyTypeObject AMType = {
     .tp_base = &FAMType,
     .tp_doc = "A grow-only autoincremented integer-valued mapping.",
     .tp_methods = am_methods,
-    .tp_name = "arraymap.AutoMap",
+    .tp_name = "arraykit.AutoMap",
     .tp_richcompare = (richcmpfunc) fam_richcompare,
 };
-
-
-//------------------------------------------------------------------------------
-// module definition
-
-// static struct PyModuleDef arraymap_module = {
-//     .m_base = PyModuleDef_HEAD_INIT,
-//     .m_doc = "Dictionary-like lookup from NumPy array values to integer positions",
-//     .m_name = "arraymap",
-//     .m_size = -1,
-// };
-
-
-// PyObject *
-// PyInit_arraymap(void)
-// {
-//     import_array();
-
-//     NonUniqueError = PyErr_NewExceptionWithDoc(
-//             "arraymap.NonUniqueError",
-//             "ValueError for non-unique values.",
-//             PyExc_ValueError,
-//             NULL);
-//     if (NonUniqueError == NULL) {
-//         return NULL;
-//     }
-
-//     PyObject *m = PyModule_Create(&arraymap_module);
-//     if (
-//         !m
-//         || PyModule_AddStringConstant(m, "__version__", Py_STRINGIFY(AM_VERSION))
-//         || PyType_Ready(&AMType)
-//         || PyType_Ready(&FAMIType)
-//         || PyType_Ready(&FAMVType)
-//         || PyType_Ready(&FAMType)
-//         || PyModule_AddObject(m, "AutoMap", (PyObject *)&AMType)
-//         || PyModule_AddObject(m, "FrozenAutoMap", (PyObject *)&FAMType)
-//         || PyModule_AddObject(m, "NonUniqueError", NonUniqueError)
-//     ) {
-//         Py_XDECREF(m);
-//         return NULL;
-//     }
-//     return m;
-// }
 
