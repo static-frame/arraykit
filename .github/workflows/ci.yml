@@ -48,7 +48,6 @@ jobs:
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 9,  req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt'}
