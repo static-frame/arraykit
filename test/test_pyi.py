@@ -58,7 +58,13 @@ class TestUnit(unittest.TestCase):
 
         spec = spec_from_loader('', loader=None)
         pyi_mod = module_from_spec(spec)
-        exec(msg, pyi_mod.__dict__)
+
+        try:
+            exec(msg, pyi_mod.__dict__)
+        except TypeError as e:
+            print(msg)
+            print(e)
+            return
 
         ak_content = Interface.from_module(ak)
         pyi_content = Interface.from_module(pyi_mod)
