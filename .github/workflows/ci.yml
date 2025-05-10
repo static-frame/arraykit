@@ -22,7 +22,7 @@ jobs:
       - run: python setup.py sdist
       - uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-sdist
           path: dist
 
   matrix_config:
@@ -89,8 +89,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: dist-wheels  # Single artifact for all wheels
+          path: dist/*
 
   upload:
     name: Publish
@@ -100,7 +100,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: dist-sdist
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-wheels
           path: dist
       - uses: pypa/gh-action-pypi-publish@master
         with:
