@@ -17,12 +17,12 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
         with:
-          python-version: 3.12
+          python-version: 3.13
       - run: pip install -r requirements-build-3_12.txt
       - run: python setup.py sdist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-sdist
           path: dist
 
   matrix_config:
@@ -48,7 +48,6 @@ jobs:
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 9,  req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
             - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt'}
@@ -87,10 +86,10 @@ jobs:
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}  # Unique artifact name
+          path: dist/*
 
   upload:
     name: Publish
@@ -98,9 +97,13 @@ jobs:
     needs: [tar_gz, wheels]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: dist-sdist
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-wheels
           path: dist
       - uses: pypa/gh-action-pypi-publish@master
         with:
