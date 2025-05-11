@@ -103,7 +103,7 @@ jobs:
           path: dist
       - uses: actions/download-artifact@v4
         with:
-          name: dist-wheels
+          name: dist-wheels-*
           path: dist
       - uses: pypa/gh-action-pypi-publish@master
         with:
