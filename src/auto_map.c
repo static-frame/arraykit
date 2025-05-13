@@ -10,25 +10,15 @@
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
-# include "auto_map.h"
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
-
-# define DEBUG_MSG_OBJ(msg, obj)      \
-    fprintf(stderr, "--- %s: %i: %s: ", __FILE__, __LINE__, __FUNCTION__); \
-    fprintf(stderr, #msg " ");        \
-    PyObject_Print(obj, stderr, 0);   \
-    fprintf(stderr, "\n");            \
-    fflush(stderr);                   \
+# include "auto_map.h"
+# include "utilities.h"
 
 //------------------------------------------------------------------------------
 // Common
 
-// static PyTypeObject AMType;
-// static PyTypeObject FAMIType;
-// static PyTypeObject FAMVType;
-// static PyTypeObject FAMType;
 PyObject *NonUniqueError;
 
 // The main storage "table" is an array of TableElement
@@ -41,7 +31,6 @@ typedef struct TableElement{
 # define LOAD 0.9
 # define SCAN 16
 
-const static size_t UCS4_SIZE = sizeof(Py_UCS4);
 
 // Partial, two-argument version of PyUnicode_FromKindAndData for consistent templating with bytes version.
 static inline PyObject*
@@ -397,52 +386,6 @@ string_to_hash(char *str, Py_ssize_t len) {
 }
 
 //------------------------------------------------------------------------------
-// the global int_cache is shared among all instances
-
-static PyObject *int_cache = NULL;
-
-// NOTE: this used to be a Py_ssize_t, which can be 32 bits on some machines and might easily overflow with a few very large indices. Using an explicit 64-bit int seems safer
-static npy_int64 key_count_global = 0;
-
-// Fill the int_cache up to size_needed with PyObject ints; `size` is not the key_count_global.
-static int
-int_cache_fill(Py_ssize_t size_needed)
-{
-    PyObject *item;
-    if (!int_cache) {
-        int_cache = PyList_New(0);
-        if (!int_cache) {
-            return -1;
-        }
-    }
-    for (Py_ssize_t i = PyList_GET_SIZE(int_cache); i < size_needed; i++) {
-        item = PyLong_FromSsize_t(i);
-        if (!item) {
-            return -1;
-        }
-        if (PyList_Append(int_cache, item)) {
-            Py_DECREF(item);
-            return -1;
-        }
-        Py_DECREF(item);
-    }
-    return 0;
-}
-
-// Given the current key_count_global, remove cache elements only if the key_count is less than the the current size of the int_cache.
-void
-int_cache_remove(Py_ssize_t key_count)
-{
-    if (!key_count) {
-        Py_CLEAR(int_cache);
-    }
-    else if (key_count < PyList_GET_SIZE(int_cache)) {
-        // del int_cache[key_count:]
-        PyList_SetSlice(int_cache, key_count, PyList_GET_SIZE(int_cache), NULL);
-    }
-}
-
-//------------------------------------------------------------------------------
 // FrozenAutoMapIterator functions
 
 typedef struct FAMIObject {
@@ -468,7 +411,7 @@ fami_iter(FAMIObject *self)
     return self;
 }
 
-// For a FAMI, Return appropriate PyObject for items, keys, and values. When values are needed they are retrieved from the int_cache. For consistency with NumPy array iteration, arrays use PyArray_ToScalar instead of PyArray_GETITEM.
+// For a FAMI, Return appropriate PyObject for items, keys, and values. For consistency with NumPy array iteration, arrays use PyArray_ToScalar instead of PyArray_GETITEM.
 static PyObject *
 fami_iternext(FAMIObject *self)
 {
@@ -488,18 +431,20 @@ fami_iternext(FAMIObject *self)
     switch (self->kind) {
         case ITEMS: {
             if (self->fam->keys_array_type) {
-                return PyTuple_Pack(
-                    2,
+                return Py_BuildValue(
+                    "NN",
                     PyArray_ToScalar(PyArray_GETPTR1(self->keys_array, index), self->keys_array),
-                    PyList_GET_ITEM(int_cache, index)
+                    PyLong_FromSsize_t(index)
                 );
             }
             else {
-                return PyTuple_Pack(
-                    2,
-                    PyList_GET_ITEM(self->fam->keys, index),
-                    PyList_GET_ITEM(int_cache, index)
-                );
+                PyObject* t = PyTuple_New(2);
+                if (!t) { return NULL; }
+                PyObject* k = PyList_GET_ITEM(self->fam->keys, index);
+                Py_INCREF(k);
+                PyTuple_SET_ITEM(t, 0, k);
+                PyTuple_SET_ITEM(t, 1, PyLong_FromSsize_t(index));
+                return t;
             }
         }
         case KEYS: {
@@ -513,9 +458,7 @@ fami_iternext(FAMIObject *self)
             }
         }
         case VALUES: {
-            PyObject *yield = PyList_GET_ITEM(int_cache, index);
-            Py_INCREF(yield);
-            return yield;
+            return PyLong_FromSsize_t(index);
         }
     }
     Py_UNREACHABLE();
@@ -1556,10 +1499,6 @@ insert_string(
 static int
 grow_table(FAMObject *self, Py_ssize_t keys_size)
 {
-    // NOTE: this is the only place int_cache_fill is called; it is not called with key_count_global, but with the max value needed
-    if (int_cache_fill(keys_size)) {
-        return -1;
-    }
     Py_ssize_t keys_load = keys_size / LOAD;
     Py_ssize_t size_old = self->table_size;
     if (keys_load < size_old) {
@@ -1628,8 +1567,6 @@ copy_to_new(PyTypeObject *cls, FAMObject *self, FAMObject *new)
             return -1;
         }
     }
-    key_count_global += self->keys_size;
-
     new->table_size = self->table_size;
     new->keys_array_type = self->keys_array_type;
     new->keys_size = self->keys_size;
@@ -1691,7 +1628,6 @@ extend(FAMObject *self, PyObject *keys)
         return -1;
     }
     Py_ssize_t size_extend = PySequence_Fast_GET_SIZE(keys);
-    key_count_global += size_extend;
     self->keys_size += size_extend;
 
     if (grow_table(self, self->keys_size)) {
@@ -1723,7 +1659,6 @@ append(FAMObject *self, PyObject *key)
         PyErr_SetString(PyExc_NotImplementedError, "Not supported for array keys");
         return -1;
     }
-    key_count_global++;
     self->keys_size++;
 
     if (grow_table(self, self->keys_size)) {
@@ -1746,7 +1681,7 @@ fam_length(FAMObject *self)
 }
 
 
-// Given a key for a FAM, return the Python integer (via the int_cache) associated with that key. Utility function used in both fam_subscript() and fam_get()
+// Given a key for a FAM, return the Python integer associated with that key. Utility function used in both fam_subscript() and fam_get()
 static PyObject *
 get(FAMObject *self, PyObject *key, PyObject *missing) {
     Py_ssize_t keys_pos = lookup(self, key);
@@ -1761,10 +1696,7 @@ get(FAMObject *self, PyObject *key, PyObject *missing) {
         PyErr_SetObject(PyExc_KeyError, key);
         return NULL;
     }
-    // use a C-integer to fetch the Python integer
-    PyObject *index = PyList_GET_ITEM(int_cache, keys_pos);
-    Py_INCREF(index);
-    return index;
+    return PyLong_FromSsize_t(keys_pos);
 }
 
 
@@ -1981,6 +1913,20 @@ fam_get_all(FAMObject *self, PyObject *key) {
 # undef GET_ALL_FLEXIBLE
 
 
+static inline int
+append_ssize_t(
+    PyObject* list,
+    Py_ssize_t value)
+{
+    PyObject* v = PyLong_FromSsize_t(value);
+    if (v == NULL) {
+        return -1;
+    }
+    int err = PyList_Append(list, v);
+    Py_DECREF(v);
+    return err;
+}
+
 // Give an array of the same kind as KAT, lookup and load any keys_pos. Depends on self, key_size, key_array, table_pos, i, k, values
 # define GET_ANY_SCALARS(npy_type_src, npy_type_dst, kat, lookup_func, hash_func, post_deref) \
 {                                                                          \
@@ -1996,7 +1942,7 @@ fam_get_all(FAMObject *self, PyObject *key) {
             continue;                                                      \
         }                                                                  \
         keys_pos = self->table[table_pos].keys_pos;                        \
-        if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) { \
+        if (append_ssize_t(values, keys_pos)) { \
             Py_DECREF(values);                                             \
             return NULL;                                                   \
         }                                                                  \
@@ -2020,7 +1966,7 @@ fam_get_all(FAMObject *self, PyObject *key) {
             continue;                                                         \
         }                                                                     \
         keys_pos = self->table[table_pos].keys_pos;                           \
-        if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) {    \
+        if (append_ssize_t(values, keys_pos)) {    \
             Py_DECREF(values);                                                \
             return NULL;                                                      \
         }                                                                     \
@@ -2066,7 +2012,7 @@ fam_get_any(FAMObject *self, PyObject *key) {
                 }
                 continue;
             }
-            if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) {
+            if (append_ssize_t(values, keys_pos)) {
                 Py_DECREF(values);
                 return NULL;
             }
@@ -2145,7 +2091,7 @@ fam_get_any(FAMObject *self, PyObject *key) {
                     }
                     continue; // do not raise
                 }
-                if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) {
+                if (append_ssize_t(values, keys_pos)) {
                     Py_DECREF(values);
                     return NULL;
                 }
@@ -2228,11 +2174,7 @@ fam_dealloc(FAMObject *self)
     if (self->keys) {
         Py_DECREF(self->keys);
     }
-
-    key_count_global -= self->keys_size;
-
     Py_TYPE(self)->tp_free((PyObject *)self);
-    int_cache_remove(key_count_global);
 }
 
 
@@ -2480,7 +2422,6 @@ fam_init(PyObject *self, PyObject *args, PyObject *kwargs)
     fam->keys_array_type = keys_array_type;
     fam->keys_size = keys_size;
     fam->key_buffer = NULL;
-    key_count_global += keys_size;
 
     // NOTE: on itialization, grow_table() does not use keys
     if (grow_table(fam, keys_size)) {
