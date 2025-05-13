@@ -16,14 +16,6 @@
 # include "auto_map.h"
 # include "utilities.h"
 
-
-// # define DEBUG_MSG_OBJ(msg, obj)      \
-//     fprintf(stderr, "--- %s: %i: %s: ", __FILE__, __LINE__, __FUNCTION__); \
-//     fprintf(stderr, #msg " ");        \
-//     PyObject_Print(obj, stderr, 0);   \
-//     fprintf(stderr, "\n");            \
-//     fflush(stderr);                   \
-
 //------------------------------------------------------------------------------
 // Common
 
@@ -1921,6 +1913,20 @@ fam_get_all(FAMObject *self, PyObject *key) {
 # undef GET_ALL_FLEXIBLE
 
 
+static inline int
+append_ssize_t(
+    PyObject* list,
+    Py_ssize_t value)
+{
+    PyObject* v = PyLong_FromSsize_t(value);
+    if (v == NULL) {
+        return -1;
+    }
+    int err = PyList_Append(list, v);
+    Py_DECREF(v);
+    return err;
+}
+
 // Give an array of the same kind as KAT, lookup and load any keys_pos. Depends on self, key_size, key_array, table_pos, i, k, values
 # define GET_ANY_SCALARS(npy_type_src, npy_type_dst, kat, lookup_func, hash_func, post_deref) \
 {                                                                          \
@@ -1936,13 +1942,10 @@ fam_get_all(FAMObject *self, PyObject *key) {
             continue;                                                      \
         }                                                                  \
         keys_pos = self->table[table_pos].keys_pos;                        \
-        PyObject* p = PyLong_FromSsize_t(keys_pos); \
-        if (PyList_Append(values, p)) { \
-            Py_DECREF(p);                   \
+        if (append_ssize_t(values, keys_pos)) { \
             Py_DECREF(values);                                             \
             return NULL;                                                   \
         }                                                                  \
-        Py_DECREF(p); \
     }                                                                      \
 }                                                                          \
 
@@ -1963,13 +1966,10 @@ fam_get_all(FAMObject *self, PyObject *key) {
             continue;                                                         \
         }                                                                     \
         keys_pos = self->table[table_pos].keys_pos;                           \
-        PyObject* p = PyLong_FromSsize_t(keys_pos); \
-        if (PyList_Append(values, p)) {    \
-            Py_DECREF(p);                   \
+        if (append_ssize_t(values, keys_pos)) {    \
             Py_DECREF(values);                                                \
             return NULL;                                                      \
         }                                                                     \
-        Py_DECREF(p); \
     }                                                                         \
 }                                                                             \
 
@@ -2012,12 +2012,10 @@ fam_get_any(FAMObject *self, PyObject *key) {
                 }
                 continue;
             }
-            PyObject* p = PyLong_FromSsize_t(keys_pos);
-            if (PyList_Append(values, p)) {
+            if (append_ssize_t(values, keys_pos)) {
                 Py_DECREF(values);
                 return NULL;
             }
-            Py_DECREF(p);
         }
     }
     else {
@@ -2093,12 +2091,10 @@ fam_get_any(FAMObject *self, PyObject *key) {
                     }
                     continue; // do not raise
                 }
-                PyObject* p = PyLong_FromSsize_t(keys_pos);
-                if (PyList_Append(values, p)) {
+                if (append_ssize_t(values, keys_pos)) {
                     Py_DECREF(values);
                     return NULL;
                 }
-                Py_DECREF(p);
             }
         }
     }
