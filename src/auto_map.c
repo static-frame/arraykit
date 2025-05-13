@@ -1761,7 +1761,7 @@ get(FAMObject *self, PyObject *key, PyObject *missing) {
         PyErr_SetObject(PyExc_KeyError, key);
         return NULL;
     }
-    return PyLong_FromSsize_t(index);
+    return PyLong_FromSsize_t(keys_pos);
     // PyObject *index = PyList_GET_ITEM(int_cache, keys_pos);
     // Py_INCREF(index);
     // return index;
