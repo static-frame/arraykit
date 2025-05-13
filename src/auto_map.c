@@ -399,48 +399,48 @@ string_to_hash(char *str, Py_ssize_t len) {
 //------------------------------------------------------------------------------
 // the global int_cache is shared among all instances
 
-static PyObject *int_cache = NULL;
+// static PyObject *int_cache = NULL;
 
-// NOTE: this used to be a Py_ssize_t, which can be 32 bits on some machines and might easily overflow with a few very large indices. Using an explicit 64-bit int seems safer
-static npy_int64 key_count_global = 0;
+// // NOTE: this used to be a Py_ssize_t, which can be 32 bits on some machines and might easily overflow with a few very large indices. Using an explicit 64-bit int seems safer
+// static npy_int64 key_count_global = 0;
 
-// Fill the int_cache up to size_needed with PyObject ints; `size` is not the key_count_global.
-static int
-int_cache_fill(Py_ssize_t size_needed)
-{
-    PyObject *item;
-    if (!int_cache) {
-        int_cache = PyList_New(0);
-        if (!int_cache) {
-            return -1;
-        }
-    }
-    for (Py_ssize_t i = PyList_GET_SIZE(int_cache); i < size_needed; i++) {
-        item = PyLong_FromSsize_t(i);
-        if (!item) {
-            return -1;
-        }
-        if (PyList_Append(int_cache, item)) {
-            Py_DECREF(item);
-            return -1;
-        }
-        Py_DECREF(item);
-    }
-    return 0;
-}
+// // Fill the int_cache up to size_needed with PyObject ints; `size` is not the key_count_global.
+// static int
+// int_cache_fill(Py_ssize_t size_needed)
+// {
+//     PyObject *item;
+//     if (!int_cache) {
+//         int_cache = PyList_New(0);
+//         if (!int_cache) {
+//             return -1;
+//         }
+//     }
+//     for (Py_ssize_t i = PyList_GET_SIZE(int_cache); i < size_needed; i++) {
+//         item = PyLong_FromSsize_t(i);
+//         if (!item) {
+//             return -1;
+//         }
+//         if (PyList_Append(int_cache, item)) {
+//             Py_DECREF(item);
+//             return -1;
+//         }
+//         Py_DECREF(item);
+//     }
+//     return 0;
+// }
 
-// Given the current key_count_global, remove cache elements only if the key_count is less than the the current size of the int_cache.
-void
-int_cache_remove(Py_ssize_t key_count)
-{
-    if (!key_count) {
-        Py_CLEAR(int_cache);
-    }
-    else if (key_count < PyList_GET_SIZE(int_cache)) {
-        // del int_cache[key_count:]
-        PyList_SetSlice(int_cache, key_count, PyList_GET_SIZE(int_cache), NULL);
-    }
-}
+// // Given the current key_count_global, remove cache elements only if the key_count is less than the the current size of the int_cache.
+// void
+// int_cache_remove(Py_ssize_t key_count)
+// {
+//     if (!key_count) {
+//         Py_CLEAR(int_cache);
+//     }
+//     else if (key_count < PyList_GET_SIZE(int_cache)) {
+//         // del int_cache[key_count:]
+//         PyList_SetSlice(int_cache, key_count, PyList_GET_SIZE(int_cache), NULL);
+//     }
+// }
 
 //------------------------------------------------------------------------------
 // FrozenAutoMapIterator functions
@@ -488,18 +488,20 @@ fami_iternext(FAMIObject *self)
     switch (self->kind) {
         case ITEMS: {
             if (self->fam->keys_array_type) {
-                return PyTuple_Pack(
-                    2,
+                return Py_BuildValue(
+                    "NN",
                     PyArray_ToScalar(PyArray_GETPTR1(self->keys_array, index), self->keys_array),
-                    PyList_GET_ITEM(int_cache, index)
+                    PyLong_FromSsize_t(index)
                 );
             }
             else {
-                return PyTuple_Pack(
-                    2,
-                    PyList_GET_ITEM(self->fam->keys, index),
-                    PyList_GET_ITEM(int_cache, index)
-                );
+                PyObject* t = PyTuple_New(2);
+                if (!t) { return NULL; }
+                PyObject* k = PyList_GET_ITEM(self->fam->keys, index);
+                Py_INCREF(k);
+                PyTuple_SET_ITEM(t, 0, k);
+                PyTuple_SET_ITEM(t, 1, PyLong_FromSsize_t(index));
+                return t;
             }
         }
         case KEYS: {
@@ -513,9 +515,7 @@ fami_iternext(FAMIObject *self)
             }
         }
         case VALUES: {
-            PyObject *yield = PyList_GET_ITEM(int_cache, index);
-            Py_INCREF(yield);
-            return yield;
+            return PyLong_FromSsize_t(index);
         }
     }
     Py_UNREACHABLE();
@@ -1557,9 +1557,9 @@ static int
 grow_table(FAMObject *self, Py_ssize_t keys_size)
 {
     // NOTE: this is the only place int_cache_fill is called; it is not called with key_count_global, but with the max value needed
-    if (int_cache_fill(keys_size)) {
-        return -1;
-    }
+    // if (int_cache_fill(keys_size)) {
+    //     return -1;
+    // }
     Py_ssize_t keys_load = keys_size / LOAD;
     Py_ssize_t size_old = self->table_size;
     if (keys_load < size_old) {
@@ -1628,7 +1628,7 @@ copy_to_new(PyTypeObject *cls, FAMObject *self, FAMObject *new)
             return -1;
         }
     }
-    key_count_global += self->keys_size;
+    // key_count_global += self->keys_size;
 
     new->table_size = self->table_size;
     new->keys_array_type = self->keys_array_type;
@@ -1691,7 +1691,7 @@ extend(FAMObject *self, PyObject *keys)
         return -1;
     }
     Py_ssize_t size_extend = PySequence_Fast_GET_SIZE(keys);
-    key_count_global += size_extend;
+    // key_count_global += size_extend;
     self->keys_size += size_extend;
 
     if (grow_table(self, self->keys_size)) {
@@ -1723,7 +1723,7 @@ append(FAMObject *self, PyObject *key)
         PyErr_SetString(PyExc_NotImplementedError, "Not supported for array keys");
         return -1;
     }
-    key_count_global++;
+    // key_count_global++;
     self->keys_size++;
 
     if (grow_table(self, self->keys_size)) {
@@ -1761,10 +1761,10 @@ get(FAMObject *self, PyObject *key, PyObject *missing) {
         PyErr_SetObject(PyExc_KeyError, key);
         return NULL;
     }
-    // use a C-integer to fetch the Python integer
-    PyObject *index = PyList_GET_ITEM(int_cache, keys_pos);
-    Py_INCREF(index);
-    return index;
+    return PyLong_FromSsize_t(index);
+    // PyObject *index = PyList_GET_ITEM(int_cache, keys_pos);
+    // Py_INCREF(index);
+    // return index;
 }
 
 
@@ -1996,10 +1996,13 @@ fam_get_all(FAMObject *self, PyObject *key) {
             continue;                                                      \
         }                                                                  \
         keys_pos = self->table[table_pos].keys_pos;                        \
-        if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) { \
+        PyObject* p = PyLong_FromSsize_t(keys_pos); \
+        if (PyList_Append(values, p)) { \
+            Py_DECREF(p);                   \
             Py_DECREF(values);                                             \
             return NULL;                                                   \
         }                                                                  \
+        Py_DECREF(p); \
     }                                                                      \
 }                                                                          \
 
@@ -2020,10 +2023,13 @@ fam_get_all(FAMObject *self, PyObject *key) {
             continue;                                                         \
         }                                                                     \
         keys_pos = self->table[table_pos].keys_pos;                           \
-        if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) {    \
+        PyObject* p = PyLong_FromSsize_t(keys_pos); \
+        if (PyList_Append(values, p)) {    \
+            Py_DECREF(p);                   \
             Py_DECREF(values);                                                \
             return NULL;                                                      \
         }                                                                     \
+        Py_DECREF(p); \
     }                                                                         \
 }                                                                             \
 
@@ -2066,10 +2072,12 @@ fam_get_any(FAMObject *self, PyObject *key) {
                 }
                 continue;
             }
-            if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) {
+            PyObject* p = PyLong_FromSsize_t(keys_pos);
+            if (PyList_Append(values, p)) {
                 Py_DECREF(values);
                 return NULL;
             }
+            Py_DECREF(p);
         }
     }
     else {
@@ -2145,10 +2153,12 @@ fam_get_any(FAMObject *self, PyObject *key) {
                     }
                     continue; // do not raise
                 }
-                if (PyList_Append(values, PyList_GET_ITEM(int_cache, keys_pos))) {
+                PyObject* p = PyLong_FromSsize_t(keys_pos);
+                if (PyList_Append(values, p)) {
                     Py_DECREF(values);
                     return NULL;
                 }
+                Py_DECREF(p);
             }
         }
     }
@@ -2229,10 +2239,10 @@ fam_dealloc(FAMObject *self)
         Py_DECREF(self->keys);
     }
 
-    key_count_global -= self->keys_size;
+    // key_count_global -= self->keys_size;
 
     Py_TYPE(self)->tp_free((PyObject *)self);
-    int_cache_remove(key_count_global);
+    // int_cache_remove(key_count_global);
 }
 
 
@@ -2480,7 +2490,7 @@ fam_init(PyObject *self, PyObject *args, PyObject *kwargs)
     fam->keys_array_type = keys_array_type;
     fam->keys_size = keys_size;
     fam->key_buffer = NULL;
-    key_count_global += keys_size;
+    // key_count_global += keys_size;
 
     // NOTE: on itialization, grow_table() does not use keys
     if (grow_table(fam, keys_size)) {
