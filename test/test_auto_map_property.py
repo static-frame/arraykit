@@ -194,7 +194,7 @@ def test_fam_array_non_unique_exception(keys: Keys):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        hypothesis.assume(keys)
+        hypothesis.assume(keys.size)
         duplicate = next(iter(keys))
 
         with pytest.raises(ValueError):
