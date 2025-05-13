@@ -10,25 +10,23 @@
 # define PY_ARRAY_UNIQUE_SYMBOL AK_ARRAY_API
 # define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
-# include "auto_map.h"
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
+# include "auto_map.h"
+# include "utilities.h"
 
-# define DEBUG_MSG_OBJ(msg, obj)      \
-    fprintf(stderr, "--- %s: %i: %s: ", __FILE__, __LINE__, __FUNCTION__); \
-    fprintf(stderr, #msg " ");        \
-    PyObject_Print(obj, stderr, 0);   \
-    fprintf(stderr, "\n");            \
-    fflush(stderr);                   \
+
+// # define DEBUG_MSG_OBJ(msg, obj)      \
+//     fprintf(stderr, "--- %s: %i: %s: ", __FILE__, __LINE__, __FUNCTION__); \
+//     fprintf(stderr, #msg " ");        \
+//     PyObject_Print(obj, stderr, 0);   \
+//     fprintf(stderr, "\n");            \
+//     fflush(stderr);                   \
 
 //------------------------------------------------------------------------------
 // Common
 
-// static PyTypeObject AMType;
-// static PyTypeObject FAMIType;
-// static PyTypeObject FAMVType;
-// static PyTypeObject FAMType;
 PyObject *NonUniqueError;
 
 // The main storage "table" is an array of TableElement
@@ -41,7 +39,6 @@ typedef struct TableElement{
 # define LOAD 0.9
 # define SCAN 16
 
-const static size_t UCS4_SIZE = sizeof(Py_UCS4);
 
 // Partial, two-argument version of PyUnicode_FromKindAndData for consistent templating with bytes version.
 static inline PyObject*
