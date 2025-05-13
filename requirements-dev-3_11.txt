@@ -1,5 +1,4 @@
 numpy==1.24.3
 pytest==7.1.2
-pylint==2.7.4
 invoke==2.2.0
 hypothesis==6.10.1
