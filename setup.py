@@ -3,9 +3,8 @@ import os
 import typing as tp
 from setuptools import Extension  # type: ignore
 from setuptools import setup
-from pathlib import Path
 
-AK_VERSION = '0.10.0'
+AK_VERSION = '1.0.0'
 
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
@@ -53,8 +52,8 @@ setup(
     version=AK_VERSION,
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
-    python_requires='>=3.9',
-    install_requires=['numpy>=1.19.5'],
+    python_requires='>=3.10',
+    install_requires=['numpy>=1.24.3'],
     url='https://github.com/static-frame/arraykit',
     author='Christopher Ariza, Brandt Bucher, Charles Burkland',
     license='MIT',
