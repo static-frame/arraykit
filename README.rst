@@ -23,7 +23,6 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 
 
-
 Dependencies
 --------------
 
@@ -33,9 +32,16 @@ ArrayKit requires the following:
 - numpy>=1.24.3
 
 
-
 What is New in ArrayKit
 -------------------------
+
+1.0.0
+............
+
+Integrated `AutoMap` and `FrozenAutoMap` from `arraymap`.
+
+Removed global integer cache from  `AutoMap` and `FrozenAutoMap` for thread safety.
+
 
 0.10.0
 ............
