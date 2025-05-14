@@ -4,7 +4,7 @@ import typing as tp
 from setuptools import Extension  # type: ignore
 from setuptools import setup
 
-AK_VERSION = '1.0.0'
+AK_VERSION = '1.0.2'
 
 def get_long_description() -> str:
     return '''The ArrayKit library provides utilities for creating and transforming NumPy arrays, implementing performance-critical StaticFrame operations as Python C extensions.
