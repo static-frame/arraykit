@@ -54,6 +54,8 @@ jobs:
             - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt'}
 
     runs-on: ${{ matrix.os }}
+    outputs:
+      artifact_names: ${{ steps.record_artifacts.outputs.artifact_names }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
@@ -91,6 +93,12 @@ jobs:
           name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}  # Unique artifact name
           path: dist/*
 
+      - name: Collect artifact name
+        run: echo "ARTIFACT_NAMES+=dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }} " >> $GITHUB_ENV
+
+        - id: collect_artifacts
+        run: echo "::set-output name=artifact_names::${{ env.ARTIFACT_NAMES }}"
+
   upload:
     name: Publish
     if: github.event_name == 'release'
@@ -101,10 +109,14 @@ jobs:
         with:
           name: dist-sdist
           path: dist
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist-wheels-*
-          path: dist
+
+      - name: Download wheel artifacts using recorded names
+        run: |
+          for artifact in ${{ needs.wheels.outputs.artifact_names }}; do
+            echo "Downloading artifact: $artifact"
+            gh run download -n "$artifact" -D dist || echo "Artifact $artifact not found."
+          done
+
       - uses: pypa/gh-action-pypi-publish@master
         with:
           password: ${{ secrets.PYPI_TOKEN }}
