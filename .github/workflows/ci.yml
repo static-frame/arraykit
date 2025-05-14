@@ -23,7 +23,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dist-sdist
-          path: dist/*.tar.gz
+          path: dist/*
 
   matrix_config:
     name: Matrix Runner Config
@@ -103,11 +103,12 @@ jobs:
         with:
           # leave out name to get all
           path: dist
+          merge-multiple: true
 
-      - name: Flatten dist directory
-        run: |
-          find dist -mindepth 2 -type f \( -name '*.whl' -o -name '*.tar.gz' \) \
-            -exec mv {} dist/ \;
+      # - name: Flatten dist directory
+      #   run: |
+      #     find dist -mindepth 2 -type f \( -name '*.whl' -o -name '*.tar.gz' \) \
+      #       -exec mv {} dist/ \;
 
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
