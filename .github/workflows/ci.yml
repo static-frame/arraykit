@@ -101,9 +101,15 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          # leave out name to get all
           path: dist
 
-      - uses: pypa/gh-action-pypi-publish@master
+      - name: Flatten dist directory
+        run: |
+          find dist -mindepth 2 -type f \( -name '*.whl' -o -name '*.tar.gz' \) \
+            -exec mv {} dist/ \;
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
           skip_existing: true
