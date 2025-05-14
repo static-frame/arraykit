@@ -22,8 +22,8 @@ jobs:
       - run: python setup.py sdist
       - uses: actions/upload-artifact@v4
         with:
-          # name: dist-sdist
-          path: dist
+          name: dist-sdist
+          path: dist/*.tar.gz
 
   matrix_config:
     name: Matrix Runner Config
@@ -112,4 +112,4 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
-          skip_existing: true
+          skip-existing: true
