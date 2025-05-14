@@ -93,8 +93,10 @@ jobs:
           name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}  # Unique artifact name
           path: dist/*
 
-      - name: Collect artifact name
-        run: echo "ARTIFACT_NAMES+=dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }} " >> $GITHUB_ENV
+          - name: Collect artifact name
+          run: |
+            # prepend the old value, then our new entry
+            echo "ARTIFACT_NAMES=${ARTIFACT_NAMES} dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }} " >> $GITHUB_ENV
 
         - id: collect_artifacts
         run: echo "::set-output name=artifact_names::${{ env.ARTIFACT_NAMES }}"
