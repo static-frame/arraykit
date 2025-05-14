@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.0.5
+............
+
+Updated build configuration.
+
+
 1.0.4
 ............
 
