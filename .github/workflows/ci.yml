@@ -62,7 +62,7 @@ jobs:
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: startsWith(matrix.os, 'windows-')
 
-      - uses: pypa/cibuildwheel@v2.21.3
+      - uses: pypa/cibuildwheel@v2.23.3
         if: matrix.os != 'macos-13-xlarge'
         with:
           output-dir: dist
@@ -76,7 +76,7 @@ jobs:
 
       - run: pip install pipx
         if: matrix.os == 'macos-13-xlarge'
-      - uses: pypa/cibuildwheel@v2.21.3
+      - uses: pypa/cibuildwheel@v2.23.3
         if: matrix.os == 'macos-13-xlarge'
         with:
           output-dir: dist
