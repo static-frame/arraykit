@@ -52,7 +52,7 @@ setup(
     version=AK_VERSION,
     description='Array utilities for StaticFrame',
     long_description=get_long_description(),
-    long_description_content_type='text/plain', # use text/x-rst
+    long_description_content_type='text/x-rst', # use text/x-rst
     python_requires='>=3.10',
     install_requires=['numpy>=1.24.3'],
     url='https://github.com/static-frame/arraykit',
