@@ -1007,6 +1007,19 @@ def test_fam_get_dt64_a():
     with pytest.raises(KeyError):
         _ = fam[k2]
 
+def test_fam_get_dt64_b():
+    a1 = np.array(("2023", "1854", "1988"), np.datetime64)
+    fam = FrozenAutoMap(list(a1))
+
+    k1 = np.datetime64("1988-01-01")
+    with pytest.raises(KeyError):
+        _ = fam[k1]
+
+    k2 = np.datetime64("2023-01-01")
+    with pytest.raises(KeyError):
+        _ = fam[k2]
+
+
 def test_am_get_dt64_a():
     a1 = np.array(("2023", "1854", "1988"), np.datetime64)
     a1.flags.writeable = False
