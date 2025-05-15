@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.0.8
+............
+
+NumPy ``datetime64`` scalar lookups in ``AutoMap`` and ``FrozenAutoMap`` explicitly require matching units.
+
+
 1.0.7
 ............
 
@@ -80,9 +86,9 @@ Updated build configuration.
 1.0.0
 ............
 
-Integrated `AutoMap` and `FrozenAutoMap` from `arraymap`.
+Integrated ``AutoMap`` and ``FrozenAutoMap`` from ``arraymap``.
 
-Removed global integer cache from  `AutoMap` and `FrozenAutoMap` for thread safety.
+Removed global integer cache from  ``AutoMap`` and ``FrozenAutoMap`` for thread safety.
 
 
 0.10.0
