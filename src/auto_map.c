@@ -685,6 +685,9 @@ lookup_hash_obj(FAMObject *self, PyObject *key, Py_hash_t hash)
     int result = -1;
     Py_hash_t h = 0;
 
+    // AK_DEBUG_MSG_OBJ("lookup_hash_obj", key);
+    // TODO: if key is a dt64, we need to get the units and compare to units before doing PyObject_RichCompareBool
+
     while (1) {
         for (Py_ssize_t i = 0; i < SCAN; i++) {
             h = table[table_pos].hash;
@@ -1027,6 +1030,8 @@ lookup_datetime(FAMObject *self, PyObject* key) {
     if (PyArray_IsScalar(key, Datetime)) {
         v = (npy_int64)PyArrayScalar_VAL(key, Datetime);
         // if we observe a NAT, we skip unit checks
+        // AK_DEBUG_MSG_OBJ("dt64 value", PyLong_FromLongLong(v));
+
         if (v != NPY_DATETIME_NAT) {
             NPY_DATETIMEUNIT key_unit = dt_unit_from_scalar(
                     (PyDatetimeScalarObject *)key);
@@ -1034,7 +1039,6 @@ lookup_datetime(FAMObject *self, PyObject* key) {
                 return -1;
             }
         }
-        // DEBUG_MSG_OBJ("dt64 value", PyLong_FromLongLong(v));
     }
     else {
         return -1;
