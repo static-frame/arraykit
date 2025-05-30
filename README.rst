@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.0.9
+............
+
+Updated types in ``pyi`` file.
+
+
 1.0.8
 ............
 
