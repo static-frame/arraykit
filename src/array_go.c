@@ -41,14 +41,23 @@ update_array_cache(ArrayGOObject *self)
     if (self->list) {
         if (self->array) {
             PyObject *container = PyTuple_Pack(2, self->array, self->list);
+            PyObject *new_array;
             if (!container) {
                 return -1;
             }
-            Py_SETREF(self->array, PyArray_Concatenate(container, 0));
+            new_array = PyArray_Concatenate(container, 0);
             Py_DECREF(container);
+            if (!new_array) {
+                return -1;
+            }
+            Py_SETREF(self->array, new_array);
         }
         else {
-            self->array = PyArray_FROM_OT(self->list, NPY_OBJECT);
+            PyObject *new_array = PyArray_FROM_OT(self->list, NPY_OBJECT);
+            if (!new_array) {
+                return -1;
+            }
+            self->array = new_array;
         }
         PyArray_CLEARFLAGS((PyArrayObject *)self->array, NPY_ARRAY_WRITEABLE);
         Py_CLEAR(self->list);
@@ -158,9 +167,20 @@ PyObject *
 ArrayGO_copy(ArrayGOObject *self, PyObject *Py_UNUSED(unused))
 {
     ArrayGOObject *copy = PyObject_GC_New(ArrayGOObject, &ArrayGOType);
+    if (!copy) {
+        return NULL;
+    }
     copy->array = self->array;
-    copy->list = self->list ? PySequence_List(self->list) : NULL;
     Py_XINCREF(copy->array);
+    if (self->list) {
+        copy->list = PySequence_List(self->list);
+        if (!copy->list) {
+            Py_DECREF(copy);
+            return NULL;
+        }
+    } else {
+        copy->list = NULL;
+    }
     return (PyObject *)copy;
 }
 
