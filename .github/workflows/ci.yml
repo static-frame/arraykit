@@ -48,10 +48,11 @@ jobs:
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt'}
-            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt'}
+            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', free_threading: '0'}
+            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', free_threading: '0'}
+            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt', free_threading: '0'}
+            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', free_threading: '0'}
+            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', free_threading: '1'}
 
     runs-on: ${{ matrix.os }}
     outputs:
@@ -75,6 +76,7 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
+          PYTHON_FREE_THREADING: ${{ matrix.python.free_threading }}
 
       - run: pip install pipx
         if: matrix.os == 'macos-13-xlarge'
@@ -87,6 +89,7 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
+          PYTHON_FREE_THREADING: ${{ matrix.python.free_threading }}
 
       - uses: actions/upload-artifact@v4
         with:
