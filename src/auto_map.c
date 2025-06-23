@@ -426,8 +426,13 @@ fami_iternext(FAMIObject *self)
             else {
                 PyObject* t = PyTuple_New(2);
                 if (!t) { return NULL; }
+#if PY_VERSION_HEX >= 0x030D0000  // Python 3.13+
                 PyObject* k = PyList_GetItemRef(self->fam->keys, index);
-                if (!t) { return NULL; }
+#else
+                PyObject* k = PyList_GET_ITEM(self->fam->keys, index);
+                Py_XINCREF(k);
+#endif
+                if (!k) { return NULL; }
                 PyTuple_SET_ITEM(t, 0, k);
                 PyTuple_SET_ITEM(t, 1, PyLong_FromSsize_t(index));
                 return t;
@@ -438,7 +443,12 @@ fami_iternext(FAMIObject *self)
                 return PyArray_ToScalar(PyArray_GETPTR1(self->keys_array, index), self->keys_array);
             }
             else {
+#if PY_VERSION_HEX >= 0x030D0000  // Python 3.13+
                 PyObject* yield = PyList_GetItemRef(self->fam->keys, index);
+#else
+                PyObject* yield = PyList_GET_ITEM(self->fam->keys, index);
+                Py_XINCREF(yield);
+#endif
                 if (!yield) { return NULL; }
                 return yield;
             }
