@@ -72,7 +72,7 @@ static struct PyModuleDef arraykit_module = {
     .m_methods = arraykit_methods,
 };
 
-PyObject *
+PyObject*
 PyInit__arraykit(void)
 {
     import_array();
@@ -134,6 +134,9 @@ PyInit__arraykit(void)
         Py_XDECREF(m);
         return NULL;
     }
+#ifdef Py_GIL_DISABLED
+    PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
+#endif
     return m;
 }
 
