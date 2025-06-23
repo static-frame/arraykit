@@ -76,7 +76,7 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
-          PYTHON_FREE_THREADING: ${{ matrix.python.free_threading }}
+          CIBW_ENABLE: ${{ matrix.python.free_threading == '1' && 'cpython-freethreading' || '' }}
 
       - run: pip install pipx
         if: matrix.os == 'macos-13-xlarge'
@@ -89,7 +89,7 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
-          PYTHON_FREE_THREADING: ${{ matrix.python.free_threading }}
+          CIBW_ENABLE: ${{ matrix.python.free_threading == '1' && 'cpython-freethreading' || '' }}
 
       - uses: actions/upload-artifact@v4
         with:
