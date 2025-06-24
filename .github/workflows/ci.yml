@@ -41,7 +41,7 @@ jobs:
           fi
 
   wheels:
-    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }} / FT ${{ matrix.python.ft }}
+    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }} / FT${{ matrix.python.ft }}
     needs: matrix_config
     strategy:
       fail-fast: false
@@ -52,7 +52,7 @@ jobs:
             - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', ft: '0'}
             - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt', ft: '0'}
             - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '0'}
-            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '1'}
+            - {minor: 13t, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '1'}
 
     runs-on: ${{ matrix.os }}
     outputs:
