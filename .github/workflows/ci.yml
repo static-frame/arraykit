@@ -93,7 +93,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}-t{{ matrix.python.ft }}  # Unique artifact name
+          name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}-t${{ matrix.python.ft }}  # Unique artifact name
           path: dist/*
 
   upload:
