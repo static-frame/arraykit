@@ -205,8 +205,15 @@ PyObject *
 is_objectable_dt64(PyObject *Py_UNUSED(m), PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject* array = (PyArrayObject*)a;
-    AK_is_objectable_dt64(array);
-    Py_RETURN_FALSE;
+    switch (AK_is_objectable_dt64(array)) {
+        case -1:
+            return NULL;
+        case 0:
+            Py_RETURN_FALSE;
+        case 1:
+            Py_RETURN_TRUE;
+    }
+    return NULL;
 }
 
 

@@ -232,8 +232,8 @@ AK_dt_unit_from_array(PyArrayObject* a) {
     return dma->base;
 }
 
-// Givne a dt64 array, determine if it can be cast to a object without data loss.
-static inline bool
+// Given a dt64 array, determine if it can be cast to a object without data loss. Returns -1 on error
+static inline int
 AK_is_objectable_dt64(PyArrayObject* a)
 {
     NPY_DATETIMEUNIT unit = AK_dt_unit_from_array(a);
@@ -258,24 +258,42 @@ AK_is_objectable_dt64(PyArrayObject* a)
             return false;
     }
 
-    PyArray_Descr* dt_year = PyArray_DescrFromType(NPY_DATETIME);
-    if (dt_year == NULL) {
-        return NULL;
+    PyObject* dt_year_str = PyUnicode_FromString("datetime64[Y]");
+    if (!dt_year_str) return -1;
+
+    PyArray_Descr* dt_year = NULL;
+    if (!PyArray_DescrConverter2(dt_year_str, &dt_year)) {
+        Py_DECREF(dt_year_str);
+        return -1;
     }
-    // TODO: not sure how to do this
-    // dt_year->metadata = Py_BuildValue("{s:i}", "unit", NPY_FR_Y);
+    Py_DECREF(dt_year_str);
+    AK_DEBUG_MSG_OBJ("got descr", (PyObject*)dt_year);
+
     PyObject* a_year = PyArray_CastToType(a, dt_year, 0);
-    Py_DECREF(dt_year);
+    if (!a_year) {
+        Py_DECREF(dt_year);
+        return -1;
+    }
+    AK_DEBUG_MSG_OBJ("a_year", a_year);
+
+    npy_int64* data = (npy_int64*)PyArray_DATA((PyArrayObject*)a_year);
+    npy_intp size = PyArray_SIZE((PyArrayObject*)a_year);
+
+    for (npy_intp i = 0; i < size; ++i) {
+        npy_int64 v = data[i];
+        // if (v == NPY_DATETIME_NAT) {
+        //     continue;
+        // }
+        // offset: 1-1970, 9999-1970
+        AK_DEBUG_MSG_OBJ("int values", PyLong_FromSsize_t(v));
+        if (v < -1969 || v > 8029) {
+            Py_DECREF(a_year);
+            return 0;
+        }
+    }
 
     Py_DECREF(a_year);
-    return false;
-
-    // years = array[~np.isnat(array)].astype(DT64_YEAR).astype(DTYPE_INT_DEFAULT) + 1970
-    // if np.any(years < datetime.MINYEAR):
-    //     return False
-    // if np.any(years > datetime.MAXYEAR):
-    //     return False
-    // return True
+    return 1;
 
 }
 

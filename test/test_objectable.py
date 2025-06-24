@@ -8,7 +8,16 @@ class TestUnit(unittest.TestCase):
 
     def test_is_objectable_dt64_a(self) -> None:
         a1 = np.array(['2022-01-04', '1954-04-12'], dtype=np.datetime64)
+        self.assertTrue(is_objectable_dt64(a1))
+
+
+    def test_is_objectable_dt64_b(self) -> None:
+        # years are nevery objectable
+        a1 = np.array(['2022', '2023'], dtype=np.datetime64)
         self.assertFalse(is_objectable_dt64(a1))
 
 
+    def test_is_objectable_dt64_c(self) -> None:
+        a1 = np.array(['-120', '2023'], dtype=np.datetime64)
+        self.assertFalse(is_objectable_dt64(a1))
 

@@ -17,6 +17,7 @@ from arraykit import mloc
 from arraykit import immutable_filter
 from arraykit import array_deepcopy
 from arraykit import isna_element
+from arraykit import is_objectable_dt64
 from arraykit import dtype_from_element
 from arraykit import count_iteration
 from arraykit import first_true_1d
@@ -951,8 +952,6 @@ class TestUnit(unittest.TestCase):
             slice_to_ascending_slice(slice(1, -10, -1), 10), # [1]
             slice(1, 2, None)
             )
-
-
 
 
 if __name__ == '__main__':
