@@ -41,6 +41,7 @@ What is New in ArrayKit
 
 Now building free-threaded compatible wheels for Python 3.13.
 
+Added ``is_objectable_dt64()``.
 
 
 1.0.9
