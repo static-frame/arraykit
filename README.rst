@@ -35,6 +35,14 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+1.1.0-dev
+............
+
+Now building free-threaded compatible wheels for Python 3.13.
+
+
+
 1.0.9
 ............
 
