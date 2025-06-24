@@ -41,17 +41,18 @@ jobs:
           fi
 
   wheels:
-    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }}
+    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }} / FT${{ matrix.python.ft }}
     needs: matrix_config
     strategy:
       fail-fast: false
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt'}
-            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt'}
+            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', ft: '0'}
+            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', ft: '0'}
+            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt', ft: '0'}
+            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '0'}
+            - {minor: 13t, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '1'}
 
     runs-on: ${{ matrix.os }}
     outputs:
@@ -75,6 +76,7 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
+          CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
       - run: pip install pipx
         if: matrix.os == 'macos-13-xlarge'
@@ -87,10 +89,11 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
+          CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}  # Unique artifact name
+          name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}-t${{ matrix.python.ft }}  # Unique artifact name
           path: dist/*
 
   upload:
@@ -104,11 +107,6 @@ jobs:
           # leave out name to get all
           path: dist
           merge-multiple: true
-
-      # - name: Flatten dist directory
-      #   run: |
-      #     find dist -mindepth 2 -type f \( -name '*.whl' -o -name '*.tar.gz' \) \
-      #       -exec mv {} dist/ \;
 
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:

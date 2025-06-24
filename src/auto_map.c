@@ -426,8 +426,13 @@ fami_iternext(FAMIObject *self)
             else {
                 PyObject* t = PyTuple_New(2);
                 if (!t) { return NULL; }
+#if PY_VERSION_HEX >= 0x030D0000  // Python 3.13+
+                PyObject* k = PyList_GetItemRef(self->fam->keys, index);
+#else
                 PyObject* k = PyList_GET_ITEM(self->fam->keys, index);
-                Py_INCREF(k);
+                Py_XINCREF(k);
+#endif
+                if (!k) { return NULL; }
                 PyTuple_SET_ITEM(t, 0, k);
                 PyTuple_SET_ITEM(t, 1, PyLong_FromSsize_t(index));
                 return t;
@@ -438,8 +443,13 @@ fami_iternext(FAMIObject *self)
                 return PyArray_ToScalar(PyArray_GETPTR1(self->keys_array, index), self->keys_array);
             }
             else {
+#if PY_VERSION_HEX >= 0x030D0000  // Python 3.13+
+                PyObject* yield = PyList_GetItemRef(self->fam->keys, index);
+#else
                 PyObject* yield = PyList_GET_ITEM(self->fam->keys, index);
-                Py_INCREF(yield);
+                Py_XINCREF(yield);
+#endif
+                if (!yield) { return NULL; }
                 return yield;
             }
         }
@@ -1302,11 +1312,11 @@ lookup(FAMObject *self, PyObject *key) {
     return self->table[table_pos].keys_pos;
 }
 
-// Insert a key_pos, hash pair into the table. Assumes table already has appropriate size. When inserting a new itme, `hash` is -1, forcing a fresh hash to be computed here. Return 0 on success, -1 on error.
+// Insert a key_pos, hash pair into the table. Assumes table already has appropriate size. When inserting a new item, `hash` is -1, forcing a fresh hash to be computed here. Return 0 on success, -1 on error.
 static int
 insert_obj(
         FAMObject *self,
-        PyObject *key,
+        PyObject *key,  // NOTE: a borrowed reference
         Py_ssize_t keys_pos,
         Py_hash_t hash)
 {
