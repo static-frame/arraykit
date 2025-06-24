@@ -258,16 +258,6 @@ AK_is_objectable_dt64(PyArrayObject* a, PyObject* dt_year)
             return false;
     }
 
-    // PyObject* dt_year_str = PyUnicode_FromString("datetime64[Y]");
-    // if (!dt_year_str) return -1;
-
-    // PyArray_Descr* dt_year = NULL;
-    // if (!PyArray_DescrConverter2(dt_year_str, &dt_year)) {
-    //     Py_DECREF(dt_year_str);
-    //     return -1;
-    // }
-    // Py_DECREF(dt_year_str);
-
     Py_INCREF(dt_year);
     PyObject* a_year = PyArray_CastToType(a, (PyArray_Descr*)dt_year, 0);
     if (!a_year) {
