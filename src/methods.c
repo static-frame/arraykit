@@ -202,10 +202,17 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
 }
 
 PyObject *
-is_objectable_dt64(PyObject *Py_UNUSED(m), PyObject *a) {
+is_objectable_dt64(PyObject *m, PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
+
+    // this returns a new reference
+    PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
+
     PyArrayObject* array = (PyArrayObject*)a;
-    switch (AK_is_objectable_dt64(array)) {
+    int result = AK_is_objectable_dt64(array, dt_year);
+    Py_DECREF(dt_year);
+
+    switch (result) {
         case -1:
             return NULL;
         case 0:
