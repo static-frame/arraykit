@@ -17,13 +17,13 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
         with:
-          python-version: 3.12
-      - run: pip install -r requirements-build-3_12.txt
+          python-version: 3.13
+      - run: pip install -r requirements-build-3_13.txt
       - run: python setup.py sdist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: dist-sdist
+          path: dist/*
 
   matrix_config:
     name: Matrix Runner Config
@@ -41,19 +41,22 @@ jobs:
           fi
 
   wheels:
-    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }}
+    name: Build / ${{ matrix.os }} / Python 3.${{ matrix.python.minor }} / FT${{ matrix.python.ft }}
     needs: matrix_config
     strategy:
       fail-fast: false
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 9,  req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt'}
-            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt'}
+            - {minor: 10, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', ft: '0'}
+            - {minor: 11, req_build: 'requirements-build-3_11.txt', req_test: 'requirements-dev-3_11.txt', ft: '0'}
+            - {minor: 12, req_build: 'requirements-build-3_12.txt', req_test: 'requirements-dev-3_12.txt', ft: '0'}
+            - {minor: 13, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '0'}
+            - {minor: 13t, req_build: 'requirements-build-3_13.txt', req_test: 'requirements-dev-3_13.txt', ft: '1'}
 
     runs-on: ${{ matrix.os }}
+    outputs:
+      artifact_names: ${{ steps.record_artifacts.outputs.artifact_names }}
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-python@master
@@ -62,7 +65,7 @@ jobs:
       - run: echo '::add-matcher::.github/problem-matchers/msvc.json'
         if: startsWith(matrix.os, 'windows-')
 
-      - uses: pypa/cibuildwheel@v2.18.0
+      - uses: pypa/cibuildwheel@v2.23.3
         if: matrix.os != 'macos-13-xlarge'
         with:
           output-dir: dist
@@ -73,10 +76,11 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
+          CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
       - run: pip install pipx
         if: matrix.os == 'macos-13-xlarge'
-      - uses: pypa/cibuildwheel@v2.18.0
+      - uses: pypa/cibuildwheel@v2.23.3
         if: matrix.os == 'macos-13-xlarge'
         with:
           output-dir: dist
@@ -85,11 +89,12 @@ jobs:
           CIBW_BEFORE_BUILD: pip install -r {project}/${{ matrix.python.req_build }}
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
+          CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: dist-wheels-${{ matrix.os }}-py3${{ matrix.python.minor }}-t${{ matrix.python.ft }}  # Unique artifact name
+          path: dist/*
 
   upload:
     name: Publish
@@ -97,11 +102,13 @@ jobs:
     needs: [tar_gz, wheels]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: dist
+          # leave out name to get all
           path: dist
-      - uses: pypa/gh-action-pypi-publish@master
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
-          skip_existing: true
+          skip-existing: true

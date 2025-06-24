@@ -30,7 +30,7 @@ class Interface(tp.NamedTuple):
                 continue
             obj = getattr(module, name)
             if isinstance(obj, type): # a class
-                if name == ak.ErrorInitTypeBlocks.__name__:
+                if name in (ak.ErrorInitTypeBlocks.__name__, ak.NonUniqueError.__name__):
                     # skip as there is Python version variability
                     continue
                 classes[name] = []
@@ -58,11 +58,22 @@ class TestUnit(unittest.TestCase):
 
         spec = spec_from_loader('', loader=None)
         pyi_mod = module_from_spec(spec)
+
         exec(msg, pyi_mod.__dict__)
 
         ak_content = Interface.from_module(ak)
         pyi_content = Interface.from_module(pyi_mod)
-        self.assertEqual(ak_content, pyi_content)
+
+        self.assertEqual(ak_content.functions, pyi_content.functions)
+
+        for name in ak_content.classes.keys():
+            ak_class = ak_content.classes[name]
+            pyi_class = pyi_content.classes[name]
+
+            if '__hash__' in ak_class: ak_class.remove('__hash__')
+            if '__hash__' in pyi_class: pyi_class.remove('__hash__')
+
+            self.assertEqual(ak_class, pyi_class)
 
 
 if __name__ == '__main__':

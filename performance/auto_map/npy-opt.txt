@@ -1,0 +1,143 @@
+
+These changes integrate direct support of NumPy arrays given as keys to `AutoMap`s and `FrozenAutoMap`s, optimizing their usage.
+
+Improvements are made in `AutoMap` initialization, whereby an array is converted to a list using optimal array methods; that list is then held as the keys.
+
+Improvements are made in `FrozenAutoMap` initialization, whereby an immutable array (for integer, floating point, and flexible dtypes), when given as keys, is held as a reference without copying to a list. Further, hashing and lookup make use of C types, avoiding any management of PyObjects.
+
+For array dtypes not explicitly handled, or for non-array keys, `FrozenAutoMap` operation is unchanged. In all cases, hash table layout and scanning, and management of the PyObject integer cache, are the same as before.
+
+A key change is that, on initialization (`fam_init`), a `KeysArrayType` enum value is assigned to the `keys_array_type` attribute of `FAMObject`. This is used for branching in all places where divergent behavior is required between keys stored as lists (as was done previously) or as keys stored as typed arrays.
+
+Performance panels compare FAM(L), FAM(A), AM(A), and Dict (`FrozenAutoMap` created from a list, `FrozenAutoMap` created from an array, `AutoMap` created from an array, and a dictionary implementing an `AutoMap` mapping). Key indicators are the performance of instantiation and lookup.
+
+The relevant comparison for StaticFrame usage is between FAM(A) and AM(A), the latter approximating what StaticFrame does presently when creating `FrozenAutoMap`s. (FAM(L) is not available to StaticFrame as AutoMaps are always created from an array, not a list of Python objects.)
+
+Across all supported types, FAM(A) initialization is more than twice as fast as AM(A). FAM(A) lookup performance varies greatly by type, but always out-performs AM(A), in some cases more than twice as fast as AM(A). In all tests, we see signs that out-performance grows with scale.
+
+Independent of performance time, All `FrozenAutoMap` usage of arrays reduces memory usage: no new `PyObject`s are created and the passed array simply has reference incremented.
+
+
+
+Key Changes
+
+Split the old `fam_new()` into `fam_new()` and `fam_init()`, implemented `__setstate__()`, `__getstate__()`:
+    To support pickling a FAM with a NumPy array, `__setstate__()` must re-set the `writeable` flag of an arary to False.
+    To integrate `__setstate__()`, the old `fam_new()` had to be divided into a `fam_new()` and a `fam_init()`.
+
+Based on `keys_array_type`, `fam_init` calls type-specific insert routines, which use type-specific hash routines to add entries to the hash table.
+
+On lookup, type-specific lookup routines are called based on `keys_array_type`. These routines identify PyObjects as PyArray scalars or native PyObject types, extract the appropriate C-type, compute a hash, and use type-specific lookup routines to discover the position in the keys array.
+
+
+Split `copy()` into `copy()` and `copy_to_new()`.
+    Due to now having `fam_new()` and `fam_init()`, copy allocation and copy setting needed to split into two methods. Now, in `fam_init`, if a `FAMType` is identified as the keys argument, `copy_to_new()` is used to transfer values from the argument to the new instance. The `copy()` function remains, now using `fam_new()` and `copy_to_new()`.
+
+Additions to the `FAMObject` struct:
+    `key_array_type`: A `KeysArrayType` enum specifying a list or array dtype. As a list is assigned zero (and all other array dtypes as non-zero), the value can be used to branch on non-array versus array processing.
+
+    `keys_size`: As determining size must branch on `keys_array_type`, this attribute is used to track size, avoiding having to go the underly keys container.
+
+    `key_buffer`: For Unicode arrays, this is a dynamically allocated buffer of size equal to one more than the array's max number of characters. This buffer is given to `PyUnicode_AsUCS4`, which will add a NULL and is why the size of the buffer is one more than max characters. This is only used for a FAM with Unicode array keys; all other usage keeps this as NULL.
+
+The type of `key_count_global` is now a platform independent 64 bit signed integer. Perviously, it was a `Py_ssize_t`, which is 32 bits on 32 bit systems and could overflow in scenarios when many indicies are created.
+
+Extended property tests for FAMs with arrays
+    A custom Hypothesis strategy has been implemented to deliver both contiguous and non-contiguous arrays.
+
+    New Hypothesis tests for array-initialized `FrozenAutoMap`s now cover all features previously tested by Hypothesis.
+
+
+
+
+
+
+
+At the core of every StaticFrame Index is an AutoMap (or the immutable FrozenAutoMap), a custom dictionary-like container implemented as a C-extension. This container meets the special needs of Index objects: given a sequence of hashable labels, permit obtaining their position with near constant-time performance. This can be done with standard dicts: given a sequence of hashables (seq) we could do the following: {k: v for v, k in enumerate(seq)}. This is inefficient, however, in that they values are always just contiguous integers; duplicating them for every dictionary is unnecessary. The first implementation optimized this aspect by using a shared cache of contiguous integers. In addition, that first implementation used a novel hash-table collision scanning approach to take advantage of contiguous memory. While this permited creating AutoMap's in about half the time as normal dicts, that performance was only available when starting with a list of Python objects. As every StaticFrame Index stores an immutable array of labels, converting that array to a list was costly and significantly reduced the performance advantage. Even more, the opportunity of just holding a reference to the immutable array was not taken, missing out on performance and memory savings. Over the past few weeks I have extended FrozenAutoMap to work directly with immutable arrays, holding on to them without copy, and using their C-types directly for hashing and lookup comparison. In most cases, particularly at scale, FrozenAutoMap, given an immutable array of non-object types, now outperforms any AutoMap created from a list. This offers a potentially significant general performance improvement throughout StaticFrame.
+
+
+
+AutoMap
+
+A specialized dictionary where keys and their ordering are the only thing that matters
+
+A key points to an integer; we want constant-time lookup from a key to its ordered position.
+
+Original AutoMap:
+
+    Took arbitrary iterables and loaded them into an internally managed List
+
+    The hash "table" is an array of structs, where each item is a pair of hash code and the index into keys list to find the key (struct TableElement)
+
+    Hashing used PyObject_Hash (lookup())
+
+    Comparison to other objects used PyObject_RichCompareBool (lookup_hash())
+
+    On insert, we compute a hash, find a hashble index, and lookup the found hash; we search the table until we find an empty position.
+
+    On lookup, we compute a hash and map it to a table_pos; fetching this table position, we see if the hash matches; if so, we fetch the key and compare it; if not a match (or if hashes do not match), we continue searching the table.
+
+    Brandt's original implementation used a sequential scan when possible to optimize performance.
+
+
+Problems with Arrays.
+
+    For every SF index, there is an immutable NumPy array of labels.
+
+    When creating an FrozenAutoMap from an array, those values would be extracted as Scalars into a list.
+
+    It was discovered that for most types, calling `tolist()` first was faster than letting FAM iterate the array and create a list. This created an intermediary list that was thrown away.
+
+    The goal of using immutable arrays is no-copy reuse. How can we use this in a FAM?
+
+    For AutoMap (mutable), we can continue to use a list
+
+
+NumPy Arrays
+
+    A PyObject that wraps (sometimes) contiguous byte data interpreted (with a dtype and strides) as a N-dimensional array data.
+
+    There are two ways to get elements out of an array:
+        as a PyObject
+        as a Scalar
+        Calling `tolist()` creates PyObjects
+        Selection & iteration result in Scalars
+
+    The performance advantage of NumPy is using the byte data and C-types directly, avoiding Py Objects
+
+
+First Approach
+
+    Store immutable array instead of keys list (no-copy)
+
+    For insertion and hashing, use PyArray_GETITEM to get a PyObject
+
+    For lookup, use PyArray_GETITEM to get a PyObject, then use PyObject_RichCompare
+
+    Performance was not improved (memory might have been)
+
+    Using PyArray_ToScalar was slower.
+
+    Problem: still have to create a PyObject for every element on initialization and lookup.
+
+
+Second Approach
+
+    Identify arrays on initialization
+
+    On insert, read C-type from byte-data and pass it to type-specific insertion function.
+
+        If array is contiguous, can do sequential access after extracting PyArray_DATA
+
+        If not, can use PyArray_GETPTR1
+
+    Type-specific insertion can use type-specific hash function (no PyObjects).
+
+    Type-specific lookup can compare a foreign key (as a C type) to value in the array (extracted with PyArray_GETPTR1)
+
+    Generic lookup routines know the type of the stored array: can reject foreign keys by type, before hashing
+
+    Given Scalars, can extract data.
+
+    Given PyObjects, can convert to C-types for type-specific loookup.
+

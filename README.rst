@@ -23,19 +23,93 @@ Code: https://github.com/InvestmentSystems/arraykit
 Packages: https://pypi.org/project/arraykit
 
 
-
 Dependencies
 --------------
 
 ArrayKit requires the following:
 
-- Python>=3.9
-- numpy>=1.19.5
-
+- Python>=3.10
+- numpy>=1.24.3
 
 
 What is New in ArrayKit
 -------------------------
+
+
+1.1.0-dev
+............
+
+Now building free-threaded compatible wheels for Python 3.13.
+
+
+
+1.0.9
+............
+
+Updated types in ``pyi`` file.
+
+
+1.0.8
+............
+
+NumPy ``datetime64`` scalar lookups in ``AutoMap`` and ``FrozenAutoMap`` explicitly require matching units.
+
+
+1.0.7
+............
+
+Updated build configuration.
+
+
+1.0.6
+............
+
+Updated build configuration.
+
+
+1.0.5
+............
+
+Updated build configuration.
+
+
+1.0.4
+............
+
+Updated build configuration.
+
+
+1.0.3
+............
+
+Updated build configuration.
+
+
+1.0.2
+............
+
+Updated build configuration.
+
+
+1.0.1
+............
+
+Updated build configuration.
+
+
+1.0.0
+............
+
+Integrated ``AutoMap`` and ``FrozenAutoMap`` from ``arraymap``.
+
+Removed global integer cache from  ``AutoMap`` and ``FrozenAutoMap`` for thread safety.
+
+
+0.10.0
+............
+
+Now building wheels for Python 3.13.
+
 
 0.9.0
 ............

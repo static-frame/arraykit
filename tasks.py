@@ -26,7 +26,7 @@ def clean(context):
 def build(context):
     # context.run('pip install -r requirements-test.txt', echo=True, pty=True)
     # keep verbose to see warnings
-    context.run(f'{sys.executable} -m pip --disable-pip-version-check -v install .', echo=True, pty=True)
+    context.run(f'{sys.executable} -m pip --disable-pip-version-check -v install --no-build-isolation .', echo=True, pty=True)
 
 
 @invoke.task(build)
