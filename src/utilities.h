@@ -229,7 +229,6 @@ AK_dt_unit_from_array(PyArrayObject* a) {
     // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
     PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
     PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyDataType_C_METADATA(dt))->meta);
-    // PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
     return dma->base;
 }
 
@@ -377,15 +376,6 @@ AK_nonzero_1d(PyArrayObject* array) {
     PyArray_ENABLEFLAGS((PyArrayObject*)final, NPY_ARRAY_OWNDATA);
     PyArray_CLEARFLAGS((PyArrayObject*)final, NPY_ARRAY_WRITEABLE);
     return final;
-}
-
-static inline NPY_DATETIMEUNIT
-AK_dt_unit_from_array(PyArrayObject* a) {
-    // This is based on get_datetime_metadata_from_dtype in the NumPy source, but that function is private. This does not check that the dtype is of the appropriate type.
-    PyArray_Descr* dt = PyArray_DESCR(a); // borrowed ref
-    PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyDataType_C_METADATA(dt))->meta);
-    // PyArray_DatetimeMetaData* dma = &(((PyArray_DatetimeDTypeMetaData *)PyArray_DESCR(a)->c_metadata)->meta);
-    return dma->base;
 }
 
 static inline NPY_DATETIMEUNIT
