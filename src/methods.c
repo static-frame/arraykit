@@ -204,11 +204,10 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
 PyObject*
 is_objectable_dt64(PyObject *m, PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject* array = (PyArrayObject*)a;
 
     // this returns a new reference
     PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
-
-    PyArrayObject* array = (PyArrayObject*)a;
     int is_objectable = AK_is_objectable_dt64(array, dt_year);
     Py_DECREF(dt_year);
 
@@ -225,15 +224,42 @@ is_objectable_dt64(PyObject *m, PyObject *a) {
 
 
 PyObject*
+is_objectable(PyObject *m, PyObject *a) {
+    AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject* array = (PyArrayObject*)a;
+
+    char kind = PyArray_DESCR(array)->kind;
+    if ((kind == 'M' || kind == 'm')) {
+        // this returns a new reference
+        PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
+        int is_objectable = AK_is_objectable_dt64(array, dt_year);
+        Py_DECREF(dt_year);
+
+        switch (is_objectable) {
+            case -1:
+                return NULL;
+            case 0:
+                Py_RETURN_FALSE;
+            case 1:
+                Py_RETURN_TRUE;
+        }
+    }
+    Py_RETURN_TRUE;
+}
+
+
+PyObject*
 astype_array(PyObject* m, PyObject* args) {
 
     PyObject* a = NULL;
     PyObject* dtype_spec = Py_None;
 
-    if (!PyArg_ParseTuple(args, "O|O", &a, &dtype_spec)) {
+    if (!PyArg_ParseTuple(args, "O!|O:astype_array",
+        &PyArray_Type, &a,
+        &dtype_spec)) {
         return NULL;
     }
-    AK_CHECK_NUMPY_ARRAY(a);
+    // AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject* array = (PyArrayObject*)a;
 
     PyArray_Descr* dtype = NULL;

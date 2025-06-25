@@ -51,6 +51,9 @@ PyObject *
 is_objectable_dt64(PyObject *m, PyObject *a);
 
 PyObject *
+is_objectable(PyObject *m, PyObject *a);
+
+PyObject *
 astype_array(PyObject *m, PyObject *args);
 
 PyObject *
