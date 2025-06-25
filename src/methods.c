@@ -324,7 +324,7 @@ astype_array(PyObject* m, PyObject* args) {
         }
     }
     // all other cases: do a standard cast conversion
-    PyObject* result = PyArray_CastToType((PyArrayObject*)array, dtype, 0);
+    PyObject* result = PyArray_CastToType(array, dtype, 0);
     if (!result) {
         Py_DECREF(dtype);
         return NULL;
