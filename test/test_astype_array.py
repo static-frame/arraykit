@@ -30,7 +30,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a2.dtype, np.dtype(np.int8))
         self.assertFalse(a2.flags.writeable)
 
-    def test_astype_array_b(self) -> None:
+    def test_astype_array_b1(self) -> None:
         a1 = np.array(['2021', '2024'], dtype=np.datetime64)
 
         a2 = astype_array(a1, np.object_)
@@ -38,3 +38,23 @@ class TestUnit(unittest.TestCase):
         self.assertFalse(a2.flags.writeable)
         self.assertEqual(list(a2), [np.datetime64('2021'), np.datetime64('2024')])
 
+
+    def test_astype_array_b2(self) -> None:
+        a1 = np.array(['2021', '1642'], dtype=np.datetime64)
+
+        a2 = astype_array(a1, np.object_)
+        self.assertEqual(a2.dtype, np.dtype(np.object_))
+        self.assertFalse(a2.flags.writeable)
+        self.assertEqual(list(a2), [np.datetime64('2021'), np.datetime64('1642')])
+
+
+    def test_astype_array_b3(self) -> None:
+        a1 = np.array(['2021', '2024', '1984', '1642'], dtype=np.datetime64).reshape((2, 2))
+
+        a2 = astype_array(a1, np.object_)
+        self.assertEqual(a2.dtype, np.dtype(np.object_))
+        self.assertFalse(a2.flags.writeable)
+        import ipdb; ipdb.set_trace()
+        self.assertEqual(
+                list(list(a) for a in a2),
+                [[np.datetime64('2021'), np.datetime64('2024')], [np.datetime64('1984'), np.datetime64('1642')]])
