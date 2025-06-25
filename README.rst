@@ -36,7 +36,7 @@ What is New in ArrayKit
 -------------------------
 
 
-1.1.0-dev
+1.1.0
 ............
 
 Now building free-threaded compatible wheels for Python 3.13.
