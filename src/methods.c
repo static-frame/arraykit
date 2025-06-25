@@ -247,7 +247,7 @@ is_objectable(PyObject *m, PyObject *a) {
     Py_RETURN_TRUE;
 }
 
-
+// Convert array to the dtype provided. NOTE: mutable arrays will be returned unless the input array is immutable and no dtype change is needed
 PyObject*
 astype_array(PyObject* m, PyObject* args) {
 
@@ -272,12 +272,12 @@ astype_array(PyObject* m, PyObject* args) {
 
     if (PyArray_EquivTypes(PyArray_DESCR(array), dtype)) {
         Py_DECREF(dtype);
+
         if (PyArray_ISWRITEABLE(array)) {
             PyObject* result = PyArray_NewCopy(array, NPY_ANYORDER);
             if (!result) {
                 return NULL;
             }
-            PyArray_CLEARFLAGS((PyArrayObject *)result, NPY_ARRAY_WRITEABLE);
             return result;
         }
         else { // already immutable
@@ -319,7 +319,6 @@ astype_array(PyObject* m, PyObject* args) {
                     PyArray_ITER_NEXT(it);
                 }
                 Py_DECREF(it);
-                PyArray_CLEARFLAGS((PyArrayObject *)result, NPY_ARRAY_WRITEABLE);
                 return result;
             }
         }
@@ -330,7 +329,6 @@ astype_array(PyObject* m, PyObject* args) {
         Py_DECREF(dtype);
         return NULL;
     }
-    PyArray_CLEARFLAGS((PyArrayObject *)result, NPY_ARRAY_WRITEABLE);
     return result;
 }
 

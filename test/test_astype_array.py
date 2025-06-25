@@ -28,14 +28,14 @@ class TestUnit(unittest.TestCase):
 
         a2 = astype_array(a1, np.int8)
         self.assertEqual(a2.dtype, np.dtype(np.int8))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
 
     def test_astype_array_b1(self) -> None:
         a1 = np.array(['2021', '2024'], dtype=np.datetime64)
 
         a2 = astype_array(a1, np.object_)
         self.assertEqual(a2.dtype, np.dtype(np.object_))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
         self.assertEqual(list(a2), [np.datetime64('2021'), np.datetime64('2024')])
 
 
@@ -44,7 +44,7 @@ class TestUnit(unittest.TestCase):
 
         a2 = astype_array(a1, np.object_)
         self.assertEqual(a2.dtype, np.dtype(np.object_))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
         self.assertEqual(list(a2), [np.datetime64('2021'), np.datetime64('1642')])
 
 
@@ -53,7 +53,7 @@ class TestUnit(unittest.TestCase):
 
         a2 = astype_array(a1, np.object_)
         self.assertEqual(a2.dtype, np.dtype(np.object_))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
         self.assertEqual(
                 list(list(a) for a in a2),
                 [[np.datetime64('2021'), np.datetime64('2024')], [np.datetime64('1984'), np.datetime64('1642')]])
@@ -64,7 +64,7 @@ class TestUnit(unittest.TestCase):
         a2 = astype_array(a1, np.object_)
         self.assertEqual(a2.dtype, np.dtype(np.object_))
         self.assertEqual(a2.shape, (2, 3))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
         self.assertEqual(
                 list(list(a) for a in a2),
                 [[np.datetime64('2021'), np.datetime64('2024'), np.datetime64('1532')],
@@ -81,7 +81,7 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(a2.dtype, np.dtype(np.float64))
         self.assertEqual(a2.shape, (3,))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
 
 
     def test_astype_array_d2(self) -> None:
@@ -90,7 +90,7 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(a2.dtype, np.dtype(np.float64))
         self.assertEqual(a2.shape, (3,))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
 
 
 
@@ -100,7 +100,7 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(a2.dtype, np.dtype(np.int64))
         self.assertEqual(a2.shape, (3,))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
 
         self.assertNotEqual(id(a1), id(a2))
 
@@ -110,7 +110,7 @@ class TestUnit(unittest.TestCase):
         a2 = astype_array(a1, np.object_)
         self.assertEqual(a2.dtype, np.dtype(np.object_))
         self.assertEqual(a2.shape, (2, 3))
-        self.assertFalse(a2.flags.writeable)
+        self.assertTrue(a2.flags.writeable)
         self.assertEqual(
                 list(list(a) for a in a2),
                 [[np.datetime64('2021-01-01T00:00:00.000000000'),
