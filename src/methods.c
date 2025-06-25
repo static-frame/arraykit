@@ -254,7 +254,8 @@ astype_array(PyObject* m, PyObject* args) {
     }
     // if not already an object and converting to an object
     if (!dt_equal && dtype->type_num == NPY_OBJECT) {
-        char kind = PyArray_DESCR(array)->kind;
+        PyArray_Descr* array_dt = PyArray_DESCR(array);
+        char kind = array_dt->kind;
         if ((kind == 'M' || kind == 'm')) {
             PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
             int is_objectable = AK_is_objectable_dt64(array, dt_year);
@@ -270,13 +271,14 @@ astype_array(PyObject* m, PyObject* args) {
                 npy_intp size = PyArray_SIZE(array);
 
                 for (npy_intp i = 0; i < size; ++i) {
-                    PyObject* item = PyArray_GETITEM(array, PyArray_GETPTR1(array, i));
+                    PyObject* item = PyArray_Scalar(PyArray_GETPTR1(array, i), array_dt, a);
                     if (!item) {
                         Py_DECREF(result);
                         return NULL;
                     }
                     data[i] = item;
                 }
+                PyArray_CLEARFLAGS((PyArrayObject *)result, NPY_ARRAY_WRITEABLE);
                 return result;
             }
         }
