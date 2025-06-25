@@ -52,6 +52,9 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"nonzero_1d", nonzero_1d, METH_O, NULL},
+    {"is_objectable_dt64", is_objectable_dt64, METH_O, NULL},
+    {"is_objectable", is_objectable, METH_O, NULL},
+    {"astype_array", astype_array, METH_VARARGS, NULL},
     {"isna_element",
             (PyCFunction)isna_element,
             METH_VARARGS | METH_KEYWORDS,
@@ -95,6 +98,7 @@ PyInit__arraykit(void)
         return NULL;
     }
 
+    // store a reference to the deepcopy function
     PyObject *copy = PyImport_ImportModule("copy");
     if (copy == NULL) {
         return NULL;
@@ -104,6 +108,18 @@ PyInit__arraykit(void)
     if (deepcopy == NULL) {
         return NULL;
     }
+
+    // store a year dtype object
+    PyObject* dt_year_str = PyUnicode_FromString("datetime64[Y]");
+    if (!dt_year_str) return NULL;
+
+    PyArray_Descr* dt_year = NULL;
+    if (!PyArray_DescrConverter2(dt_year_str, &dt_year)) {
+        Py_DECREF(dt_year_str);
+        return NULL;
+    }
+    Py_DECREF(dt_year_str);
+
 
     PyObject *m = PyModule_Create(&arraykit_module);
     if (!m ||
@@ -128,9 +144,11 @@ PyInit__arraykit(void)
         PyModule_AddObject(m, "ErrorInitTypeBlocks", ErrorInitTypeBlocks) ||
         PyModule_AddObject(m, "AutoMap", (PyObject *)&AMType) ||
         PyModule_AddObject(m, "FrozenAutoMap", (PyObject *)&FAMType) ||
-        PyModule_AddObject(m, "NonUniqueError", NonUniqueError)
+        PyModule_AddObject(m, "NonUniqueError", NonUniqueError) ||
+        PyModule_AddObject(m, "dt_year", (PyObject *)dt_year)
 ){
-        Py_DECREF(deepcopy);
+        Py_XDECREF(deepcopy);
+        Py_XDECREF(dt_year);
         Py_XDECREF(m);
         return NULL;
     }

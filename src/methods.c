@@ -201,6 +201,139 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
     return AK_nonzero_1d(array);
 }
 
+PyObject*
+is_objectable_dt64(PyObject *m, PyObject *a) {
+    AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject* array = (PyArrayObject*)a;
+
+    // this returns a new reference
+    PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
+    int is_objectable = AK_is_objectable_dt64(array, dt_year);
+    Py_DECREF(dt_year);
+
+    switch (is_objectable) {
+        case -1:
+            return NULL;
+        case 0:
+            Py_RETURN_FALSE;
+        case 1:
+            Py_RETURN_TRUE;
+    }
+    return NULL;
+}
+
+
+PyObject*
+is_objectable(PyObject *m, PyObject *a) {
+    AK_CHECK_NUMPY_ARRAY(a);
+    PyArrayObject* array = (PyArrayObject*)a;
+
+    char kind = PyArray_DESCR(array)->kind;
+    if ((kind == 'M' || kind == 'm')) {
+        // this returns a new reference
+        PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
+        int is_objectable = AK_is_objectable_dt64(array, dt_year);
+        Py_DECREF(dt_year);
+
+        switch (is_objectable) {
+            case -1:
+                return NULL;
+            case 0:
+                Py_RETURN_FALSE;
+            case 1:
+                Py_RETURN_TRUE;
+        }
+    }
+    Py_RETURN_TRUE;
+}
+
+// Convert array to the dtype provided. NOTE: mutable arrays will be returned unless the input array is immutable and no dtype change is needed
+PyObject*
+astype_array(PyObject* m, PyObject* args) {
+
+    PyObject* a = NULL;
+    PyObject* dtype_spec = Py_None;
+
+    if (!PyArg_ParseTuple(args, "O!|O:astype_array",
+        &PyArray_Type, &a,
+        &dtype_spec)) {
+        return NULL;
+    }
+    PyArrayObject* array = (PyArrayObject*)a;
+
+    PyArray_Descr* dtype = NULL;
+    if (dtype_spec == Py_None) {
+        dtype = PyArray_DescrFromType(NPY_DEFAULT_TYPE);
+    } else {
+        if (!PyArray_DescrConverter(dtype_spec, &dtype)) {
+            return NULL;
+        }
+    }
+
+    if (PyArray_EquivTypes(PyArray_DESCR(array), dtype)) {
+        Py_DECREF(dtype);
+
+        if (PyArray_ISWRITEABLE(array)) {
+            PyObject* result = PyArray_NewCopy(array, NPY_ANYORDER);
+            if (!result) {
+                return NULL;
+            }
+            return result;
+        }
+        else { // already immutable
+            Py_INCREF(a);
+            return a;
+        }
+    }
+    // if converting to an object
+    if (dtype->type_num == NPY_OBJECT) {
+        char kind = PyArray_DESCR(array)->kind;
+        if ((kind == 'M' || kind == 'm')) {
+            PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
+            int is_objectable = AK_is_objectable_dt64(array, dt_year);
+            Py_DECREF(dt_year);
+
+            if (!is_objectable) {
+                PyObject* result = PyArray_NewLikeArray(array, NPY_ANYORDER, dtype, 0);
+                if (!result) {
+                    Py_DECREF(dtype);
+                    return NULL;
+                }
+                PyObject** data = (PyObject**)PyArray_DATA((PyArrayObject*)result);
+
+                PyArrayIterObject* it = (PyArrayIterObject*)PyArray_IterNew(a);
+                if (!it) {
+                    Py_DECREF(result);
+                    return NULL;
+                }
+
+                npy_intp i = 0;
+                while (it->index < it->size) {
+                    PyObject* item = PyArray_ToScalar(it->dataptr, array);
+                    if (!item) {
+                        Py_DECREF(result);
+                        Py_DECREF(it);
+                        return NULL;
+                    }
+                    data[i++] = item;
+                    PyArray_ITER_NEXT(it);
+                }
+                Py_DECREF(it);
+                return result;
+            }
+        }
+    }
+    // all other cases: do a standard cast conversion
+    PyObject* result = PyArray_CastToType(array, dtype, 0);
+    if (!result) {
+        Py_DECREF(dtype);
+        return NULL;
+    }
+    return result;
+}
+
+
+
 static char *first_true_1d_kwarg_names[] = {
     "array",
     "forward",
