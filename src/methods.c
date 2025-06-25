@@ -259,7 +259,6 @@ astype_array(PyObject* m, PyObject* args) {
         &dtype_spec)) {
         return NULL;
     }
-    // AK_CHECK_NUMPY_ARRAY(a);
     PyArrayObject* array = (PyArrayObject*)a;
 
     PyArray_Descr* dtype = NULL;
@@ -294,16 +293,25 @@ astype_array(PyObject* m, PyObject* args) {
                     return NULL;
                 }
                 PyObject** data = (PyObject**)PyArray_DATA((PyArrayObject*)result);
-                npy_intp size = PyArray_SIZE(array);
 
-                for (npy_intp i = 0; i < size; ++i) {
-                    PyObject* item = PyArray_Scalar(PyArray_GETPTR1(array, i), array_dt, a);
+                PyArrayIterObject* it = (PyArrayIterObject*)PyArray_IterNew(a);
+                if (!it) {
+                    Py_DECREF(result);
+                    return NULL;
+                }
+
+                npy_intp i = 0;
+                while (it->index < it->size) {
+                    PyObject* item = PyArray_ToScalar(it->dataptr, array);
                     if (!item) {
                         Py_DECREF(result);
+                        Py_DECREF(it);
                         return NULL;
                     }
-                    data[i] = item;
+                    data[i++] = item;
+                    PyArray_ITER_NEXT(it);
                 }
+                Py_DECREF(it);
                 PyArray_CLEARFLAGS((PyArrayObject *)result, NPY_ARRAY_WRITEABLE);
                 return result;
             }

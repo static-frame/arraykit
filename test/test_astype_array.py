@@ -54,7 +54,40 @@ class TestUnit(unittest.TestCase):
         a2 = astype_array(a1, np.object_)
         self.assertEqual(a2.dtype, np.dtype(np.object_))
         self.assertFalse(a2.flags.writeable)
-        import ipdb; ipdb.set_trace()
         self.assertEqual(
                 list(list(a) for a in a2),
                 [[np.datetime64('2021'), np.datetime64('2024')], [np.datetime64('1984'), np.datetime64('1642')]])
+
+    def test_astype_array_b4(self) -> None:
+        a1 = np.array(['2021', '2024', '1532', '1984', '1642', '899'], dtype=np.datetime64).reshape((2, 3))
+
+        a2 = astype_array(a1, np.object_)
+        self.assertEqual(a2.dtype, np.dtype(np.object_))
+        self.assertEqual(a2.shape, (2, 3))
+        self.assertFalse(a2.flags.writeable)
+        self.assertEqual(
+                list(list(a) for a in a2),
+                [[np.datetime64('2021'), np.datetime64('2024'), np.datetime64('1532')],
+                 [np.datetime64('1984'), np.datetime64('1642'), np.datetime64('899')]])
+
+    def test_astype_array_c(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = astype_array([3, 4, 5], np.int64)
+
+
+    def test_astype_array_d1(self) -> None:
+        a1 = np.array([10, 20, 30], dtype=np.int64)
+        a2 = astype_array(a1)
+
+        self.assertEqual(a2.dtype, np.dtype(np.float64))
+        self.assertEqual(a2.shape, (3,))
+        self.assertFalse(a2.flags.writeable)
+
+
+    def test_astype_array_d2(self) -> None:
+        a1 = np.array([10, 20, 30], dtype=np.int64)
+        a2 = astype_array(a1, None)
+
+        self.assertEqual(a2.dtype, np.dtype(np.float64))
+        self.assertEqual(a2.shape, (3,))
+        self.assertFalse(a2.flags.writeable)
