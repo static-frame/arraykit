@@ -91,3 +91,33 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(a2.dtype, np.dtype(np.float64))
         self.assertEqual(a2.shape, (3,))
         self.assertFalse(a2.flags.writeable)
+
+
+
+    def test_astype_array_d3(self) -> None:
+        a1 = np.array([10, 20, 30], dtype=np.int64)
+        a2 = astype_array(a1, np.int64)
+
+        self.assertEqual(a2.dtype, np.dtype(np.int64))
+        self.assertEqual(a2.shape, (3,))
+        self.assertFalse(a2.flags.writeable)
+
+        self.assertNotEqual(id(a1), id(a2))
+
+    def test_astype_array_e(self) -> None:
+        a1 = np.array(['2021', '2024', '1997', '1984', '2000', '1999'], dtype='datetime64[ns]').reshape((2, 3))
+
+        a2 = astype_array(a1, np.object_)
+        self.assertEqual(a2.dtype, np.dtype(np.object_))
+        self.assertEqual(a2.shape, (2, 3))
+        self.assertFalse(a2.flags.writeable)
+        self.assertEqual(
+                list(list(a) for a in a2),
+                [[np.datetime64('2021-01-01T00:00:00.000000000'),
+                  np.datetime64('2024-01-01T00:00:00.000000000'),
+                  np.datetime64('1997-01-01T00:00:00.000000000')],
+                  [np.datetime64('1984-01-01T00:00:00.000000000'),
+                   np.datetime64('2000-01-01T00:00:00.000000000'),
+                   np.datetime64('1999-01-01T00:00:00.000000000')]]
+                 )
+

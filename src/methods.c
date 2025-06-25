@@ -266,21 +266,28 @@ astype_array(PyObject* m, PyObject* args) {
         dtype = PyArray_DescrFromType(NPY_DEFAULT_TYPE);
     } else {
         if (!PyArray_DescrConverter(dtype_spec, &dtype)) {
-            Py_DECREF((PyObject*)array);
             return NULL;
         }
     }
 
-    int dt_equal = PyArray_EquivTypes(PyArray_DESCR(array), dtype);
-    if (dt_equal && !PyArray_ISWRITEABLE(array)) {
+    if (PyArray_EquivTypes(PyArray_DESCR(array), dtype)) {
         Py_DECREF(dtype);
-        Py_INCREF(a);
-        return a;
+        if (PyArray_ISWRITEABLE(array)) {
+            PyObject* result = PyArray_NewCopy(array, NPY_ANYORDER);
+            if (!result) {
+                return NULL;
+            }
+            PyArray_CLEARFLAGS((PyArrayObject *)result, NPY_ARRAY_WRITEABLE);
+            return result;
+        }
+        else { // already immutable
+            Py_INCREF(a);
+            return a;
+        }
     }
-    // if not already an object and converting to an object
-    if (!dt_equal && dtype->type_num == NPY_OBJECT) {
-        PyArray_Descr* array_dt = PyArray_DESCR(array);
-        char kind = array_dt->kind;
+    // if converting to an object
+    if (dtype->type_num == NPY_OBJECT) {
+        char kind = PyArray_DESCR(array)->kind;
         if ((kind == 'M' || kind == 'm')) {
             PyObject* dt_year = PyObject_GetAttrString(m, "dt_year");
             int is_objectable = AK_is_objectable_dt64(array, dt_year);
