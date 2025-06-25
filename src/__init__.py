@@ -32,6 +32,7 @@ from ._arraykit import array_to_tuple_array as array_to_tuple_array
 from ._arraykit import array_to_tuple_iter as array_to_tuple_iter
 from ._arraykit import nonzero_1d as nonzero_1d
 from ._arraykit import is_objectable_dt64 as is_objectable_dt64
+from ._arraykit import astype_array as astype_array
 from ._arraykit import AutoMap as AutoMap
 from ._arraykit import FrozenAutoMap as FrozenAutoMap
 from ._arraykit import NonUniqueError as NonUniqueError
