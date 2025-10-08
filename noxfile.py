@@ -76,12 +76,14 @@ def build(session):
 @nox.session(python=False)
 def test(session):
     """Build then run pytest (like invoke: test depends on build)."""
+    do_clean(session)
     do_build(session)
     do_test(session)
 
 @nox.session(python=False)
 def performance(session):
     """Build then run performance benches (like invoke: performance depends on build)."""
+    do_clean(session)
     do_build(session)
     do_performance(session)
 
