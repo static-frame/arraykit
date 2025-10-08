@@ -5,7 +5,7 @@ import typing as tp
 from setuptools import Extension  # type: ignore
 from setuptools import setup
 
-AK_VERSION = '1.1.0'
+AK_VERSION = '1.2.0'
 
 ROOT_DIR_FP = path.abspath(path.dirname(__file__))
 
