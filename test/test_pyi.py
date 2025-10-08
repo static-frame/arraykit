@@ -14,6 +14,8 @@ class Interface(tp.NamedTuple):
 
     @staticmethod
     def _valid_name(name: str) -> bool:
+        if name in ('__annotate__', '__class__', '__annotate_func__'):
+            return False
         if name.startswith('__'):
             return True
         if name.startswith('_'):
