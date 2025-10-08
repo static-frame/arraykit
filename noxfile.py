@@ -1,6 +1,5 @@
 import nox
 import sys
-import os
 
 ARTIFACTS = (
     "*.egg-info",
@@ -13,7 +12,6 @@ ARTIFACTS = (
 # Make `nox` default to running tests if you just do `nox`
 nox.options.sessions = ["test"]
 
-# ----- helpers (not sessions) -----
 
 def do_clean(session: nox.Session) -> None:
     # uninstall arraykit
@@ -61,7 +59,8 @@ def do_lint(session: nox.Session) -> None:
         external=True,
     )
 
-# ----- sessions -----
+
+# NOTE: use `nox -s build` to launch a session
 
 @nox.session(python=False)  # use current environment
 def clean(session):
