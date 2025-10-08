@@ -1,4 +1,4 @@
 numpy==2.3.1
 pytest==8.3.3
-invoke==2.2.0
+nox==2025.5.1
 hypothesis==6.131.16
