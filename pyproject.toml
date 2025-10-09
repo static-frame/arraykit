@@ -6,7 +6,6 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-
 [project]
 name = "arraykit"
 description = "Array utilities for StaticFrame"
