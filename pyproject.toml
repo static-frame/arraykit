@@ -46,29 +46,7 @@ classifiers = [
 Homepage = "https://github.com/static-frame/arraykit"
 
 [tool.setuptools]
-# Your src layout is already “src/” but package_dir currently maps the top-level
-# module "arraykit" to "src". Keep that mapping explicitly:
 package-dir = { "arraykit" = "src" }
 
 [tool.setuptools.package-data]
 arraykit = ["__init__.pyi", "py.typed"]
-
-# Define your C extension here. We'll add NumPy's include/lib paths dynamically
-# via a tiny setup.py shim (below).
-# [tool.setuptools.ext-modules."arraykit._arraykit"]
-# sources = [
-#   "src/_arraykit.c",
-#   "src/array_go.c",
-#   "src/array_to_tuple.c",
-#   "src/block_index.c",
-#   "src/delimited_to_arrays.c",
-#   "src/methods.c",
-#   "src/tri_map.c",
-#   "src/auto_map.c",
-# ]
-# include-dirs = ["src"]
-# define-macros = [["AK_VERSION", "1.2.0"]]
-
-# # If you truly need to link to 'npymath', leave libraries empty here and let the
-# # setup.py shim add it only when/where it exists.
-# libraries = ["npymath"]  # (we'll add dynamically in the shim if present)
