@@ -9,10 +9,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arraykit"
-version = "1.2.0"
 description = "Array utilities for StaticFrame"
 readme = { file = "README.rst", content-type = "text/x-rst" }
 requires-python = ">=3.10"
+
+dynamic = ["version"]
 
 authors = [
   { name = "Christopher Ariza" },
@@ -50,3 +51,7 @@ package-dir = { "arraykit" = "src" }
 
 [tool.setuptools.package-data]
 arraykit = ["__init__.pyi", "py.typed"]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+

@@ -1,8 +1,9 @@
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import site, os
+from pathlib import Path
 
-AK_VERSION = "1.2.0"
+AK_VERSION = Path("VERSION").read_text(encoding="utf-8").strip()
 
 def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
     dirs = []
