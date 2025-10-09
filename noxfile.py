@@ -28,8 +28,8 @@ def do_build(session: nox.Session) -> None:
     # keep -v to see warnings; no build isolation to match your invoke cmd
     session.run(
         sys.executable, "-m", "pip",
-        "--disable-pip-version-check", "-v",
-        "install", "--no-build-isolation", ".",
+        "--disable-pip-version-check",
+        "install", "-v", "--no-build-isolation", ".",
         external=True
     )
 
