@@ -35,6 +35,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.2.0
+............
+
+Now building wheels for Python 3.14 and 3.14t.
+
 
 1.1.0
 ............
