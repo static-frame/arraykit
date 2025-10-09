@@ -1,0 +1,56 @@
+[build-system]
+requires = [
+  "setuptools>=64",
+  "wheel",
+  "numpy>=2.2"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arraykit"
+description = "Array utilities for StaticFrame"
+readme = { file = "README.rst", content-type = "text/x-rst" }
+requires-python = ">=3.10"
+
+dynamic = ["version"]
+
+authors = [
+  { name = "Christopher Ariza" },
+  { name = "Brandt Bucher" },
+  { name = "Charles Burkland" },
+]
+license = "MIT"
+keywords = ["numpy", "array"]
+dependencies = [
+  "numpy>=1.24.3",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development",
+  "Programming Language :: C",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Free Threading",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/static-frame/arraykit"
+
+[tool.setuptools]
+package-dir = { "arraykit" = "src" }
+
+[tool.setuptools.package-data]
+arraykit = ["__init__.pyi", "py.typed"]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+
