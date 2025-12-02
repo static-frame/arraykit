@@ -35,9 +35,9 @@ jobs:
       - id: step
         run: |
           if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            echo 'matrix_os=["macos-15-xlarge", "macos-15", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
+            echo 'matrix_os=["macos-15-xlarge", "macos-15-intel", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
           else
-            echo 'matrix_os=["macos-15", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
+            echo 'matrix_os=["macos-15-intel", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
           fi
 
   wheels:
