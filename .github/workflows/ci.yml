@@ -35,9 +35,9 @@ jobs:
       - id: step
         run: |
           if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            echo 'matrix_os=["macos-13-xlarge", "macos-13", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
+            echo 'matrix_os=["macos-15-xlarge", "macos-15-intel", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
           else
-            echo 'matrix_os=["macos-13", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
+            echo 'matrix_os=["macos-15-intel", "ubuntu-22.04", "windows-2022"]' >> $GITHUB_OUTPUT
           fi
 
   wheels:
@@ -67,7 +67,7 @@ jobs:
         if: startsWith(matrix.os, 'windows-')
 
       - uses: pypa/cibuildwheel@v3.2.0
-        if: matrix.os != 'macos-13-xlarge'
+        if: matrix.os != 'macos-15-xlarge'
         with:
           output-dir: dist
         env:
@@ -79,9 +79,9 @@ jobs:
           CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
       - run: pip install pipx
-        if: matrix.os == 'macos-13-xlarge'
+        if: matrix.os == 'macos-15-xlarge'
       - uses: pypa/cibuildwheel@v3.2.0
-        if: matrix.os == 'macos-13-xlarge'
+        if: matrix.os == 'macos-15-xlarge'
         with:
           output-dir: dist
         env:
