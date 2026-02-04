@@ -169,6 +169,7 @@ AK_TPS_Resolve(AK_TypeParserState previous, AK_TypeParserState new) {
     }
     // numerical promotion
     if (previous == TPS_INT) {
+        // this means that an empty field will not force integer to string
         if (new == TPS_EMPTY || new == TPS_INT) return TPS_INT;
         if (new == TPS_FLOAT) return TPS_FLOAT;
         if (new == TPS_COMPLEX) return TPS_COMPLEX;
