@@ -35,6 +35,13 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+
+1.2.1
+............
+
+Minor improvement in efficiency of string-to-float conversion in ``delimited_to_arrays()``.
+
+
 1.2.0
 ............
 
