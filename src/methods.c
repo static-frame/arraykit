@@ -870,7 +870,7 @@ get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kw
     }
 
     if (PyArray_TYPE(indexers) != NPY_INT64) {
-        PyErr_SetString(PyExc_ValueError, "Array must be of type np.int64");
+        PyErr_SetString(PyExc_ValueError, "indexers must be of type np.int64");
         return NULL;
     }
 
