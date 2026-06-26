@@ -65,6 +65,48 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
 }
 
 PyObject *
+slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    if (!PySlice_Check(a)) {
+        return PyErr_Format(PyExc_TypeError,
+                "Expected a slice, not %s",
+                Py_TYPE(a)->tp_name);
+    }
+    PyObject* py_start = ((PySliceObject*)a)->start;
+    PyObject* py_stop = ((PySliceObject*)a)->stop;
+    PyObject* py_step = ((PySliceObject*)a)->step;
+
+    if (py_start == Py_None || py_stop == Py_None) {
+        Py_RETURN_NONE;
+    }
+
+    Py_ssize_t step = 1;
+    if (py_step != Py_None) {
+        step = PyLong_AsSsize_t(py_step);
+        if (step == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+    }
+    if (step != 1) {
+        Py_RETURN_NONE;
+    }
+
+    Py_ssize_t start = PyLong_AsSsize_t(py_start);
+    if (start == -1 && PyErr_Occurred()) {
+        return NULL;
+    }
+    Py_ssize_t stop = PyLong_AsSsize_t(py_stop);
+    if (stop == -1 && PyErr_Occurred()) {
+        return NULL;
+    }
+
+    if (start < 0 || stop < 0 || stop - start != 1) {
+        Py_RETURN_NONE;
+    }
+    return PyLong_FromSsize_t(start);
+}
+
+PyObject *
 column_2d_filter(PyObject *Py_UNUSED(m), PyObject *a)
 {
     AK_CHECK_NUMPY_ARRAY_1D_2D(a);

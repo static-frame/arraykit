@@ -23,6 +23,7 @@ from arraykit import count_iteration
 from arraykit import first_true_1d
 from arraykit import first_true_2d
 from arraykit import slice_to_ascending_slice
+from arraykit import slice_to_unit
 from arraykit import array_to_tuple_array
 from arraykit import array_to_tuple_iter
 
@@ -952,6 +953,22 @@ class TestUnit(unittest.TestCase):
             slice_to_ascending_slice(slice(1, -10, -1), 10), # [1]
             slice(1, 2, None)
             )
+
+    def test_slice_to_unit_a(self) -> None:
+        self.assertEqual(slice_to_unit(slice(3, 4)), 3)
+        self.assertEqual(slice_to_unit(slice(0, 1)), 0)
+
+    def test_slice_to_unit_b(self) -> None:
+        self.assertIsNone(slice_to_unit(slice(0, 2)))
+        self.assertIsNone(slice_to_unit(slice(0, 1, 2)))
+        self.assertIsNone(slice_to_unit(slice(0, 1, -1)))
+        self.assertIsNone(slice_to_unit(slice(None, 1)))
+        self.assertIsNone(slice_to_unit(slice(0, None)))
+        self.assertIsNone(slice_to_unit(slice(-1, 0)))
+
+    def test_slice_to_unit_c(self) -> None:
+        with self.assertRaises(TypeError):
+            _ = slice_to_unit(3)
 
 
 if __name__ == '__main__':
