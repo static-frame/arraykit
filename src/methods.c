@@ -60,7 +60,7 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
             &PyLong_Type, &size)) {
         return NULL;
     }
-    // will delegate NULL on eroror
+    // will delegate NULL on error
     return AK_slice_to_ascending_slice(slice, PyLong_AsSsize_t(size));
 }
 

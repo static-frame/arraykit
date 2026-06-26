@@ -960,6 +960,7 @@ class TestUnit(unittest.TestCase):
 
     def test_slice_to_unit_b(self) -> None:
         self.assertIsNone(slice_to_unit(slice(0, 2)))
+        self.assertIsNone(slice_to_unit(slice(5, 5)))
         self.assertIsNone(slice_to_unit(slice(0, 1, 2)))
         self.assertIsNone(slice_to_unit(slice(0, 1, -1)))
         self.assertIsNone(slice_to_unit(slice(None, 1)))
