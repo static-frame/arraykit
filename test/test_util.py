@@ -960,13 +960,13 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(slice_to_unit(slice(None, 1)), 0)
 
     def test_slice_to_unit_b(self) -> None:
-        self.assertIsNone(slice_to_unit(slice(0, 2)))
-        self.assertIsNone(slice_to_unit(slice(5, 5)))
-        self.assertIsNone(slice_to_unit(slice(0, 1, 2)))
-        self.assertIsNone(slice_to_unit(slice(0, 1, -1)))
-        self.assertIsNone(slice_to_unit(slice(0, None)))
-        self.assertIsNone(slice_to_unit(slice(None, 2)))
-        self.assertIsNone(slice_to_unit(slice(-1, 0)))
+        self.assertEqual(slice_to_unit(slice(0, 2)), -1)
+        self.assertEqual(slice_to_unit(slice(5, 5)), -1)
+        self.assertEqual(slice_to_unit(slice(0, 1, 2)), -1)
+        self.assertEqual(slice_to_unit(slice(0, 1, -1)), -1)
+        self.assertEqual(slice_to_unit(slice(0, None)), -1)
+        self.assertEqual(slice_to_unit(slice(None, 2)), -1)
+        self.assertEqual(slice_to_unit(slice(-1, 0)), -1)
 
     def test_slice_to_unit_c(self) -> None:
         with self.assertRaises(TypeError):

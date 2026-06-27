@@ -77,7 +77,7 @@ slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
     PyObject* py_step = ((PySliceObject*)a)->step;
 
     if (py_stop == Py_None) {
-        Py_RETURN_NONE;
+        return PyLong_FromLong(-1);
     }
 
     Py_ssize_t step = 1;
@@ -88,7 +88,7 @@ slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
         }
     }
     if (step != 1) {
-        Py_RETURN_NONE;
+        return PyLong_FromLong(-1);
     }
 
     Py_ssize_t start = 0;
@@ -104,7 +104,7 @@ slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
     }
 
     if (start < 0 || stop < 0 || stop - start != 1) {
-        Py_RETURN_NONE;
+        return PyLong_FromLong(-1);
     }
     return PyLong_FromSsize_t(start);
 }

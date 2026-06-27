@@ -14,7 +14,7 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a);
 PyObject *
 slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args);
 
-// Return an integer when a slice is exactly a single positive-position unit.
+// Return an integer when a slice is exactly a single positive-position unit, else -1.
 PyObject *
 slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a);
 
