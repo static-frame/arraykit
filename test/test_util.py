@@ -1022,6 +1022,13 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = slice_to_unit(3)
 
+    def test_slice_to_unit_d(self) -> None:
+        # __index__-able (NumPy integer) bounds are accepted
+        self.assertEqual(slice_to_unit(slice(np.int64(3), np.int64(4))), 3)
+        self.assertEqual(slice_to_unit(slice(np.int64(2), np.int64(4))), -1)
+        self.assertEqual(slice_to_unit(slice(None, np.int64(1))), 0)
+        self.assertEqual(slice_to_unit(slice(np.int64(2), np.int64(3), np.int64(1))), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
