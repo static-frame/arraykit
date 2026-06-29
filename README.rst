@@ -35,6 +35,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.3.0
+............
+
+Added ``slice_to_unit()``.
+
 
 1.2.1
 ............
