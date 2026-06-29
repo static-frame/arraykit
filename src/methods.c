@@ -1165,6 +1165,10 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
     npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
     Py_ssize_t itemsize = PyArray_ITEMSIZE(array);
+    if (itemsize == 0) {
+        NpyIter_Deallocate(iter);
+        Py_RETURN_NONE;
+    }
     PyObject *write_name = PyUnicode_InternFromString("write");
     if (write_name == NULL) {
         NpyIter_Deallocate(iter);
