@@ -48,6 +48,7 @@ class TestUnit(unittest.TestCase):
 
     def test_transition_slices_from_group_2d_mixed_types_a(self) -> None:
         group = np.array([[1], ['1'], [2]], dtype=object)
+        self.assertNotEqual(group[0, 0], group[1, 0])
         slices, group_to_tuple = transition_slices_from_group(group)
         self.assertTrue(group_to_tuple)
         self.assertEqual(
