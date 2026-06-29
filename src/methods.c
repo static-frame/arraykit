@@ -1269,7 +1269,9 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             }
         }
         else {
-            /* Fall back to Python write() method */
+            /* Fall back to Python write() method.
+             * Note: PyMemoryView_FromMemory requires non-const char*, but we pass
+             * PyBUF_READ flag which makes the view read-only, so the cast is safe. */
             PyObject *buffer = PyMemoryView_FromMemory((char *)data_to_write, chunk_size, PyBUF_READ);
             if (buffer == NULL) {
                 goto fail;
@@ -1300,7 +1302,10 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         }
     } while(iternext(iter));
 
-    /* Check if iteration stopped due to an error */
+    /* Check if iteration stopped due to an error.
+     * NpyIter can return 0 for TWO reasons: end of iteration OR error.
+     * We MUST check PyErr_Occurred() to distinguish between the two.
+     * This is the standard pattern for NpyIter error handling. */
     if (PyErr_Occurred()) {
         goto fail;
     }
