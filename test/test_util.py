@@ -3,6 +3,7 @@ import collections
 import datetime
 import unittest
 import warnings
+from io import BytesIO
 from io import StringIO
 import numpy as np  # type: ignore
 # import pandas as pd # disable so as to compile 32 bit wheels for python 3.12
@@ -26,6 +27,7 @@ from arraykit import slice_to_ascending_slice
 from arraykit import slice_to_unit
 from arraykit import array_to_tuple_array
 from arraykit import array_to_tuple_iter
+from arraykit import write_array_to_file
 
 from performance.reference.util import get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full
 from arraykit import get_new_indexers_and_screen
@@ -286,6 +288,37 @@ class TestUnit(unittest.TestCase):
         a1 = np.arange(10)
         with self.assertRaises(TypeError):
             a2 = array_deepcopy(a1, ())
+
+    #---------------------------------------------------------------------------
+    def test_write_array_to_file_a(self) -> None:
+        a1 = np.arange(12).reshape(3, 4)
+        fp = BytesIO()
+        write_array_to_file(a1, fp, buffersize=2)
+
+        expected = b''.join(chunk.tobytes('C')
+                for chunk in np.nditer(
+                    a1,
+                    flags=('external_loop', 'buffered', 'zerosize_ok'),
+                    buffersize=2,
+                    order='C'))
+        self.assertEqual(fp.getvalue(), expected)
+
+    def test_write_array_to_file_b(self) -> None:
+        a1 = np.arange(12).reshape(3, 4).T
+        fp = BytesIO()
+        write_array_to_file(a1, fp, fortran_order=True, buffersize=2)
+
+        expected = b''.join(chunk.tobytes('C')
+                for chunk in np.nditer(
+                    a1,
+                    flags=('external_loop', 'buffered', 'zerosize_ok'),
+                    buffersize=2,
+                    order='F'))
+        self.assertEqual(fp.getvalue(), expected)
+
+    def test_write_array_to_file_c(self) -> None:
+        with self.assertRaises(ValueError):
+            write_array_to_file(np.arange(4), BytesIO(), buffersize=0)
 
     #---------------------------------------------------------------------------
     def test_array_to_tuple_array_1d_a(self) -> None:

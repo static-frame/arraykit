@@ -65,6 +65,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)get_new_indexers_and_screen,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"write_array_to_file",
+            (PyCFunction)write_array_to_file,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 

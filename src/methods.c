@@ -7,6 +7,7 @@
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
+# include <string.h>
 
 # include "methods.h"
 # include "utilities.h"
@@ -1100,6 +1101,123 @@ static char *array_deepcopy_kwarg_names[] = {
     "memo",
     NULL
 };
+
+static char *write_array_to_file_kwarg_names[] = {
+    "array",
+    "file",
+    "fortran_order",
+    "buffersize",
+    NULL
+};
+
+PyObject *
+write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *a;
+    PyObject *file;
+    int fortran_order = 0;
+    npy_intp buffersize = 0;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "OO|pn:write_array_to_file", write_array_to_file_kwarg_names,
+            &a,
+            &file,
+            &fortran_order,
+            &buffersize)) {
+        return NULL;
+    }
+    AK_CHECK_NUMPY_ARRAY(a);
+    if (buffersize < 1) {
+        PyErr_SetString(PyExc_ValueError, "buffersize must be greater than zero");
+        return NULL;
+    }
+
+    PyArrayObject *array = (PyArrayObject*)a;
+    npy_uint32 flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_BUFFERED | NPY_ITER_ZEROSIZE_OK;
+    NPY_ORDER order = (fortran_order && !PyArray_IS_C_CONTIGUOUS(array))
+            ? NPY_FORTRANORDER
+            : NPY_CORDER;
+    PyArrayObject *operands[] = {array};
+    npy_uint32 op_flags[] = {NPY_ITER_READONLY | NPY_ITER_ALIGNED};
+    NpyIter *iter = NpyIter_AdvancedNew(
+            1,
+            operands,
+            flags,
+            order,
+            NPY_NO_CASTING,
+            op_flags,
+            NULL,
+            -1,
+            NULL,
+            NULL,
+            buffersize
+            );
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (iternext == NULL) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char **dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    Py_ssize_t itemsize = PyArray_ITEMSIZE(array);
+    PyObject *write_name = PyUnicode_InternFromString("write");
+    if (write_name == NULL) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    do {
+        npy_intp inner_size = *innersizeptr;
+        if (inner_size == 0) {
+            continue;
+        }
+        if (inner_size > PY_SSIZE_T_MAX / itemsize) {
+            PyErr_SetString(PyExc_OverflowError, "array chunk too large");
+            goto fail;
+        }
+        Py_ssize_t chunk_size = (Py_ssize_t)inner_size * itemsize;
+        PyObject *buffer = NULL;
+
+        if (*strideptr == itemsize) {
+            buffer = PyMemoryView_FromMemory(*dataptr, chunk_size, PyBUF_READ);
+        }
+        else {
+            buffer = PyBytes_FromStringAndSize(NULL, chunk_size);
+            if (buffer) {
+                char *dst = PyBytes_AS_STRING(buffer);
+                char *src = *dataptr;
+                npy_intp stride = *strideptr;
+                for (npy_intp i = 0; i < inner_size; ++i) {
+                    memcpy(dst + (i * itemsize), src + (i * stride), itemsize);
+                }
+            }
+        }
+        if (buffer == NULL) {
+            goto fail;
+        }
+
+        PyObject *write_result = PyObject_CallMethodObjArgs(file, write_name, buffer, NULL);
+        Py_DECREF(buffer);
+        if (write_result == NULL) {
+            goto fail;
+        }
+        Py_DECREF(write_result);
+    } while(iternext(iter));
+
+    NpyIter_Deallocate(iter);
+    Py_DECREF(write_name);
+    Py_RETURN_NONE;
+
+    fail:
+        NpyIter_Deallocate(iter);
+        Py_DECREF(write_name);
+        return NULL;
+}
 
 PyObject *
 array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)
