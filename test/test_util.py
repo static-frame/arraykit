@@ -326,6 +326,17 @@ class TestUnit(unittest.TestCase):
         write_array_to_file(a1, fp)
         self.assertEqual(fp.getvalue(), a1.tobytes())
 
+    def test_write_array_to_file_e(self) -> None:
+        a1 = np.arange(10, dtype=np.int16)[::2]
+        fp = BytesIO()
+        write_array_to_file(a1, fp, buffersize=3)
+        self.assertEqual(fp.getvalue(), a1.tobytes('C'))
+
+    def test_write_array_to_file_f(self) -> None:
+        a1 = np.empty(5, dtype=np.dtype('V0'))
+        fp = BytesIO()
+        write_array_to_file(a1, fp)
+        self.assertEqual(fp.getvalue(), b'')
     #---------------------------------------------------------------------------
     def test_array_to_tuple_array_1d_a(self) -> None:
         a1 = np.arange(10)
