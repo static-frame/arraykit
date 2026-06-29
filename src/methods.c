@@ -303,6 +303,19 @@ AK_values_not_equal_1d(PyArrayObject* array, npy_intp left, npy_intp right)
 static inline int
 AK_rows_equal_2d(PyArrayObject* array, npy_intp left, npy_intp right)
 {
+    if (PyArray_TYPE(array) == NPY_OBJECT) {
+        npy_intp cols = PyArray_DIM(array, 1);
+        for (npy_intp col = 0; col < cols; ++col) {
+            PyObject* left_value = *(PyObject**)PyArray_GETPTR2(array, left, col);
+            PyObject* right_value = *(PyObject**)PyArray_GETPTR2(array, right, col);
+            int is_equal = PyObject_RichCompareBool(left_value, right_value, Py_EQ);
+            if (is_equal <= 0) {
+                return is_equal;
+            }
+        }
+        return 1;
+    }
+
     npy_intp stride_0 = PyArray_STRIDE(array, 0);
     npy_intp stride_1 = PyArray_STRIDE(array, 1);
     npy_intp cols = PyArray_DIM(array, 1);
@@ -336,7 +349,7 @@ transition_slices_from_group(PyObject *Py_UNUSED(m), PyObject *a)
     Py_INCREF(working);
 
     if (group_to_tuple && PyArray_TYPE(group) == NPY_OBJECT) {
-        PyObject* casted = PyObject_CallMethod((PyObject*)group, "astype", "O", (PyObject*)&PyUnicode_Type);
+        PyObject* casted = PyObject_CallMethod((PyObject*)group, "astype", "s", "str");
         Py_DECREF(working);
         if (!casted) {
             return NULL;
