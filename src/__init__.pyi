@@ -204,7 +204,7 @@ def write_array_to_file(
         __file: tp.IO[bytes],
         *,
         fortran_order: bool = False,
-        buffersize: int = 1,
+        buffersize: int = 8192,
         ) -> None: ...
 
 def first_true_1d(__array: np.ndarray, *, forward: bool) -> int: ...

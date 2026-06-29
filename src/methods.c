@@ -1116,7 +1116,7 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *a;
     PyObject *file;
     int fortran_order = 0;
-    npy_intp buffersize = 1;
+    npy_intp buffersize = 8192;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "OO|pn:write_array_to_file", write_array_to_file_kwarg_names,
             &a,
