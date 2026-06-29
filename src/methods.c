@@ -1116,7 +1116,7 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *a;
     PyObject *file;
     int fortran_order = 0;
-    npy_intp buffersize = 0;
+    npy_intp buffersize = 1;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
             "OO|pn:write_array_to_file", write_array_to_file_kwarg_names,
             &a,
@@ -1127,7 +1127,7 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     AK_CHECK_NUMPY_ARRAY(a);
     if (buffersize < 1) {
-        PyErr_SetString(PyExc_ValueError, "buffersize must be greater than zero");
+        PyErr_SetString(PyExc_ValueError, "buffersize must be at least 1");
         return NULL;
     }
 

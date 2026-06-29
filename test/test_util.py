@@ -320,6 +320,12 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             write_array_to_file(np.arange(4), BytesIO(), buffersize=0)
 
+    def test_write_array_to_file_d(self) -> None:
+        a1 = np.arange(4, dtype=np.int64)
+        fp = BytesIO()
+        write_array_to_file(a1, fp)
+        self.assertEqual(fp.getvalue(), a1.tobytes())
+
     #---------------------------------------------------------------------------
     def test_array_to_tuple_array_1d_a(self) -> None:
         a1 = np.arange(10)
