@@ -1209,12 +1209,27 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         Py_RETURN_NONE;
     }
 
-    /* Try to get file descriptor for direct writes. If this fails,
-     * we'll fall back to calling Python's write() method. */
+    // Try to get file descriptor for direct writes. fall back to calling Python's write() method.
     int fd = PyObject_AsFileDescriptor(file);
     int use_fd = (fd >= 0);
-    
-    /* For non-fd path, we need the write method name */
+
+    /* If we are going to write directly to the file descriptor, we must first
+     * flush any data buffered at the Python level (e.g. an io.BufferedWriter
+     * from open(path, 'wb')). Writing to the raw fd bypasses that user-space
+     * buffer, so without a flush our bytes would land at the kernel offset,
+     * ahead of any still-buffered data, corrupting the file. Raw integer fds
+     * (e.g. from os.open) have no flush() method; that is not an error. */
+    if (use_fd) {
+        PyObject *flush_result = PyObject_CallMethod(file, "flush", NULL);
+        if (flush_result == NULL) {
+            PyErr_Clear();
+        }
+        else {
+            Py_DECREF(flush_result);
+        }
+    }
+
+    // For non-fd path, we need the write method name
     PyObject *write_name = NULL;
     if (!use_fd) {
         PyErr_Clear();  /* Clear the error from PyObject_AsFileDescriptor */
@@ -1225,7 +1240,7 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         }
     }
 
-    /* Allocate a buffer for packing non-contiguous data */
+    // Allocate a buffer for packing non-contiguous data
     char *pack_buffer = NULL;
     Py_ssize_t pack_buffer_size = 0;
 
@@ -1239,10 +1254,10 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             goto fail;
         }
         Py_ssize_t chunk_size = (Py_ssize_t)inner_size * itemsize;
-        
+
         const char *data_to_write = *dataptr;
-        
-        /* If stride is not contiguous, pack into buffer */
+
+        // If stride is not contiguous, pack into buffer
         if (*strideptr != itemsize) {
             if (pack_buffer_size < chunk_size) {
                 char *new_buffer = (char *)PyMem_Realloc(pack_buffer, chunk_size);
@@ -1261,16 +1276,14 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             data_to_write = pack_buffer;
         }
 
-        /* Write the data */
+        // Write the data
         if (use_fd) {
-            /* Direct file descriptor write - no Python objects needed! */
             if (write_to_fd(fd, data_to_write, chunk_size) < 0) {
                 goto fail;
             }
         }
         else {
-            /* Fall back to Python write() method.
-             * Note: PyMemoryView_FromMemory requires non-const char*, but we pass
+            /* Note: PyMemoryView_FromMemory requires non-const char*, but we pass
              * PyBUF_READ flag which makes the view read-only, so the cast is safe. */
             PyObject *buffer = PyMemoryView_FromMemory((char *)data_to_write, chunk_size, PyBUF_READ);
             if (buffer == NULL) {
@@ -1282,7 +1295,7 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             if (write_result == NULL) {
                 goto fail;
             }
-            
+
             /* Check for partial writes */
             if (PyLong_Check(write_result)) {
                 Py_ssize_t bytes_written = PyLong_AsSsize_t(write_result);
@@ -1302,27 +1315,21 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         }
     } while(iternext(iter));
 
-    /* Check if iteration stopped due to an error.
-     * NpyIter can return 0 for TWO reasons: end of iteration OR error.
-     * We MUST check PyErr_Occurred() to distinguish between the two.
-     * This is the standard pattern for NpyIter error handling. */
+    /* NpyIter can return 0 for TWO reasons: end of iteration OR error.
+     * We MUST check PyErr_Occurred() to distinguish between the two. */
     if (PyErr_Occurred()) {
         goto fail;
     }
 
     PyMem_Free(pack_buffer);
     NpyIter_Deallocate(iter);
-    if (write_name != NULL) {
-        Py_DECREF(write_name);
-    }
+    Py_XDECREF(write_name);
     Py_RETURN_NONE;
 
     fail:
         PyMem_Free(pack_buffer);
         NpyIter_Deallocate(iter);
-        if (write_name != NULL) {
-            Py_DECREF(write_name);
-        }
+        Py_XDECREF(write_name);
         return NULL;
 }
 
