@@ -9,6 +9,12 @@
 # include "numpy/halffloat.h"
 # include <string.h>
 
+# ifdef _WIN32
+#  include <io.h>
+# else
+#  include <unistd.h>
+# endif
+
 # include "methods.h"
 # include "utilities.h"
 
@@ -1110,6 +1116,39 @@ static char *write_array_to_file_kwarg_names[] = {
     NULL
 };
 
+/* Helper function to write data directly to a file descriptor.
+ * Returns -1 on error (with Python exception set), or 0 on success.
+ */
+static int
+write_to_fd(int fd, const char *data, Py_ssize_t size)
+{
+    Py_ssize_t total_written = 0;
+    while (total_written < size) {
+        Py_ssize_t to_write = size - total_written;
+#ifdef _WIN32
+        /* On Windows, _write has a max count of INT_MAX */
+        if (to_write > INT_MAX) {
+            to_write = INT_MAX;
+        }
+        int written = _write(fd, data + total_written, (unsigned int)to_write);
+#else
+        /* On POSIX, write may have platform-specific limits */
+        ssize_t written = write(fd, data + total_written, to_write);
+#endif
+        if (written < 0) {
+            PyErr_SetFromErrno(PyExc_OSError);
+            return -1;
+        }
+        if (written == 0) {
+            /* No progress - treat as error */
+            PyErr_SetString(PyExc_OSError, "write() returned 0");
+            return -1;
+        }
+        total_written += written;
+    }
+    return 0;
+}
+
 PyObject *
 write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
@@ -1169,11 +1208,26 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         NpyIter_Deallocate(iter);
         Py_RETURN_NONE;
     }
-    PyObject *write_name = PyUnicode_InternFromString("write");
-    if (write_name == NULL) {
-        NpyIter_Deallocate(iter);
-        return NULL;
+
+    /* Try to get file descriptor for direct writes. If this fails,
+     * we'll fall back to calling Python's write() method. */
+    int fd = PyObject_AsFileDescriptor(file);
+    int use_fd = (fd >= 0);
+    
+    /* For non-fd path, we need the write method name */
+    PyObject *write_name = NULL;
+    if (!use_fd) {
+        PyErr_Clear();  /* Clear the error from PyObject_AsFileDescriptor */
+        write_name = PyUnicode_InternFromString("write");
+        if (write_name == NULL) {
+            NpyIter_Deallocate(iter);
+            return NULL;
+        }
     }
+
+    /* Allocate a buffer for packing non-contiguous data */
+    char *pack_buffer = NULL;
+    Py_ssize_t pack_buffer_size = 0;
 
     do {
         npy_intp inner_size = *innersizeptr;
@@ -1185,41 +1239,85 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             goto fail;
         }
         Py_ssize_t chunk_size = (Py_ssize_t)inner_size * itemsize;
-        PyObject *buffer = NULL;
-
-        if (*strideptr == itemsize) {
-            buffer = PyMemoryView_FromMemory(*dataptr, chunk_size, PyBUF_READ);
-        }
-        else {
-            buffer = PyBytes_FromStringAndSize(NULL, chunk_size);
-            if (buffer) {
-                char *dst = PyBytes_AS_STRING(buffer);
-                char *src = *dataptr;
-                npy_intp stride = *strideptr;
-                for (npy_intp i = 0; i < inner_size; ++i) {
-                    memcpy(dst + (i * itemsize), src + (i * stride), itemsize);
+        
+        const char *data_to_write = *dataptr;
+        
+        /* If stride is not contiguous, pack into buffer */
+        if (*strideptr != itemsize) {
+            if (pack_buffer_size < chunk_size) {
+                char *new_buffer = (char *)PyMem_Realloc(pack_buffer, chunk_size);
+                if (new_buffer == NULL) {
+                    PyErr_NoMemory();
+                    goto fail;
                 }
+                pack_buffer = new_buffer;
+                pack_buffer_size = chunk_size;
+            }
+            char *src = *dataptr;
+            npy_intp stride = *strideptr;
+            for (npy_intp i = 0; i < inner_size; ++i) {
+                memcpy(pack_buffer + (i * itemsize), src + (i * stride), itemsize);
+            }
+            data_to_write = pack_buffer;
+        }
+
+        /* Write the data */
+        if (use_fd) {
+            /* Direct file descriptor write - no Python objects needed! */
+            if (write_to_fd(fd, data_to_write, chunk_size) < 0) {
+                goto fail;
             }
         }
-        if (buffer == NULL) {
-            goto fail;
-        }
+        else {
+            /* Fall back to Python write() method */
+            PyObject *buffer = PyMemoryView_FromMemory((char *)data_to_write, chunk_size, PyBUF_READ);
+            if (buffer == NULL) {
+                goto fail;
+            }
 
-        PyObject *write_result = PyObject_CallMethodObjArgs(file, write_name, buffer, NULL);
-        Py_DECREF(buffer);
-        if (write_result == NULL) {
-            goto fail;
+            PyObject *write_result = PyObject_CallMethodObjArgs(file, write_name, buffer, NULL);
+            Py_DECREF(buffer);
+            if (write_result == NULL) {
+                goto fail;
+            }
+            
+            /* Check for partial writes */
+            if (PyLong_Check(write_result)) {
+                Py_ssize_t bytes_written = PyLong_AsSsize_t(write_result);
+                if (bytes_written < 0 && PyErr_Occurred()) {
+                    Py_DECREF(write_result);
+                    goto fail;
+                }
+                if (bytes_written != chunk_size) {
+                    Py_DECREF(write_result);
+                    PyErr_Format(PyExc_OSError,
+                                 "write() returned partial write (%zd of %zd bytes)",
+                                 bytes_written, chunk_size);
+                    goto fail;
+                }
+            }
+            Py_DECREF(write_result);
         }
-        Py_DECREF(write_result);
     } while(iternext(iter));
 
+    /* Check if iteration stopped due to an error */
+    if (PyErr_Occurred()) {
+        goto fail;
+    }
+
+    PyMem_Free(pack_buffer);
     NpyIter_Deallocate(iter);
-    Py_DECREF(write_name);
+    if (write_name != NULL) {
+        Py_DECREF(write_name);
+    }
     Py_RETURN_NONE;
 
     fail:
+        PyMem_Free(pack_buffer);
         NpyIter_Deallocate(iter);
-        Py_DECREF(write_name);
+        if (write_name != NULL) {
+            Py_DECREF(write_name);
+        }
         return NULL;
 }
 
