@@ -8,6 +8,7 @@ from importlib.util import module_from_spec
 
 import arraykit as ak
 
+
 class Interface(tp.NamedTuple):
     functions: tp.List[str]
     classes: tp.Dict[str, tp.List[str]]
@@ -25,14 +26,17 @@ class Interface(tp.NamedTuple):
     @classmethod
     def from_module(cls, module):
         functions: tp.List[str] = []
-        classes: tp.Dict[str: tp.List[str]] = {}
+        classes: tp.Dict[str : tp.List[str]] = {}
 
         for name in dir(module):
             if not cls._valid_name(name):
                 continue
             obj = getattr(module, name)
-            if isinstance(obj, type): # a class
-                if name in (ak.ErrorInitTypeBlocks.__name__, ak.NonUniqueError.__name__):
+            if isinstance(obj, type):  # a class
+                if name in (
+                    ak.ErrorInitTypeBlocks.__name__,
+                    ak.NonUniqueError.__name__,
+                ):
                     # skip as there is Python version variability
                     continue
                 classes[name] = []
@@ -49,7 +53,6 @@ class Interface(tp.NamedTuple):
 
 
 class TestUnit(unittest.TestCase):
-
     # @unittest.skip('not sure if pyi is in right location')
     def test_interface(self) -> None:
 
@@ -72,8 +75,10 @@ class TestUnit(unittest.TestCase):
             ak_class = ak_content.classes[name]
             pyi_class = pyi_content.classes[name]
 
-            if '__hash__' in ak_class: ak_class.remove('__hash__')
-            if '__hash__' in pyi_class: pyi_class.remove('__hash__')
+            if '__hash__' in ak_class:
+                ak_class.remove('__hash__')
+            if '__hash__' in pyi_class:
+                pyi_class.remove('__hash__')
 
             self.assertEqual(ak_class, pyi_class)
 

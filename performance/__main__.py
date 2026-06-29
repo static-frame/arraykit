@@ -27,7 +27,9 @@ from performance.reference.util import get_new_indexers_and_screen_ak
 from performance.reference.util import get_new_indexers_and_screen_ref
 from performance.reference.util import split_after_count as split_after_count_ref
 from performance.reference.util import count_iteration as count_iteration_ref
-from performance.reference.util import slice_to_ascending_slice as slice_to_ascending_slice_ref
+from performance.reference.util import (
+    slice_to_ascending_slice as slice_to_ascending_slice_ref,
+)
 
 from performance.reference.array_go import ArrayGO as ArrayGOREF
 
@@ -55,29 +57,39 @@ class Perf:
     FUNCTIONS = ('main',)
     NUMBER = 10
 
-class FixtureFileLike:
 
+class FixtureFileLike:
     COUNT_ROW = 1_000_000
     COUNT_COLUMN = 10
 
     def __init__(self):
-        records_int = [','.join(str(x) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        records_int = [
+            ','.join(str(x) for x in range(self.COUNT_COLUMN))
+        ] * self.COUNT_ROW
         self.file_like_int = io.StringIO('\n'.join(records_int))
 
-        records_bool = [','.join(str(bool(x % 2)) for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        records_bool = [
+            ','.join(str(bool(x % 2)) for x in range(self.COUNT_COLUMN))
+        ] * self.COUNT_ROW
         self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
-        records_str = [','.join('foobar' for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        records_str = [
+            ','.join('foobar' for x in range(self.COUNT_COLUMN))
+        ] * self.COUNT_ROW
         self.file_like_str = io.StringIO('\n'.join(records_str))
 
-        records_float = [','.join('1.2345' for x in range(self.COUNT_COLUMN))] * self.COUNT_ROW
+        records_float = [
+            ','.join('1.2345' for x in range(self.COUNT_COLUMN))
+        ] * self.COUNT_ROW
         self.file_like_float = io.StringIO('\n'.join(records_float))
 
         self.axis = 1
 
+
 # #-------------------------------------------------------------------------------
 class DelimitedToArraysTypedPandas(FixtureFileLike, Perf):
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
 
 class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
     entry = staticmethod(delimited_to_arrays_ak)
@@ -105,6 +117,7 @@ class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
 
 class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
     import pandas
+
     entry = staticmethod(pandas.read_csv)
     dtypes_int = {i: int for i in range(FixtureFileLike.COUNT_COLUMN)}
     dtypes_bool = {i: bool for i in range(FixtureFileLike.COUNT_COLUMN)}
@@ -127,10 +140,13 @@ class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
         self.file_like_float.seek(0)
         _ = self.entry(self.file_like_float, dtype=self.dtypes_float)
 
+
 # #-------------------------------------------------------------------------------
+
 
 class DelimitedToArraysParsedPandas(FixtureFileLike, Perf):
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
 
 class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
     entry = staticmethod(delimited_to_arrays_ak)
@@ -154,6 +170,7 @@ class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
 
 class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
     import pandas
+
     entry = staticmethod(pandas.read_csv)
 
     def int_uniform(self):
@@ -176,6 +193,7 @@ class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
 # #-------------------------------------------------------------------------------
 class DelimitedToArraysTypedGenft(FixtureFileLike, Perf):
     FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
+
 
 class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
     entry = staticmethod(delimited_to_arrays_ak)
@@ -284,24 +302,25 @@ class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
 #         _ = self.entry(self.file_like_float, delimiter=',', dtype=None)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class MLoc(Perf):
-
     def __init__(self):
         self.array = np.arange(100)
 
     def main(self):
         self.entry(self.array)
 
+
 class MLocAK(MLoc):
     entry = staticmethod(mloc_ak)
+
 
 class MLocREF(MLoc):
     entry = staticmethod(mloc_ref)
 
-#-------------------------------------------------------------------------------
-class ImmutableFilter(Perf):
 
+# -------------------------------------------------------------------------------
+class ImmutableFilter(Perf):
     def __init__(self):
         self.array = np.arange(100)
 
@@ -309,15 +328,17 @@ class ImmutableFilter(Perf):
         a2 = self.entry(self.array)
         a3 = self.entry(a2)
 
+
 class ImmutableFilterAK(ImmutableFilter):
     entry = staticmethod(immutable_filter_ak)
+
 
 class ImmutableFilterREF(ImmutableFilter):
     entry = staticmethod(immutable_filter_ref)
 
-#-------------------------------------------------------------------------------
-class NameFilter(Perf):
 
+# -------------------------------------------------------------------------------
+class NameFilter(Perf):
     def __init__(self):
         self.name1 = ('foo', None, ['bar'])
         self.name2 = 'foo'
@@ -329,15 +350,17 @@ class NameFilter(Perf):
             pass
         self.entry(self.name2)
 
+
 class NameFilterAK(NameFilter):
     entry = staticmethod(name_filter_ak)
+
 
 class NameFilterREF(NameFilter):
     entry = staticmethod(name_filter_ref)
 
-#-------------------------------------------------------------------------------
-class ShapeFilter(Perf):
 
+# -------------------------------------------------------------------------------
+class ShapeFilter(Perf):
     def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(20, 5)
@@ -345,16 +368,18 @@ class ShapeFilter(Perf):
     def main(self):
         self.entry(self.array1)
         self.entry(self.array2)
+
 
 class ShapeFilterAK(ShapeFilter):
     entry = staticmethod(shape_filter_ak)
 
+
 class ShapeFilterREF(ShapeFilter):
     entry = staticmethod(shape_filter_ref)
 
-#-------------------------------------------------------------------------------
-class Column2DFilter(Perf):
 
+# -------------------------------------------------------------------------------
+class Column2DFilter(Perf):
     def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(20, 5)
@@ -363,16 +388,17 @@ class Column2DFilter(Perf):
         self.entry(self.array1)
         self.entry(self.array2)
 
+
 class Column2DFilterAK(Column2DFilter):
     entry = staticmethod(column_2d_filter_ak)
+
 
 class Column2DFilterREF(Column2DFilter):
     entry = staticmethod(column_2d_filter_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class Column1DFilter(Perf):
-
     def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(100, 1)
@@ -381,15 +407,17 @@ class Column1DFilter(Perf):
         self.entry(self.array1)
         self.entry(self.array2)
 
+
 class Column1DFilterAK(Column1DFilter):
     entry = staticmethod(column_1d_filter_ak)
+
 
 class Column1DFilterREF(Column1DFilter):
     entry = staticmethod(column_1d_filter_ref)
 
-#-------------------------------------------------------------------------------
-class Row1DFilter(Perf):
 
+# -------------------------------------------------------------------------------
+class Row1DFilter(Perf):
     def __init__(self):
         self.array1 = np.arange(100)
         self.array2 = self.array1.reshape(1, 100)
@@ -398,16 +426,17 @@ class Row1DFilter(Perf):
         self.entry(self.array1)
         self.entry(self.array2)
 
+
 class Row1DFilterAK(Row1DFilter):
     entry = staticmethod(row_1d_filter_ak)
+
 
 class Row1DFilterREF(Row1DFilter):
     entry = staticmethod(row_1d_filter_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class ResolveDType(Perf):
-
     def __init__(self):
         self.dtype1 = np.arange(100).dtype
         self.dtype2 = np.array(('a', 'b')).dtype
@@ -415,26 +444,25 @@ class ResolveDType(Perf):
     def main(self):
         self.entry(self.dtype1, self.dtype2)
 
+
 class ResolveDTypeAK(ResolveDType):
     entry = staticmethod(resolve_dtype_ak)
+
 
 class ResolveDTypeREF(ResolveDType):
     entry = staticmethod(resolve_dtype_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class ResolveDTypeIter(Perf):
-
     FUNCTIONS = ('iter10', 'iter100000')
     NUMBER = 500
 
     def __init__(self):
         self.dtypes10 = [np.dtype(int)] * 9 + [np.dtype(float)]
         self.dtypes100000 = (
-                [np.dtype(int)] * 50000 +
-                [np.dtype(float)] * 49999 +
-                [np.dtype(bool)]
-                )
+            [np.dtype(int)] * 50000 + [np.dtype(float)] * 49999 + [np.dtype(bool)]
+        )
 
     def iter10(self):
         self.entry(self.dtypes10)
@@ -442,14 +470,16 @@ class ResolveDTypeIter(Perf):
     def iter100000(self):
         self.entry(self.dtypes100000)
 
+
 class ResolveDTypeIterAK(ResolveDTypeIter):
     entry = staticmethod(resolve_dtype_iter_ak)
+
 
 class ResolveDTypeIterREF(ResolveDTypeIter):
     entry = staticmethod(resolve_dtype_iter_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class ArrayDeepcopy(Perf):
     FUNCTIONS = ('memo_new', 'memo_shared')
     NUMBER = 500
@@ -457,7 +487,7 @@ class ArrayDeepcopy(Perf):
     def __init__(self):
         self.array1 = np.arange(100_000)
         self.array2 = np.full(100_000, None)
-        self.array2[0] = [np.nan] # add a mutable
+        self.array2[0] = [np.nan]  # add a mutable
         self.memo = {}
 
     def memo_new(self):
@@ -469,14 +499,16 @@ class ArrayDeepcopy(Perf):
         self.entry(self.array1, self.memo)
         self.entry(self.array2, self.memo)
 
+
 class ArrayDeepcopyAK(ArrayDeepcopy):
     entry = staticmethod(array_deepcopy_ak)
+
 
 class ArrayDeepcopyREF(ArrayDeepcopy):
     entry = staticmethod(array_deepcopy_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class ArrayGOPerf(Perf):
     NUMBER = 500
 
@@ -490,14 +522,16 @@ class ArrayGOPerf(Perf):
             if i % 50:
                 _ = ag.values
 
+
 class ArrayGOPerfAK(ArrayGOPerf):
     entry = staticmethod(ArrayGOAK)
+
 
 class ArrayGOPerfREF(ArrayGOPerf):
     entry = staticmethod(ArrayGOREF)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class DtypeFromElementPerf(Perf):
     NUMBER = 1000
 
@@ -505,14 +539,41 @@ class DtypeFromElementPerf(Perf):
         NT = namedtuple('NT', tuple('abc'))
 
         self.values = [
-                np.longlong(-1), np.int_(-1), np.intc(-1), np.short(-1), np.byte(-1),
-                np.ubyte(1), np.ushort(1), np.uintc(1), np.uint(1), np.ulonglong(1),
-                np.half(1.0), np.single(1.0), np.float64(1.0), np.longdouble(1.0),
-                np.csingle(1.0j), np.complex_(1.0j), np.clongdouble(1.0j),
-                np.bool_(0), np.str_('1'), np.str_('1'), np.void(1),
-                np.object(), np.datetime64('NaT'), np.timedelta64('NaT'), np.nan,
-                12, 12.0, True, None, float('NaN'), object(), (1, 2, 3),
-                NT(1, 2, 3), datetime.date(2020, 12, 31), datetime.timedelta(14),
+            np.longlong(-1),
+            np.int_(-1),
+            np.intc(-1),
+            np.short(-1),
+            np.byte(-1),
+            np.ubyte(1),
+            np.ushort(1),
+            np.uintc(1),
+            np.uint(1),
+            np.ulonglong(1),
+            np.half(1.0),
+            np.single(1.0),
+            np.float64(1.0),
+            np.longdouble(1.0),
+            np.csingle(1.0j),
+            np.complex_(1.0j),
+            np.clongdouble(1.0j),
+            np.bool_(0),
+            np.str_('1'),
+            np.str_('1'),
+            np.void(1),
+            np.object(),
+            np.datetime64('NaT'),
+            np.timedelta64('NaT'),
+            np.nan,
+            12,
+            12.0,
+            True,
+            None,
+            float('NaN'),
+            object(),
+            (1, 2, 3),
+            NT(1, 2, 3),
+            datetime.date(2020, 12, 31),
+            datetime.timedelta(14),
         ]
 
         # Datetime & Timedelta
@@ -529,35 +590,47 @@ class DtypeFromElementPerf(Perf):
             for val in self.values:
                 self.entry(val)
 
+
 class DtypeFromElementPerfAK(DtypeFromElementPerf):
     entry = staticmethod(dtype_from_element_ak)
+
 
 class DtypeFromElementPerfREF(DtypeFromElementPerf):
     entry = staticmethod(dtype_from_element_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class IsNaElementPerf(Perf):
     NUMBER = 1000
 
     def __init__(self):
-        class FloatSubclass(float): pass
-        class ComplexSubclass(complex): pass
+        class FloatSubclass(float):
+            pass
+
+        class ComplexSubclass(complex):
+            pass
 
         self.values = [
-                # Na-elements
-                np.datetime64('NaT'), np.timedelta64('NaT'), None, float('NaN'), -float('NaN'),
-
-                # Non-float, Non-na elements
-                1, 'str', np.datetime64('2020-12-31'), datetime.date(2020, 12, 31), False,
+            # Na-elements
+            np.datetime64('NaT'),
+            np.timedelta64('NaT'),
+            None,
+            float('NaN'),
+            -float('NaN'),
+            # Non-float, Non-na elements
+            1,
+            'str',
+            np.datetime64('2020-12-31'),
+            datetime.date(2020, 12, 31),
+            False,
         ]
 
         nan = np.nan
         complex_nans = [
-                complex(nan, 0),
-                complex(-nan, 0),
-                complex(0, nan),
-                complex(0, -nan),
+            complex(nan, 0),
+            complex(-nan, 0),
+            complex(0, nan),
+            complex(0, -nan),
         ]
 
         float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
@@ -579,8 +652,20 @@ class IsNaElementPerf(Perf):
 
         # Append a wide range of float values, with different precision, across types
         for val in (
-                1e-1000, 1e-309, 1e-39, 1e-16, 1e-5, 0.1, 0., 1.0, 1e5, 1e16, 1e39, 1e309, 1e1000,
-            ):
+            1e-1000,
+            1e-309,
+            1e-39,
+            1e-16,
+            1e-5,
+            0.1,
+            0.0,
+            1.0,
+            1e5,
+            1e16,
+            1e39,
+            1e309,
+            1e1000,
+        ):
             for ctor in float_classes:
                 self.values.append(ctor(val))
                 self.values.append(ctor(-val))
@@ -596,31 +681,33 @@ class IsNaElementPerf(Perf):
             for val in self.values:
                 self.entry(val)
 
+
 class IsNaElementPerfAK(IsNaElementPerf):
     entry = staticmethod(isna_element_ak)
+
 
 class IsNaElementPerfREF(IsNaElementPerf):
     entry = staticmethod(isna_element_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class GetNewIndexersAndScreenPerf(Perf):
     FUNCTIONS = (
-        "ordered",
-        "unordered",
-        "tiled",
-        "repeat",
-        "quick_exit",
-        "late_exit",
-        "small",
-        "large",
+        'ordered',
+        'unordered',
+        'tiled',
+        'repeat',
+        'quick_exit',
+        'late_exit',
+        'small',
+        'large',
     )
     NUMBER = 5
 
-    TILED = "tiled"
-    REPEATED = "repeated"
-    ORDERED = "ordered"
-    UNORDERED = "unordered"
+    TILED = 'tiled'
+    REPEATED = 'repeated'
+    ORDERED = 'ordered'
+    UNORDERED = 'unordered'
 
     class Key(tp.NamedTuple):
         type1: str
@@ -700,9 +787,7 @@ class GetNewIndexersAndScreenPerfREF(GetNewIndexersAndScreenPerf):
     entry = staticmethod(get_new_indexers_and_screen_ref)
 
 
-
-
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class SplitAfterCount(Perf):
     NUMBER = 200_000
 
@@ -712,14 +797,16 @@ class SplitAfterCount(Perf):
     def main(self):
         post = self.entry(self.string, ',', 20)
 
+
 class SplitAfterCountAK(SplitAfterCount):
     entry = staticmethod(split_after_count_ak)
+
 
 class SplitAfterCountREF(SplitAfterCount):
     entry = staticmethod(split_after_count_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class CountIterations(Perf):
     NUMBER = 10_000
 
@@ -730,14 +817,16 @@ class CountIterations(Perf):
         post = self.entry(self.strio)
         self.strio.seek(0)
 
+
 class CountIterationsAK(CountIterations):
     entry = staticmethod(count_iteration_ak)
+
 
 class CountIterationsREF(CountIterations):
     entry = staticmethod(count_iteration_ref)
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 class SliceToAscending(Perf):
     NUMBER = 1_000_000
 
@@ -747,30 +836,35 @@ class SliceToAscending(Perf):
     def main(self):
         _ = self.entry(self.slc, 101)
 
+
 class SliceToAscendingAK(SliceToAscending):
     entry = staticmethod(slice_to_ascending_slice_ak)
+
 
 class SliceToAscendingREF(SliceToAscending):
     entry = staticmethod(slice_to_ascending_slice_ref)
 
-#-------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------
+
 
 def get_arg_parser():
 
     p = argparse.ArgumentParser(
         description='ArrayKit performance tool.',
-        )
-    p.add_argument("--names",
-        nargs='+',
-        help='Provide one or more performance tests by name.')
+    )
+    p.add_argument(
+        '--names', nargs='+', help='Provide one or more performance tests by name.'
+    )
     return p
+
 
 def main():
     options = get_arg_parser().parse_args()
     match = None if not options.names else set(options.names)
 
     records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
-    for cls_perf in Perf.__subclasses__(): # only get one level
+    for cls_perf in Perf.__subclasses__():  # only get one level
         cls_map = {}
         if match and cls_perf.__name__ not in match:
             continue
@@ -784,15 +878,24 @@ def main():
             results = {}
             for key, cls_runner in cls_map.items():
                 runner = cls_runner()
-                if hasattr(runner, 'pre'): #TEMP, for branches
+                if hasattr(runner, 'pre'):  # TEMP, for branches
                     raise RuntimeError('convert your pre() method to __init__()')
                 f = getattr(runner, func_attr)
-                results[key] = timeit.timeit('f()',
-                        globals=locals(),
-                        number=cls_runner.NUMBER)
-            records.append((cls_perf.__name__, func_attr, results['ak'], results['ref'], results['ref'] / results['ak']))
+                results[key] = timeit.timeit(
+                    'f()', globals=locals(), number=cls_runner.NUMBER
+                )
+            records.append(
+                (
+                    cls_perf.__name__,
+                    func_attr,
+                    results['ak'],
+                    results['ref'],
+                    results['ref'] / results['ak'],
+                )
+            )
 
-    import pandas as pd # NOTE: cannot make StaticFrame a dependency
+    import pandas as pd  # NOTE: cannot make StaticFrame a dependency
+
     riter = iter(records)
     columns = next(riter)
     f = pd.DataFrame.from_records(riter, columns=columns)
@@ -803,6 +906,7 @@ def main():
     #     print(''.join(
     #         (r.ljust(width) if isinstance(r, str) else str(round(r, 8)).ljust(width)) for r in record
     #         ))
+
 
 if __name__ == '__main__':
     main()

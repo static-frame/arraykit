@@ -1,17 +1,16 @@
-
 from arraykit import shape_filter
 from arraykit import resolve_dtype
 
 import typing as tp
 import numpy as np
 
-#-------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------
 def from_blocks(
-        raw_blocks: tp.Iterable[np.ndarray],
-        ):
-    '''Simulation of legacy routine within TypeBlocks.
-    '''
-    index: tp.List[tp.Tuple[int, int]] = [] # columns position to blocks key
+    raw_blocks: tp.Iterable[np.ndarray],
+):
+    """Simulation of legacy routine within TypeBlocks."""
+    index: tp.List[tp.Tuple[int, int]] = []  # columns position to blocks key
     block_count = 0
     row_count = None
     column_count = 0
@@ -21,11 +20,13 @@ def from_blocks(
         if not block.__class__ is np.ndarray:
             raise ErrorInitTypeBlocks(f'found non array block: {block}')
         if block.ndim > 2:
-            raise ErrorInitTypeBlocks(f'cannot include array with {block.ndim} dimensions')
+            raise ErrorInitTypeBlocks(
+                f'cannot include array with {block.ndim} dimensions'
+            )
 
         r, c = shape_filter(block)
 
-        if row_count is not None and r != row_count: #type: ignore [unreachable]
+        if row_count is not None and r != row_count:  # type: ignore [unreachable]
             raise ErrorInitTypeBlocks(f'mismatched row count: {r}: {row_count}')
         else:
             row_count = r
@@ -43,20 +44,21 @@ def from_blocks(
         block_count += 1
     return (row_count, column_count), index
 
-#-------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------
 
 
 def cols_to_slice(indices: tp.Sequence[int]) -> slice:
-    '''Translate an iterable of contiguous integers into a slice.
-Integers are assumed to be ordered (ascending or descending) and contiguous.
-    '''
+    """Translate an iterable of contiguous integers into a slice.
+    Integers are assumed to be ordered (ascending or descending) and contiguous.
+    """
     start_idx = indices[0]
     # single column as a single slice
     if len(indices) == 1:
         return slice(start_idx, start_idx + 1)
 
     stop_idx = indices[-1]
-    if stop_idx > start_idx: # ascending indices
+    if stop_idx > start_idx:  # ascending indices
         return slice(start_idx, stop_idx + 1)
 
     if stop_idx == 0:
@@ -64,11 +66,13 @@ Integers are assumed to be ordered (ascending or descending) and contiguous.
     # stop is less than start, need to reduce by 1 to cover range
     return slice(start_idx, stop_idx - 1, -1)
 
-def indices_to_contiguous_pairs(indices: tp.Iterable[tp.Tuple[int, int]]
-    ) -> tp.Iterator[tp.Tuple[int, slice]]:
-    '''Indices are pairs of (block_idx, value); convert these to pairs of (block_idx, slice) when we identify contiguous indices
-within a block (these are block slices)
-    '''
+
+def indices_to_contiguous_pairs(
+    indices: tp.Iterable[tp.Tuple[int, int]],
+) -> tp.Iterator[tp.Tuple[int, slice]]:
+    """Indices are pairs of (block_idx, value); convert these to pairs of (block_idx, slice) when we identify contiguous indices
+    within a block (these are block slices)
+    """
     # store pairs of block idx, ascending col list
     last: tp.Optional[tp.Tuple[int, int]] = None
 
@@ -110,7 +114,7 @@ class IterContiguous:
         #     return start
 
         if start <= end_inclusive:
-            return slice(start, end_inclusive + 1, None) # can be 1
+            return slice(start, end_inclusive + 1, None)  # can be 1
         # reverse slice
         if end_inclusive == 0:
             return slice(start, None, -1)
@@ -120,13 +124,13 @@ class IterContiguous:
         slice_start = -1
         while True:
             if self.next_block == -2:
-                return None # terminate the loop
+                return None  # terminate the loop
             if self.next_block != -1:
                 # discontinuity found on last iteration, set new start
                 self.last_block = self.next_block
                 self.last_column = self.next_column
                 slice_start = self.last_column
-                self.next_block = -1 # clear next state
+                self.next_block = -1  # clear next state
                 self.next_column = -1
 
             try:
@@ -144,7 +148,9 @@ class IterContiguous:
                 slice_start = column
                 continue
 
-            if self.last_block == block and abs(column - self.last_column) == 1: # contiguous
+            if (
+                self.last_block == block and abs(column - self.last_column) == 1
+            ):  # contiguous
                 self.last_column = column
                 continue
 
@@ -154,7 +160,6 @@ class IterContiguous:
             self.next_column = column
             return self.last_block, self.build_slice(slice_start, self.last_column)
 
-
     def iter(self) -> tp.Iterator[tp.Tuple[int, slice]]:
         while True:
             post = self.getter()
@@ -163,8 +168,8 @@ class IterContiguous:
             else:
                 break
 
-#-------------------------------------------------------------------------------
 
+# -------------------------------------------------------------------------------
 
 
 if __name__ == '__main__':
@@ -177,13 +182,11 @@ if __name__ == '__main__':
         [(0, 0), (2, 3), (2, 2), (2, 1), (2, 6), (10, 1)],
         [(2, 3), (0, 0), (2, 2), (2, 1), (2, 6), (2, 7)],
         [(2, 3), (2, 2), (5, 2), (5, 1), (5, 0), (2, 1), (2, 0)],
-
     )
     for sample in samples:
         p1 = list(indices_to_contiguous_pairs(sample))
         print(sample)
         print(p1)
-
 
         iterc = IterContiguous(sample)
         p2 = list(iterc.iter())

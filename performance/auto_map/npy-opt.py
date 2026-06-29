@@ -29,7 +29,7 @@ from fixtures import (
 
 
 class MapProcessor:
-    NAME = ""
+    NAME = ''
     SORT = -1
 
     def __init__(self, pl: PayLoad):
@@ -43,7 +43,7 @@ class MapProcessor:
 
 # -------------------------------------------------------------------------------
 class FAMLInstantiate(MapProcessor):
-    NAME = "FAM(L): instantiate"
+    NAME = 'FAM(L): instantiate'
     SORT = 0
 
     def __call__(self):
@@ -52,7 +52,7 @@ class FAMLInstantiate(MapProcessor):
 
 
 class AMAInstantiate(MapProcessor):
-    NAME = "AM(A): instantiate"
+    NAME = 'AM(A): instantiate'
     SORT = 0
 
     def __call__(self):
@@ -61,7 +61,7 @@ class AMAInstantiate(MapProcessor):
 
 
 class FAMAInstantiate(MapProcessor):
-    NAME = "FAM(A): instantiate"
+    NAME = 'FAM(A): instantiate'
     SORT = 0
 
     def __call__(self):
@@ -70,7 +70,7 @@ class FAMAInstantiate(MapProcessor):
 
 
 class FAMAtolistInstantiate(MapProcessor):
-    NAME = "FAM(Atolist): instantiate"
+    NAME = 'FAM(Atolist): instantiate'
     SORT = 0
 
     def __call__(self):
@@ -79,7 +79,7 @@ class FAMAtolistInstantiate(MapProcessor):
 
 
 class DictInstantiate(MapProcessor):
-    NAME = "Dict: instantiate"
+    NAME = 'Dict: instantiate'
     SORT = 0
 
     def __call__(self):
@@ -89,7 +89,7 @@ class DictInstantiate(MapProcessor):
 
 # -------------------------------------------------------------------------------
 class FAMLLookup(MapProcessor):
-    NAME = "FAM(L): lookup"
+    NAME = 'FAM(L): lookup'
     SORT = 0
 
     def __call__(self):
@@ -99,7 +99,7 @@ class FAMLLookup(MapProcessor):
 
 
 class FAMALookup(MapProcessor):
-    NAME = "FAM(A): lookup"
+    NAME = 'FAM(A): lookup'
     SORT = 0
 
     def __call__(self):
@@ -109,7 +109,7 @@ class FAMALookup(MapProcessor):
 
 
 class DictLookup(MapProcessor):
-    NAME = "Dict: lookup"
+    NAME = 'Dict: lookup'
     SORT = 0
 
     def __call__(self):
@@ -120,7 +120,7 @@ class DictLookup(MapProcessor):
 
 # -------------------------------------------------------------------------------
 class FAMLLookupScalar(MapProcessor):
-    NAME = "FAM(L): lookup scalar"
+    NAME = 'FAM(L): lookup scalar'
     SORT = 0
 
     def __call__(self):
@@ -130,7 +130,7 @@ class FAMLLookupScalar(MapProcessor):
 
 
 class FAMALookupScalar(MapProcessor):
-    NAME = "FAM(A): lookup scalar"
+    NAME = 'FAM(A): lookup scalar'
     SORT = 0
 
     def __call__(self):
@@ -140,7 +140,7 @@ class FAMALookupScalar(MapProcessor):
 
 
 class AMALookupScalar(MapProcessor):
-    NAME = "AM(A): lookup scalar"
+    NAME = 'AM(A): lookup scalar'
     SORT = 0
 
     def __call__(self):
@@ -150,7 +150,7 @@ class AMALookupScalar(MapProcessor):
 
 
 class DictLookupScalar(MapProcessor):
-    NAME = "Dict: lookup scalar"
+    NAME = 'Dict: lookup scalar'
     SORT = 0
 
     def __call__(self):
@@ -161,7 +161,7 @@ class DictLookupScalar(MapProcessor):
 
 # -------------------------------------------------------------------------------
 class FAMLNotIn(MapProcessor):
-    NAME = "FAM(L): not in"
+    NAME = 'FAM(L): not in'
     SORT = 0
 
     def __call__(self):
@@ -171,7 +171,7 @@ class FAMLNotIn(MapProcessor):
 
 
 class FAMANotIn(MapProcessor):
-    NAME = "FAM(A): not in"
+    NAME = 'FAM(A): not in'
     SORT = 0
 
     def __call__(self):
@@ -181,7 +181,7 @@ class FAMANotIn(MapProcessor):
 
 
 class AMANotIn(MapProcessor):
-    NAME = "AM(A): not in"
+    NAME = 'AM(A): not in'
     SORT = 0
 
     def __call__(self):
@@ -191,7 +191,7 @@ class AMANotIn(MapProcessor):
 
 
 class DictNotIn(MapProcessor):
-    NAME = "Dict: not in"
+    NAME = 'Dict: not in'
     SORT = 0
 
     def __call__(self):
@@ -202,7 +202,7 @@ class DictNotIn(MapProcessor):
 
 # -------------------------------------------------------------------------------
 class FAMLKeys(MapProcessor):
-    NAME = "FAM(L): keys"
+    NAME = 'FAM(L): keys'
     SORT = 0
 
     def __call__(self):
@@ -211,7 +211,7 @@ class FAMLKeys(MapProcessor):
 
 
 class FAMAKeys(MapProcessor):
-    NAME = "FAM(A): keys"
+    NAME = 'FAM(A): keys'
     SORT = 0
 
     def __call__(self):
@@ -220,7 +220,7 @@ class FAMAKeys(MapProcessor):
 
 
 class DictKeys(MapProcessor):
-    NAME = "Dict: keys"
+    NAME = 'Dict: keys'
     SORT = 0
 
     def __call__(self):
@@ -230,7 +230,7 @@ class DictKeys(MapProcessor):
 
 # -------------------------------------------------------------------------------
 class FAMLItems(MapProcessor):
-    NAME = "FAM(L): items"
+    NAME = 'FAM(L): items'
     SORT = 0
 
     def __call__(self):
@@ -239,7 +239,7 @@ class FAMLItems(MapProcessor):
 
 
 class FAMAItems(MapProcessor):
-    NAME = "FAM(A): items"
+    NAME = 'FAM(A): items'
     SORT = 0
 
     def __call__(self):
@@ -248,7 +248,7 @@ class FAMAItems(MapProcessor):
 
 
 class DictItems(MapProcessor):
-    NAME = "Dict: items"
+    NAME = 'Dict: items'
     SORT = 0
 
     def __call__(self):
@@ -259,7 +259,7 @@ class DictItems(MapProcessor):
 def get_versions() -> str:
     import platform
 
-    return f"OS: {platform.system()} / ArrayMap: {arraymap.__version__} / NumPy: {np.__version__}\n"
+    return f'OS: {platform.system()} / ArrayMap: {arraymap.__version__} / NumPy: {np.__version__}\n'
 
 
 CLS_FF = (
@@ -293,52 +293,51 @@ NUMBER = 2
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
     if seconds < 1e-4:
-        return f"{seconds * 1e6: .1f} (µs)"
+        return f'{seconds * 1e6: .1f} (µs)'
     if seconds < 1e-1:
-        return f"{seconds * 1e3: .1f} (ms)"
-    return f"{seconds: .1f} (s)"
+        return f'{seconds * 1e3: .1f} (ms)'
+    return f'{seconds: .1f} (s)'
 
 
-def plot_performance(frame, suffix: str = ""):
-    fixture_total = len(frame["fixture"].unique())
-    cat_total = len(frame["size"].unique())
-    processor_total = len(frame["cls_processor"].unique())
+def plot_performance(frame, suffix: str = ''):
+    fixture_total = len(frame['fixture'].unique())
+    cat_total = len(frame['size'].unique())
+    processor_total = len(frame['cls_processor'].unique())
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap('plasma')
     color = cmap(np.arange(processor_total) / processor_total)
 
     # category is the size of the array
-    for cat_count, (cat_label, cat) in enumerate(frame.groupby("size")):
-
+    for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
         # fixture is the data type fixture
-        fixture_data = {fix_label: fix for fix_label, fix in cat.groupby("fixture")}
+        fixture_data = {fix_label: fix for fix_label, fix in cat.groupby('fixture')}
         for fixture_count, fixture_label in enumerate(FF_ORDER):
             fixture = fixture_data[fixture_label]
             ax = axes[cat_count][fixture_count]
 
             # set order by cls_processor, i.e., the type of test being done
-            fixture["sort"] = [f.SORT for f in fixture["cls_processor"]]
-            fixture = fixture.sort_values("sort")
+            fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
+            fixture = fixture.sort_values('sort')
 
-            results = fixture["time"].values.tolist()
-            names = [cls.NAME for cls in fixture["cls_processor"]]
+            results = fixture['time'].values.tolist()
+            names = [cls.NAME for cls in fixture['cls_processor']]
             # x = np.arange(len(results))
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
             # density, position = fixture_label.split('-')
             # cat_label is the size of the array
-            title = f"{cat_label:.0e}\n{fixture_label}"
+            title = f'{cat_label:.0e}\n{fixture_label}'
 
             ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.8)
-            time_max = fixture["time"].max()
-            time_min = fixture["time"].min()
+            time_max = fixture['time'].max()
+            time_min = fixture['time'].min()
             y_ticks = [0, time_min, time_max * 0.5, time_max]
             y_labels = [
-                "",
+                '',
                 seconds_to_display(time_min),
                 seconds_to_display(time_max * 0.5),
                 seconds_to_display(time_max),
@@ -352,23 +351,23 @@ def plot_performance(frame, suffix: str = ""):
             ax.set_yticklabels(y_labels, fontsize=4)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
-                axis="x",
+                axis='x',
                 bottom=False,
                 labelbottom=False,
             )
             ax.tick_params(
-                axis="y",
+                axis='y',
                 length=2,
                 width=0.5,
                 pad=1,
             )
     fig.set_size_inches(9, 3)  # width, height
-    fig.legend(post, names_display, loc="center right", fontsize=6)
+    fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(0.05, 0.96, f"AutoMap {suffix.title()}: {NUMBER} Iterations", fontsize=10)
+    fig.text(0.05, 0.96, f'AutoMap {suffix.title()}: {NUMBER} Iterations', fontsize=10)
     fig.text(0.05, 0.90, get_versions(), fontsize=6)
 
-    fp = f"/tmp/arraymap-{suffix}.png"
+    fp = f'/tmp/arraymap-{suffix}.png'
     plt.subplots_adjust(
         left=0.075,
         bottom=0.05,
@@ -380,10 +379,10 @@ def plot_performance(frame, suffix: str = ""):
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
 
-    if sys.platform.startswith("linux"):
-        os.system(f"eog {fp}&")
+    if sys.platform.startswith('linux'):
+        os.system(f'eog {fp}&')
     else:
-        os.system(f"open {fp}")
+        os.system(f'open {fp}')
 
 
 def run_test(processors, suffix):
@@ -397,7 +396,7 @@ def run_test(processors, suffix):
                 record = [cls, NUMBER, fixture_label, size]
                 print(record)
                 try:
-                    result = timeit.timeit(f"runner()", globals=locals(), number=NUMBER)
+                    result = timeit.timeit(f'runner()', globals=locals(), number=NUMBER)
                 except OSError:
                     result = np.nan
                 finally:
@@ -406,14 +405,13 @@ def run_test(processors, suffix):
                 records.append(record)
 
     f = pd.DataFrame.from_records(
-        records, columns=("cls_processor", "number", "fixture", "size", "time")
+        records, columns=('cls_processor', 'number', 'fixture', 'size', 'time')
     )
     print(f)
     plot_performance(f, suffix)
 
 
-if __name__ == "__main__":
-
+if __name__ == '__main__':
     CLS_PROCESSOR = (
         FAMLInstantiate,
         FAMAInstantiate,
@@ -451,5 +449,5 @@ if __name__ == "__main__":
         # DictNotIn,
     )
 
-    run_test(cls_instantiate, "instantiate")
-    run_test(cls_lookup, "lookup")
+    run_test(cls_instantiate, 'instantiate')
+    run_test(cls_lookup, 'lookup')

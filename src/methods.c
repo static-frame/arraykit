@@ -7,6 +7,13 @@
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
+# include <string.h>
+
+# ifdef _WIN32
+#  include <io.h>
+# else
+#  include <unistd.h>
+# endif
 
 # include "methods.h"
 # include "utilities.h"
@@ -1100,6 +1107,231 @@ static char *array_deepcopy_kwarg_names[] = {
     "memo",
     NULL
 };
+
+static char *write_array_to_file_kwarg_names[] = {
+    "array",
+    "file",
+    "fortran_order",
+    "buffersize",
+    NULL
+};
+
+/* Helper function to write data directly to a file descriptor.
+ * Returns -1 on error (with Python exception set), or 0 on success.
+ */
+static int
+write_to_fd(int fd, const char *data, Py_ssize_t size)
+{
+    Py_ssize_t total_written = 0;
+    while (total_written < size) {
+        Py_ssize_t to_write = size - total_written;
+#ifdef _WIN32
+        /* On Windows, _write has a max count of INT_MAX */
+        if (to_write > INT_MAX) {
+            to_write = INT_MAX;
+        }
+        int written = _write(fd, data + total_written, (unsigned int)to_write);
+#else
+        /* On POSIX, write may have platform-specific limits */
+        ssize_t written = write(fd, data + total_written, to_write);
+#endif
+        if (written < 0) {
+            PyErr_SetFromErrno(PyExc_OSError);
+            return -1;
+        }
+        if (written == 0) {
+            /* No progress - treat as error */
+            PyErr_SetString(PyExc_OSError, "write() returned 0");
+            return -1;
+        }
+        total_written += written;
+    }
+    return 0;
+}
+
+PyObject *
+write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *a;
+    PyObject *file;
+    int fortran_order = 0;
+    npy_intp buffersize = 8192;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "OO|pn:write_array_to_file", write_array_to_file_kwarg_names,
+            &a,
+            &file,
+            &fortran_order,
+            &buffersize)) {
+        return NULL;
+    }
+    AK_CHECK_NUMPY_ARRAY(a);
+    if (buffersize < 1) {
+        PyErr_SetString(PyExc_ValueError, "buffersize must be at least 1");
+        return NULL;
+    }
+
+    PyArrayObject *array = (PyArrayObject*)a;
+    npy_uint32 flags = NPY_ITER_EXTERNAL_LOOP | NPY_ITER_BUFFERED | NPY_ITER_ZEROSIZE_OK;
+    NPY_ORDER order = (fortran_order && !PyArray_IS_C_CONTIGUOUS(array))
+            ? NPY_FORTRANORDER
+            : NPY_CORDER;
+    PyArrayObject *operands[] = {array};
+    npy_uint32 op_flags[] = {NPY_ITER_READONLY | NPY_ITER_ALIGNED};
+    NpyIter *iter = NpyIter_AdvancedNew(
+            1,
+            operands,
+            flags,
+            order,
+            NPY_NO_CASTING,
+            op_flags,
+            NULL,
+            -1,
+            NULL,
+            NULL,
+            buffersize
+            );
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    if (iternext == NULL) {
+        NpyIter_Deallocate(iter);
+        return NULL;
+    }
+
+    char **dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    Py_ssize_t itemsize = PyArray_ITEMSIZE(array);
+    if (itemsize == 0) {
+        NpyIter_Deallocate(iter);
+        Py_RETURN_NONE;
+    }
+
+    // Try to get file descriptor for direct writes. fall back to calling Python's write() method.
+    int fd = PyObject_AsFileDescriptor(file);
+    int use_fd = (fd >= 0);
+
+    /* If we are going to write directly to the file descriptor, we must first
+     * flush any data buffered at the Python level (e.g. an io.BufferedWriter
+     * from open(path, 'wb')). Writing to the raw fd bypasses that user-space
+     * buffer, so without a flush our bytes would land at the kernel offset,
+     * ahead of any still-buffered data, corrupting the file. Raw integer fds
+     * (e.g. from os.open) have no flush() method; that is not an error. */
+    if (use_fd) {
+        PyObject *flush_result = PyObject_CallMethod(file, "flush", NULL);
+        if (flush_result == NULL) {
+            PyErr_Clear();
+        }
+        else {
+            Py_DECREF(flush_result);
+        }
+    }
+
+    // For non-fd path, we need the write method name
+    PyObject *write_name = NULL;
+    if (!use_fd) {
+        PyErr_Clear();  /* Clear the error from PyObject_AsFileDescriptor */
+        write_name = PyUnicode_InternFromString("write");
+        if (write_name == NULL) {
+            NpyIter_Deallocate(iter);
+            return NULL;
+        }
+    }
+
+    // Allocate a buffer for packing non-contiguous data
+    char *pack_buffer = NULL;
+    Py_ssize_t pack_buffer_size = 0;
+
+    do {
+        npy_intp inner_size = *innersizeptr;
+        if (inner_size == 0) {
+            continue;
+        }
+        if (inner_size > PY_SSIZE_T_MAX / itemsize) {
+            PyErr_SetString(PyExc_OverflowError, "array chunk too large");
+            goto fail;
+        }
+        Py_ssize_t chunk_size = (Py_ssize_t)inner_size * itemsize;
+
+        const char *data_to_write = *dataptr;
+
+        // If stride is not contiguous, pack into buffer
+        if (*strideptr != itemsize) {
+            if (pack_buffer_size < chunk_size) {
+                char *new_buffer = (char *)PyMem_Realloc(pack_buffer, chunk_size);
+                if (new_buffer == NULL) {
+                    PyErr_NoMemory();
+                    goto fail;
+                }
+                pack_buffer = new_buffer;
+                pack_buffer_size = chunk_size;
+            }
+            char *src = *dataptr;
+            npy_intp stride = *strideptr;
+            for (npy_intp i = 0; i < inner_size; ++i) {
+                memcpy(pack_buffer + (i * itemsize), src + (i * stride), itemsize);
+            }
+            data_to_write = pack_buffer;
+        }
+
+        // Write the data
+        if (use_fd) {
+            if (write_to_fd(fd, data_to_write, chunk_size) < 0) {
+                goto fail;
+            }
+        }
+        else {
+            /* Note: PyMemoryView_FromMemory requires non-const char*, but we pass
+             * PyBUF_READ flag which makes the view read-only, so the cast is safe. */
+            PyObject *buffer = PyMemoryView_FromMemory((char *)data_to_write, chunk_size, PyBUF_READ);
+            if (buffer == NULL) {
+                goto fail;
+            }
+
+            PyObject *write_result = PyObject_CallMethodObjArgs(file, write_name, buffer, NULL);
+            Py_DECREF(buffer);
+            if (write_result == NULL) {
+                goto fail;
+            }
+
+            /* Check for partial writes */
+            if (PyLong_Check(write_result)) {
+                Py_ssize_t bytes_written = PyLong_AsSsize_t(write_result);
+                if (bytes_written < 0 && PyErr_Occurred()) {
+                    Py_DECREF(write_result);
+                    goto fail;
+                }
+                if (bytes_written != chunk_size) {
+                    Py_DECREF(write_result);
+                    PyErr_Format(PyExc_OSError,
+                                 "write() returned partial write (%zd of %zd bytes)",
+                                 bytes_written, chunk_size);
+                    goto fail;
+                }
+            }
+            Py_DECREF(write_result);
+        }
+    } while(iternext(iter));
+
+    /* NpyIter can return 0 for TWO reasons: end of iteration OR error.
+     * We MUST check PyErr_Occurred() to distinguish between the two. */
+    if (PyErr_Occurred()) {
+        goto fail;
+    }
+
+    PyMem_Free(pack_buffer);
+    NpyIter_Deallocate(iter);
+    Py_XDECREF(write_name);
+    Py_RETURN_NONE;
+
+    fail:
+        PyMem_Free(pack_buffer);
+        NpyIter_Deallocate(iter);
+        Py_XDECREF(write_name);
+        return NULL;
+}
 
 PyObject *
 array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs)

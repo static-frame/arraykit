@@ -11,14 +11,14 @@ from arraykit import NonUniqueError
 
 
 def test_am_extend():
-    am1 = AutoMap(("a", "b"))
-    am2 = am1 | AutoMap(("c", "d"))
-    assert list(am2.keys()) == ["a", "b", "c", "d"]
+    am1 = AutoMap(('a', 'b'))
+    am2 = am1 | AutoMap(('c', 'd'))
+    assert list(am2.keys()) == ['a', 'b', 'c', 'd']
 
 
 def test_am_add():
     a = AutoMap()
-    for l, key in enumerate(["a", "b", "c", "d"]):
+    for l, key in enumerate(['a', 'b', 'c', 'd']):
         assert a.add(key) is None
         assert len(a) == l + 1
         assert a[key] == l
@@ -26,7 +26,7 @@ def test_am_add():
 
 def test_fam_contains():
     x = []
-    fam = FrozenAutoMap(("a", "b", "c"))
+    fam = FrozenAutoMap(('a', 'b', 'c'))
     assert (x in fam.values()) == False
     # NOTE: exercise x to force seg fault
     assert len(x) == 0
@@ -115,32 +115,32 @@ def test_fam_constructor_array_float_a():
 
 
 def test_fam_constructor_array_dt64_a():
-    a1 = np.array(("1970-01", "2023-05"), dtype=np.datetime64)
+    a1 = np.array(('1970-01', '2023-05'), dtype=np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam[np.datetime64("2023-05")] == 1
-    assert fam[np.datetime64("1970-01")] == 0
+    assert fam[np.datetime64('2023-05')] == 1
+    assert fam[np.datetime64('1970-01')] == 0
 
     with pytest.raises(KeyError):
-        fam[np.datetime64("nat")]
+        fam[np.datetime64('nat')]
 
     with pytest.raises(KeyError):
-        fam[np.datetime64("1970")]
+        fam[np.datetime64('1970')]
 
 
 def test_fam_constructor_array_dt64_b():
-    a1 = np.array(("1542", "nat"), dtype=np.datetime64)
+    a1 = np.array(('1542', 'nat'), dtype=np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    assert fam[np.datetime64("nat")] == 1
-    assert fam[np.datetime64("nat", "D")] == 1
-    assert fam[np.datetime64("nat", "ns")] == 1
-    assert fam[np.datetime64("1542")] == 0
+    assert fam[np.datetime64('nat')] == 1
+    assert fam[np.datetime64('nat', 'D')] == 1
+    assert fam[np.datetime64('nat', 'ns')] == 1
+    assert fam[np.datetime64('1542')] == 0
 
 
 def test_fam_constructor_array_dt64_c():
-    a1 = np.array(("nat", "nat"), dtype=np.datetime64)
+    a1 = np.array(('nat', 'nat'), dtype=np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     # when we get "generic" dt64 units, we load scalars in a list, and can thus support multiple NaNs
@@ -148,7 +148,7 @@ def test_fam_constructor_array_dt64_c():
 
 
 def test_fam_constructor_array_dt64_d():
-    a1 = np.array(("2023-05", "2023-05"), dtype=np.datetime64)
+    a1 = np.array(('2023-05', '2023-05'), dtype=np.datetime64)
     a1.flags.writeable = False
     with pytest.raises(NonUniqueError):
         fam = FrozenAutoMap(a1)
@@ -158,14 +158,14 @@ def test_fam_constructor_array_dt64_d():
 
 
 def test_fam_constructor_array_unicode_a():
-    a1 = np.array(("a", "b", "a"))
+    a1 = np.array(('a', 'b', 'a'))
     a1.flags.writeable = False
     with pytest.raises(NonUniqueError):
         fam = FrozenAutoMap(a1)
 
 
 def test_fam_constructor_array_unicode_b():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     for k in a1:
@@ -173,7 +173,7 @@ def test_fam_constructor_array_unicode_b():
 
 
 def test_fam_constructor_array_unicode_c():
-    a1 = np.array(("z0Ct", "z0DS", "z0E9"))
+    a1 = np.array(('z0Ct', 'z0DS', 'z0E9'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
@@ -191,82 +191,82 @@ def test_fam_constructor_array_unicode_c():
 
 
 def test_fam_constructor_array_unicode_d1():
-    a1 = np.array(["", "\x000"], dtype="U2")
+    a1 = np.array(['', '\x000'], dtype='U2')
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     assert len(fam) == 2
-    assert list(fam) == ["", "\x000"]
-    assert "" in fam
-    assert "\x000" in fam
+    assert list(fam) == ['', '\x000']
+    assert '' in fam
+    assert '\x000' in fam
 
 
 def test_fam_constructor_array_unicode_d2():
-    a1 = np.array(["", "\x000\x00"], dtype="U3")
+    a1 = np.array(['', '\x000\x00'], dtype='U3')
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     assert len(fam) == 2
-    assert list(fam) == ["", "\x000"]  # we lost the last null
-    assert "" in fam
-    assert "\x000" in fam
+    assert list(fam) == ['', '\x000']  # we lost the last null
+    assert '' in fam
+    assert '\x000' in fam
 
 
 def test_fam_copy_array_unicode_a():
-    a1 = np.array(("a", "ccc", "bb"))
+    a1 = np.array(('a', 'ccc', 'bb'))
     a1.flags.writeable = False
     fam1 = FrozenAutoMap(a1)
     fam2 = FrozenAutoMap(fam1)
-    assert fam2["a"] == 0
-    assert fam2["ccc"] == 1
-    assert fam2["bb"] == 2
+    assert fam2['a'] == 0
+    assert fam2['ccc'] == 1
+    assert fam2['bb'] == 2
 
 
 # ------------------------------------------------------------------------------
 
 
 def test_fam_constructor_array_bytes_a():
-    a1 = np.array((b"a", b"b", b"c"))
+    a1 = np.array((b'a', b'b', b'c'))
     with pytest.raises(TypeError):
         fam = FrozenAutoMap(a1)
 
 
 def test_fam_constructor_array_bytes_b():
-    a1 = np.array((b"aaa", b"b", b"aaa"))
+    a1 = np.array((b'aaa', b'b', b'aaa'))
     a1.flags.writeable = False
     with pytest.raises(NonUniqueError):
         fam = FrozenAutoMap(a1)
 
 
 def test_fam_constructor_array_bytes_c():
-    a1 = np.array((b"aaa", b"b", b"cc"))
+    a1 = np.array((b'aaa', b'b', b'cc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    assert fam[b"aaa"] == 0
-    assert fam[b"b"] == 1
-    assert fam[b"cc"] == 2
+    assert fam[b'aaa'] == 0
+    assert fam[b'b'] == 1
+    assert fam[b'cc'] == 2
 
 
 def test_fam_copy_array_bytes_a():
-    a1 = np.array((b"a", b"ccc", b"bb"))
+    a1 = np.array((b'a', b'ccc', b'bb'))
     a1.flags.writeable = False
     fam1 = FrozenAutoMap(a1)
     fam2 = FrozenAutoMap(fam1)
-    assert fam2[b"a"] == 0
-    assert fam2[b"ccc"] == 1
-    assert fam2[b"bb"] == 2
+    assert fam2[b'a'] == 0
+    assert fam2[b'ccc'] == 1
+    assert fam2[b'bb'] == 2
 
 
 # ------------------------------------------------------------------------------
 
 
 def test_fam_array_bytes_get_a():
-    a1 = np.array((b"", b"  ", b"   ", b"    "))
+    a1 = np.array((b'', b'  ', b'   ', b'    '))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get(b"") == 0
-    assert fam.get(b" ") == None
-    assert fam.get(b"   ") == 2
-    assert fam.get(b"    ") == 3
+    assert fam.get(b'') == 0
+    assert fam.get(b' ') == None
+    assert fam.get(b'   ') == 2
+    assert fam.get(b'    ') == 3
 
 
 # ------------------------------------------------------------------------------
@@ -297,7 +297,7 @@ def test_fam_array_int_get_a():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 0
     assert fam.get(True) == 0
     assert fam.get(a1[2]) == 2
@@ -309,7 +309,7 @@ def test_fam_array_int_get_b():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 0
     assert fam.get(True) == 0
     assert fam.get(a1[2]) == 2
@@ -322,7 +322,7 @@ def test_fam_array_int_get_c1():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 0
     assert fam.get(True) == 0
     assert fam.get(a1[2]) == 2
@@ -350,7 +350,7 @@ def test_fam_array_int_get_d():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 0
     assert fam.get(True) == 0
     assert fam.get(a1[2]) == 2
@@ -363,7 +363,7 @@ def test_fam_array_int_get_e():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(2147483648) == 0
     assert fam.get(a1[0]) == 0
 
@@ -405,7 +405,7 @@ def test_fam_array_int_get_d():
     ):
         a2 = a1.astype(ctype)
         for k in a2:
-            assert k in fam, f"{type(k)}"
+            assert k in fam, f'{type(k)}'
     assert 2.0 in fam
     assert 2.1 not in fam
     assert True in fam
@@ -429,7 +429,7 @@ def test_fam_array_uint_get_a():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 0
     assert fam.get(True) == 0
     assert fam.get(a1[2]) == 2
@@ -444,7 +444,7 @@ def test_fam_array_uint_get_b():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 1
     assert fam.get(True) == 1
     assert fam.get(a1[2]) == 2
@@ -459,7 +459,7 @@ def test_fam_array_uint_get_c():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 1
     assert fam.get(True) == 1
     assert fam.get(a1[2]) == 2
@@ -474,7 +474,7 @@ def test_fam_array_uint_get_d():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1) == 1
     assert fam.get(True) == 1
     assert fam.get(a1[2]) == 2
@@ -512,10 +512,10 @@ def test_fam_array_uint_get_f():
     ):
         a2 = a1.astype(ctype)
         for k in a2:
-            assert k in fam, f"{type(k)}"
+            assert k in fam, f'{type(k)}'
         a3 = -a2
         for k in a3:
-            assert k not in fam, f"{type(k)}"
+            assert k not in fam, f'{type(k)}'
 
     assert True in fam
     assert 4.0 in fam
@@ -532,7 +532,7 @@ def test_fam_array_float_get_a():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(1.5) == 0
     assert fam.get(10.2) == 1
     assert fam.get(a1[1]) == 1
@@ -544,7 +544,7 @@ def test_fam_array_float_get_b():
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     # assert fam.get(1.5) == 0
     assert fam.get(a1[0]) == 0
     assert fam.get(a1[1]) == 1
@@ -555,7 +555,7 @@ def test_fam_array_float_get_c1():
     a1 = np.array((1.5, 10.2, 8.8), dtype=np.float16)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    assert fam.get("f") is None
+    assert fam.get('f') is None
     assert fam.get(a1[0]) == 0
     assert fam.get(a1[1]) == 1
     assert fam.get(a1[2]) == 2
@@ -586,10 +586,10 @@ def test_fam_array_float_get_d():
     ):
         a2 = a1.astype(ctype)
         for k in a2:
-            assert k in fam, f"{type(k)}"
+            assert k in fam, f'{type(k)}'
         a3 = -a2
         for k in a3:
-            assert k not in fam, f"{type(k)}"
+            assert k not in fam, f'{type(k)}'
 
     assert True in fam
     assert 4.0 in fam
@@ -602,28 +602,28 @@ def test_fam_array_float_get_d():
 
 
 def test_fam_array_unicode_get_a():
-    a1 = np.array(("bb", "a", "ccc"))
+    a1 = np.array(('bb', 'a', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("a") == 1
-    assert fam.get("bb") == 0
-    assert fam.get("ccc") == 2
+    assert fam.get('a') == 1
+    assert fam.get('bb') == 0
+    assert fam.get('ccc') == 2
     assert fam.get(None) is None
     assert fam.get(3.2) is None
-    assert fam.get("cc") is None
-    assert fam.get("cccc") is None
+    assert fam.get('cc') is None
+    assert fam.get('cccc') is None
 
 
 def test_fam_array_unicode_get_b():
-    a1 = np.array(("", "  ", "   ", "    "))
+    a1 = np.array(('', '  ', '   ', '    '))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    assert fam.get("") == 0
-    assert fam.get(" ") == None
-    assert fam.get("   ") == 2
-    assert fam.get("    ") == 3
+    assert fam.get('') == 0
+    assert fam.get(' ') == None
+    assert fam.get('   ') == 2
+    assert fam.get('    ') == 3
 
 
 # ------------------------------------------------------------------------------
@@ -659,50 +659,50 @@ def test_fam_array_items_a():
 
 
 def test_fam_array_values_b():
-    a1 = np.array(("a", "b", "c", "d"))
+    a1 = np.array(('a', 'b', 'c', 'd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     assert list(fam.values()) == [0, 1, 2, 3]
 
 
 def test_fam_array_keys_b():
-    a1 = np.array(("a", "b", "c", "d"))
+    a1 = np.array(('a', 'b', 'c', 'd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    assert list(fam.keys()) == ["a", "b", "c", "d"]
+    assert list(fam.keys()) == ['a', 'b', 'c', 'd']
 
 
 def test_fam_array_items_b():
-    a1 = np.array(("a", "b", "c", "d"))
+    a1 = np.array(('a', 'b', 'c', 'd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    assert list(fam.items()) == [("a", 0), ("b", 1), ("c", 2), ("d", 3)]
+    assert list(fam.items()) == [('a', 0), ('b', 1), ('c', 2), ('d', 3)]
 
 
 def test_fam_array_items_c():
-    a1 = np.array(("a", "b", "c"))
+    a1 = np.array(('a', 'b', 'c'))
     a1.flags.writeable = False
     fam1 = FrozenAutoMap(a1)
 
     fam2 = FrozenAutoMap(fam1)
-    assert list(fam2.items()) == [("a", 0), ("b", 1), ("c", 2)]
-    assert list(fam1.items()) == [("a", 0), ("b", 1), ("c", 2)]
+    assert list(fam2.items()) == [('a', 0), ('b', 1), ('c', 2)]
+    assert list(fam1.items()) == [('a', 0), ('b', 1), ('c', 2)]
 
 
 # ------------------------------------------------------------------------------
 
 
 def test_am_array_constructor_a():
-    a1 = np.array(("a", "b", "c"))
+    a1 = np.array(('a', 'b', 'c'))
     a1.flags.writeable = False
     am1 = AutoMap(a1)
 
 
 def test_am_array_constructor_b():
-    a1 = np.array(("2022-01", "2023-05"), dtype=np.datetime64)
+    a1 = np.array(('2022-01', '2023-05'), dtype=np.datetime64)
     a1.flags.writeable = False
     am1 = AutoMap(a1)
-    assert am1[np.datetime64("2023-05")] == 1
+    assert am1[np.datetime64('2023-05')] == 1
 
 
 def test_am_array_constructor_c():
@@ -718,7 +718,7 @@ def test_am_array_constructor_c():
 
 
 def test_fam_array_pickle_a():
-    a1 = np.array(("a", "b", "c", "d"))
+    a1 = np.array(('a', 'b', 'c', 'd'))
     a1.flags.writeable = False
     fam1 = FrozenAutoMap(a1)
     fam2 = pickle.loads(pickle.dumps(fam1))
@@ -737,7 +737,7 @@ def test_fam_array_get_all_a():
         fam.get_all((3, 3))
 
     with pytest.raises(TypeError):
-        fam.get_all("a")
+        fam.get_all('a')
 
     with pytest.raises(TypeError):
         fam.get_all(None)
@@ -759,28 +759,28 @@ def test_fam_array_get_all_b():
 
 
 def test_fam_array_get_all_c():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     with pytest.raises(KeyError):
-        fam.get_all(["bb", "c"])
+        fam.get_all(['bb', 'c'])
 
 
 def test_fam_array_get_all_d1():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    post1 = fam.get_all(np.array(("bb", "a", "ccc", "a", "bb")))
+    post1 = fam.get_all(np.array(('bb', 'a', 'ccc', 'a', 'bb')))
     assert post1.tolist() == [1, 0, 2, 0, 1]
     assert post1.flags.writeable == False
 
 
 def test_fam_array_get_all_d2():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     with pytest.raises(KeyError):
-        fam.get_all(np.array(("bb", "a", "ccc", "aa")))
+        fam.get_all(np.array(('bb', 'a', 'ccc', 'aa')))
 
 
 def test_fam_array_get_all_e():
@@ -792,100 +792,100 @@ def test_fam_array_get_all_e():
 
 
 def test_fam_array_get_all_f1():
-    a1 = np.array(("a", "bb", "ccc", "dd"))
+    a1 = np.array(('a', 'bb', 'ccc', 'dd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    post = fam.get_all(np.array(["ccc", "dd", "bb", "bb"]))
+    post = fam.get_all(np.array(['ccc', 'dd', 'bb', 'bb']))
     assert post.tolist() == [2, 3, 1, 1]
 
 
 def test_fam_array_get_all_f2():
-    a1 = np.array(("a", "bb", "ccc", "dd"))
+    a1 = np.array(('a', 'bb', 'ccc', 'dd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     with pytest.raises(KeyError):
-        fam.get_all(np.array(["bb", "c"]))
+        fam.get_all(np.array(['bb', 'c']))
 
 
 def test_fam_array_get_all_g1():
-    a1 = np.array((b"a", b"bb", b"ccc", b"dd"))
+    a1 = np.array((b'a', b'bb', b'ccc', b'dd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    post = fam.get_all(np.array([b"ccc", b"dd", b"bb", b"bb"]))
+    post = fam.get_all(np.array([b'ccc', b'dd', b'bb', b'bb']))
     assert post.tolist() == [2, 3, 1, 1]
 
 
 def test_fam_array_get_all_g2():
-    a1 = np.array((b"a", b"bb", b"ccc", b"dd"))
+    a1 = np.array((b'a', b'bb', b'ccc', b'dd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     with pytest.raises(KeyError):
-        fam.get_all(np.array([b"dd", b"x"]))
+        fam.get_all(np.array([b'dd', b'x']))
 
 
 def test_fam_array_get_all_h():
-    a1 = np.array((b"a", b""))
+    a1 = np.array((b'a', b''))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    post = fam.get_all(np.array([b"", b"", b"a"]))
+    post = fam.get_all(np.array([b'', b'', b'a']))
     assert post.tolist() == [1, 1, 0]
 
 
 def test_fam_array_get_all_i():
-    a1 = np.array((b"foo", b"bar"))
+    a1 = np.array((b'foo', b'bar'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     with pytest.raises(KeyError):
-        _ = fam.get_all(np.array([b"fo", b"ba"]))
+        _ = fam.get_all(np.array([b'fo', b'ba']))
 
     with pytest.raises(KeyError):
-        _ = fam.get_all(np.array([b"", b""]))
+        _ = fam.get_all(np.array([b'', b'']))
 
 
 def test_fam_array_get_all_j():
-    a1 = np.array(("aaaaa", "bb", "ccc", "dd"))
+    a1 = np.array(('aaaaa', 'bb', 'ccc', 'dd'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     with pytest.raises(KeyError):
-        _ = fam.get_all(np.array(["a", "b"]))
+        _ = fam.get_all(np.array(['a', 'b']))
 
-    assert fam.get_all(np.array(("bb", "dd", "bb", "dd"))).tolist() == [1, 3, 1, 3]
+    assert fam.get_all(np.array(('bb', 'dd', 'bb', 'dd'))).tolist() == [1, 3, 1, 3]
 
 
 def test_fam_array_get_all_k1():
-    a1 = np.array(("2023-01-05", "1854-05-02"), np.datetime64)
+    a1 = np.array(('2023-01-05', '1854-05-02'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     post = fam.get_all(
-        np.array(["1854-05-02", "2023-01-05", "2023-01-05"], np.datetime64)
+        np.array(['1854-05-02', '2023-01-05', '2023-01-05'], np.datetime64)
     )
     assert post.tolist() == [1, 0, 0]
 
 
 def test_fam_array_get_all_k2():
-    a1 = np.array(("2023-01-05", "1854-05-02"), np.datetime64)
+    a1 = np.array(('2023-01-05', '1854-05-02'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     with pytest.raises(KeyError):
         post = fam.get_all(
-            np.array(["1854-05-02", "2023-01-05", "2020-01-05"], np.datetime64)
+            np.array(['1854-05-02', '2023-01-05', '2020-01-05'], np.datetime64)
         )
 
 
 def test_fam_array_get_all_l():
-    a1 = np.array(("2023-01-05", "1854-05-02", "1988-01-01"), np.datetime64)
+    a1 = np.array(('2023-01-05', '1854-05-02', '1988-01-01'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
     with pytest.raises(KeyError):
-        _ = fam.get_all(np.array(["2022-01", "2023-01", "1988-01"], np.datetime64))
+        _ = fam.get_all(np.array(['2022-01', '2023-01', '1988-01'], np.datetime64))
 
 
 def test_fam_array_get_all_m1():
@@ -920,32 +920,32 @@ def test_fam_array_get_all_m3():
 
 
 def test_fam_array_get_any_a1():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    post1 = fam.get_any(["bbb", "ccc", "a", "bbb"])
+    post1 = fam.get_any(['bbb', 'ccc', 'a', 'bbb'])
     assert post1 == [2, 0]
 
-    post2 = fam.get_any(["bbb", "bbb"])
+    post2 = fam.get_any(['bbb', 'bbb'])
     assert post2 == []
 
 
 def test_fam_array_get_any_a2():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    post1 = fam.get_any(np.array(("bbb", "a", "ccc", "aa", "bbb")))
+    post1 = fam.get_any(np.array(('bbb', 'a', 'ccc', 'aa', 'bbb')))
     assert post1 == [0, 2]
 
 
 def test_fam_array_get_any_a3():
-    a1 = np.array(("a", "bb", "ccc"))
+    a1 = np.array(('a', 'bb', 'ccc'))
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
-    post1 = fam.get_any(np.array(["bbb", "ccc", "a", "bbb"]))
+    post1 = fam.get_any(np.array(['bbb', 'ccc', 'a', 'bbb']))
     assert post1 == [2, 0]
 
-    post2 = fam.get_any(np.array(["bbb", "bbb"]))
+    post2 = fam.get_any(np.array(['bbb', 'bbb']))
     assert post2 == []
 
 
@@ -962,74 +962,72 @@ def test_fam_array_get_any_b():
 
 
 def test_fam_array_get_any_c1():
-    a1 = np.array(("2023-01-05", "1854-05-02"), np.datetime64)
+    a1 = np.array(('2023-01-05', '1854-05-02'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     post = fam.get_any(
-        np.array(
-            ["1854-05-02", "nat", "1854-05-02", "2023-01-05", "nat"], np.datetime64
-        )
+        np.array(['1854-05-02', 'nat', '1854-05-02', '2023-01-05', 'nat'], np.datetime64)
     )
     assert post == [1, 1, 0]
 
 
 def test_fam_array_get_any_c2():
-    a1 = np.array(("2023-01-05", "1854-05-02"), np.datetime64)
+    a1 = np.array(('2023-01-05', '1854-05-02'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
     post = fam.get_any(
-        np.array(["1854-05-02", "2023-01-05", "2020-01-05"], np.datetime64)
+        np.array(['1854-05-02', '2023-01-05', '2020-01-05'], np.datetime64)
     )
     assert post == [1, 0]
 
 
 def test_fam_array_get_any_d():
-    a1 = np.array(("2023-01-05", "1854-05-02", "1988-01-01"), np.datetime64)
+    a1 = np.array(('2023-01-05', '1854-05-02', '1988-01-01'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    post = fam.get_any(np.array(["2022-01", "2023-01", "1988-01"], np.datetime64))
+    post = fam.get_any(np.array(['2022-01', '2023-01', '1988-01'], np.datetime64))
     assert post == []
 
 
 def test_fam_get_dt64_a():
-    a1 = np.array(("2023", "1854", "1988"), np.datetime64)
+    a1 = np.array(('2023', '1854', '1988'), np.datetime64)
     a1.flags.writeable = False
     fam = FrozenAutoMap(a1)
 
-    k1 = np.datetime64("1988-01-01")
+    k1 = np.datetime64('1988-01-01')
     with pytest.raises(KeyError):
         _ = fam[k1]
 
-    k2 = np.datetime64("2023-01-01")
+    k2 = np.datetime64('2023-01-01')
     with pytest.raises(KeyError):
         _ = fam[k2]
 
+
 def test_fam_get_dt64_b():
-    a1 = np.array(("2023", "1854", "1988"), np.datetime64)
+    a1 = np.array(('2023', '1854', '1988'), np.datetime64)
     fam = FrozenAutoMap(list(a1))
 
-    k1 = np.datetime64("1988-01-01")
+    k1 = np.datetime64('1988-01-01')
     with pytest.raises(KeyError):
         _ = fam[k1]
 
-    k2 = np.datetime64("2023-01-01")
+    k2 = np.datetime64('2023-01-01')
     with pytest.raises(KeyError):
         _ = fam[k2]
 
 
 def test_am_get_dt64_a():
-    a1 = np.array(("2023", "1854", "1988"), np.datetime64)
+    a1 = np.array(('2023', '1854', '1988'), np.datetime64)
     a1.flags.writeable = False
     fam = AutoMap(a1)
 
-    k1 = np.datetime64("1988-01-01")
+    k1 = np.datetime64('1988-01-01')
     with pytest.raises(KeyError):
         _ = fam[k1]
 
-    k2 = np.datetime64("2023-01-01")
+    k2 = np.datetime64('2023-01-01')
     with pytest.raises(KeyError):
         _ = fam[k2]
-
