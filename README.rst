@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.3.1
+............
+
+Improved ``slice_to_unit()`` integer extraction.
+
+
 1.3.0
 ............
 

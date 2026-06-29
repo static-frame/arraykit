@@ -82,7 +82,7 @@ slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
 
     Py_ssize_t step = 1;
     if (py_step != Py_None) {
-        step = PyLong_AsSsize_t(py_step);
+        step = PyNumber_AsSsize_t(py_step, NULL);
         if (step == -1 && PyErr_Occurred()) {
             return NULL;
         }
@@ -93,12 +93,12 @@ slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
 
     Py_ssize_t start = 0;
     if (py_start != Py_None) {
-        start = PyLong_AsSsize_t(py_start);
+        start = PyNumber_AsSsize_t(py_start, NULL);
         if (start == -1 && PyErr_Occurred()) {
             return NULL;
         }
     }
-    Py_ssize_t stop = PyLong_AsSsize_t(py_stop);
+    Py_ssize_t stop = PyNumber_AsSsize_t(py_stop, NULL);
     if (stop == -1 && PyErr_Occurred()) {
         return NULL;
     }
