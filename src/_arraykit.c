@@ -53,6 +53,7 @@ static PyMethodDef arraykit_methods[] =  {
             NULL},
     {"count_iteration", count_iteration, METH_O, NULL},
     {"nonzero_1d", nonzero_1d, METH_O, NULL},
+    {"transition_slices_from_group", transition_slices_from_group, METH_O, NULL},
     {"is_objectable_dt64", is_objectable_dt64, METH_O, NULL},
     {"is_objectable", is_objectable, METH_O, NULL},
     {"astype_array", astype_array, METH_VARARGS, NULL},

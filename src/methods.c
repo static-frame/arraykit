@@ -7,6 +7,7 @@
 # include "numpy/arrayobject.h"
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
+# include <string.h>
 
 # include "methods.h"
 # include "utilities.h"
@@ -244,6 +245,162 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
         return NULL;
     }
     return AK_nonzero_1d(array);
+}
+
+static inline int
+AK_append_transition_slice(PyObject* slices, npy_intp start, npy_intp stop)
+{
+    PyObject* py_start = PyLong_FromSsize_t(start);
+    if (!py_start) {
+        return -1;
+    }
+
+    PyObject* py_stop = NULL;
+    if (stop == -1) {
+        py_stop = Py_None;
+        Py_INCREF(py_stop);
+    }
+    else {
+        py_stop = PyLong_FromSsize_t(stop);
+    }
+    if (!py_stop) {
+        Py_DECREF(py_start);
+        return -1;
+    }
+
+    PyObject* slc = PySlice_New(py_start, py_stop, Py_None);
+    Py_DECREF(py_start);
+    Py_DECREF(py_stop);
+    if (!slc) {
+        return -1;
+    }
+    int append_result = PyList_Append(slices, slc);
+    Py_DECREF(slc);
+    return append_result;
+}
+
+static inline int
+AK_values_not_equal_1d(PyArrayObject* array, npy_intp left, npy_intp right)
+{
+    char* p_left = PyArray_BYTES(array) + (left * PyArray_STRIDE(array, 0));
+    char* p_right = PyArray_BYTES(array) + (right * PyArray_STRIDE(array, 0));
+
+    PyObject* left_value = PyArray_GETITEM(array, p_left);
+    if (!left_value) {
+        return -1;
+    }
+    PyObject* right_value = PyArray_GETITEM(array, p_right);
+    if (!right_value) {
+        Py_DECREF(left_value);
+        return -1;
+    }
+    int is_not_equal = PyObject_RichCompareBool(left_value, right_value, Py_NE);
+    Py_DECREF(left_value);
+    Py_DECREF(right_value);
+    return is_not_equal;
+}
+
+static inline int
+AK_rows_equal_2d(PyArrayObject* array, npy_intp left, npy_intp right)
+{
+    npy_intp stride_0 = PyArray_STRIDE(array, 0);
+    npy_intp stride_1 = PyArray_STRIDE(array, 1);
+    npy_intp cols = PyArray_DIM(array, 1);
+    npy_intp itemsize = PyArray_ITEMSIZE(array);
+
+    char* p_left = PyArray_BYTES(array) + (left * stride_0);
+    char* p_right = PyArray_BYTES(array) + (right * stride_0);
+
+    if (stride_1 == itemsize) {
+        return memcmp(p_left, p_right, (size_t)(cols * itemsize)) == 0;
+    }
+
+    for (npy_intp col = 0; col < cols; ++col) {
+        npy_intp offset = col * stride_1;
+        if (memcmp(p_left + offset, p_right + offset, (size_t)itemsize) != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+PyObject *
+transition_slices_from_group(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    AK_CHECK_NUMPY_ARRAY_1D_2D(a);
+    PyArrayObject* group = (PyArrayObject*)a;
+    bool group_to_tuple = PyArray_NDIM(group) == 2;
+    npy_intp size = PyArray_DIM(group, 0);
+
+    PyArrayObject* working = group;
+    Py_INCREF(working);
+
+    if (group_to_tuple && PyArray_TYPE(group) == NPY_OBJECT) {
+        PyObject* casted = PyObject_CallMethod((PyObject*)group, "astype", "O", (PyObject*)&PyUnicode_Type);
+        Py_DECREF(working);
+        if (!casted) {
+            return NULL;
+        }
+        if (!PyArray_Check(casted)) {
+            Py_DECREF(casted);
+            PyErr_SetString(PyExc_RuntimeError, "Unexpected result from astype");
+            return NULL;
+        }
+        working = (PyArrayObject*)casted;
+    }
+
+    PyObject* slices = PyList_New(0);
+    if (!slices) {
+        Py_DECREF(working);
+        return NULL;
+    }
+
+    npy_intp start = 0;
+    for (npy_intp i = 1; i < size; ++i) {
+        int is_transition = 0;
+        if (group_to_tuple) {
+            int is_equal = AK_rows_equal_2d(working, i - 1, i);
+            if (is_equal < 0) {
+                Py_DECREF(working);
+                Py_DECREF(slices);
+                return NULL;
+            }
+            is_transition = !is_equal;
+        }
+        else {
+            is_transition = AK_values_not_equal_1d(working, i - 1, i);
+            if (is_transition < 0) {
+                Py_DECREF(working);
+                Py_DECREF(slices);
+                return NULL;
+            }
+        }
+        if (is_transition) {
+            if (AK_append_transition_slice(slices, start, i)) {
+                Py_DECREF(working);
+                Py_DECREF(slices);
+                return NULL;
+            }
+            start = i;
+        }
+    }
+    if (start < size) {
+        if (AK_append_transition_slice(slices, start, -1)) {
+            Py_DECREF(working);
+            Py_DECREF(slices);
+            return NULL;
+        }
+    }
+    Py_DECREF(working);
+
+    PyObject* slices_iter = PyObject_GetIter(slices);
+    Py_DECREF(slices);
+    if (!slices_iter) {
+        return NULL;
+    }
+    PyObject* result = PyTuple_Pack(2, slices_iter, group_to_tuple ? Py_True : Py_False);
+    Py_DECREF(slices_iter);
+    return result;
 }
 
 PyObject*

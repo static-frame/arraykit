@@ -52,6 +52,9 @@ PyObject *
 nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a);
 
 PyObject *
+transition_slices_from_group(PyObject *Py_UNUSED(m), PyObject *a);
+
+PyObject *
 is_objectable_dt64(PyObject *m, PyObject *a);
 
 PyObject *
