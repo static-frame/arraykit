@@ -4,7 +4,7 @@ import numpy as np
 from arraykit import TriMap
 
 dt64 = np.datetime64
-nat = dt64("nat")
+nat = dt64('nat')
 
 
 class TestUnit(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestUnit(unittest.TestCase):
         tm = TriMap(10_000, 20_000)
         self.assertEqual(
             str(tm),
-            "<arraykit.TriMap(len: 0, src_fill: -1, dst_fill: -1, is_many: false, is_finalized: false)>",
+            '<arraykit.TriMap(len: 0, src_fill: -1, dst_fill: -1, is_many: false, is_finalized: false)>',
         )
 
     def test_tri_map_repr_b(self) -> None:
@@ -33,7 +33,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
         self.assertEqual(
             str(tm),
-            "<arraykit.TriMap(len: 7, src_fill: 0, dst_fill: 5, is_many: true, is_finalized: true)>",
+            '<arraykit.TriMap(len: 7, src_fill: 0, dst_fill: 5, is_many: true, is_finalized: true)>',
         )
 
     def test_tri_map_finalize_a(self) -> None:
@@ -53,10 +53,10 @@ class TestUnit(unittest.TestCase):
             )
 
         with self.assertRaises(TypeError):
-            tm.register_one(3, "a")
+            tm.register_one(3, 'a')
 
         with self.assertRaises(TypeError):
-            tm.register_one("b", "a")
+            tm.register_one('b', 'a')
 
         with self.assertRaises(TypeError):
             tm.register_one()
@@ -68,7 +68,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
         self.assertEqual(
             repr(tm),
-            "<arraykit.TriMap(len: 2000, src_fill: 0, dst_fill: 0, is_many: false, is_finalized: true)>",
+            '<arraykit.TriMap(len: 2000, src_fill: 0, dst_fill: 0, is_many: false, is_finalized: true)>',
         )
 
     def test_tri_map_register_one_c(self) -> None:
@@ -104,13 +104,13 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(
             repr(tm),
-            "<arraykit.TriMap(len: 8, src_fill: -1, dst_fill: -1, is_many: false, is_finalized: false)>",
+            '<arraykit.TriMap(len: 8, src_fill: -1, dst_fill: -1, is_many: false, is_finalized: false)>',
         )
 
         tm.finalize()
         self.assertEqual(
             repr(tm),
-            "<arraykit.TriMap(len: 8, src_fill: 5, dst_fill: 0, is_many: false, is_finalized: true)>",
+            '<arraykit.TriMap(len: 8, src_fill: 5, dst_fill: 0, is_many: false, is_finalized: true)>',
         )
 
     def test_tri_map_register_many_a(self) -> None:
@@ -118,7 +118,7 @@ class TestUnit(unittest.TestCase):
         tm.register_many(3, np.array([2, 5, 8], dtype=np.int64))
 
         with self.assertRaises(TypeError):
-            tm.register_many("foo", np.array([2, 5, 8]))
+            tm.register_many('foo', np.array([2, 5, 8]))
 
         with self.assertRaises(TypeError):
             tm.register_many(3, [3, 2])
@@ -137,7 +137,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
         self.assertEqual(
             repr(tm),
-            "<arraykit.TriMap(len: 3, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>",
+            '<arraykit.TriMap(len: 3, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>',
         )
 
     def test_tri_map_register_many_d1(self) -> None:
@@ -147,7 +147,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
         self.assertEqual(
             repr(tm),
-            "<arraykit.TriMap(len: 200, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>",
+            '<arraykit.TriMap(len: 200, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>',
         )
 
     def test_tri_map_register_many_d2(self) -> None:
@@ -157,7 +157,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
         self.assertEqual(
             repr(tm),
-            "<arraykit.TriMap(len: 200, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>",
+            '<arraykit.TriMap(len: 200, src_fill: 0, dst_fill: 0, is_many: true, is_finalized: true)>',
         )
 
     # ---------------------------------------------------------------------------
@@ -182,8 +182,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post_dst.tolist(), [-1, -1, 30, 30, 40, 40])
 
     def test_tri_map_map_src_no_fill_b(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd"])
-        dst = np.array(["cc", "cc", "dddd", "dddd"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'cc', 'dddd', 'dddd'])
 
         tm = TriMap(4, 4)
         tm.register_one(0, 0)
@@ -195,10 +195,10 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post.flags.writeable)
-        self.assertEqual(post.tolist(), ["a", "bbb", "cc", "dddd"])
+        self.assertEqual(post.tolist(), ['a', 'bbb', 'cc', 'dddd'])
 
     def test_tri_map_map_src_no_fill_c(self) -> None:
-        src = np.array(["aaaaa", "bbb", "cc", "dddd"])
+        src = np.array(['aaaaa', 'bbb', 'cc', 'dddd'])
 
         tm = TriMap(4, 4)
         tm.register_many(0, np.array([1, 3], dtype=np.int64))
@@ -208,10 +208,10 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post.flags.writeable)
-        self.assertEqual(post.tolist(), ["aaaaa", "aaaaa", "bbb", "bbb"])
+        self.assertEqual(post.tolist(), ['aaaaa', 'aaaaa', 'bbb', 'bbb'])
 
     def test_tri_map_map_src_no_fill_c(self) -> None:
-        src = np.array([None, "bbb", 3, False])
+        src = np.array([None, 'bbb', 3, False])
 
         tm = TriMap(4, 4)
         tm.register_one(0, 0)
@@ -223,10 +223,10 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post.flags.writeable)
-        self.assertEqual(post.tolist(), [None, "bbb", 3, False])
+        self.assertEqual(post.tolist(), [None, 'bbb', 3, False])
 
     def test_tri_map_map_src_no_fill_d(self) -> None:
-        src = np.array([None, "bbb", 3, False])
+        src = np.array([None, 'bbb', 3, False])
 
         tm = TriMap(4, 4)
         tm.register_many(0, np.array([1, 3], dtype=np.int64))
@@ -236,7 +236,7 @@ class TestUnit(unittest.TestCase):
         post = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post.flags.writeable)
-        self.assertEqual(post.tolist(), [None, None, "bbb", "bbb"])
+        self.assertEqual(post.tolist(), [None, None, 'bbb', 'bbb'])
 
     # ---------------------------------------------------------------------------
 
@@ -257,7 +257,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post.tolist(), [10, 20, 30, 40, -1, -1])
 
     def test_tri_map_map_src_fill_b(self) -> None:
-        src = np.array(["aa", "bbbbb", "ccc", "dddd"])
+        src = np.array(['aa', 'bbbbb', 'ccc', 'dddd'])
 
         tm = TriMap(4, 4)
         tm.register_one(0, -1)
@@ -267,12 +267,12 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post = tm.map_src_fill(src, "na", np.dtype(str))
+        post = tm.map_src_fill(src, 'na', np.dtype(str))
         self.assertFalse(post.flags.writeable)
-        self.assertEqual(post.tolist(), ["aa", "bbbbb", "ccc", "dddd", "na", "na"])
+        self.assertEqual(post.tolist(), ['aa', 'bbbbb', 'ccc', 'dddd', 'na', 'na'])
 
     def test_tri_map_map_src_fill_c(self) -> None:
-        src = np.array(["aa", None, False, 300000000000000000000])
+        src = np.array(['aa', None, False, 300000000000000000000])
 
         tm = TriMap(4, 4)
         tm.register_one(0, -1)
@@ -282,17 +282,17 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post = tm.map_src_fill(src, "na", np.dtype(str))
+        post = tm.map_src_fill(src, 'na', np.dtype(str))
         self.assertFalse(post.flags.writeable)
         self.assertEqual(
-            post.tolist(), ["aa", None, False, 300000000000000000000, "na", "na"]
+            post.tolist(), ['aa', None, False, 300000000000000000000, 'na', 'na']
         )
 
     # ---------------------------------------------------------------------------
 
     def test_tri_map_map_a(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd"])
-        dst = np.array(["cc", "a", "a", "a", "cc"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
@@ -304,16 +304,16 @@ class TestUnit(unittest.TestCase):
         post_src = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post_src.flags.writeable)
-        self.assertEqual(post_src.tolist(), ["a", "a", "a", "bbb", "cc", "cc", "dddd"])
+        self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
 
-        post_dst = tm.map_dst_fill(dst, "", np.dtype(str))
+        post_dst = tm.map_dst_fill(dst, '', np.dtype(str))
         del dst
         self.assertFalse(post_dst.flags.writeable)
-        self.assertEqual(post_dst.tolist(), ["a", "a", "a", "", "cc", "cc", ""])
+        self.assertEqual(post_dst.tolist(), ['a', 'a', 'a', '', 'cc', 'cc', ''])
 
     def test_tri_map_map_b(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd", "a"])
-        dst = np.array(["cc", "dddd", "a", "bbb", "cc"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd', 'a'])
+        dst = np.array(['cc', 'dddd', 'a', 'bbb', 'cc'])
 
         tm = TriMap(len(src), len(dst))
         tm.register_one(0, 2)
@@ -326,12 +326,12 @@ class TestUnit(unittest.TestCase):
         post_src = tm.map_src_no_fill(src)
         del src
         self.assertFalse(post_src.flags.writeable)
-        self.assertEqual(post_src.tolist(), ["a", "bbb", "cc", "cc", "dddd", "a"])
+        self.assertEqual(post_src.tolist(), ['a', 'bbb', 'cc', 'cc', 'dddd', 'a'])
 
         post_dst = tm.map_dst_no_fill(dst)
         del dst
         self.assertFalse(post_dst.flags.writeable)
-        self.assertEqual(post_dst.tolist(), ["a", "bbb", "cc", "cc", "dddd", "a"])
+        self.assertEqual(post_dst.tolist(), ['a', 'bbb', 'cc', 'cc', 'dddd', 'a'])
 
     def test_tri_map_map_c(self) -> None:
         src = np.array([0, 200, 300, 400, 0], dtype=np.int64)
@@ -392,9 +392,7 @@ class TestUnit(unittest.TestCase):
         post_src = tm.map_src_fill(src, -20, np.dtype(np.int64))
         del src
         self.assertFalse(post_src.flags.writeable)
-        self.assertEqual(
-            post_src.tolist(), [0, 200, 200, 300, 300, 5, 0, -20, -20, -20]
-        )
+        self.assertEqual(post_src.tolist(), [0, 200, 200, 300, 300, 5, 0, -20, -20, -20])
 
         post_dst = tm.map_dst_fill(dst, -20, np.dtype(np.int64))
         del dst
@@ -624,7 +622,7 @@ class TestUnit(unittest.TestCase):
 
         self.assertEqual(
             str(tm),
-            "<arraykit.TriMap(len: 6, src_fill: 1, dst_fill: 1, is_many: true, is_finalized: true)>",
+            '<arraykit.TriMap(len: 6, src_fill: 1, dst_fill: 1, is_many: true, is_finalized: true)>',
         )
 
     def test_tri_map_map_uint_d(self) -> None:
@@ -966,8 +964,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post_dst.tolist(), [17, 20, 20, 8, 8, 7])
 
     def test_tri_map_map_bytes_a(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd", "a"], dtype=np.bytes_)
-        dst = np.array(["cc", "dddd", "a", "bbb", "cc"], dtype=np.bytes_)
+        src = np.array(['a', 'bbb', 'cc', 'dddd', 'a'], dtype=np.bytes_)
+        dst = np.array(['cc', 'dddd', 'a', 'bbb', 'cc'], dtype=np.bytes_)
 
         tm = TriMap(len(src), len(dst))
         tm.register_one(0, 2)
@@ -978,14 +976,14 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
-        self.assertEqual(post_src.tolist(), [b"a", b"bbb", b"cc", b"cc", b"dddd", b"a"])
+        self.assertEqual(post_src.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
 
         post_dst = tm.map_dst_no_fill(dst)
-        self.assertEqual(post_dst.tolist(), [b"a", b"bbb", b"cc", b"cc", b"dddd", b"a"])
+        self.assertEqual(post_dst.tolist(), [b'a', b'bbb', b'cc', b'cc', b'dddd', b'a'])
 
     def test_tri_map_map_bytes_a(self) -> None:
-        src = np.array([b"a", b"bbb", b"cc"], dtype=np.bytes_)
-        dst = np.array([b"cc", b"dddd", b"eee"], dtype=np.bytes_)
+        src = np.array([b'a', b'bbb', b'cc'], dtype=np.bytes_)
+        dst = np.array([b'cc', b'dddd', b'eee'], dtype=np.bytes_)
 
         tm = TriMap(len(src), len(dst))
         tm.register_one(0, -1)
@@ -994,16 +992,16 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post_src = tm.map_src_fill(src, b"--", np.dtype(np.bytes_))
-        post_dst = tm.map_dst_fill(dst, b"--", np.dtype(np.bytes_))
-        self.assertEqual(post_src.tolist(), [b"a", b"bbb", b"cc", b"--", b"--"])
-        self.assertEqual(post_dst.tolist(), [b"--", b"--", b"cc", b"dddd", b"eee"])
+        post_src = tm.map_src_fill(src, b'--', np.dtype(np.bytes_))
+        post_dst = tm.map_dst_fill(dst, b'--', np.dtype(np.bytes_))
+        self.assertEqual(post_src.tolist(), [b'a', b'bbb', b'cc', b'--', b'--'])
+        self.assertEqual(post_dst.tolist(), [b'--', b'--', b'cc', b'dddd', b'eee'])
 
     # ---------------------------------------------------------------------------
 
     def test_tri_map_map_unicode_a(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd"])
-        dst = np.array(["cc", "a", "a", "a", "cc"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
@@ -1013,14 +1011,14 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
-        self.assertEqual(post_src.tolist(), ["a", "a", "a", "bbb", "cc", "cc", "dddd"])
+        self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
 
-        post_dst = tm.map_dst_fill(dst, "====", np.array("====").dtype)
-        self.assertEqual(post_dst.tolist(), ["a", "a", "a", "====", "cc", "cc", "===="])
+        post_dst = tm.map_dst_fill(dst, '====', np.array('====').dtype)
+        self.assertEqual(post_dst.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
 
     def test_tri_map_map_unicode_b(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd"])
-        dst = np.array(["cc", "a", "a", "a", "cc"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
@@ -1030,19 +1028,17 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post_src = tm.map_src_no_fill(src)
-        self.assertEqual(post_src.tolist(), ["a", "a", "a", "bbb", "cc", "cc", "dddd"])
+        self.assertEqual(post_src.tolist(), ['a', 'a', 'a', 'bbb', 'cc', 'cc', 'dddd'])
 
-        post_dst1 = tm.map_dst_fill(dst, b"====", np.array(b"====").dtype)
-        self.assertEqual(
-            post_dst1.tolist(), ["a", "a", "a", "====", "cc", "cc", "===="]
-        )
+        post_dst1 = tm.map_dst_fill(dst, b'====', np.array(b'====').dtype)
+        self.assertEqual(post_dst1.tolist(), ['a', 'a', 'a', '====', 'cc', 'cc', '===='])
 
-        post_dst2 = tm.map_dst_fill(dst, b"?", np.array(b"?").dtype)
-        self.assertEqual(post_dst2.tolist(), ["a", "a", "a", "?", "cc", "cc", "?"])
+        post_dst2 = tm.map_dst_fill(dst, b'?', np.array(b'?').dtype)
+        self.assertEqual(post_dst2.tolist(), ['a', 'a', 'a', '?', 'cc', 'cc', '?'])
 
     def test_tri_map_map_unicode_c(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd"])
-        dst = np.array(["cc", "a", "a", "a", "cc"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'a', 'cc'])
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(0, np.array([1, 2, 3], dtype=np.dtype(np.int64)))
@@ -1052,21 +1048,19 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post_dst1 = tm.map_dst_fill(dst, 3, np.dtype(object))
-        self.assertEqual(post_dst1.tolist(), ["a", "a", "a", 3, "cc", "cc", 3])
+        self.assertEqual(post_dst1.tolist(), ['a', 'a', 'a', 3, 'cc', 'cc', 3])
 
         self.assertEqual(
             str(tm),
-            "<arraykit.TriMap(len: 7, src_fill: 0, dst_fill: 2, is_many: true, is_finalized: true)>",
+            '<arraykit.TriMap(len: 7, src_fill: 0, dst_fill: 2, is_many: true, is_finalized: true)>',
         )
 
     # ---------------------------------------------------------------------------
 
     def test_tri_map_map_dt64_a(self) -> None:
-        src = np.array(
-            ["2022-01", "1954-03", "1743-09", "1988-12"], dtype=np.datetime64
-        )
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
         dst = np.array(
-            ["1743-09", "2022-01", "2022-01", "2022-01", "1743-09", "2005-11"],
+            ['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'],
             dtype=np.datetime64,
         )
 
@@ -1078,45 +1072,43 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post_src = tm.map_src_fill(src, nat, np.dtype("datetime64"))
-        self.assertEqual(post_src.dtype, np.dtype("datetime64[M]"))
+        post_src = tm.map_src_fill(src, nat, np.dtype('datetime64'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
         # string to permit NaN comparison
         self.assertEqual(
             [str(dt) for dt in post_src],
             [
-                "2022-01",
-                "2022-01",
-                "2022-01",
-                "1954-03",
-                "1743-09",
-                "1743-09",
-                "1988-12",
-                "NaT",
+                '2022-01',
+                '2022-01',
+                '2022-01',
+                '1954-03',
+                '1743-09',
+                '1743-09',
+                '1988-12',
+                'NaT',
             ],
         )
 
-        post_dst = tm.map_dst_fill(dst, nat, np.dtype("datetime64"))
-        self.assertEqual(post_dst.dtype, np.dtype("datetime64[M]"))
+        post_dst = tm.map_dst_fill(dst, nat, np.dtype('datetime64'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[M]'))
         self.assertEqual(
             [str(dt) for dt in post_dst],
             [
-                "2022-01",
-                "2022-01",
-                "2022-01",
-                "NaT",
-                "1743-09",
-                "1743-09",
-                "NaT",
-                "2005-11",
+                '2022-01',
+                '2022-01',
+                '2022-01',
+                'NaT',
+                '1743-09',
+                '1743-09',
+                'NaT',
+                '2005-11',
             ],
         )
 
     def test_tri_map_map_dt64_b(self) -> None:
-        src = np.array(
-            ["2022-01", "1954-03", "1743-09", "1988-12"], dtype=np.datetime64
-        )
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
         dst = np.array(
-            ["1743-09", "2022-01", "2022-01", "2022-01", "1743-09", "2005-11"],
+            ['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'],
             dtype=np.datetime64,
         )
 
@@ -1128,44 +1120,42 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post_src = tm.map_src_fill(src, "1999-12", np.dtype("datetime64"))
-        self.assertEqual(post_src.dtype, np.dtype("datetime64[M]"))
+        post_src = tm.map_src_fill(src, '1999-12', np.dtype('datetime64'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
         self.assertEqual(
             [str(dt) for dt in post_src],
             [
-                "2022-01",
-                "2022-01",
-                "2022-01",
-                "1954-03",
-                "1743-09",
-                "1743-09",
-                "1988-12",
-                "1999-12",
+                '2022-01',
+                '2022-01',
+                '2022-01',
+                '1954-03',
+                '1743-09',
+                '1743-09',
+                '1988-12',
+                '1999-12',
             ],
         )
 
-        post_dst = tm.map_dst_fill(dst, "1999-12", np.dtype("datetime64"))
-        self.assertEqual(post_dst.dtype, np.dtype("datetime64[M]"))
+        post_dst = tm.map_dst_fill(dst, '1999-12', np.dtype('datetime64'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[M]'))
         self.assertEqual(
             [str(dt) for dt in post_dst],
             [
-                "2022-01",
-                "2022-01",
-                "2022-01",
-                "1999-12",
-                "1743-09",
-                "1743-09",
-                "1999-12",
-                "2005-11",
+                '2022-01',
+                '2022-01',
+                '2022-01',
+                '1999-12',
+                '1743-09',
+                '1743-09',
+                '1999-12',
+                '2005-11',
             ],
         )
 
     def test_tri_map_map_dt64_c(self) -> None:
-        src = np.array(
-            ["2022-01", "1954-03", "1743-09", "1988-12"], dtype=np.datetime64
-        )
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
         dst = np.array(
-            ["1743-09", "2022-01", "2022-01", "2022-01", "1743-09", "2005-11"],
+            ['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'],
             dtype=np.datetime64,
         )
 
@@ -1177,45 +1167,43 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post_src = tm.map_src_fill(src, "1999", np.dtype("datetime64[Y]"))
-        self.assertEqual(post_src.dtype, np.dtype("datetime64[M]"))
+        post_src = tm.map_src_fill(src, '1999', np.dtype('datetime64[Y]'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[M]'))
         # NOTE: the year dtype is "fit" within the year-mo by defaulting to the first month; we might not want to permit this
         self.assertEqual(
             [str(dt) for dt in post_src],
             [
-                "2022-01",
-                "2022-01",
-                "2022-01",
-                "1954-03",
-                "1743-09",
-                "1743-09",
-                "1988-12",
-                "1999-01",
+                '2022-01',
+                '2022-01',
+                '2022-01',
+                '1954-03',
+                '1743-09',
+                '1743-09',
+                '1988-12',
+                '1999-01',
             ],
         )
 
-        post_dst = tm.map_dst_fill(dst, "1999", np.dtype("datetime64[Y]"))
-        self.assertEqual(post_dst.dtype, np.dtype("datetime64[M]"))
+        post_dst = tm.map_dst_fill(dst, '1999', np.dtype('datetime64[Y]'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[M]'))
         self.assertEqual(
             [str(dt) for dt in post_dst],
             [
-                "2022-01",
-                "2022-01",
-                "2022-01",
-                "1999-01",
-                "1743-09",
-                "1743-09",
-                "1999-01",
-                "2005-11",
+                '2022-01',
+                '2022-01',
+                '2022-01',
+                '1999-01',
+                '1743-09',
+                '1743-09',
+                '1999-01',
+                '2005-11',
             ],
         )
 
     def test_tri_map_map_dt64_d(self) -> None:
-        src = np.array(
-            ["2022-01", "1954-03", "1743-09", "1988-12"], dtype=np.datetime64
-        )
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
         dst = np.array(
-            ["1743-09", "2022-01", "2022-01", "2022-01", "1743-09", "2005-11"],
+            ['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'],
             dtype=np.datetime64,
         )
 
@@ -1227,35 +1215,35 @@ class TestUnit(unittest.TestCase):
         tm.register_unmatched_dst()
         tm.finalize()
 
-        post_src = tm.map_src_fill(src, "1999-09-09", np.dtype("datetime64[D]"))
-        self.assertEqual(post_src.dtype, np.dtype("datetime64[D]"))
+        post_src = tm.map_src_fill(src, '1999-09-09', np.dtype('datetime64[D]'))
+        self.assertEqual(post_src.dtype, np.dtype('datetime64[D]'))
         self.assertEqual(
             [str(dt) for dt in post_src],
             [
-                "2022-01-01",
-                "2022-01-01",
-                "2022-01-01",
-                "1954-03-01",
-                "1743-09-01",
-                "1743-09-01",
-                "1988-12-01",
-                "1999-09-09",
+                '2022-01-01',
+                '2022-01-01',
+                '2022-01-01',
+                '1954-03-01',
+                '1743-09-01',
+                '1743-09-01',
+                '1988-12-01',
+                '1999-09-09',
             ],
         )
 
-        post_dst = tm.map_dst_fill(dst, "1999-09-09", np.dtype("datetime64[D]"))
-        self.assertEqual(post_dst.dtype, np.dtype("datetime64[D]"))
+        post_dst = tm.map_dst_fill(dst, '1999-09-09', np.dtype('datetime64[D]'))
+        self.assertEqual(post_dst.dtype, np.dtype('datetime64[D]'))
         self.assertEqual(
             [str(dt) for dt in post_dst],
             [
-                "2022-01-01",
-                "2022-01-01",
-                "2022-01-01",
-                "1999-09-09",
-                "1743-09-01",
-                "1743-09-01",
-                "1999-09-09",
-                "2005-11-01",
+                '2022-01-01',
+                '2022-01-01',
+                '2022-01-01',
+                '1999-09-09',
+                '1743-09-01',
+                '1743-09-01',
+                '1999-09-09',
+                '2005-11-01',
             ],
         )
 
@@ -1336,8 +1324,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post.tolist(), [0, 200, 300, 400])
 
     def test_tri_map_merge_d(self) -> None:
-        src = np.array(["a", "bbb", "cc", "dddd"])
-        dst = np.array(["cc", "a", "a", "ee", "cc"])
+        src = np.array(['a', 'bbb', 'cc', 'dddd'])
+        dst = np.array(['cc', 'a', 'a', 'ee', 'cc'])
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(0, np.array([1, 2], dtype=np.dtype(np.int64)))
@@ -1348,11 +1336,11 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post = tm.map_merge(src, dst)
-        self.assertEqual(post.tolist(), ["a", "a", "bbb", "cc", "cc", "dddd", "ee"])
+        self.assertEqual(post.tolist(), ['a', 'a', 'bbb', 'cc', 'cc', 'dddd', 'ee'])
 
     def test_tri_map_merge_e(self) -> None:
-        src = np.array([None, False, -42, "dddd"], dtype=object)
-        dst = np.array([-42, None, None, "ee", -42], dtype=object)
+        src = np.array([None, False, -42, 'dddd'], dtype=object)
+        dst = np.array([-42, None, None, 'ee', -42], dtype=object)
 
         tm = TriMap(len(src), len(dst))
         tm.register_many(0, np.array([1, 2], dtype=np.dtype(np.int64)))
@@ -1363,7 +1351,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post = tm.map_merge(src, dst)
-        self.assertEqual(post.tolist(), [None, None, False, -42, -42, "dddd", "ee"])
+        self.assertEqual(post.tolist(), [None, None, False, -42, -42, 'dddd', 'ee'])
 
     def test_tri_map_merge_f(self) -> None:
         src = np.array(
@@ -1374,7 +1362,7 @@ class TestUnit(unittest.TestCase):
             ],
             dtype=object,
         )
-        dst = np.array([True, "ee", 88], dtype=object)
+        dst = np.array([True, 'ee', 88], dtype=object)
 
         tm = TriMap(len(src), len(dst))
         tm.register_one(0, -1)
@@ -1384,7 +1372,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post = tm.map_merge(src, dst)
-        self.assertEqual(post.tolist(), [None, False, -42, True, "ee", 88])
+        self.assertEqual(post.tolist(), [None, False, -42, True, 'ee', 88])
 
     def test_tri_map_merge_g(self) -> None:
         src = np.array(
@@ -1395,7 +1383,7 @@ class TestUnit(unittest.TestCase):
             ],
             dtype=object,
         )
-        dst = np.array([None, False, -42, "ee", "ff"], dtype=object)
+        dst = np.array([None, False, -42, 'ee', 'ff'], dtype=object)
 
         tm = TriMap(len(src), len(dst))
         tm.register_one(0, 0)
@@ -1405,7 +1393,7 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
 
         post = tm.map_merge(src, dst)
-        self.assertEqual(post.tolist(), [None, False, -42, "ee", "ff"])
+        self.assertEqual(post.tolist(), [None, False, -42, 'ee', 'ff'])
 
     def test_tri_map_merge_h(self) -> None:
         src = np.array([0, 200, 300, 40], dtype=np.int64)
@@ -1423,11 +1411,9 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post.tolist(), [0, 200, 300, 40, 50])
 
     def test_tri_map_merge_i(self) -> None:
-        src = np.array(
-            ["2022-01", "1954-03", "1743-09", "1988-12"], dtype=np.datetime64
-        )
+        src = np.array(['2022-01', '1954-03', '1743-09', '1988-12'], dtype=np.datetime64)
         dst = np.array(
-            ["1743-09", "2022-01", "2022-01", "2022-01", "1743-09", "2005-11"],
+            ['1743-09', '2022-01', '2022-01', '2022-01', '1743-09', '2005-11'],
             dtype=np.datetime64,
         )
 
@@ -1443,13 +1429,13 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(
             list(post),
             [
-                np.datetime64("2022-01"),
-                np.datetime64("2022-01"),
-                np.datetime64("2022-01"),
-                np.datetime64("1954-03"),
-                np.datetime64("1743-09"),
-                np.datetime64("1743-09"),
-                np.datetime64("1988-12"),
-                np.datetime64("2005-11"),
+                np.datetime64('2022-01'),
+                np.datetime64('2022-01'),
+                np.datetime64('2022-01'),
+                np.datetime64('1954-03'),
+                np.datetime64('1743-09'),
+                np.datetime64('1743-09'),
+                np.datetime64('1988-12'),
+                np.datetime64('2005-11'),
             ],
         )

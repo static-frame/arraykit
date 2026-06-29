@@ -54,7 +54,7 @@ from arraykit import ArrayGO as ArrayGOAK
 
 
 class Perf:
-    FUNCTIONS = ("main",)
+    FUNCTIONS = ('main',)
     NUMBER = 10
 
 
@@ -64,31 +64,31 @@ class FixtureFileLike:
 
     def __init__(self):
         records_int = [
-            ",".join(str(x) for x in range(self.COUNT_COLUMN))
+            ','.join(str(x) for x in range(self.COUNT_COLUMN))
         ] * self.COUNT_ROW
-        self.file_like_int = io.StringIO("\n".join(records_int))
+        self.file_like_int = io.StringIO('\n'.join(records_int))
 
         records_bool = [
-            ",".join(str(bool(x % 2)) for x in range(self.COUNT_COLUMN))
+            ','.join(str(bool(x % 2)) for x in range(self.COUNT_COLUMN))
         ] * self.COUNT_ROW
-        self.file_like_bool = io.StringIO("\n".join(records_bool))
+        self.file_like_bool = io.StringIO('\n'.join(records_bool))
 
         records_str = [
-            ",".join("foobar" for x in range(self.COUNT_COLUMN))
+            ','.join('foobar' for x in range(self.COUNT_COLUMN))
         ] * self.COUNT_ROW
-        self.file_like_str = io.StringIO("\n".join(records_str))
+        self.file_like_str = io.StringIO('\n'.join(records_str))
 
         records_float = [
-            ",".join("1.2345" for x in range(self.COUNT_COLUMN))
+            ','.join('1.2345' for x in range(self.COUNT_COLUMN))
         ] * self.COUNT_ROW
-        self.file_like_float = io.StringIO("\n".join(records_float))
+        self.file_like_float = io.StringIO('\n'.join(records_float))
 
         self.axis = 1
 
 
 # #-------------------------------------------------------------------------------
 class DelimitedToArraysTypedPandas(FixtureFileLike, Perf):
-    FUNCTIONS = ("bool_uniform", "int_uniform", "str_uniform", "float_uniform")
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 
 class DelimitedToArraysTypedPandasAK(DelimitedToArraysTypedPandas):
@@ -145,7 +145,7 @@ class DelimitedToArraysTypedPandasREF(DelimitedToArraysTypedPandas):
 
 
 class DelimitedToArraysParsedPandas(FixtureFileLike, Perf):
-    FUNCTIONS = ("bool_uniform", "int_uniform", "str_uniform", "float_uniform")
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 
 class DelimitedToArraysParsedPandasAK(DelimitedToArraysParsedPandas):
@@ -192,7 +192,7 @@ class DelimitedToArraysParsedPandasREF(DelimitedToArraysParsedPandas):
 
 # #-------------------------------------------------------------------------------
 class DelimitedToArraysTypedGenft(FixtureFileLike, Perf):
-    FUNCTIONS = ("bool_uniform", "int_uniform", "str_uniform", "float_uniform")
+    FUNCTIONS = ('bool_uniform', 'int_uniform', 'str_uniform', 'float_uniform')
 
 
 class DelimitedToArraysTypedGenftAK(DelimitedToArraysTypedGenft):
@@ -226,19 +226,19 @@ class DelimitedToArraysTypedGenftREF(DelimitedToArraysTypedGenft):
 
     def int_uniform(self):
         self.file_like_int.seek(0)
-        _ = self.entry(self.file_like_int, delimiter=",", dtype=int)
+        _ = self.entry(self.file_like_int, delimiter=',', dtype=int)
 
     def bool_uniform(self):
         self.file_like_bool.seek(0)
-        _ = self.entry(self.file_like_bool, delimiter=",", dtype=bool)
+        _ = self.entry(self.file_like_bool, delimiter=',', dtype=bool)
 
     def str_uniform(self):
         self.file_like_str.seek(0)
-        _ = self.entry(self.file_like_str, delimiter=",", dtype=str)
+        _ = self.entry(self.file_like_str, delimiter=',', dtype=str)
 
     def float_uniform(self):
         self.file_like_float.seek(0)
-        _ = self.entry(self.file_like_float, delimiter=",", dtype=float)
+        _ = self.entry(self.file_like_float, delimiter=',', dtype=float)
 
 
 # #-------------------------------------------------------------------------------
@@ -340,8 +340,8 @@ class ImmutableFilterREF(ImmutableFilter):
 # -------------------------------------------------------------------------------
 class NameFilter(Perf):
     def __init__(self):
-        self.name1 = ("foo", None, ["bar"])
-        self.name2 = "foo"
+        self.name1 = ('foo', None, ['bar'])
+        self.name2 = 'foo'
 
     def main(self):
         try:
@@ -439,7 +439,7 @@ class Row1DFilterREF(Row1DFilter):
 class ResolveDType(Perf):
     def __init__(self):
         self.dtype1 = np.arange(100).dtype
-        self.dtype2 = np.array(("a", "b")).dtype
+        self.dtype2 = np.array(('a', 'b')).dtype
 
     def main(self):
         self.entry(self.dtype1, self.dtype2)
@@ -455,7 +455,7 @@ class ResolveDTypeREF(ResolveDType):
 
 # -------------------------------------------------------------------------------
 class ResolveDTypeIter(Perf):
-    FUNCTIONS = ("iter10", "iter100000")
+    FUNCTIONS = ('iter10', 'iter100000')
     NUMBER = 500
 
     def __init__(self):
@@ -481,7 +481,7 @@ class ResolveDTypeIterREF(ResolveDTypeIter):
 
 # -------------------------------------------------------------------------------
 class ArrayDeepcopy(Perf):
-    FUNCTIONS = ("memo_new", "memo_shared")
+    FUNCTIONS = ('memo_new', 'memo_shared')
     NUMBER = 500
 
     def __init__(self):
@@ -536,7 +536,7 @@ class DtypeFromElementPerf(Perf):
     NUMBER = 1000
 
     def __init__(self):
-        NT = namedtuple("NT", tuple("abc"))
+        NT = namedtuple('NT', tuple('abc'))
 
         self.values = [
             np.longlong(-1),
@@ -557,18 +557,18 @@ class DtypeFromElementPerf(Perf):
             np.complex_(1.0j),
             np.clongdouble(1.0j),
             np.bool_(0),
-            np.str_("1"),
-            np.str_("1"),
+            np.str_('1'),
+            np.str_('1'),
             np.void(1),
             np.object(),
-            np.datetime64("NaT"),
-            np.timedelta64("NaT"),
+            np.datetime64('NaT'),
+            np.timedelta64('NaT'),
             np.nan,
             12,
             12.0,
             True,
             None,
-            float("NaN"),
+            float('NaN'),
             object(),
             (1, 2, 3),
             NT(1, 2, 3),
@@ -577,13 +577,13 @@ class DtypeFromElementPerf(Perf):
         ]
 
         # Datetime & Timedelta
-        for precision in ["ns", "us", "ms", "s", "m", "h", "D", "M", "Y"]:
-            for kind, ctor in (("m", np.timedelta64), ("M", np.datetime64)):
+        for precision in ['ns', 'us', 'ms', 's', 'm', 'h', 'D', 'M', 'Y']:
+            for kind, ctor in (('m', np.timedelta64), ('M', np.datetime64)):
                 self.values.append(ctor(12, precision))
 
         for size in (1, 8, 16, 32, 64, 128, 256, 512):
             self.values.append(bytes(size))
-            self.values.append("x" * size)
+            self.values.append('x' * size)
 
     def main(self):
         for _ in range(40):
@@ -612,15 +612,15 @@ class IsNaElementPerf(Perf):
 
         self.values = [
             # Na-elements
-            np.datetime64("NaT"),
-            np.timedelta64("NaT"),
+            np.datetime64('NaT'),
+            np.timedelta64('NaT'),
             None,
-            float("NaN"),
-            -float("NaN"),
+            float('NaN'),
+            -float('NaN'),
             # Non-float, Non-na elements
             1,
-            "str",
-            np.datetime64("2020-12-31"),
+            'str',
+            np.datetime64('2020-12-31'),
             datetime.date(2020, 12, 31),
             False,
         ]
@@ -634,11 +634,11 @@ class IsNaElementPerf(Perf):
         ]
 
         float_classes = [float, np.float16, np.float32, np.float64, FloatSubclass]
-        if hasattr(np, "float128"):
+        if hasattr(np, 'float128'):
             float_classes.append(np.float128)
 
         cfloat_classes = [complex, np.complex64, np.complex128, ComplexSubclass]
-        if hasattr(np, "complex256"):
+        if hasattr(np, 'complex256'):
             cfloat_classes.append(np.complex256)
 
         # Append all the different types of nans across dtypes
@@ -693,21 +693,21 @@ class IsNaElementPerfREF(IsNaElementPerf):
 # -------------------------------------------------------------------------------
 class GetNewIndexersAndScreenPerf(Perf):
     FUNCTIONS = (
-        "ordered",
-        "unordered",
-        "tiled",
-        "repeat",
-        "quick_exit",
-        "late_exit",
-        "small",
-        "large",
+        'ordered',
+        'unordered',
+        'tiled',
+        'repeat',
+        'quick_exit',
+        'late_exit',
+        'small',
+        'large',
     )
     NUMBER = 5
 
-    TILED = "tiled"
-    REPEATED = "repeated"
-    ORDERED = "ordered"
-    UNORDERED = "unordered"
+    TILED = 'tiled'
+    REPEATED = 'repeated'
+    ORDERED = 'ordered'
+    UNORDERED = 'unordered'
 
     class Key(tp.NamedTuple):
         type1: str
@@ -792,10 +792,10 @@ class SplitAfterCount(Perf):
     NUMBER = 200_000
 
     def __init__(self):
-        self.string = "".join(["abcd,"] * 1000)
+        self.string = ''.join(['abcd,'] * 1000)
 
     def main(self):
-        post = self.entry(self.string, ",", 20)
+        post = self.entry(self.string, ',', 20)
 
 
 class SplitAfterCountAK(SplitAfterCount):
@@ -811,7 +811,7 @@ class CountIterations(Perf):
     NUMBER = 10_000
 
     def __init__(self):
-        self.strio = io.StringIO("\n".join(["abcd"] * 10_000))
+        self.strio = io.StringIO('\n'.join(['abcd'] * 10_000))
 
     def main(self):
         post = self.entry(self.strio)
@@ -851,10 +851,10 @@ class SliceToAscendingREF(SliceToAscending):
 def get_arg_parser():
 
     p = argparse.ArgumentParser(
-        description="ArrayKit performance tool.",
+        description='ArrayKit performance tool.',
     )
     p.add_argument(
-        "--names", nargs="+", help="Provide one or more performance tests by name."
+        '--names', nargs='+', help='Provide one or more performance tests by name.'
     )
     return p
 
@@ -863,34 +863,34 @@ def main():
     options = get_arg_parser().parse_args()
     match = None if not options.names else set(options.names)
 
-    records = [("cls", "func", "ak", "ref", "ref/ak")]
+    records = [('cls', 'func', 'ak', 'ref', 'ref/ak')]
     for cls_perf in Perf.__subclasses__():  # only get one level
         cls_map = {}
         if match and cls_perf.__name__ not in match:
             continue
         print(cls_perf)
         for cls_runner in cls_perf.__subclasses__():
-            if cls_runner.__name__.endswith("AK"):
-                cls_map["ak"] = cls_runner
-            elif cls_runner.__name__.endswith("REF"):
-                cls_map["ref"] = cls_runner
+            if cls_runner.__name__.endswith('AK'):
+                cls_map['ak'] = cls_runner
+            elif cls_runner.__name__.endswith('REF'):
+                cls_map['ref'] = cls_runner
         for func_attr in cls_perf.FUNCTIONS:
             results = {}
             for key, cls_runner in cls_map.items():
                 runner = cls_runner()
-                if hasattr(runner, "pre"):  # TEMP, for branches
-                    raise RuntimeError("convert your pre() method to __init__()")
+                if hasattr(runner, 'pre'):  # TEMP, for branches
+                    raise RuntimeError('convert your pre() method to __init__()')
                 f = getattr(runner, func_attr)
                 results[key] = timeit.timeit(
-                    "f()", globals=locals(), number=cls_runner.NUMBER
+                    'f()', globals=locals(), number=cls_runner.NUMBER
                 )
             records.append(
                 (
                     cls_perf.__name__,
                     func_attr,
-                    results["ak"],
-                    results["ref"],
-                    results["ref"] / results["ak"],
+                    results['ak'],
+                    results['ref'],
+                    results['ref'] / results['ak'],
                 )
             )
 
@@ -908,5 +908,5 @@ def main():
     #         ))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

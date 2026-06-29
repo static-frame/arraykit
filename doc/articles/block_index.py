@@ -24,7 +24,7 @@ from performance.reference.block_index import indices_to_contiguous_pairs
 
 
 class ArrayProcessor:
-    NAME = ""
+    NAME = ''
     SORT = -1
 
     def __init__(self, arrays: tp.Iterable[np.ndarray]):
@@ -47,7 +47,7 @@ class ArrayProcessor:
 
 # -------------------------------------------------------------------------------
 class BlockIndexLoad(ArrayProcessor):
-    NAME = "BlockIndex: load"
+    NAME = 'BlockIndex: load'
     SORT = 0
 
     def __call__(self):
@@ -58,7 +58,7 @@ class BlockIndexLoad(ArrayProcessor):
 
 
 class TupleIndexLoad(ArrayProcessor):
-    NAME = "TupleIndex: load"
+    NAME = 'TupleIndex: load'
     SORT = 10
 
     def __call__(self):
@@ -67,7 +67,7 @@ class TupleIndexLoad(ArrayProcessor):
 
 
 class BlockIndexCopy(ArrayProcessor):
-    NAME = "BlockIndex: copy"
+    NAME = 'BlockIndex: copy'
     SORT = 2
 
     def __call__(self):
@@ -76,7 +76,7 @@ class BlockIndexCopy(ArrayProcessor):
 
 
 class TupleIndexCopy(ArrayProcessor):
-    NAME = "TupleIndex: copy"
+    NAME = 'TupleIndex: copy'
     SORT = 12
 
     def __call__(self):
@@ -85,7 +85,7 @@ class TupleIndexCopy(ArrayProcessor):
 
 
 class BlockIndexPickle(ArrayProcessor):
-    NAME = "BlockIndex: pickle"
+    NAME = 'BlockIndex: pickle'
     SORT = 4
 
     def __call__(self):
@@ -94,7 +94,7 @@ class BlockIndexPickle(ArrayProcessor):
 
 
 class TupleIndexPickle(ArrayProcessor):
-    NAME = "TupleIndex: pickle"
+    NAME = 'TupleIndex: pickle'
     SORT = 14
 
     def __call__(self):
@@ -103,7 +103,7 @@ class TupleIndexPickle(ArrayProcessor):
 
 
 class BlockIndexLookup(ArrayProcessor):
-    NAME = "BlockIndex: lookup"
+    NAME = 'BlockIndex: lookup'
     SORT = 1
 
     def __call__(self):
@@ -113,7 +113,7 @@ class BlockIndexLookup(ArrayProcessor):
 
 
 class BlockIndexLookupBlock(ArrayProcessor):
-    NAME = "BlockIndex: lookup block"
+    NAME = 'BlockIndex: lookup block'
     SORT = 1.1
 
     def __call__(self):
@@ -123,7 +123,7 @@ class BlockIndexLookupBlock(ArrayProcessor):
 
 
 class TupleIndexLookup(ArrayProcessor):
-    NAME = "TupleIndex: lookup"
+    NAME = 'TupleIndex: lookup'
     SORT = 11
 
     def __call__(self):
@@ -133,7 +133,7 @@ class TupleIndexLookup(ArrayProcessor):
 
 
 class BlockIndexIterIntArray(ArrayProcessor):
-    NAME = "BlockIndex: contig by int array"
+    NAME = 'BlockIndex: contig by int array'
     SORT = 5
 
     def __call__(self):
@@ -141,7 +141,7 @@ class BlockIndexIterIntArray(ArrayProcessor):
 
 
 class TupleIndexIterIntArray(ArrayProcessor):
-    NAME = "TupleIndex: contig by int array"
+    NAME = 'TupleIndex: contig by int array'
     SORT = 15
 
     def __call__(self):
@@ -150,7 +150,7 @@ class TupleIndexIterIntArray(ArrayProcessor):
 
 
 class BlockIndexIterIntList(ArrayProcessor):
-    NAME = "BlockIndex: contig by int list"
+    NAME = 'BlockIndex: contig by int list'
     SORT = 6
 
     def __call__(self):
@@ -158,7 +158,7 @@ class BlockIndexIterIntList(ArrayProcessor):
 
 
 class TupleIndexIterIntList(ArrayProcessor):
-    NAME = "TupleIndex: contig by int list"
+    NAME = 'TupleIndex: contig by int list'
     SORT = 16
 
     def __call__(self):
@@ -167,7 +167,7 @@ class TupleIndexIterIntList(ArrayProcessor):
 
 
 class BlockIndexIterSlice(ArrayProcessor):
-    NAME = "BlockIndex: contig by slice"
+    NAME = 'BlockIndex: contig by slice'
     SORT = 7
 
     def __call__(self):
@@ -175,7 +175,7 @@ class BlockIndexIterSlice(ArrayProcessor):
 
 
 class TupleIndexIterSlice(ArrayProcessor):
-    NAME = "TupleIndex: contig by slice"
+    NAME = 'TupleIndex: contig by slice'
     SORT = 17
 
     def __call__(self):
@@ -184,7 +184,7 @@ class TupleIndexIterSlice(ArrayProcessor):
 
 
 class BlockIndexIterBoolArray(ArrayProcessor):
-    NAME = "BlockIndex: contig by bool array"
+    NAME = 'BlockIndex: contig by bool array'
     SORT = 8
 
     def __call__(self):
@@ -192,7 +192,7 @@ class BlockIndexIterBoolArray(ArrayProcessor):
 
 
 class TupleIndexIterBoolArray(ArrayProcessor):
-    NAME = "TupleIndex: contig by bool array"
+    NAME = 'TupleIndex: contig by bool array'
     SORT = 18
 
     def __call__(self):
@@ -211,52 +211,50 @@ NUMBER = 50
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
     if seconds < 1e-4:
-        return f"{seconds * 1e6: .1f} (µs)"
+        return f'{seconds * 1e6: .1f} (µs)'
     if seconds < 1e-1:
-        return f"{seconds * 1e3: .1f} (ms)"
-    return f"{seconds: .1f} (s)"
+        return f'{seconds * 1e3: .1f} (ms)'
+    return f'{seconds: .1f} (s)'
 
 
 def plot_performance(frame):
-    fixture_total = len(frame["fixture"].unique())
-    cat_total = len(frame["size"].unique())
-    processor_total = len(frame["cls_processor"].unique())
+    fixture_total = len(frame['fixture'].unique())
+    cat_total = len(frame['size'].unique())
+    processor_total = len(frame['cls_processor'].unique())
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap('plasma')
 
     color = cmap(np.arange(processor_total) / processor_total)
 
     # category is the size of the array
-    for cat_count, (cat_label, cat) in enumerate(frame.groupby("size")):
-        for fixture_count, (fixture_label, fixture) in enumerate(
-            cat.groupby("fixture")
-        ):
+    for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
+        for fixture_count, (fixture_label, fixture) in enumerate(cat.groupby('fixture')):
             ax = axes[cat_count][fixture_count]
 
             # set order
-            fixture["sort"] = [f.SORT for f in fixture["cls_processor"]]
-            fixture = fixture.sort_values("sort")
+            fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
+            fixture = fixture.sort_values('sort')
 
-            results = fixture["time"].values.tolist()
+            results = fixture['time'].values.tolist()
             x_labels = [
-                f"{i}: {cls.NAME}"
-                for i, cls in zip(range(1, len(results) + 1), fixture["cls_processor"])
+                f'{i}: {cls.NAME}'
+                for i, cls in zip(range(1, len(results) + 1), fixture['cls_processor'])
             ]
             x_tick_labels = [str(l + 1) for l in range(len(x_labels))]
             x = np.arange(len(results))
             x_bar = ax.bar(x_labels, results, color=color)
 
-            title = f"{cat_label:.0e}\n{fixture_label}"
+            title = f'{cat_label:.0e}\n{fixture_label}'
             ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.5)  # larger makes taller tan wide
 
-            time_max = fixture["time"].max()
-            time_min = fixture["time"].min()
+            time_max = fixture['time'].max()
+            time_min = fixture['time'].min()
             y_ticks = [0, time_min, time_max * 0.5, time_max]
             y_labels = [
-                "",
+                '',
                 seconds_to_display(time_min),
                 seconds_to_display(time_max * 0.5),
                 seconds_to_display(time_max),
@@ -269,7 +267,7 @@ def plot_performance(frame):
             ax.set_yticks(y_ticks)
             ax.set_yticklabels(y_labels, fontsize=4)
             ax.tick_params(
-                axis="y",
+                axis='y',
                 length=2,
                 width=0.5,
                 pad=1,
@@ -277,7 +275,7 @@ def plot_performance(frame):
             ax.set_xticks(x)
             ax.set_xticklabels(x_tick_labels, fontsize=4)
             ax.tick_params(
-                axis="x",
+                axis='x',
                 length=2,
                 width=0.5,
                 pad=1,
@@ -285,12 +283,12 @@ def plot_performance(frame):
             # ax.set_yscale('log')
 
     fig.set_size_inches(9, 3.5)  # width, height
-    fig.legend(x_bar, x_labels, loc="center right", fontsize=6)
+    fig.legend(x_bar, x_labels, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(0.05, 0.96, f"BlockIndex Performance: {NUMBER} Iterations", fontsize=10)
+    fig.text(0.05, 0.96, f'BlockIndex Performance: {NUMBER} Iterations', fontsize=10)
     fig.text(0.05, 0.90, get_versions(), fontsize=6)
 
-    fp = "/tmp/block_index.png"
+    fp = '/tmp/block_index.png'
     plt.subplots_adjust(
         left=0.075,
         bottom=0.05,
@@ -302,10 +300,10 @@ def plot_performance(frame):
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
 
-    if sys.platform.startswith("linux"):
-        os.system(f"eog {fp}&")
+    if sys.platform.startswith('linux'):
+        os.system(f'eog {fp}&')
     else:
-        os.system(f"open {fp}")
+        os.system(f'open {fp}')
 
 
 # -------------------------------------------------------------------------------
@@ -314,7 +312,7 @@ ROW_COUNT = 2
 
 
 class FixtureFactory:
-    NAME = ""
+    NAME = ''
 
     @staticmethod
     def get_arrays(size: int) -> np.ndarray:
@@ -327,7 +325,7 @@ class FixtureFactory:
 
 
 class FFColumnar(FixtureFactory):
-    NAME = "columnar"
+    NAME = 'columnar'
 
     @staticmethod
     def get_arrays(size: int) -> tp.Iterator[np.ndarray]:
@@ -342,7 +340,7 @@ from itertools import cycle
 
 
 class FFMixed(FixtureFactory):
-    NAME = "mixed"
+    NAME = 'mixed'
 
     @staticmethod
     def get_arrays(size: int) -> tp.Iterator[np.ndarray]:
@@ -356,7 +354,7 @@ class FFMixed(FixtureFactory):
 
 
 class FFUniform(FixtureFactory):
-    NAME = "uniform"
+    NAME = 'uniform'
 
     @staticmethod
     def get_arrays(size: int) -> tp.Iterator[np.ndarray]:
@@ -368,7 +366,7 @@ class FFUniform(FixtureFactory):
 def get_versions() -> str:
     import platform
 
-    return f"OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n"
+    return f'OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n'
 
 
 CLS_PROCESSOR = (
@@ -409,7 +407,7 @@ def run_test():
                 record = [cls, NUMBER, fixture_label, size]
                 print(record)
                 try:
-                    result = timeit.timeit(f"runner()", globals=locals(), number=NUMBER)
+                    result = timeit.timeit(f'runner()', globals=locals(), number=NUMBER)
                 except OSError:
                     result = np.nan
                 finally:
@@ -418,11 +416,11 @@ def run_test():
                 records.append(record)
 
     f = pd.DataFrame.from_records(
-        records, columns=("cls_processor", "number", "fixture", "size", "time")
+        records, columns=('cls_processor', 'number', 'fixture', 'size', 'time')
     )
     print(f)
     plot_performance(f)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run_test()

@@ -25,5 +25,5 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post1.tolist(), post2.tolist())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

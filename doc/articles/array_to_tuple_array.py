@@ -14,7 +14,7 @@ sys.path.append(os.getcwd())
 
 
 class ArrayProcessor:
-    NAME = ""
+    NAME = ''
     SORT = -1
 
     def __init__(self, array: np.ndarray):
@@ -23,7 +23,7 @@ class ArrayProcessor:
 
 # -------------------------------------------------------------------------------
 class AKArray2D1D(ArrayProcessor):
-    NAME = "ak.array_to_tuple_array()"
+    NAME = 'ak.array_to_tuple_array()'
     SORT = 0
 
     def __call__(self):
@@ -31,7 +31,7 @@ class AKArray2D1D(ArrayProcessor):
 
 
 class PyArray2D1D(ArrayProcessor):
-    NAME = "Python construction"
+    NAME = 'Python construction'
     SORT = 1
 
     def __call__(self):
@@ -52,28 +52,28 @@ NUMBER = 200
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
     if seconds < 1e-4:
-        return f"{seconds * 1e6: .1f} (µs)"
+        return f'{seconds * 1e6: .1f} (µs)'
     if seconds < 1e-1:
-        return f"{seconds * 1e3: .1f} (ms)"
-    return f"{seconds: .1f} (s)"
+        return f'{seconds * 1e3: .1f} (ms)'
+    return f'{seconds: .1f} (s)'
 
 
 def plot_performance(frame):
-    fixture_total = len(frame["fixture"].unique())
-    cat_total = len(frame["size"].unique())
-    processor_total = len(frame["cls_processor"].unique())
+    fixture_total = len(frame['fixture'].unique())
+    cat_total = len(frame['size'].unique())
+    processor_total = len(frame['cls_processor'].unique())
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap('plasma')
 
     color = cmap(np.arange(processor_total) / max(processor_total, 3))
 
     # category is the size of the array
-    for cat_count, (cat_label, cat) in enumerate(frame.groupby("size")):
+    for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
         # each fixture is a collection of tests for one display
         fixtures = {
-            fixture_label: fixture for fixture_label, fixture in cat.groupby("fixture")
+            fixture_label: fixture for fixture_label, fixture in cat.groupby('fixture')
         }
         for fixture_count, (fixture_label, fixture) in enumerate(
             (k, fixtures[k]) for k in FixtureFactory.DENSITY_TO_DISPLAY
@@ -81,28 +81,26 @@ def plot_performance(frame):
             ax = axes[cat_count][fixture_count]
 
             # set order
-            fixture["sort"] = [f.SORT for f in fixture["cls_processor"]]
-            fixture = fixture.sort_values("sort")
+            fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
+            fixture = fixture.sort_values('sort')
 
-            results = fixture["time"].values.tolist()
-            names = [cls.NAME for cls in fixture["cls_processor"]]
+            results = fixture['time'].values.tolist()
+            names = [cls.NAME for cls in fixture['cls_processor']]
             # x = np.arange(len(results))
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
             # density, position = fixture_label.split('-')
             # cat_label is the size of the array
-            title = (
-                f"{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[fixture_label]}"
-            )
+            title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[fixture_label]}'
 
             ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.75)  # makes taller than wide
-            time_max = fixture["time"].max()
+            time_max = fixture['time'].max()
             ax.set_yticks([0, time_max * 0.5, time_max])
             ax.set_yticklabels(
                 [
-                    "",
+                    '',
                     seconds_to_display(time_max * 0.5),
                     seconds_to_display(time_max),
                 ],
@@ -110,25 +108,25 @@ def plot_performance(frame):
             )
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
-                axis="x",
-                which="both",
+                axis='x',
+                which='both',
                 bottom=False,
                 top=False,
                 labelbottom=False,
             )
 
     fig.set_size_inches(8, 4)  # width, height
-    fig.legend(post, names_display, loc="center right", fontsize=6)
+    fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
     fig.text(
         0.05,
         0.96,
-        f"array_to_tuple_array() Performance: {NUMBER} Iterations",
+        f'array_to_tuple_array() Performance: {NUMBER} Iterations',
         fontsize=10,
     )
     fig.text(0.05, 0.90, get_versions(), fontsize=6)
 
-    fp = "/tmp/array_to_tuple_array.png"
+    fp = '/tmp/array_to_tuple_array.png'
     plt.subplots_adjust(
         left=0.05,
         bottom=0.05,
@@ -140,17 +138,17 @@ def plot_performance(frame):
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
 
-    if sys.platform.startswith("linux"):
-        os.system(f"eog {fp}&")
+    if sys.platform.startswith('linux'):
+        os.system(f'eog {fp}&')
     else:
-        os.system(f"open {fp}")
+        os.system(f'open {fp}')
 
 
 # -------------------------------------------------------------------------------
 
 
 class FixtureFactory:
-    NAME = ""
+    NAME = ''
 
     @staticmethod
     def get_array(size: int, width_ratio: int) -> np.ndarray:
@@ -164,11 +162,11 @@ class FixtureFactory:
         return cls.NAME, array
 
     DENSITY_TO_DISPLAY = {
-        "column-1": "1 Column",
-        "column-2": "2 Column",
-        "column-5": "5 Column",
-        "column-10": "10 Column",
-        "column-20": "20 Column",
+        'column-1': '1 Column',
+        'column-2': '2 Column',
+        'column-5': '5 Column',
+        'column-10': '10 Column',
+        'column-20': '20 Column',
     }
 
     # POSITION_TO_DISPLAY = {
@@ -178,7 +176,7 @@ class FixtureFactory:
 
 
 class FFC1(FixtureFactory):
-    NAME = "column-1"
+    NAME = 'column-1'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -187,7 +185,7 @@ class FFC1(FixtureFactory):
 
 
 class FFC2(FixtureFactory):
-    NAME = "column-2"
+    NAME = 'column-2'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -196,7 +194,7 @@ class FFC2(FixtureFactory):
 
 
 class FFC5(FixtureFactory):
-    NAME = "column-5"
+    NAME = 'column-5'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -205,7 +203,7 @@ class FFC5(FixtureFactory):
 
 
 class FFC10(FixtureFactory):
-    NAME = "column-10"
+    NAME = 'column-10'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -214,7 +212,7 @@ class FFC10(FixtureFactory):
 
 
 class FFC20(FixtureFactory):
-    NAME = "column-20"
+    NAME = 'column-20'
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
@@ -225,7 +223,7 @@ class FFC20(FixtureFactory):
 def get_versions() -> str:
     import platform
 
-    return f"OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n"
+    return f'OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n'
 
 
 CLS_PROCESSOR = (
@@ -253,7 +251,7 @@ def run_test():
                 record = [cls, NUMBER, fixture_label, size]
                 print(record)
                 try:
-                    result = timeit.timeit(f"runner()", globals=locals(), number=NUMBER)
+                    result = timeit.timeit(f'runner()', globals=locals(), number=NUMBER)
                 except OSError:
                     result = np.nan
                 finally:
@@ -262,11 +260,11 @@ def run_test():
                 records.append(record)
 
     f = pd.DataFrame.from_records(
-        records, columns=("cls_processor", "number", "fixture", "size", "time")
+        records, columns=('cls_processor', 'number', 'fixture', 'size', 'time')
     )
     print(f)
     plot_performance(f)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run_test()

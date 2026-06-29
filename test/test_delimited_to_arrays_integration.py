@@ -18,29 +18,29 @@ class DelimitedSource(tp.NamedTuple):
 
 
 SOURCES = {
-    "noa-1": DelimitedSource(
-        url="https://www.ndbc.noaa.gov/view_text_file.php?filename=46222h2018.txt.gz&dir=data/historical/stdmet/",
-        delimiter=" ",
+    'noa-1': DelimitedSource(
+        url='https://www.ndbc.noaa.gov/view_text_file.php?filename=46222h2018.txt.gz&dir=data/historical/stdmet/',
+        delimiter=' ',
         skip_header=2,
         expected_dtypes=[
-            "i",
-            "i",
-            "i",
-            "i",
-            "i",
-            "i",
-            "f",
-            "f",
-            "f",
-            "f",
-            "f",
-            "i",
-            "f",
-            "f",
-            "f",
-            "f",
-            "f",
-            "f",
+            'i',
+            'i',
+            'i',
+            'i',
+            'i',
+            'i',
+            'f',
+            'f',
+            'f',
+            'f',
+            'f',
+            'i',
+            'f',
+            'f',
+            'f',
+            'f',
+            'f',
+            'f',
         ],
         expected_row_count=16824,
     )
@@ -48,24 +48,24 @@ SOURCES = {
 
 
 def download_and_split(fp: str) -> tp.Iterable[str]:
-    fn = hashlib.sha224(bytes(fp, encoding="utf8")).hexdigest() + ".txt"
-    if os.path.exists("/tmp"):
-        fp_destination = os.path.join("/tmp", fn)
+    fn = hashlib.sha224(bytes(fp, encoding='utf8')).hexdigest() + '.txt'
+    if os.path.exists('/tmp'):
+        fp_destination = os.path.join('/tmp', fn)
     else:
         fp_destination = None
 
     if fp_destination and os.path.exists(fp_destination):
-        print(f"using {fp_destination}")
+        print(f'using {fp_destination}')
         with open(fp_destination) as f:
             return f.readlines()
 
     with request.urlopen(fp) as response:  # pragma: no cover
-        contents = response.read().decode("utf-8")
+        contents = response.read().decode('utf-8')
         if fp_destination:
-            print(f"writing {fp_destination}")
-            with open(fp_destination, "w") as f:
+            print(f'writing {fp_destination}')
+            with open(fp_destination, 'w') as f:
                 f.write(contents)
-        return contents.split("\n")
+        return contents.split('\n')
 
 
 def process_sources():
@@ -81,5 +81,5 @@ def process_sources():
         assert all(len(a) == ds.expected_row_count for a in post)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     process_sources()

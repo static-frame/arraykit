@@ -15,11 +15,11 @@ class Interface(tp.NamedTuple):
 
     @staticmethod
     def _valid_name(name: str) -> bool:
-        if name in ("__annotate__", "__class__", "__annotate_func__"):
+        if name in ('__annotate__', '__class__', '__annotate_func__'):
             return False
-        if name.startswith("__"):
+        if name.startswith('__'):
             return True
-        if name.startswith("_"):
+        if name.startswith('_'):
             return False
         return True
 
@@ -56,12 +56,12 @@ class TestUnit(unittest.TestCase):
     # @unittest.skip('not sure if pyi is in right location')
     def test_interface(self) -> None:
 
-        fp = os.path.join(os.path.dirname(ak.__file__), "__init__.pyi")
+        fp = os.path.join(os.path.dirname(ak.__file__), '__init__.pyi')
 
         with open(fp) as f:
             msg = f.read()
 
-        spec = spec_from_loader("", loader=None)
+        spec = spec_from_loader('', loader=None)
         pyi_mod = module_from_spec(spec)
 
         exec(msg, pyi_mod.__dict__)
@@ -75,13 +75,13 @@ class TestUnit(unittest.TestCase):
             ak_class = ak_content.classes[name]
             pyi_class = pyi_content.classes[name]
 
-            if "__hash__" in ak_class:
-                ak_class.remove("__hash__")
-            if "__hash__" in pyi_class:
-                pyi_class.remove("__hash__")
+            if '__hash__' in ak_class:
+                ak_class.remove('__hash__')
+            if '__hash__' in pyi_class:
+                pyi_class.remove('__hash__')
 
             self.assertEqual(ak_class, pyi_class)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

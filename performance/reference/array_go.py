@@ -18,9 +18,9 @@ class ArrayGO:
     _array_mutable: tp.Optional[tp.List[tp.Any]]
 
     __slots__ = (
-        "_array",
-        "_array_mutable",
-        "_recache",
+        '_array',
+        '_array_mutable',
+        '_recache',
     )
 
     # NOTE: this can be implemented with one array, where we overallocate for growth, then grow as needed, or with an array and list. Since most instaces will not need to grow (only edge nodes), overall efficiency might be greater with a list
@@ -42,7 +42,7 @@ class ArrayGO:
             else:
                 self._array = immutable_filter(iterable)
             if self._array.dtype != self._DTYPE:
-                raise NotImplementedError("only object arrays are supported")
+                raise NotImplementedError('only object arrays are supported')
             self._recache = False
             self._array_mutable = None
         else:  # assume it is a list or listable
@@ -55,7 +55,7 @@ class ArrayGO:
                 self._array_mutable = list(iterable)
 
     # ---------------------------------------------------------------------------
-    def __deepcopy__(self, memo: tp.Dict[int, tp.Any]) -> "ArrayGO":
+    def __deepcopy__(self, memo: tp.Dict[int, tp.Any]) -> 'ArrayGO':
         if self._recache:
             self._update_array_cache()
 
@@ -67,13 +67,13 @@ class ArrayGO:
         memo[id(self)] = obj
         return obj  # type: ignore
 
-    def __copy__(self) -> "ArrayGO":
+    def __copy__(self) -> 'ArrayGO':
         """Return a shallow copy of this ArrayGO."""
         if self._recache:
             self._update_array_cache()
         return self.__class__(self._array, own_iterable=True)
 
-    def copy(self) -> "ArrayGO":
+    def copy(self) -> 'ArrayGO':
         """Return a shallow copy of this ArrayGO."""
         return self.__copy__()
 

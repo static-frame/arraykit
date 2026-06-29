@@ -3,15 +3,15 @@ from copy import deepcopy
 
 import numpy as np
 
-DTYPE_DATETIME_KIND = "M"
-DTYPE_TIMEDELTA_KIND = "m"
-DTYPE_COMPLEX_KIND = "c"
-DTYPE_FLOAT_KIND = "f"
-DTYPE_OBJECT_KIND = "O"
-DTYPE_BOOL_KIND = "b"
+DTYPE_DATETIME_KIND = 'M'
+DTYPE_TIMEDELTA_KIND = 'm'
+DTYPE_COMPLEX_KIND = 'c'
+DTYPE_FLOAT_KIND = 'f'
+DTYPE_OBJECT_KIND = 'O'
+DTYPE_BOOL_KIND = 'b'
 
-DTYPE_STR_KINDS = ("U", "S")  # S is np.bytes_
-DTYPE_INT_KINDS = ("i", "u")  # signed and unsigned
+DTYPE_STR_KINDS = ('U', 'S')  # S is np.bytes_
+DTYPE_INT_KINDS = ('i', 'u')  # signed and unsigned
 DTYPE_INEXACT_KINDS = (
     DTYPE_FLOAT_KIND,
     DTYPE_COMPLEX_KIND,
@@ -33,7 +33,7 @@ EMPTY_SLICE = slice(0, 0)  # gathers nothing
 
 def mloc(array: np.ndarray) -> int:
     """Return the memory location of an array."""
-    return tp.cast(int, array.__array_interface__["data"][0])
+    return tp.cast(int, array.__array_interface__['data'][0])
 
 
 def immutable_filter(src_array: np.ndarray) -> np.ndarray:
@@ -52,7 +52,7 @@ def name_filter(name):
     try:
         hash(name)
     except TypeError:
-        raise TypeError("unhashable name attribute", name)
+        raise TypeError('unhashable name attribute', name)
     return name
 
 
@@ -110,7 +110,7 @@ def resolve_dtype(dt1: np.dtype, dt2: np.dtype) -> np.dtype:
         return dt1
 
     # if either is object, we go to object
-    if dt1.kind == "O" or dt2.kind == "O":
+    if dt1.kind == 'O' or dt2.kind == 'O':
         return DTYPE_OBJECT
 
     dt1_is_str = dt1.kind in DTYPE_STR_KINDS
@@ -217,7 +217,7 @@ def dtype_from_element(value: tp.Optional[tp.Hashable]) -> np.dtype:
         return DTYPE_OBJECT
     if isinstance(value, tuple):
         return DTYPE_OBJECT
-    if hasattr(value, "dtype"):
+    if hasattr(value, 'dtype'):
         return value.dtype  # type: ignore
     # NOTE: calling array and getting dtype on np.nan is faster than combining isinstance, isnan calls
     return np.array(value).dtype
@@ -258,7 +258,7 @@ def get_new_indexers_and_screen_ak(
 
 def split_after_count(string: str, delimiter: str, count: int):
     *left, right = string.split(delimiter, maxsplit=count)
-    return ",".join(left), right
+    return ','.join(left), right
 
 
 def count_iteration(iterable: tp.Iterable):
