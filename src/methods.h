@@ -14,6 +14,10 @@ row_1d_filter(PyObject *Py_UNUSED(m), PyObject *a);
 PyObject *
 slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args);
 
+// Return an integer when a slice is exactly a single positive-position unit, else -1.
+PyObject *
+slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a);
+
 // Reshape if necessary a flat ndim 1 array into a 2D array with one columns and rows of length.
 // related example: https://github.com/RhysU/ar/blob/master/ar-python.cpp
 PyObject *

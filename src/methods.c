@@ -60,8 +60,53 @@ slice_to_ascending_slice(PyObject *Py_UNUSED(m), PyObject *args) {
             &PyLong_Type, &size)) {
         return NULL;
     }
-    // will delegate NULL on eroror
+    // will delegate NULL on error
     return AK_slice_to_ascending_slice(slice, PyLong_AsSsize_t(size));
+}
+
+PyObject *
+slice_to_unit(PyObject *Py_UNUSED(m), PyObject *a)
+{
+    if (!PySlice_Check(a)) {
+        return PyErr_Format(PyExc_TypeError,
+                "Expected a slice, not %s",
+                Py_TYPE(a)->tp_name);
+    }
+    PyObject* py_start = ((PySliceObject*)a)->start;
+    PyObject* py_stop = ((PySliceObject*)a)->stop;
+    PyObject* py_step = ((PySliceObject*)a)->step;
+
+    if (py_stop == Py_None) {
+        return PyLong_FromLong(-1);
+    }
+
+    Py_ssize_t step = 1;
+    if (py_step != Py_None) {
+        step = PyLong_AsSsize_t(py_step);
+        if (step == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+    }
+    if (step != 1) {
+        return PyLong_FromLong(-1);
+    }
+
+    Py_ssize_t start = 0;
+    if (py_start != Py_None) {
+        start = PyLong_AsSsize_t(py_start);
+        if (start == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+    }
+    Py_ssize_t stop = PyLong_AsSsize_t(py_stop);
+    if (stop == -1 && PyErr_Occurred()) {
+        return NULL;
+    }
+
+    if (start < 0 || stop < 0 || stop - start != 1) {
+        return PyLong_FromLong(-1);
+    }
+    return PyLong_FromSsize_t(start);
 }
 
 PyObject *
