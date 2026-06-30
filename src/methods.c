@@ -1244,6 +1244,10 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     char *pack_buffer = NULL;
     Py_ssize_t pack_buffer_size = 0;
 
+    /* For the write() path, reuse a single memoryview across iterations,
+     * rebinding it to each chunk, instead of allocating a new object each time. */
+    PyObject *buffer = NULL;
+
     do {
         npy_intp inner_size = *innersizeptr;
         if (inner_size == 0) {
@@ -1283,20 +1287,31 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             }
         }
         else {
-            /* Note: PyMemoryView_FromMemory requires non-const char*, but we pass
+            /* Reuse a single memoryview, rebinding it to the current chunk. This
+             * is safe because write() consumes the bytes synchronously and does
+             * not retain the view (exports return to 0 before write() returns).
+             * Note: PyMemoryView_FromMemory requires non-const char*, but we pass
              * PyBUF_READ flag which makes the view read-only, so the cast is safe. */
-            PyObject *buffer = PyMemoryView_FromMemory((char *)data_to_write, chunk_size, PyBUF_READ);
             if (buffer == NULL) {
-                goto fail;
+                buffer = PyMemoryView_FromMemory((char *)data_to_write, chunk_size, PyBUF_READ);
+                if (buffer == NULL) {
+                    goto fail;
+                }
+            }
+            else {
+                // Rebind buf/len (and shape[0], since ndim == 1 and itemsize == 1) to this chunk
+                Py_buffer *view = PyMemoryView_GET_BUFFER(buffer);
+                view->buf = (void *)data_to_write;
+                view->len = chunk_size;
+                view->shape[0] = chunk_size;
             }
 
             PyObject *write_result = PyObject_CallMethodObjArgs(file, write_name, buffer, NULL);
-            Py_DECREF(buffer);
             if (write_result == NULL) {
                 goto fail;
             }
 
-            /* Check for partial writes */
+            // Check for partial writes
             if (PyLong_Check(write_result)) {
                 Py_ssize_t bytes_written = PyLong_AsSsize_t(write_result);
                 if (bytes_written < 0 && PyErr_Occurred()) {
@@ -1322,12 +1337,14 @@ write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
 
     PyMem_Free(pack_buffer);
+    Py_XDECREF(buffer);
     NpyIter_Deallocate(iter);
     Py_XDECREF(write_name);
     Py_RETURN_NONE;
 
     fail:
         PyMem_Free(pack_buffer);
+        Py_XDECREF(buffer);
         NpyIter_Deallocate(iter);
         Py_XDECREF(write_name);
         return NULL;
