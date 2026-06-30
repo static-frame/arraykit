@@ -18,16 +18,16 @@ def from_blocks(
 
     for block in raw_blocks:
         if not block.__class__ is np.ndarray:
-            raise ErrorInitTypeBlocks(f"found non array block: {block}")
+            raise ErrorInitTypeBlocks(f'found non array block: {block}')
         if block.ndim > 2:
             raise ErrorInitTypeBlocks(
-                f"cannot include array with {block.ndim} dimensions"
+                f'cannot include array with {block.ndim} dimensions'
             )
 
         r, c = shape_filter(block)
 
         if row_count is not None and r != row_count:  # type: ignore [unreachable]
-            raise ErrorInitTypeBlocks(f"mismatched row count: {r}: {row_count}")
+            raise ErrorInitTypeBlocks(f'mismatched row count: {r}: {row_count}')
         else:
             row_count = r
         if c == 0:
@@ -172,7 +172,7 @@ class IterContiguous:
 # -------------------------------------------------------------------------------
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     samples = (
         [(0, 0), (0, 1), (0, 2), (1, 1), (1, 3), (2, 0), (3, 0), (3, 1), (3, 2)],
         [(0, 0), (2, 1), (3, 5), (10, 1)],

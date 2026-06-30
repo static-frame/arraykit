@@ -25,7 +25,7 @@ class TestUnit(unittest.TestCase):
 
     def test_block_index_init_b1(self) -> None:
         with self.assertRaises(TypeError):
-            _ = BlockIndex(3, 2, 10, 2, "a")
+            _ = BlockIndex(3, 2, 10, 2, 'a')
 
     def test_block_index_init_c1(self) -> None:
         bi1 = BlockIndex()
@@ -44,18 +44,18 @@ class TestUnit(unittest.TestCase):
         block, row, bir_count, bir_capacity, bi, dt = bi1.__getstate__()
 
         with self.assertRaises(TypeError):
-            bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, "a")
+            bi2 = BlockIndex(block, row, bir_count, bir_capacity, bi, 'a')
 
     def test_block_index_init_d(self) -> None:
         bi1 = BlockIndex()
-        self.assertTrue("None" in repr(bi1))
+        self.assertTrue('None' in repr(bi1))
 
     # ---------------------------------------------------------------------------
 
     def test_block_index_register_a(self) -> None:
         bi1 = BlockIndex()
         with self.assertRaises(ErrorInitTypeBlocks):
-            bi1.register("foo")
+            bi1.register('foo')
 
         with self.assertRaises(ErrorInitTypeBlocks):
             bi1.register(3.5)
@@ -189,12 +189,12 @@ class TestUnit(unittest.TestCase):
 
     def test_block_index_copy_b(self) -> None:
         dt1 = np.dtype(np.float64)
-        bi1 = BlockIndex(0, 2, 0, 8, b"", dt1)
+        bi1 = BlockIndex(0, 2, 0, 8, b'', dt1)
         bi2 = bi1.copy()
         dt2 = bi1.dtype
         del dt1
         del bi1
-        self.assertTrue("float64" in repr(bi2))
+        self.assertTrue('float64' in repr(bi2))
         del bi2
         self.assertEqual(dt2, np.dtype(np.float64))
 
@@ -257,7 +257,7 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(4).reshape(2, 2))
 
         with self.assertRaises(TypeError):
-            bi1["a"]
+            bi1['a']
         with self.assertRaises(TypeError):
             bi1[3:5]
 
@@ -355,7 +355,7 @@ class TestUnit(unittest.TestCase):
             _ = bi1.iter_select(None)
 
         with self.assertRaises(TypeError):
-            _ = bi1.iter_select(np.array(["a", "b"]))
+            _ = bi1.iter_select(np.array(['a', 'b']))
 
         with self.assertRaises(TypeError):
             _ = bi1.iter_select(np.arange(4).reshape(2, 2))
@@ -405,7 +405,7 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(4).reshape(2, 2))
 
         with self.assertRaises(TypeError):
-            _ = list(bi1.iter_select([0, 3, "b"]))
+            _ = list(bi1.iter_select([0, 3, 'b']))
 
     # ---------------------------------------------------------------------------
     def test_block_index_iter_select_slice_a(self) -> None:
@@ -553,7 +553,7 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(10).reshape(2, 5))
 
         with self.assertRaises(TypeError):
-            _ = list(bi1.iter_select(["b", "c"]))
+            _ = list(bi1.iter_select(['b', 'c']))
 
     def test_block_index_iter_select_sequence_d(self) -> None:
         bi1 = BlockIndex()
@@ -599,12 +599,8 @@ class TestUnit(unittest.TestCase):
             list(bi1.iter_contiguous([0, 1, 6, 7])),
             [(0, slice(0, 2, None)), (0, slice(6, 8, None))],
         )
-        self.assertEqual(
-            list(bi1.iter_contiguous(slice(None))), [(0, slice(0, 8, None))]
-        )
-        self.assertEqual(
-            list(bi1.iter_contiguous(slice(1, 6))), [(0, slice(1, 6, None))]
-        )
+        self.assertEqual(list(bi1.iter_contiguous(slice(None))), [(0, slice(0, 8, None))])
+        self.assertEqual(list(bi1.iter_contiguous(slice(1, 6))), [(0, slice(1, 6, None))])
         self.assertEqual(
             list(bi1.iter_contiguous(slice(0, 8, 3))),
             [(0, slice(0, 1, None)), (0, slice(3, 4, None)), (0, slice(6, 7, None))],
@@ -739,7 +735,7 @@ class TestUnit(unittest.TestCase):
         bi1.register(np.arange(4).reshape(2, 2))
 
         with self.assertRaises(TypeError):
-            _ = list(bi1.iter_contiguous("a"))
+            _ = list(bi1.iter_contiguous('a'))
 
     def test_block_index_iter_contiguous_h1(self) -> None:
         bi1 = BlockIndex()
@@ -801,9 +797,7 @@ class TestUnit(unittest.TestCase):
 
         slc = slice(None)
         self.assertEqual(list(bi1.iter_block()), [(0, slc), (1, slc), (2, slc)])
-        self.assertEqual(
-            list(reversed(bi1.iter_block())), [(2, slc), (1, slc), (0, slc)]
-        )
+        self.assertEqual(list(reversed(bi1.iter_block())), [(2, slc), (1, slc), (0, slc)])
 
     def test_block_index_iter_block_b(self) -> None:
         bi1 = BlockIndex()

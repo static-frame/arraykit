@@ -54,63 +54,63 @@ def is_space(c: str) -> bool:
 
 
 def is_sign(c: str) -> bool:
-    return c == "+" or c == "-"
+    return c == '+' or c == '-'
 
 
 def is_paren_open(c: str) -> bool:
-    return c == "("
+    return c == '('
 
 
 def is_paren_close(c: str) -> bool:
-    return c == ")"
+    return c == ')'
 
 
 def is_decimal(c: str) -> bool:
-    return c == "."
+    return c == '.'
 
 
 def is_a(c: str) -> bool:
-    return c == "a" or c == "A"
+    return c == 'a' or c == 'A'
 
 
 def is_e(c: str) -> bool:
-    return c == "e" or c == "E"
+    return c == 'e' or c == 'E'
 
 
 def is_f(c: str) -> bool:
-    return c == "f" or c == "F"
+    return c == 'f' or c == 'F'
 
 
 def is_i(c: str) -> bool:
-    return c == "i" or c == "I"
+    return c == 'i' or c == 'I'
 
 
 def is_j(c: str) -> bool:
-    return c == "j" or c == "J"
+    return c == 'j' or c == 'J'
 
 
 def is_l(c: str) -> bool:
-    return c == "l" or c == "L"
+    return c == 'l' or c == 'L'
 
 
 def is_n(c: str) -> bool:
-    return c == "n" or c == "N"
+    return c == 'n' or c == 'N'
 
 
 def is_r(c: str) -> bool:
-    return c == "r" or c == "R"
+    return c == 'r' or c == 'R'
 
 
 def is_s(c: str) -> bool:
-    return c == "s" or c == "S"
+    return c == 's' or c == 'S'
 
 
 def is_t(c: str) -> bool:
-    return c == "t" or c == "T"
+    return c == 't' or c == 'T'
 
 
 def is_u(c: str) -> bool:
-    return c == "u" or c == "U"
+    return c == 'u' or c == 'U'
 
 
 class TypeResolved(Enum):
@@ -123,7 +123,7 @@ class TypeResolved(Enum):
     IS_EMPTY = 7
 
     @classmethod
-    def resolve(cls, previous: "TypeResolved", new: "TypeResolved") -> None:
+    def resolve(cls, previous: 'TypeResolved', new: 'TypeResolved') -> None:
         if new is cls.IS_UNKNOWN:
             return cls.IS_STRING
 
@@ -512,94 +512,94 @@ class TypeField:
 
 class TestUnit(unittest.TestCase):
     def test_bool_a(self) -> None:
-        self.assertEqual(TypeField().process_field("   true"), TypeResolved.IS_BOOL)
-        self.assertEqual(TypeField().process_field("FALSE"), TypeResolved.IS_BOOL)
-        self.assertEqual(TypeField().process_field("FaLSE   "), TypeResolved.IS_BOOL)
+        self.assertEqual(TypeField().process_field('   true'), TypeResolved.IS_BOOL)
+        self.assertEqual(TypeField().process_field('FALSE'), TypeResolved.IS_BOOL)
+        self.assertEqual(TypeField().process_field('FaLSE   '), TypeResolved.IS_BOOL)
 
-        self.assertEqual(TypeField().process_field("  tals  "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("FALSEblah"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("   true f"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("   true3"), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('  tals  '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('FALSEblah'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('   true f'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('   true3'), TypeResolved.IS_STRING)
 
     def test_bool_b(self) -> None:
-        self.assertEqual(TypeField().process_field("   true +"), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('   true +'), TypeResolved.IS_STRING)
 
     def test_str_a(self) -> None:
-        self.assertEqual(TypeField().process_field("+++"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("   ee   "), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('+++'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('   ee   '), TypeResolved.IS_STRING)
 
     @given(st.integers())
     def test_int_property(self, v) -> None:
         self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_INT)
 
     def test_int_a(self) -> None:
-        self.assertEqual(TypeField().process_field(" 3"), TypeResolved.IS_INT)
-        self.assertEqual(TypeField().process_field("3 "), TypeResolved.IS_INT)
-        self.assertEqual(TypeField().process_field("  +3 "), TypeResolved.IS_INT)
-        self.assertEqual(TypeField().process_field("+599w"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("k599"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("59 4"), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' 3'), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_field('3 '), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_field('  +3 '), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_field('+599w'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('k599'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('59 4'), TypeResolved.IS_STRING)
 
-        self.assertEqual(TypeField().process_field("153"), TypeResolved.IS_INT)
-        self.assertEqual(TypeField().process_field("  153  "), TypeResolved.IS_INT)
-        self.assertEqual(TypeField().process_field("  15 3"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("5 3"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field(" 5 3 "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("  5 3 "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("  5  3 "), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('153'), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_field('  153  '), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_field('  15 3'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('5 3'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' 5 3 '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('  5 3 '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('  5  3 '), TypeResolved.IS_STRING)
 
     @given(st.floats())
     def test_float_property(self, v) -> None:
         self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_FLOAT)
 
     def test_float_a(self) -> None:
-        self.assertEqual(TypeField().process_field(" .3"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("3. "), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field(" 2343. "), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field(" 2343.9 "), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' .3'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('3. '), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' 2343. '), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' 2343.9 '), TypeResolved.IS_FLOAT)
 
-        self.assertEqual(TypeField().process_field(" 23t3.9 "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field(" 233.9!"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("4.3.5"), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' 23t3.9 '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' 233.9!'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('4.3.5'), TypeResolved.IS_STRING)
 
     def test_float_b(self) -> None:
-        self.assertEqual(TypeField().process_field(" 4e3"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("4E3 "), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' 4e3'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('4E3 '), TypeResolved.IS_FLOAT)
 
-        self.assertEqual(TypeField().process_field(" 4e3e"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("4e3   e"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("e99   "), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' 4e3e'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('4e3   e'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('e99   '), TypeResolved.IS_STRING)
 
     def test_float_c(self) -> None:
-        self.assertEqual(TypeField().process_field("  .  "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field(".."), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("e+j."), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('  .  '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('..'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('e+j.'), TypeResolved.IS_STRING)
 
     def test_float_d(self) -> None:
-        self.assertEqual(TypeField().process_field("  nan"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("NaN   "), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('  nan'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('NaN   '), TypeResolved.IS_FLOAT)
 
-        self.assertEqual(TypeField().process_field("NaN3   "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field(" N an   "), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('NaN3   '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' N an   '), TypeResolved.IS_STRING)
 
     def test_float_e(self) -> None:
-        self.assertEqual(TypeField().process_field("-inf"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("inf"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("INF   "), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field(" +InF   "), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('-inf'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('inf'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('INF   '), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' +InF   '), TypeResolved.IS_FLOAT)
 
     def test_float_f(self) -> None:
-        self.assertEqual(TypeField().process_field("-nan"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("nan"), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field("nan   "), TypeResolved.IS_FLOAT)
-        self.assertEqual(TypeField().process_field(" +nan   "), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('-nan'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('nan'), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('nan   '), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field(' +nan   '), TypeResolved.IS_FLOAT)
 
     def test_float_g(self) -> None:
-        self.assertEqual(TypeField().process_field("8.++"), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('8.++'), TypeResolved.IS_STRING)
 
     def test_float_known_false_positive(self) -> None:
         # NOTE: we mark this as float because we do not observe that a number must follow e; assume this will fail in float conversion
-        self.assertEqual(TypeField().process_field("8e"), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_field('8e'), TypeResolved.IS_FLOAT)
 
     @given(st.complex_numbers())
     def test_complex_property(self, v) -> None:
@@ -607,171 +607,139 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(TypeField().process_field(str(v)), TypeResolved.IS_COMPLEX)
 
     def test_complex_a(self) -> None:
-        self.assertEqual(TypeField().process_field("23j  "), TypeResolved.IS_COMPLEX)
-        self.assertEqual(TypeField().process_field(" 4e3j"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('23j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' 4e3j'), TypeResolved.IS_COMPLEX)
 
-        self.assertEqual(TypeField().process_field(" 4e3jw"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field(" J4e3j"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("-4.3+3j"), TypeResolved.IS_COMPLEX)
-        self.assertEqual(TypeField().process_field(" j4e3"), TypeResolved.IS_STRING)
-        self.assertEqual(
-            TypeField().process_field("j11111    "), TypeResolved.IS_STRING
-        )
+        self.assertEqual(TypeField().process_field(' 4e3jw'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' J4e3j'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('-4.3+3j'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' j4e3'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('j11111    '), TypeResolved.IS_STRING)
 
     def test_complex_b(self) -> None:
+        self.assertEqual(TypeField().process_field('2.3-3.5j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('+23-35j  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('+23-3.5j  '), TypeResolved.IS_COMPLEX)
         self.assertEqual(
-            TypeField().process_field("2.3-3.5j  "), TypeResolved.IS_COMPLEX
-        )
-        self.assertEqual(
-            TypeField().process_field("+23-35j  "), TypeResolved.IS_COMPLEX
-        )
-        self.assertEqual(
-            TypeField().process_field("+23-3.5j  "), TypeResolved.IS_COMPLEX
-        )
-        self.assertEqual(
-            TypeField().process_field("-3e-10-3e-2j"), TypeResolved.IS_COMPLEX
+            TypeField().process_field('-3e-10-3e-2j'), TypeResolved.IS_COMPLEX
         )
 
-        self.assertEqual(
-            TypeField().process_field("+23-3.5j  +"), TypeResolved.IS_STRING
-        )
+        self.assertEqual(TypeField().process_field('+23-3.5j  +'), TypeResolved.IS_STRING)
 
     def test_complex_c(self) -> None:
-        self.assertEqual(
-            TypeField().process_field(" (23+3j) "), TypeResolved.IS_COMPLEX
-        )
-        self.assertEqual(
-            TypeField().process_field("(4e3-4.5j)"), TypeResolved.IS_COMPLEX
-        )
-        self.assertEqual(TypeField().process_field("(4.3)"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' (23+3j) '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('(4e3-4.5j)'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('(4.3)'), TypeResolved.IS_COMPLEX)
 
-        self.assertEqual(
-            TypeField().process_field(" (23+3j)) "), TypeResolved.IS_STRING
-        )
-        self.assertEqual(TypeField().process_field(" (((23+3j"), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field(" 2(3+3j) "), TypeResolved.IS_STRING)
-        self.assertEqual(TypeField().process_field("(23+)3j "), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' (23+3j)) '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' (((23+3j'), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field(' 2(3+3j) '), TypeResolved.IS_STRING)
+        self.assertEqual(TypeField().process_field('(23+)3j '), TypeResolved.IS_STRING)
 
     def test_complex_d(self) -> None:
-        self.assertEqual(TypeField().process_field(" infj"), TypeResolved.IS_COMPLEX)
-        self.assertEqual(TypeField().process_field(" -infj"), TypeResolved.IS_COMPLEX)
-        self.assertEqual(TypeField().process_field(" +infj"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' infj'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' -infj'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' +infj'), TypeResolved.IS_COMPLEX)
 
-        self.assertEqual(TypeField().process_field(" nanj"), TypeResolved.IS_COMPLEX)
-        self.assertEqual(TypeField().process_field(" -nanj  "), TypeResolved.IS_COMPLEX)
-        self.assertEqual(TypeField().process_field(" +nanj"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' nanj'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' -nanj  '), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' +nanj'), TypeResolved.IS_COMPLEX)
 
     def test_complex_e(self) -> None:
-        self.assertEqual(TypeField().process_field(" inf+0j"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' inf+0j'), TypeResolved.IS_COMPLEX)
 
     def test_complex_f(self) -> None:
-        self.assertEqual(
-            TypeField().process_field(" inf+nanj"), TypeResolved.IS_COMPLEX
-        )
+        self.assertEqual(TypeField().process_field(' inf+nanj'), TypeResolved.IS_COMPLEX)
 
     def test_complex_g(self) -> None:
-        self.assertEqual(
-            TypeField().process_field(" inf-infj"), TypeResolved.IS_COMPLEX
-        )
+        self.assertEqual(TypeField().process_field(' inf-infj'), TypeResolved.IS_COMPLEX)
 
     def test_complex_h(self) -> None:
-        self.assertEqual(TypeField().process_field(" -0+infj"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field(' -0+infj'), TypeResolved.IS_COMPLEX)
 
     def test_complex_i(self) -> None:
-        self.assertEqual(TypeField().process_field("(inf+0j)"), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('(inf+0j)'), TypeResolved.IS_COMPLEX)
 
     def test_complex_j1(self) -> None:
-        self.assertEqual(
-            TypeField().process_field("(-0+infj)"), TypeResolved.IS_COMPLEX
-        )
+        self.assertEqual(TypeField().process_field('(-0+infj)'), TypeResolved.IS_COMPLEX)
 
     def test_complex_j2(self) -> None:
-        self.assertEqual(
-            TypeField().process_field("(-23e-10e)"), TypeResolved.IS_STRING
-        )
+        self.assertEqual(TypeField().process_field('(-23e-10e)'), TypeResolved.IS_STRING)
 
     def test_complex_k(self) -> None:
         self.assertEqual(
-            TypeField().process_field("(-23e-10j-34e-2)"), TypeResolved.IS_COMPLEX
+            TypeField().process_field('(-23e-10j-34e-2)'), TypeResolved.IS_COMPLEX
         )
         self.assertEqual(
-            TypeField().process_field("(-23e-10j-34e-2+)"), TypeResolved.IS_STRING
+            TypeField().process_field('(-23e-10j-34e-2+)'), TypeResolved.IS_STRING
         )
 
     def test_complex_known_false_positive(self) -> None:
         # NOTE: genfromtxt identifies this as string as j component is in first position
-        self.assertEqual(TypeField().process_field("23j-43"), TypeResolved.IS_COMPLEX)
-        self.assertEqual(
-            TypeField().process_field("+23-3.5j3"), TypeResolved.IS_COMPLEX
-        )
+        self.assertEqual(TypeField().process_field('23j-43'), TypeResolved.IS_COMPLEX)
+        self.assertEqual(TypeField().process_field('+23-3.5j3'), TypeResolved.IS_COMPLEX)
 
     def test_line_a(self) -> None:
         self.assertEqual(
-            TypeField().process_line(("25", "2.5", "")), TypeResolved.IS_FLOAT
+            TypeField().process_line(('25', '2.5', '')), TypeResolved.IS_FLOAT
         )
         self.assertEqual(
-            TypeField().process_line((" .1", "2.5", "")), TypeResolved.IS_FLOAT
+            TypeField().process_line((' .1', '2.5', '')), TypeResolved.IS_FLOAT
         )
-        self.assertEqual(TypeField().process_line(("25", "", "")), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_line(('25', '', '')), TypeResolved.IS_INT)
 
         self.assertEqual(
-            TypeField().process_line(("25", "2.5", "e")), TypeResolved.IS_STRING
+            TypeField().process_line(('25', '2.5', 'e')), TypeResolved.IS_STRING
         )
 
     def test_line_b(self) -> None:
         self.assertEqual(
-            TypeField().process_line(("  true", "  false", "FALSE")),
+            TypeField().process_line(('  true', '  false', 'FALSE')),
             TypeResolved.IS_BOOL,
         )
         self.assertEqual(
-            TypeField().process_line(("  true", "  false", "FALSEq")),
+            TypeField().process_line(('  true', '  false', 'FALSEq')),
             TypeResolved.IS_STRING,
         )
 
     def test_line_c(self) -> None:
-        self.assertEqual(TypeField().process_line(("3", "", "4")), TypeResolved.IS_INT)
+        self.assertEqual(TypeField().process_line(('3', '', '4')), TypeResolved.IS_INT)
 
-        self.assertEqual(
-            TypeField().process_line(("3", "", "4e")), TypeResolved.IS_FLOAT
-        )
-        self.assertEqual(
-            TypeField().process_line(("3", "", ".")), TypeResolved.IS_STRING
-        )
+        self.assertEqual(TypeField().process_line(('3', '', '4e')), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_line(('3', '', '.')), TypeResolved.IS_STRING)
 
-        self.assertEqual(TypeField().process_line(("", "", "")), TypeResolved.IS_FLOAT)
+        self.assertEqual(TypeField().process_line(('', '', '')), TypeResolved.IS_FLOAT)
 
     def test_line_d(self) -> None:
+        self.assertEqual(TypeField().process_line(('3', '', '4.')), TypeResolved.IS_FLOAT)
         self.assertEqual(
-            TypeField().process_line(("3", "", "4.")), TypeResolved.IS_FLOAT
+            TypeField().process_line(('3', '', '4e3')), TypeResolved.IS_FLOAT
         )
         self.assertEqual(
-            TypeField().process_line(("3", "", "4e3")), TypeResolved.IS_FLOAT
-        )
-        self.assertEqual(
-            TypeField().process_line(("3", "", "(4e3)")), TypeResolved.IS_COMPLEX
+            TypeField().process_line(('3', '', '(4e3)')), TypeResolved.IS_COMPLEX
         )
 
         self.assertEqual(
-            TypeField().process_line(("3", "", "(4e3)", "True")), TypeResolved.IS_STRING
+            TypeField().process_line(('3', '', '(4e3)', 'True')), TypeResolved.IS_STRING
         )
 
     def test_line_e(self) -> None:
         self.assertEqual(
-            TypeField().process_line(("foo", "", "", "bar")), TypeResolved.IS_STRING
+            TypeField().process_line(('foo', '', '', 'bar')), TypeResolved.IS_STRING
         )
 
         self.assertEqual(
-            TypeField().process_line(("", "", "", "bar")), TypeResolved.IS_STRING
+            TypeField().process_line(('', '', '', 'bar')), TypeResolved.IS_STRING
         )
 
     def test_line_f(self) -> None:
         # EMPTY is treated as False
         self.assertEqual(
-            TypeField().process_line(("", "", "", "True")), TypeResolved.IS_BOOL
+            TypeField().process_line(('', '', '', 'True')), TypeResolved.IS_BOOL
         )
 
-        self.assertEqual(TypeField().process_line(("True", "")), TypeResolved.IS_BOOL)
+        self.assertEqual(TypeField().process_line(('True', '')), TypeResolved.IS_BOOL)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

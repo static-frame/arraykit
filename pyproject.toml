@@ -54,3 +54,23 @@ arraykit = ["__init__.pyi", "py.typed"]
 [tool.setuptools.dynamic]
 version = { file = "VERSION" }
 
+[tool.ruff]
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+]
+
+line-length = 90
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

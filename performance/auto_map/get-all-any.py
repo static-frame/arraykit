@@ -42,7 +42,7 @@ from fixtures import (
 
 
 class MapProcessor:
-    NAME = ""
+    NAME = ''
     SORT = -1
 
     def __init__(self, pl: PayLoad):
@@ -54,7 +54,7 @@ class MapProcessor:
 
 # -------------------------------------------------------------------------------
 class ListCompAllScalar(MapProcessor):
-    NAME = "all: list comp, lookup by scalar"
+    NAME = 'all: list comp, lookup by scalar'
     SORT = 0
 
     def __call__(self):
@@ -72,7 +72,7 @@ class ListCompAllScalar(MapProcessor):
 
 
 class GetAllListScalar(MapProcessor):
-    NAME = "all: get all, lookup by scalar list"
+    NAME = 'all: get all, lookup by scalar list'
     SORT = 0
 
     def __call__(self):
@@ -81,7 +81,7 @@ class GetAllListScalar(MapProcessor):
 
 
 class GetAllArray(MapProcessor):
-    NAME = "all: get all, lookup by array"
+    NAME = 'all: get all, lookup by array'
     SORT = 0
 
     def __call__(self):
@@ -91,7 +91,7 @@ class GetAllArray(MapProcessor):
 
 # -------------------------------------------------------------------------------
 class ListCompAnyScalar(MapProcessor):
-    NAME = "any: list comp, lookup by scalar"
+    NAME = 'any: list comp, lookup by scalar'
     SORT = 0
 
     def __call__(self):
@@ -109,7 +109,7 @@ class ListCompAnyScalar(MapProcessor):
 
 
 class GetAnyListScalar(MapProcessor):
-    NAME = "any: get all, lookup by scalar list"
+    NAME = 'any: get all, lookup by scalar list'
     SORT = 0
 
     def __call__(self):
@@ -118,7 +118,7 @@ class GetAnyListScalar(MapProcessor):
 
 
 class GetAnyArray(MapProcessor):
-    NAME = "any: get all, lookup by array"
+    NAME = 'any: get all, lookup by array'
     SORT = 0
 
     def __call__(self):
@@ -132,7 +132,7 @@ class GetAnyArray(MapProcessor):
 def get_versions() -> str:
     import platform
 
-    return f"OS: {platform.system()} / ArrayMap: {arraymap.__version__} / NumPy: {np.__version__}\n"
+    return f'OS: {platform.system()} / ArrayMap: {arraymap.__version__} / NumPy: {np.__version__}\n'
 
 
 CLS_FF = (
@@ -157,51 +157,51 @@ from itertools import product
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
     if seconds < 1e-4:
-        return f"{seconds * 1e6: .1f} (µs)"
+        return f'{seconds * 1e6: .1f} (µs)'
     if seconds < 1e-1:
-        return f"{seconds * 1e3: .1f} (ms)"
-    return f"{seconds: .1f} (s)"
+        return f'{seconds * 1e3: .1f} (ms)'
+    return f'{seconds: .1f} (s)'
 
 
-def plot_performance(frame, suffix: str = ""):
-    fixture_total = len(frame["fixture"].unique())
-    cat_total = len(frame["size"].unique())
-    processor_total = len(frame["cls_processor"].unique())
+def plot_performance(frame, suffix: str = ''):
+    fixture_total = len(frame['fixture'].unique())
+    cat_total = len(frame['size'].unique())
+    processor_total = len(frame['cls_processor'].unique())
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap('plasma')
     color = cmap(np.arange(processor_total) / processor_total)
 
     # category is the size of the array
-    for cat_count, (cat_label, cat) in enumerate(frame.groupby("size")):
+    for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
         # fixture is the data type fixture
-        fixture_data = {fix_label: fix for fix_label, fix in cat.groupby("fixture")}
+        fixture_data = {fix_label: fix for fix_label, fix in cat.groupby('fixture')}
         for fixture_count, fixture_label in enumerate(FF_ORDER):
             fixture = fixture_data[fixture_label]
             ax = axes[cat_count][fixture_count]
 
             # set order by cls_processor, i.e., the type of test being done
-            fixture["sort"] = [f.SORT for f in fixture["cls_processor"]]
-            fixture = fixture.sort_values("sort")
+            fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
+            fixture = fixture.sort_values('sort')
 
-            results = fixture["time"].values.tolist()
-            names = [cls.NAME for cls in fixture["cls_processor"]]
+            results = fixture['time'].values.tolist()
+            names = [cls.NAME for cls in fixture['cls_processor']]
             # x = np.arange(len(results))
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
             # density, position = fixture_label.split('-')
             # cat_label is the size of the array
-            title = f"{cat_label:.0e}\n{fixture_label}"
+            title = f'{cat_label:.0e}\n{fixture_label}'
 
             ax.set_title(title, fontsize=6)
             ax.set_box_aspect(0.8)
-            time_max = fixture["time"].max()
-            time_min = fixture["time"].min()
+            time_max = fixture['time'].max()
+            time_min = fixture['time'].min()
             y_ticks = [0, time_min, time_max * 0.5, time_max]
             y_labels = [
-                "",
+                '',
                 seconds_to_display(time_min),
                 seconds_to_display(time_max * 0.5),
                 seconds_to_display(time_max),
@@ -215,24 +215,24 @@ def plot_performance(frame, suffix: str = ""):
             ax.set_yticklabels(y_labels, fontsize=4)
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
-                axis="x",
+                axis='x',
                 bottom=False,
                 labelbottom=False,
             )
             ax.tick_params(
-                axis="y",
+                axis='y',
                 length=2,
                 width=0.5,
                 pad=1,
             )
 
     fig.set_size_inches(9, 4)  # width, height
-    fig.legend(post, names_display, loc="center right", fontsize=6)
+    fig.legend(post, names_display, loc='center right', fontsize=6)
     # horizontal, vertical
-    fig.text(0.05, 0.96, f"AutoMap {suffix.title()}: {NUMBER} Iterations", fontsize=10)
+    fig.text(0.05, 0.96, f'AutoMap {suffix.title()}: {NUMBER} Iterations', fontsize=10)
     fig.text(0.05, 0.90, get_versions(), fontsize=6)
 
-    fp = f"/tmp/arraymap-{suffix}.png"
+    fp = f'/tmp/arraymap-{suffix}.png'
     plt.subplots_adjust(
         left=0.075,
         bottom=0.05,
@@ -245,10 +245,10 @@ def plot_performance(frame, suffix: str = ""):
     print(fp)
     plt.savefig(fp, dpi=300)
 
-    if sys.platform.startswith("linux"):
-        os.system(f"eog {fp}&")
+    if sys.platform.startswith('linux'):
+        os.system(f'eog {fp}&')
     else:
-        os.system(f"open {fp}")
+        os.system(f'open {fp}')
 
 
 def run_test(processors, suffix):
@@ -262,7 +262,7 @@ def run_test(processors, suffix):
                 record = [cls, NUMBER, fixture_label, size]
                 print(record)
                 try:
-                    result = timeit.timeit(f"runner()", globals=locals(), number=NUMBER)
+                    result = timeit.timeit(f'runner()', globals=locals(), number=NUMBER)
                 except OSError:
                     result = np.nan
                 finally:
@@ -271,13 +271,13 @@ def run_test(processors, suffix):
                 records.append(record)
 
     f = pd.DataFrame.from_records(
-        records, columns=("cls_processor", "number", "fixture", "size", "time")
+        records, columns=('cls_processor', 'number', 'fixture', 'size', 'time')
     )
     print(f)
     plot_performance(f, suffix)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     cls_instantiate = (
         ListCompAllScalar,
         # GetAllListObj,
@@ -289,4 +289,4 @@ if __name__ == "__main__":
         GetAnyArray,
     )
 
-    run_test(cls_instantiate, "get-all-any")
+    run_test(cls_instantiate, 'get-all-any')

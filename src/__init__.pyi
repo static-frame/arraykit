@@ -3,7 +3,7 @@ import datetime
 
 import numpy as np  # type: ignore
 
-_T = tp.TypeVar("_T")
+_T = tp.TypeVar('_T')
 
 __version__: str
 
@@ -23,7 +23,7 @@ _TLabel = tp.Union[
     np.timedelta64,
     datetime.date,
     datetime.datetime,
-    tp.Tuple["_TLabel", ...],
+    tp.Tuple['_TLabel', ...],
 ]
 
 class ErrorInitTypeBlocks(RuntimeError):
@@ -85,7 +85,7 @@ class BlockIndex:
         row_count: int = -1,
         bir_count: int = 0,
         bir_capacity: int = 8,
-        bir_bytes: bytes = b"",
+        bir_bytes: bytes = b'',
         dtype: np.dtype = None,
     ) -> None: ...
     def register(self, __value: np.ndarray) -> bool: ...
@@ -97,7 +97,7 @@ class BlockIndex:
     ) -> bytes: ...
     def copy(
         self,
-    ) -> "BlockIndex": ...
+    ) -> 'BlockIndex': ...
     def __len__(
         self,
     ) -> int: ...
@@ -169,8 +169,8 @@ def iterable_str_to_array_1d(
     iterable: tp.Iterable[str],
     *,
     dtype: tp.Optional[tp.Any] = None,
-    thousandschar: str = ",",
-    decimalchar: str = ".",
+    thousandschar: str = ',',
+    decimalchar: str = '.',
 ) -> np.ndarray: ...
 def delimited_to_arrays(
     file_like: tp.Iterable[str],
@@ -178,23 +178,23 @@ def delimited_to_arrays(
     axis: int = 0,
     dtypes: tp.Optional[tp.Callable[[int], tp.Any]] = None,
     line_select: tp.Optional[tp.Callable[[int], bool]] = None,
-    delimiter: str = ",",
+    delimiter: str = ',',
     doublequote: bool = True,
-    escapechar: tp.Optional[str] = "",
+    escapechar: tp.Optional[str] = '',
     quotechar: tp.Optional[str] = '"',
     quoting: int = 0,
     skipinitialspace: bool = False,
     strict: bool = False,
-    thousandschar: str = ",",
-    decimalchar: str = ".",
+    thousandschar: str = ',',
+    decimalchar: str = '.',
 ) -> tp.List[np.array]: ...
 def split_after_count(
     string: str,
     *,
-    delimiter: str = ",",
+    delimiter: str = ',',
     count: int = 0,
     doublequote: bool = True,
-    escapechar: tp.Optional[str] = "",
+    escapechar: tp.Optional[str] = '',
     quotechar: tp.Optional[str] = '"',
     quoting: int = 0,
     strict: bool = False,

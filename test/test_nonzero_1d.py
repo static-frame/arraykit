@@ -19,7 +19,7 @@ class TestUnit(unittest.TestCase):
             nonzero_1d(np.array([0, 1]))
 
         with self.assertRaises(ValueError):
-            nonzero_1d(np.array(["a", "bbb"]))
+            nonzero_1d(np.array(['a', 'bbb']))
 
     def test_nonzero_1d_a5(self) -> None:
         with self.assertRaises(ValueError):
@@ -32,9 +32,7 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(
             nonzero_1d(np.array([False, True, False, True])).tolist(), [1, 3]
         )
-        self.assertEqual(
-            nonzero_1d(np.array([False, False, False, False])).tolist(), []
-        )
+        self.assertEqual(nonzero_1d(np.array([False, False, False, False])).tolist(), [])
 
     def test_nonzero_1d_b2(self) -> None:
         self.assertEqual(
