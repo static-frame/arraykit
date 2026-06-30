@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.4.0
+............
+
+Added ``write_array_to_file()``.
+
+
 1.3.1
 ............
 
