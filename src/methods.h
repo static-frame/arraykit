@@ -78,6 +78,9 @@ isna_element(PyObject *m, PyObject *args, PyObject *kwargs);
 PyObject *
 get_new_indexers_and_screen(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
+PyObject *
+write_array_to_file(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
+
 // Specialized array deepcopy that stores immutable arrays in an optional memo dict that can be provided with kwargs.
 PyObject *
 array_deepcopy(PyObject *m, PyObject *args, PyObject *kwargs);

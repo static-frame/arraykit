@@ -24,6 +24,7 @@ from ._arraykit import delimited_to_arrays as delimited_to_arrays
 from ._arraykit import iterable_str_to_array_1d as iterable_str_to_array_1d
 from ._arraykit import split_after_count as split_after_count
 from ._arraykit import get_new_indexers_and_screen as get_new_indexers_and_screen
+from ._arraykit import write_array_to_file as write_array_to_file
 from ._arraykit import count_iteration as count_iteration
 from ._arraykit import first_true_1d as first_true_1d
 from ._arraykit import first_true_2d as first_true_2d

@@ -9,6 +9,13 @@ AK_VERSION = Path('VERSION').read_text(encoding='utf-8').strip()
 
 def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
     dirs = []
+    # Check user site-packages
+    user_site = site.getusersitepackages()
+    if user_site:
+        fp = os.path.join(user_site, *components)
+        if os.path.exists(fp):
+            dirs.append(fp)
+    # Check system site-packages
     for sp in site.getsitepackages():
         fp = os.path.join(sp, *components)
         if os.path.exists(fp):

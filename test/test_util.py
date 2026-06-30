@@ -1,8 +1,11 @@
 import pytest
 import collections
 import datetime
+import os
+import tempfile
 import unittest
 import warnings
+from io import BytesIO
 from io import StringIO
 import numpy as np  # type: ignore
 # import pandas as pd # disable so as to compile 32 bit wheels for python 3.12
@@ -26,6 +29,7 @@ from arraykit import slice_to_ascending_slice
 from arraykit import slice_to_unit
 from arraykit import array_to_tuple_array
 from arraykit import array_to_tuple_iter
+from arraykit import write_array_to_file
 
 from performance.reference.util import (
     get_new_indexers_and_screen_ak as get_new_indexers_and_screen_full,
@@ -283,6 +287,160 @@ class TestUnit(unittest.TestCase):
         a1 = np.arange(10)
         with self.assertRaises(TypeError):
             a2 = array_deepcopy(a1, ())
+
+    # ---------------------------------------------------------------------------
+    def test_write_array_to_file_a(self) -> None:
+        a1 = np.arange(12).reshape(3, 4)
+        fp = BytesIO()
+        write_array_to_file(a1, fp, buffersize=2)
+
+        expected = b''.join(
+            chunk.tobytes('C')
+            for chunk in np.nditer(
+                a1,
+                flags=('external_loop', 'buffered', 'zerosize_ok'),
+                buffersize=2,
+                order='C',
+            )
+        )
+        self.assertEqual(fp.getvalue(), expected)
+
+    def test_write_array_to_file_b(self) -> None:
+        a1 = np.arange(12).reshape(3, 4).T
+        fp = BytesIO()
+        write_array_to_file(a1, fp, fortran_order=True, buffersize=2)
+
+        expected = b''.join(
+            chunk.tobytes('C')
+            for chunk in np.nditer(
+                a1,
+                flags=('external_loop', 'buffered', 'zerosize_ok'),
+                buffersize=2,
+                order='F',
+            )
+        )
+        self.assertEqual(fp.getvalue(), expected)
+
+    def test_write_array_to_file_c(self) -> None:
+        with self.assertRaises(ValueError):
+            write_array_to_file(np.arange(4), BytesIO(), buffersize=0)
+
+    def test_write_array_to_file_d(self) -> None:
+        a1 = np.arange(4, dtype=np.int64)
+        fp = BytesIO()
+        write_array_to_file(a1, fp)
+        self.assertEqual(fp.getvalue(), a1.tobytes())
+
+    def test_write_array_to_file_e(self) -> None:
+        a1 = np.arange(10, dtype=np.int16)[::2]
+        fp = BytesIO()
+        write_array_to_file(a1, fp, buffersize=3)
+        self.assertEqual(fp.getvalue(), a1.tobytes('C'))
+
+    def test_write_array_to_file_f(self) -> None:
+        a1 = np.empty(5, dtype=np.dtype('V0'))
+        fp = BytesIO()
+        write_array_to_file(a1, fp)
+        self.assertEqual(fp.getvalue(), b'')
+
+    # ---------------------------------------------------------------------------
+    # fd fast-path tests (real files expose fileno(), so these exercise the
+    # direct file-descriptor write path rather than the Python write() fallback)
+
+    def test_write_array_to_file_fd_a(self) -> None:
+        # basic 1d C-contiguous array to a real (buffered) file
+        a1 = np.arange(20, dtype=np.int64)
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'a.bin')
+            with open(fp, 'wb') as f:
+                write_array_to_file(a1, f)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), a1.tobytes())
+
+    def test_write_array_to_file_fd_b(self) -> None:
+        # 2d array, C order, small buffersize forces multiple chunks
+        a1 = np.arange(12).reshape(3, 4)
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'b.bin')
+            with open(fp, 'wb') as f:
+                write_array_to_file(a1, f, buffersize=2)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), a1.tobytes('C'))
+
+    def test_write_array_to_file_fd_c(self) -> None:
+        # 2d fortran-ordered array written in fortran order
+        a1 = np.arange(12).reshape(3, 4).T
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'c.bin')
+            with open(fp, 'wb') as f:
+                write_array_to_file(a1, f, fortran_order=True, buffersize=2)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), a1.tobytes('F'))
+
+    def test_write_array_to_file_fd_d(self) -> None:
+        # non-contiguous array (strided view) exercises the packing path
+        a1 = np.arange(10, dtype=np.int16)[::2]
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'd.bin')
+            with open(fp, 'wb') as f:
+                write_array_to_file(a1, f, buffersize=3)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), a1.tobytes('C'))
+
+    def test_write_array_to_file_fd_flush(self) -> None:
+        # regression: a Python-level buffered write before the fd write must be
+        # preserved. Without an internal flush, the array bytes would be written
+        # at the kernel offset ahead of the still-buffered header, corrupting
+        # the file.
+        a1 = np.arange(8, dtype=np.int64)
+        header = b'HEADER-DATA'
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'flush.bin')
+            with open(fp, 'wb') as f:
+                f.write(header)
+                write_array_to_file(a1, f)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), header + a1.tobytes())
+
+    def test_write_array_to_file_fd_interleave(self) -> None:
+        # multiple array writes interleaved with Python writes stay ordered
+        a1 = np.arange(4, dtype=np.int32)
+        a2 = np.arange(4, 8, dtype=np.int32)
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'inter.bin')
+            with open(fp, 'wb') as f:
+                f.write(b'<')
+                write_array_to_file(a1, f)
+                f.write(b'|')
+                write_array_to_file(a2, f)
+                f.write(b'>')
+            with open(fp, 'rb') as f:
+                self.assertEqual(
+                    f.read(), b'<' + a1.tobytes() + b'|' + a2.tobytes() + b'>'
+                )
+
+    def test_write_array_to_file_fd_raw_fd(self) -> None:
+        # an os.open integer fd (no .flush) must still work
+        a1 = np.arange(6, dtype=np.float64)
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'raw.bin')
+            fd = os.open(fp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+            try:
+                write_array_to_file(a1, fd)
+            finally:
+                os.close(fd)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), a1.tobytes())
+
+    def test_write_array_to_file_fd_empty(self) -> None:
+        # zero-size array to a real file produces an empty file
+        a1 = np.array([], dtype=np.int64)
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, 'empty.bin')
+            with open(fp, 'wb') as f:
+                write_array_to_file(a1, f)
+            with open(fp, 'rb') as f:
+                self.assertEqual(f.read(), b'')
 
     # ---------------------------------------------------------------------------
     def test_array_to_tuple_array_1d_a(self) -> None:

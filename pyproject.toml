@@ -19,7 +19,7 @@ authors = [
   { name = "Brandt Bucher" },
   { name = "Charles Burkland" },
 ]
-license = "MIT"
+license = { text = "MIT" }
 keywords = ["numpy", "array"]
 dependencies = [
   "numpy>=1.24.3",
