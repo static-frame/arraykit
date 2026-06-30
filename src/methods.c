@@ -422,7 +422,13 @@ AK_fill_transition_slices_1d(PyArrayObject* working, npy_intp size, PyObject* sl
     npy_intp stride = PyArray_STRIDE(working, 0);
     npy_intp itemsize = PyArray_ITEMSIZE(working);
 
-    if (stride == itemsize) {
+    // stride == itemsize proves the data is packed, but the typed fast-path
+    // below casts `base` to a concrete C type and dereferences v[i] directly,
+    // which is undefined behavior on a misaligned buffer (and can SIGBUS on
+    // strict-alignment platforms). Contiguity and alignment are independent in
+    // numpy, so require PyArray_ISALIGNED explicitly; anything unaligned falls
+    // through to the memcpy/memcmp-based generic scan, which is alignment-safe.
+    if (stride == itemsize && PyArray_ISALIGNED(working)) {
         switch (PyArray_TYPE(working)) {
             case NPY_DOUBLE: {
                 // == honors IEEE semantics: NaN != NaN, +0.0 == -0.0

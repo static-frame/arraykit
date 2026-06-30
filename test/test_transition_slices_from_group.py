@@ -28,6 +28,35 @@ class TestUnit(unittest.TestCase):
             [(0, 2, None), (2, 4, None), (4, None, None)],
         )
 
+    def test_transition_slices_from_group_1d_unaligned(self) -> None:
+        # A contiguous (stride == itemsize) but *unaligned* buffer must not take
+        # the typed fast-path, whose pointer-cast dereferences are UB on
+        # misaligned data; it should fall through to the alignment-safe scan and
+        # still produce results identical to an aligned copy.
+        def make_unaligned(values, dtype):
+            dt = np.dtype(dtype)
+            n = len(values)
+            raw = np.empty(n * dt.itemsize + dt.itemsize, dtype=np.uint8)
+            # view starting one byte in -> contiguous but misaligned
+            a = raw[1 : 1 + n * dt.itemsize].view(dt)
+            a[:] = values
+            return a
+
+        for dtype, values in (
+            (np.float64, [1.0, 1.0, 2.0, 2.0, 2.0, 3.0]),
+            (np.int64, [10, 10, 10, 20, 20, 30]),
+            (np.int32, [5, 5, 6, 7, 7]),
+        ):
+            a = make_unaligned(values, dtype)
+            self.assertTrue(a.flags.c_contiguous)
+            self.assertFalse(a.flags.aligned)
+            ref = np.array(values, dtype=dtype)  # fresh, aligned
+
+            slices, group_to_tuple = transition_slices_from_group(a)
+            ref_slices, _ = transition_slices_from_group(ref)
+            self.assertFalse(group_to_tuple)
+            self.assertEqual(slices_to_pairs(slices), slices_to_pairs(ref_slices))
+
     def test_transition_slices_from_group_2d_a(self) -> None:
         group = np.array(
             [
