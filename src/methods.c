@@ -253,6 +253,10 @@ nonzero_1d(PyObject *Py_UNUSED(m), PyObject *a) {
     return AK_nonzero_1d(array);
 }
 
+//------------------------------------------------------------------------------
+// transition_slices_from_group
+
+// Returns -1 on error
 static inline int
 AK_append_transition_slice(PyObject* slices, npy_intp start, npy_intp stop)
 {
@@ -280,7 +284,7 @@ AK_append_transition_slice(PyObject* slices, npy_intp start, npy_intp stop)
     if (!slc) {
         return -1;
     }
-    int append_result = PyList_Append(slices, slc);
+    int append_result = PyList_Append(slices, slc); // -1 on error
     Py_DECREF(slc);
     return append_result;
 }
@@ -313,13 +317,13 @@ AK_values_not_equal_1d(PyArrayObject* array, npy_intp left, npy_intp right)
         // Floats need IEEE semantics, which a byte compare would get wrong for
         // NaN (distinct bits compare equal under ==) and signed zero.
         case NPY_FLOAT: {
-            float a, b;
+            npy_float a, b;
             memcpy(&a, p_left, sizeof a);
             memcpy(&b, p_right, sizeof b);
             return a != b;
         }
         case NPY_DOUBLE: {
-            double a, b;
+            npy_double a, b;
             memcpy(&a, p_left, sizeof a);
             memcpy(&b, p_right, sizeof b);
             return a != b;
@@ -432,12 +436,12 @@ AK_fill_transition_slices_1d(PyArrayObject* working, npy_intp size, PyObject* sl
         switch (PyArray_TYPE(working)) {
             case NPY_DOUBLE: {
                 // == honors IEEE semantics: NaN != NaN, +0.0 == -0.0
-                const double* v = (const double*)base;
+                const npy_double* v = (const npy_double*)base;
                 AK_SCAN_TRANSITIONS(v[i] == v[i - 1]);
                 goto finalize;
             }
             case NPY_FLOAT: {
-                const float* v = (const float*)base;
+                const npy_float* v = (const npy_float*)base;
                 AK_SCAN_TRANSITIONS(v[i] == v[i - 1]);
                 goto finalize;
             }
@@ -585,6 +589,8 @@ transition_slices_from_group(PyObject *Py_UNUSED(m), PyObject *a)
     return result;
 }
 
+
+//------------------------------------------------------------------------------
 PyObject*
 is_objectable_dt64(PyObject *m, PyObject *a) {
     AK_CHECK_NUMPY_ARRAY(a);
