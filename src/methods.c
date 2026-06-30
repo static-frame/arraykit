@@ -460,6 +460,34 @@ AK_fill_transition_slices_1d(PyArrayObject* working, npy_intp size, PyObject* sl
                 }
                 break;
             }
+            case NPY_OBJECT: {
+                // Read the stored PyObject* directly (borrowed, GIL held) and
+                // rich-compare, skipping PyArray_GETITEM dispatch and refcount
+                // churn. The compare can error, so this can't use the macro.
+                PyObject** v = (PyObject**)base;
+                npy_intp i = 1;
+                while (i < size) {
+                    while (i < size) {
+                        int eq = PyObject_RichCompareBool(v[i], v[i - 1], Py_EQ);
+                        if (eq < 0) {
+                            return -1;
+                        }
+                        if (!eq) {
+                            break;
+                        }
+                        ++i;
+                    }
+                    if (i >= size) {
+                        break;
+                    }
+                    if (AK_append_transition_slice(slices, start, i)) {
+                        return -1;
+                    }
+                    start = i;
+                    ++i;
+                }
+                goto finalize;
+            }
             default:
                 break;
         }
