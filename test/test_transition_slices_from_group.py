@@ -10,7 +10,6 @@ def slices_to_pairs(slices):
 
 
 class TestUnit(unittest.TestCase):
-
     def test_transition_slices_from_group_1d_a(self) -> None:
         group = np.array([10, 10, 10, 20, 20, 30])
         slices, group_to_tuple = transition_slices_from_group(group)
@@ -21,7 +20,7 @@ class TestUnit(unittest.TestCase):
         )
 
     def test_transition_slices_from_group_1d_object_a(self) -> None:
-        group = np.array(['a', 'a', 'b', 'b', 'c'], dtype=object)
+        group = np.array(["a", "a", "b", "b", "c"], dtype=object)
         slices, group_to_tuple = transition_slices_from_group(group)
         self.assertFalse(group_to_tuple)
         self.assertEqual(
@@ -49,7 +48,7 @@ class TestUnit(unittest.TestCase):
     def test_transition_slices_from_group_2d_mixed_types_a(self) -> None:
         # object rows are compared by value (rich equality), consistent with the
         # 1d object path: 1, '1', and 2 are all distinct, so no rows merge
-        group = np.array([[1], ['1'], [2]], dtype=object)
+        group = np.array([[1], ["1"], [2]], dtype=object)
         self.assertNotEqual(group[0, 0], group[1, 0])
         slices, group_to_tuple = transition_slices_from_group(group)
         self.assertTrue(group_to_tuple)
@@ -100,9 +99,16 @@ class TestUnit(unittest.TestCase):
     def test_transition_slices_from_group_1d_dtypes(self) -> None:
         # the integral fast paths dispatch by width; cover each
         for dtype in (
-            np.int8, np.int16, np.int32, np.int64,
-            np.uint8, np.uint16, np.uint32, np.uint64,
-            np.float32, np.float64,
+            np.int8,
+            np.int16,
+            np.int32,
+            np.int64,
+            np.uint8,
+            np.uint16,
+            np.uint32,
+            np.uint64,
+            np.float32,
+            np.float64,
         ):
             group = np.array([10, 10, 10, 20, 20, 30], dtype=dtype)
             slices, group_to_tuple = transition_slices_from_group(group)
@@ -138,8 +144,8 @@ class TestUnit(unittest.TestCase):
 
     def test_transition_slices_from_group_1d_datetime_nat(self) -> None:
         # NaT is unequal to everything, including itself
-        d = np.datetime64('2020-01-01')
-        nat = np.datetime64('NaT')
+        d = np.datetime64("2020-01-01")
+        nat = np.datetime64("NaT")
         group = np.array([d, nat, nat, d])
         slices, _ = transition_slices_from_group(group)
         self.assertEqual(
@@ -148,8 +154,8 @@ class TestUnit(unittest.TestCase):
         )
 
     def test_transition_slices_from_group_1d_timedelta_nat(self) -> None:
-        t = np.timedelta64(5, 'D')
-        nat = np.timedelta64('NaT')
+        t = np.timedelta64(5, "D")
+        nat = np.timedelta64("NaT")
         group = np.array([t, t, nat, nat])
         slices, _ = transition_slices_from_group(group)
         self.assertEqual(
@@ -158,7 +164,7 @@ class TestUnit(unittest.TestCase):
         )
 
     def test_transition_slices_from_group_1d_str(self) -> None:
-        group = np.array(['a', 'a', 'bb', 'b', 'b'])
+        group = np.array(["a", "a", "bb", "b", "b"])
         slices, _ = transition_slices_from_group(group)
         self.assertEqual(
             slices_to_pairs(slices),

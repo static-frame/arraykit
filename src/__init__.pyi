@@ -3,34 +3,33 @@ import datetime
 
 import numpy as np  # type: ignore
 
-_T = tp.TypeVar('_T')
+_T = tp.TypeVar("_T")
 
 __version__: str
 
 _TLabel = tp.Union[
-        tp.Hashable,
-        int,
-        bool,
-        np.bool_,
-        np.integer,
-        float,
-        complex,
-        np.inexact,
-        str,
-        bytes,
-        None,
-        np.datetime64,
-        np.timedelta64,
-        datetime.date,
-        datetime.datetime,
-        tp.Tuple['_TLabel', ...],
+    tp.Hashable,
+    int,
+    bool,
+    np.bool_,
+    np.integer,
+    float,
+    complex,
+    np.inexact,
+    str,
+    bytes,
+    None,
+    np.datetime64,
+    np.timedelta64,
+    datetime.date,
+    datetime.datetime,
+    tp.Tuple["_TLabel", ...],
 ]
 
 class ErrorInitTypeBlocks(RuntimeError):
     def __init__(self, *args: tp.Any, **kwargs: tp.Any) -> None: ...
     def with_traceback(self, tb: Exception) -> Exception: ...
     def __setstate__(self) -> None: ...
-
 
 class NonUniqueError(RuntimeError):
     def __init__(self, *args: tp.Any, **kwargs: tp.Any) -> None: ...
@@ -62,20 +61,18 @@ class TriMap:
     def dst_no_fill(self) -> bool: ...
     def map_src_no_fill(self, /, array_from: np.ndarray) -> np.ndarray: ...
     def map_dst_no_fill(self, /, array_from: np.ndarray) -> np.ndarray: ...
-    def map_src_fill(self, /,
-            array_from: np.ndarray,
-            fill_value: tp.Any,
-            fill_value_dtype: np.dtype
-            ) -> np.ndarray: ...
-    def map_dst_fill(self, /,
-            array_from: np.ndarray,
-            fill_value: tp.Any,
-            fill_value_dtype: np.dtype
-            ) -> np.ndarray: ...
-    def map_merge(self, /,
-            array_from_src: np.ndarray,
-            array_from_dst: np.ndarray,
-            ) -> np.ndarray: ...
+    def map_src_fill(
+        self, /, array_from: np.ndarray, fill_value: tp.Any, fill_value_dtype: np.dtype
+    ) -> np.ndarray: ...
+    def map_dst_fill(
+        self, /, array_from: np.ndarray, fill_value: tp.Any, fill_value_dtype: np.dtype
+    ) -> np.ndarray: ...
+    def map_merge(
+        self,
+        /,
+        array_from_src: np.ndarray,
+        array_from_dst: np.ndarray,
+    ) -> np.ndarray: ...
 
 class BlockIndex:
     shape: tp.Tuple[int, int]
@@ -84,46 +81,68 @@ class BlockIndex:
     columns: int
 
     def __init__(
-            block_count: int = 0,
-            row_count: int = -1,
-            bir_count: int = 0,
-            bir_capacity: int = 8,
-            bir_bytes: bytes = b'',
-            dtype: np.dtype = None,
-            ) -> None: ...
+        block_count: int = 0,
+        row_count: int = -1,
+        bir_count: int = 0,
+        bir_capacity: int = 8,
+        bir_bytes: bytes = b"",
+        dtype: np.dtype = None,
+    ) -> None: ...
     def register(self, __value: np.ndarray) -> bool: ...
-    def to_list(self,) -> tp.List[tp.Tuple[int, int]]: ...
-    def to_bytes(self,) -> bytes: ...
-    def copy(self,) -> 'BlockIndex': ...
-    def __len__(self,) -> int: ...
-    def __iter__(self,) -> tp.Iterator[tp.Tuple[int, int]]: ...
-    def __reversed__(self,) -> tp.Iterator[tp.Tuple[int, int]]: ...
+    def to_list(
+        self,
+    ) -> tp.List[tp.Tuple[int, int]]: ...
+    def to_bytes(
+        self,
+    ) -> bytes: ...
+    def copy(
+        self,
+    ) -> "BlockIndex": ...
+    def __len__(
+        self,
+    ) -> int: ...
+    def __iter__(
+        self,
+    ) -> tp.Iterator[tp.Tuple[int, int]]: ...
+    def __reversed__(
+        self,
+    ) -> tp.Iterator[tp.Tuple[int, int]]: ...
     def __getitem__(self, __key: int) -> tp.Tuple[int, int]: ...
-    def __getstate__(self,) -> tp.Tuple[int, int, int, int, bytes]: ...
+    def __getstate__(
+        self,
+    ) -> tp.Tuple[int, int, int, int, bytes]: ...
     def __setstate__(self, state: tp.Tuple[int, int, int, int, bytes]) -> None: ...
     def get_block(self, __key: int) -> int: ...
     def get_column(self, __key: int) -> int: ...
-    def iter_select(self,
-            __key: tp.Union[slice, np.ndarray, tp.List[int]],
-            ) -> tp.Iterator[tp.Tuple[int, int]]: ...
-    def iter_contiguous(self,
-            __key: tp.Union[slice, np.ndarray, tp.List[int]],
-            *,
-            ascending: bool = False,
-            reduce: bool = False,
-            ) -> tp.Iterator[tp.Tuple[int, tp.Union[slice, int]]]: ...
+    def iter_select(
+        self,
+        __key: tp.Union[slice, np.ndarray, tp.List[int]],
+    ) -> tp.Iterator[tp.Tuple[int, int]]: ...
+    def iter_contiguous(
+        self,
+        __key: tp.Union[slice, np.ndarray, tp.List[int]],
+        *,
+        ascending: bool = False,
+        reduce: bool = False,
+    ) -> tp.Iterator[tp.Tuple[int, tp.Union[slice, int]]]: ...
     def iter_block(self) -> tp.Iterator[tp.Tuple[int, slice]]: ...
 
-
 class FrozenAutoMap:
-    def __init__(self, labels: tp.Iterable[_TLabel] | np.ndarray = (), /,) -> None: ...
-    def get(self, __key: _TLabel, /,) -> int: ...
+    def __init__(
+        self,
+        labels: tp.Iterable[_TLabel] | np.ndarray = (),
+        /,
+    ) -> None: ...
+    def get(
+        self,
+        __key: _TLabel,
+        /,
+    ) -> int: ...
     def keys(self) -> tp.Iterator[_TLabel]: ...
     def items(self) -> tp.Iterator[tuple[_TLabel, int]]: ...
     def values(self) -> tp.Iterator[int]: ...
     def get_all(self, __key: list[_TLabel] | np.ndarray) -> np.ndarray: ...
     def get_any(self, __key: list[_TLabel] | np.ndarray) -> list[int]: ...
-
     def __iter__(self) -> tp.Iterator[_TLabel]: ...
     def __getitem__(self, __key: tp.Any) -> int: ...
     def __contains__(self, __key: tp.Any) -> bool: ...
@@ -133,59 +152,54 @@ class FrozenAutoMap:
     def __getstate__(self) -> tp.Any: ...
     def __setstate__(self, __state: tp.Any) -> None: ...
     def __len__(self) -> int: ...
-
     def __or__(self) -> tp.Any: ...
     def __ror__(self) -> tp.Any: ...
 
-
 class AutoMap(FrozenAutoMap):
-    def __init__(self, labels: tp.Iterable[_TLabel] | np.ndarray = (), /,) -> None: ...
+    def __init__(
+        self,
+        labels: tp.Iterable[_TLabel] | np.ndarray = (),
+        /,
+    ) -> None: ...
     def __ior__(self) -> tp.Any: ...
     def add(self, __key: _TLabel) -> None: ...
     def update(self, __keys: tp.Iterable[_TLabel] | np.ndarray) -> None: ...
 
-
-
-
 def iterable_str_to_array_1d(
-        iterable: tp.Iterable[str],
-        *,
-        dtype: tp.Optional[tp.Any] = None,
-        thousandschar: str = ',',
-        decimalchar: str = '.',
-        ) -> np.ndarray: ...
-
+    iterable: tp.Iterable[str],
+    *,
+    dtype: tp.Optional[tp.Any] = None,
+    thousandschar: str = ",",
+    decimalchar: str = ".",
+) -> np.ndarray: ...
 def delimited_to_arrays(
-        file_like: tp.Iterable[str],
-        *,
-        axis: int = 0,
-        dtypes: tp.Optional[tp.Callable[[int], tp.Any]] = None,
-        line_select: tp.Optional[tp.Callable[[int], bool]] = None,
-        delimiter: str = ',',
-        doublequote: bool = True,
-        escapechar: tp.Optional[str] = '',
-        quotechar: tp.Optional[str] = '"',
-        quoting: int = 0,
-        skipinitialspace: bool = False,
-        strict: bool = False,
-        thousandschar: str = ',',
-        decimalchar: str = '.',
-        ) -> tp.List[np.array]: ...
-
+    file_like: tp.Iterable[str],
+    *,
+    axis: int = 0,
+    dtypes: tp.Optional[tp.Callable[[int], tp.Any]] = None,
+    line_select: tp.Optional[tp.Callable[[int], bool]] = None,
+    delimiter: str = ",",
+    doublequote: bool = True,
+    escapechar: tp.Optional[str] = "",
+    quotechar: tp.Optional[str] = '"',
+    quoting: int = 0,
+    skipinitialspace: bool = False,
+    strict: bool = False,
+    thousandschar: str = ",",
+    decimalchar: str = ".",
+) -> tp.List[np.array]: ...
 def split_after_count(
-        string: str,
-        *,
-        delimiter: str = ',',
-        count: int = 0,
-        doublequote: bool = True,
-        escapechar: tp.Optional[str] = '',
-        quotechar: tp.Optional[str] = '"',
-        quoting: int = 0,
-        strict: bool = False,
-        ) -> tp.Tuple[str, str]: ...
-
+    string: str,
+    *,
+    delimiter: str = ",",
+    count: int = 0,
+    doublequote: bool = True,
+    escapechar: tp.Optional[str] = "",
+    quotechar: tp.Optional[str] = '"',
+    quoting: int = 0,
+    strict: bool = False,
+) -> tp.Tuple[str, str]: ...
 def count_iteration(__iterable: tp.Iterable) -> int: ...
-
 def immutable_filter(__array: np.ndarray) -> np.ndarray: ...
 def mloc(__array: np.ndarray) -> int: ...
 def name_filter(__name: _TLabel) -> _TLabel: ...
@@ -193,17 +207,22 @@ def shape_filter(__array: np.ndarray) -> np.ndarray: ...
 def column_2d_filter(__array: np.ndarray) -> np.ndarray: ...
 def column_1d_filter(__array: np.ndarray) -> np.ndarray: ...
 def row_1d_filter(__array: np.ndarray) -> np.ndarray: ...
-def array_deepcopy(__array: np.ndarray, memo: tp.Optional[tp.Dict[int, tp.Any]]) -> np.ndarray: ...
+def array_deepcopy(
+    __array: np.ndarray, memo: tp.Optional[tp.Dict[int, tp.Any]]
+) -> np.ndarray: ...
 def resolve_dtype(__d1: np.dtype, __d2: np.dtype) -> np.dtype: ...
 def resolve_dtype_iter(__dtypes: tp.Iterable[np.dtype]) -> np.dtype: ...
 def isna_element(__value: tp.Any, include_none: bool = True) -> bool: ...
 def dtype_from_element(__value: tp.Optional[_TLabel]) -> np.dtype: ...
-def get_new_indexers_and_screen(indexers: np.ndarray, positions: np.ndarray) -> tp.Tuple[np.ndarray, np.ndarray]: ...
-
+def get_new_indexers_and_screen(
+    indexers: np.ndarray, positions: np.ndarray
+) -> tp.Tuple[np.ndarray, np.ndarray]: ...
 def first_true_1d(__array: np.ndarray, *, forward: bool) -> int: ...
 def first_true_2d(__array: np.ndarray, *, forward: bool, axis: int) -> np.ndarray: ...
 def nonzero_1d(__array: np.ndarray, /) -> np.ndarray: ...
-def transition_slices_from_group(__group: np.ndarray, /) -> tp.Tuple[tp.Iterator[slice], bool]: ...
+def transition_slices_from_group(
+    __group: np.ndarray, /
+) -> tp.Tuple[tp.Iterator[slice], bool]: ...
 def is_objectable_dt64(__array: np.ndarray, /) -> bool: ...
 def is_objectable(__array: np.ndarray, /) -> bool: ...
 def astype_array(__array: np.ndarray, __dtype: np.dtype | None, /) -> np.ndarray: ...

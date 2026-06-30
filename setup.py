@@ -6,6 +6,7 @@ from pathlib import Path
 
 AK_VERSION = Path("VERSION").read_text(encoding="utf-8").strip()
 
+
 def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
     dirs = []
     for sp in site.getsitepackages():
@@ -13,6 +14,7 @@ def get_ext_dir(*components: tp.Iterable[str]) -> tp.Sequence[str]:
         if os.path.exists(fp):
             dirs.append(fp)
     return dirs
+
 
 ext_modules = [
     Extension(
@@ -27,13 +29,11 @@ ext_modules = [
             "src/tri_map.c",
             "src/auto_map.c",
         ],
-
-        include_dirs=get_ext_dir('numpy', '_core', 'include') + ['src'],
-        library_dirs=get_ext_dir('numpy', '_core', 'lib'),
+        include_dirs=get_ext_dir("numpy", "_core", "include") + ["src"],
+        library_dirs=get_ext_dir("numpy", "_core", "lib"),
         define_macros=[("AK_VERSION", AK_VERSION)],
         libraries=["npymath"],
     )
 ]
 
 setup(ext_modules=ext_modules)
-

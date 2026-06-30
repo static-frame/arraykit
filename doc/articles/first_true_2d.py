@@ -1,6 +1,3 @@
-
-
-
 import os
 import sys
 import timeit
@@ -17,38 +14,41 @@ import pandas as pd
 sys.path.append(os.getcwd())
 
 
-
 class ArrayProcessor:
-    NAME = ''
+    NAME = ""
     SORT = -1
 
     def __init__(self, array: np.ndarray):
         self.array = array
 
-#-------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------
 class AKFirstTrueAxis0Forward(ArrayProcessor):
-    NAME = 'ak.first_true_2d(forward=True, axis=0)'
+    NAME = "ak.first_true_2d(forward=True, axis=0)"
     SORT = 0
 
     def __call__(self):
         _ = first_true_2d(self.array, forward=True, axis=0)
 
+
 class AKFirstTrueAxis1Forward(ArrayProcessor):
-    NAME = 'ak.first_true_2d(forward=True, axis=1)'
+    NAME = "ak.first_true_2d(forward=True, axis=1)"
     SORT = 0
 
     def __call__(self):
         _ = first_true_2d(self.array, forward=True, axis=1)
 
+
 class AKFirstTrueAxis0Reverse(ArrayProcessor):
-    NAME = 'ak.first_true_2d(forward=False, axis=0)'
+    NAME = "ak.first_true_2d(forward=False, axis=0)"
     SORT = 1
 
     def __call__(self):
         _ = first_true_2d(self.array, forward=False, axis=0)
 
+
 class AKFirstTrueAxis1Reverse(ArrayProcessor):
-    NAME = 'ak.first_true_2d(forward=False, axis=1)'
+    NAME = "ak.first_true_2d(forward=False, axis=1)"
     SORT = 1
 
     def __call__(self):
@@ -56,7 +56,7 @@ class AKFirstTrueAxis1Reverse(ArrayProcessor):
 
 
 class NPNonZero(ArrayProcessor):
-    NAME = 'np.nonzero()'
+    NAME = "np.nonzero()"
     SORT = 3
 
     def __call__(self):
@@ -65,15 +65,16 @@ class NPNonZero(ArrayProcessor):
 
 
 class NPArgMaxAxis0(ArrayProcessor):
-    NAME = 'np.any(axis=0), np.argmax(axis=0)'
+    NAME = "np.any(axis=0), np.argmax(axis=0)"
     SORT = 4
 
     def __call__(self):
         _ = ~np.any(self.array, axis=0)
         _ = np.argmax(self.array, axis=0)
 
+
 class NPArgMaxAxis1(ArrayProcessor):
-    NAME = 'np.any(axis=1), np.argmax(axis=1)'
+    NAME = "np.any(axis=1), np.argmax(axis=1)"
     SORT = 4
 
     def __call__(self):
@@ -81,108 +82,116 @@ class NPArgMaxAxis1(ArrayProcessor):
         _ = np.argmax(self.array, axis=1)
 
 
-
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 NUMBER = 100
+
 
 def seconds_to_display(seconds: float) -> str:
     seconds /= NUMBER
     if seconds < 1e-4:
-        return f'{seconds * 1e6: .1f} (µs)'
+        return f"{seconds * 1e6: .1f} (µs)"
     if seconds < 1e-1:
-        return f'{seconds * 1e3: .1f} (ms)'
-    return f'{seconds: .1f} (s)'
+        return f"{seconds * 1e3: .1f} (ms)"
+    return f"{seconds: .1f} (s)"
 
 
 def plot_performance(frame):
-    fixture_total = len(frame['fixture'].unique())
-    cat_total = len(frame['size'].unique())
-    processor_total = len(frame['cls_processor'].unique())
+    fixture_total = len(frame["fixture"].unique())
+    cat_total = len(frame["size"].unique())
+    processor_total = len(frame["cls_processor"].unique())
     fig, axes = plt.subplots(cat_total, fixture_total)
 
     # cmap = plt.get_cmap('terrain')
-    cmap = plt.get_cmap('plasma')
+    cmap = plt.get_cmap("plasma")
 
     color = cmap(np.arange(processor_total) / processor_total)
 
     # category is the size of the array
-    for cat_count, (cat_label, cat) in enumerate(frame.groupby('size')):
+    for cat_count, (cat_label, cat) in enumerate(frame.groupby("size")):
         for fixture_count, (fixture_label, fixture) in enumerate(
-                cat.groupby('fixture')):
+            cat.groupby("fixture")
+        ):
             ax = axes[cat_count][fixture_count]
 
             # set order
-            fixture['sort'] = [f.SORT for f in fixture['cls_processor']]
-            fixture = fixture.sort_values('sort')
+            fixture["sort"] = [f.SORT for f in fixture["cls_processor"]]
+            fixture = fixture.sort_values("sort")
 
-            results = fixture['time'].values.tolist()
-            names = [cls.NAME for cls in fixture['cls_processor']]
+            results = fixture["time"].values.tolist()
+            names = [cls.NAME for cls in fixture["cls_processor"]]
             # x = np.arange(len(results))
             names_display = names
             post = ax.bar(names_display, results, color=color)
 
-            density, position = fixture_label.split('-')
+            density, position = fixture_label.split("-")
             # cat_label is the size of the array
-            title = f'{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[density]}\n{FixtureFactory.POSITION_TO_DISPLAY[position]}'
+            title = f"{cat_label:.0e}\n{FixtureFactory.DENSITY_TO_DISPLAY[density]}\n{FixtureFactory.POSITION_TO_DISPLAY[position]}"
 
             ax.set_title(title, fontsize=6)
-            ax.set_box_aspect(0.75) # makes taller tan wide
-            time_max = fixture['time'].max()
+            ax.set_box_aspect(0.75)  # makes taller tan wide
+            time_max = fixture["time"].max()
             ax.set_yticks([0, time_max * 0.5, time_max])
-            ax.set_yticklabels(['',
-                    seconds_to_display(time_max * .5),
+            ax.set_yticklabels(
+                [
+                    "",
+                    seconds_to_display(time_max * 0.5),
                     seconds_to_display(time_max),
-                    ], fontsize=6)
+                ],
+                fontsize=6,
+            )
             # ax.set_xticks(x, names_display, rotation='vertical')
             ax.tick_params(
-                    axis='x',
-                    which='both',
-                    bottom=False,
-                    top=False,
-                    labelbottom=False,
-                    )
-
-    fig.set_size_inches(9, 3.5) # width, height
-    fig.legend(post, names_display, loc='center right', fontsize=6)
-    # horizontal, vertical
-    fig.text(.05, .96, f'first_true_2d() Performance: {NUMBER} Iterations', fontsize=10)
-    fig.text(.05, .90, get_versions(), fontsize=6)
-
-    fp = '/tmp/first_true.png'
-    plt.subplots_adjust(
-            left=0.075,
-            bottom=0.05,
-            right=0.75,
-            top=0.85,
-            wspace=1, # width
-            hspace=0.1,
+                axis="x",
+                which="both",
+                bottom=False,
+                top=False,
+                labelbottom=False,
             )
+
+    fig.set_size_inches(9, 3.5)  # width, height
+    fig.legend(post, names_display, loc="center right", fontsize=6)
+    # horizontal, vertical
+    fig.text(
+        0.05, 0.96, f"first_true_2d() Performance: {NUMBER} Iterations", fontsize=10
+    )
+    fig.text(0.05, 0.90, get_versions(), fontsize=6)
+
+    fp = "/tmp/first_true.png"
+    plt.subplots_adjust(
+        left=0.075,
+        bottom=0.05,
+        right=0.75,
+        top=0.85,
+        wspace=1,  # width
+        hspace=0.1,
+    )
     # plt.rcParams.update({'font.size': 22})
     plt.savefig(fp, dpi=300)
 
-    if sys.platform.startswith('linux'):
-        os.system(f'eog {fp}&')
+    if sys.platform.startswith("linux"):
+        os.system(f"eog {fp}&")
     else:
-        os.system(f'open {fp}')
+        os.system(f"open {fp}")
 
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+
 
 class FixtureFactory:
-    NAME = ''
+    NAME = ""
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
         return np.full(size, False, dtype=bool)
 
     def _get_array_filled(
-            size: int,
-            start_third: int, # 1 or 2
-            density: float, # less than 1
-            ) -> np.ndarray:
+        size: int,
+        start_third: int,  # 1 or 2
+        density: float,  # less than 1
+    ) -> np.ndarray:
         a = FixtureFactory.get_array(size)
         count = size * density
-        start = int(len(a) * (start_third/3))
+        start = int(len(a) * (start_third / 3))
         length = len(a) - start
         step = int(length / count)
         fill = np.arange(start, len(a), step)
@@ -195,71 +204,73 @@ class FixtureFactory:
         return cls.NAME, array
 
     DENSITY_TO_DISPLAY = {
-        'single': '1 True',
-        'tenth': '10% True',
-        'third': '33% True',
+        "single": "1 True",
+        "tenth": "10% True",
+        "third": "33% True",
     }
 
     POSITION_TO_DISPLAY = {
-        'first_third': 'Fill 1/3 to End',
-        'second_third': 'Fill 2/3 to End',
+        "first_third": "Fill 1/3 to End",
+        "second_third": "Fill 2/3 to End",
     }
 
 
 class FFSingleFirstThird(FixtureFactory):
-    NAME = 'single-first_third'
+    NAME = "single-first_third"
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
         a = FixtureFactory.get_array(size)
-        a[int(len(a) * (1/3))] = True
+        a[int(len(a) * (1 / 3))] = True
         return a
 
+
 class FFSingleSecondThird(FixtureFactory):
-    NAME = 'single-second_third'
+    NAME = "single-second_third"
 
     @staticmethod
     def get_array(size: int) -> np.ndarray:
         a = FixtureFactory.get_array(size)
-        a[int(len(a) * (2/3))] = True
+        a[int(len(a) * (2 / 3))] = True
         return a
 
 
 class FFTenthPostFirstThird(FixtureFactory):
-    NAME = 'tenth-first_third'
+    NAME = "tenth-first_third"
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=1, density=.1)
+        return cls._get_array_filled(size, start_third=1, density=0.1)
 
 
 class FFTenthPostSecondThird(FixtureFactory):
-    NAME = 'tenth-second_third'
+    NAME = "tenth-second_third"
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=2, density=.1)
+        return cls._get_array_filled(size, start_third=2, density=0.1)
 
 
 class FFThirdPostFirstThird(FixtureFactory):
-    NAME = 'third-first_third'
+    NAME = "third-first_third"
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=1, density=1/3)
+        return cls._get_array_filled(size, start_third=1, density=1 / 3)
 
 
 class FFThirdPostSecondThird(FixtureFactory):
-    NAME = 'third-second_third'
+    NAME = "third-second_third"
 
     @classmethod
     def get_array(cls, size: int) -> np.ndarray:
-        return cls._get_array_filled(size, start_third=2, density=1/3)
+        return cls._get_array_filled(size, start_third=2, density=1 / 3)
 
 
 def get_versions() -> str:
     import platform
-    return f'OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n'
+
+    return f"OS: {platform.system()} / ArrayKit: {ak.__version__} / NumPy: {np.__version__}\n"
 
 
 CLS_PROCESSOR = (
@@ -269,8 +280,8 @@ CLS_PROCESSOR = (
     AKFirstTrueAxis1Reverse,
     NPNonZero,
     NPArgMaxAxis0,
-    NPArgMaxAxis1
-    )
+    NPArgMaxAxis1,
+)
 
 CLS_FF = (
     FFSingleFirstThird,
@@ -296,10 +307,7 @@ def run_test():
                 record = [cls, NUMBER, fixture_label, size]
                 print(record)
                 try:
-                    result = timeit.timeit(
-                            f'runner()',
-                            globals=locals(),
-                            number=NUMBER)
+                    result = timeit.timeit(f"runner()", globals=locals(), number=NUMBER)
                 except OSError:
                     result = np.nan
                 finally:
@@ -307,15 +315,12 @@ def run_test():
                 record.append(result)
                 records.append(record)
 
-    f = pd.DataFrame.from_records(records,
-            columns=('cls_processor', 'number', 'fixture', 'size', 'time')
-            )
+    f = pd.DataFrame.from_records(
+        records, columns=("cls_processor", "number", "fixture", "size", "time")
+    )
     print(f)
     plot_performance(f)
 
-if __name__ == '__main__':
 
+if __name__ == "__main__":
     run_test()
-
-
-
