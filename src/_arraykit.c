@@ -70,6 +70,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)write_array_to_file,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"factorize",
+            (PyCFunction)factorize,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 
