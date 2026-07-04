@@ -49,6 +49,7 @@ from arraykit import isna_element as isna_element_ak
 from arraykit import split_after_count as split_after_count_ak
 from arraykit import count_iteration as count_iteration_ak
 from arraykit import slice_to_ascending_slice as slice_to_ascending_slice_ak
+from arraykit import group_ordering as group_ordering_ak
 
 from arraykit import ArrayGO as ArrayGOAK
 
@@ -843,6 +844,27 @@ class SliceToAscendingAK(SliceToAscending):
 
 class SliceToAscendingREF(SliceToAscending):
     entry = staticmethod(slice_to_ascending_slice_ref)
+
+
+# -------------------------------------------------------------------------------
+class GroupOrdering(Perf):
+    NUMBER = 20
+
+    def __init__(self):
+        rng = np.random.default_rng(0)
+        # 1M rows over ~5k dense groups, shuffled (mimics factorize codes)
+        self.codes = rng.integers(0, 5_000, size=1_000_000).astype(np.intp)
+
+    def main(self):
+        _ = self.entry(self.codes)
+
+
+class GroupOrderingAK(GroupOrdering):
+    entry = staticmethod(group_ordering_ak)
+
+
+class GroupOrderingREF(GroupOrdering):
+    entry = staticmethod(lambda codes: np.argsort(codes, kind='stable'))
 
 
 # -------------------------------------------------------------------------------

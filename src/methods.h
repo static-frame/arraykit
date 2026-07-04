@@ -70,6 +70,9 @@ PyObject *
 first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *
+group_ordering(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
+
+PyObject *
 dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg);
 
 PyObject *

@@ -74,6 +74,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)factorize,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"group_ordering",
+            (PyCFunction)group_ordering,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 
