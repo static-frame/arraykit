@@ -35,6 +35,11 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.6.0
+............
+Added ``factorize``.
+
+
 1.5.0
 ............
 Added ``transition_slices_from_group``.
