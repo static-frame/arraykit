@@ -147,7 +147,15 @@ class TestUnit(unittest.TestCase):
             group_ordering(codes)
 
     def test_group_ordering_wrong_dtype(self) -> None:
-        codes = np.array([0, 1, 2], dtype=np.int32)
+        # pick an integer width that differs from intp on this platform
+        # (intp is 32-bit on some Windows builds, 64-bit elsewhere)
+        wrong = np.int32 if np.dtype(np.intp).itemsize != 4 else np.int64
+        codes = np.array([0, 1, 2], dtype=wrong)
+        with self.assertRaises(ValueError):
+            group_ordering(codes)
+
+    def test_group_ordering_wrong_dtype_float(self) -> None:
+        codes = np.array([0.0, 1.0, 2.0], dtype=np.float64)
         with self.assertRaises(ValueError):
             group_ordering(codes)
 
