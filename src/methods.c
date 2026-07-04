@@ -985,6 +985,149 @@ first_true_2d(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     return (PyObject *)array_pos;
 }
 
+static char *group_ordering_kwarg_names[] = {
+    "codes",
+    "size",
+    NULL
+};
+
+// Stable counting sort of dense factorize codes. Given `codes` in [0, size),
+// return (permutation, offsets) such that permutation[offsets[g]:offsets[g+1]]
+// are the input positions of group g, in ascending (stable) order. This is an
+// O(n) alternative to np.argsort(codes, kind='stable') for already-dense codes.
+PyObject *
+group_ordering(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *codes = NULL;
+    PyObject *size_obj = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!|$O:group_ordering",
+            group_ordering_kwarg_names,
+            &PyArray_Type, &codes,
+            &size_obj
+            )) {
+        return NULL;
+    }
+    if (PyArray_NDIM(codes) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Array must be 1-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(codes) != NPY_INTP) {
+        PyErr_SetString(PyExc_ValueError, "Array must be of type intp");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(codes)) {
+        PyErr_SetString(PyExc_ValueError, "Array must be contiguous");
+        return NULL;
+    }
+
+    npy_intp n = PyArray_SIZE(codes);
+    npy_intp *codes_buffer = (npy_intp*)PyArray_DATA(codes);
+
+    // Determine the number of groups: caller-provided, else max(codes) + 1.
+    npy_intp size = 0;
+    int size_given = (size_obj != NULL && size_obj != Py_None);
+    if (size_given) {
+        size = (npy_intp)PyNumber_AsSsize_t(size_obj, PyExc_OverflowError);
+        if (size == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+        if (size < 0) {
+            PyErr_SetString(PyExc_ValueError, "size must be non-negative");
+            return NULL;
+        }
+    }
+    else {
+        for (npy_intp i = 0; i < n; i++) {
+            npy_intp c = codes_buffer[i];
+            if (c < 0) {
+                PyErr_SetString(PyExc_ValueError, "codes must be non-negative");
+                return NULL;
+            }
+            // guard c + 1 against signed overflow (undefined behavior)
+            if (c == NPY_MAX_INTP) {
+                PyErr_SetString(PyExc_OverflowError,
+                        "cannot infer size: code value too large");
+                return NULL;
+            }
+            if (c + 1 > size) {
+                size = c + 1;
+            }
+        }
+    }
+
+    // offsets has length size + 1; guard that against signed overflow (covers
+    // both a caller-provided size and an inferred one)
+    if (size == NPY_MAX_INTP) {
+        PyErr_SetString(PyExc_OverflowError, "size too large");
+        return NULL;
+    }
+
+    PyObject *perm_arr = NULL;
+    PyObject *offsets_arr = NULL;
+    npy_intp *cursor = NULL;
+
+    perm_arr = PyArray_EMPTY(1, &n, NPY_INTP, 0);
+    if (!perm_arr) {
+        goto fail;
+    }
+    npy_intp size_plus = size + 1;
+    offsets_arr = PyArray_ZEROS(1, &size_plus, NPY_INTP, 0);
+    if (!offsets_arr) {
+        goto fail;
+    }
+    npy_intp *perm = (npy_intp*)PyArray_DATA((PyArrayObject*)perm_arr);
+    npy_intp *offsets = (npy_intp*)PyArray_DATA((PyArrayObject*)offsets_arr);
+
+    // Count pass: tally each group into offsets[c + 1]. When size was inferred
+    // the codes are already known to be in [0, size); only a caller-provided
+    // size needs the range validated here.
+    for (npy_intp i = 0; i < n; i++) {
+        npy_intp c = codes_buffer[i];
+        if (size_given && (c < 0 || c >= size)) {
+            PyErr_Format(PyExc_ValueError,
+                    "code %zd out of range [0, %zd)",
+                    (Py_ssize_t)c, (Py_ssize_t)size);
+            goto fail;
+        }
+        offsets[c + 1]++;
+    }
+    // Prefix sum: offsets[g] becomes the start index of group g; offsets[size] == n.
+    for (npy_intp g = 0; g < size; g++) {
+        offsets[g + 1] += offsets[g];
+    }
+    // Scatter pass: place each input position at its group's running cursor.
+    // Ascending i preserves original order within each group (stability).
+    if (size > 0) {
+        cursor = PyMem_New(npy_intp, size);
+        if (!cursor) {
+            PyErr_NoMemory();
+            goto fail;
+        }
+        memcpy(cursor, offsets, size * sizeof(npy_intp));
+        for (npy_intp i = 0; i < n; i++) {
+            perm[cursor[codes_buffer[i]]++] = i;
+        }
+    }
+
+    PyArray_CLEARFLAGS((PyArrayObject*)perm_arr, NPY_ARRAY_WRITEABLE);
+    PyArray_CLEARFLAGS((PyArrayObject*)offsets_arr, NPY_ARRAY_WRITEABLE);
+
+    PyMem_Free(cursor);
+
+    PyObject *result = PyTuple_Pack(2, perm_arr, offsets_arr);
+    Py_DECREF(perm_arr);
+    Py_DECREF(offsets_arr);
+    return result;
+
+fail:
+    PyMem_Free(cursor);
+    Py_XDECREF(perm_arr);
+    Py_XDECREF(offsets_arr);
+    return NULL;
+}
+
 PyObject *
 dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {
