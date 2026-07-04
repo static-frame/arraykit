@@ -2523,6 +2523,31 @@ error:
 //------------------------------------------------------------------------------
 // factorize
 
+// A fast float hash for factorize only. Unlike double_to_hash (CPython-
+// compatible, so hash(1.0)==hash(1), via frexp + a loop), factorize never needs
+// cross-type hashing -- it only compares floats to floats from the same array by
+// `==`. So we canonicalize -0.0 to +0.0 (they compare equal, must hash equal),
+// reinterpret the bits, and apply a splitmix64 finalizer for good avalanche.
+// NaN never reaches here (handled before probing); +/-inf hash distinctly, which
+// is correct since they are distinct values. lookup_hash_double takes the hash as
+// a parameter, so this stays self-consistent within factorize's scratch table.
+static inline Py_hash_t
+factorize_double_to_hash(double v)
+{
+    if (v == 0.0) {
+        v = 0.0; // collapse -0.0 to +0.0
+    }
+    npy_uint64 x;
+    memcpy(&x, &v, sizeof(x));
+    x ^= x >> 33;
+    x *= 0xff51afd7ed558ccdULL;
+    x ^= x >> 33;
+    x *= 0xc4ceb9fe1a85ec53ULL;
+    x ^= x >> 33;
+    Py_hash_t h = (Py_hash_t)x;
+    return h == -1 ? -2 : h; // -1 marks an empty slot
+}
+
 // Detect a Python-level float NaN (a Python float or a NumPy floating scalar) so
 // that object-dtype arrays collapse all NaN into a single code, matching the
 // float-dtype behavior. Only real floats are treated as NaN here; None, NaT, and
@@ -2619,7 +2644,7 @@ factorize_obj_is_float_nan(PyObject* key)
         }                                                           \
     }                                                               \
     else {                                                          \
-        Py_hash_t hash = double_to_hash(v);                        \
+        Py_hash_t hash = factorize_double_to_hash(v);              \
         FACTORIZE_RECORD(lookup_hash_double(&scratch, v, hash, kat_lookup), hash); \
     }                                                               \
 }                                                                   \
