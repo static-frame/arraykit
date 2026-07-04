@@ -1044,10 +1044,23 @@ group_ordering(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
                 PyErr_SetString(PyExc_ValueError, "codes must be non-negative");
                 return NULL;
             }
+            // guard c + 1 against signed overflow (undefined behavior)
+            if (c == NPY_MAX_INTP) {
+                PyErr_SetString(PyExc_OverflowError,
+                        "cannot infer size: code value too large");
+                return NULL;
+            }
             if (c + 1 > size) {
                 size = c + 1;
             }
         }
+    }
+
+    // offsets has length size + 1; guard that against signed overflow (covers
+    // both a caller-provided size and an inferred one)
+    if (size == NPY_MAX_INTP) {
+        PyErr_SetString(PyExc_OverflowError, "size too large");
+        return NULL;
     }
 
     PyObject *perm_arr = NULL;

@@ -859,12 +859,20 @@ class GroupOrdering(Perf):
         _ = self.entry(self.codes)
 
 
+def group_ordering_ref(codes):
+    # match group_ordering's contract: return both the stable permutation and
+    # the CSR-style group offsets (length size + 1)
+    perm = np.argsort(codes, kind='stable')
+    offsets = np.concatenate([[0], np.cumsum(np.bincount(codes))]).astype(np.intp)
+    return perm, offsets
+
+
 class GroupOrderingAK(GroupOrdering):
     entry = staticmethod(group_ordering_ak)
 
 
 class GroupOrderingREF(GroupOrdering):
-    entry = staticmethod(lambda codes: np.argsort(codes, kind='stable'))
+    entry = staticmethod(group_ordering_ref)
 
 
 # -------------------------------------------------------------------------------

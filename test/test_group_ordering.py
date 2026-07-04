@@ -185,6 +185,18 @@ class TestUnit(unittest.TestCase):
         with self.assertRaises(ValueError):
             group_ordering(codes, size=0)
 
+    def test_group_ordering_infer_overflow(self) -> None:
+        # a code at the intp max would overflow when inferring size = c + 1
+        codes = np.array([np.iinfo(np.intp).max], dtype=np.intp)
+        with self.assertRaises(OverflowError):
+            group_ordering(codes)
+
+    def test_group_ordering_size_overflow(self) -> None:
+        # an explicit size at the intp max would overflow computing size + 1
+        codes = np.array([0, 1], dtype=np.intp)
+        with self.assertRaises(OverflowError):
+            group_ordering(codes, size=np.iinfo(np.intp).max)
+
     # ------------------------------------------------------------------
     # immutability
 
