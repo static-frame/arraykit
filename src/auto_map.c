@@ -2576,10 +2576,14 @@ factorize_obj_is_float_nan(PyObject* key)
 {                                                                     \
     if (contiguous) {                                                \
         const npy_type* b = (const npy_type*)PyArray_DATA(a);        \
-        for (npy_intp i = 0; i < n; i++) {                           \
-            value_t v = (value_t)b[i];                               \
+        const npy_type* b_end = b + n;                               \
+        npy_intp i = 0;                                              \
+        while (b < b_end) {                                          \
+            value_t v = (value_t)*b;                                 \
             Py_hash_t hash = hash_func(v);                           \
             FACTORIZE_RECORD(lookup_func(&scratch, v, hash, kat_lookup), hash); \
+            b++;                                                     \
+            i++;                                                     \
         }                                                            \
     }                                                                \
     else {                                                           \
@@ -2624,8 +2628,12 @@ factorize_obj_is_float_nan(PyObject* key)
 {                                                                     \
     if (contiguous) {                                               \
         const npy_type* b = (const npy_type*)PyArray_DATA(a);       \
-        for (npy_intp i = 0; i < n; i++) {                          \
-            FACTORIZE_FLOAT_ELEM(post_deref(b[i]), kat_lookup)      \
+        const npy_type* b_end = b + n;                              \
+        npy_intp i = 0;                                             \
+        while (b < b_end) {                                         \
+            FACTORIZE_FLOAT_ELEM(post_deref(*b), kat_lookup)        \
+            b++;                                                    \
+            i++;                                                    \
         }                                                           \
     }                                                               \
     else {                                                         \
