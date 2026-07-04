@@ -2569,58 +2569,95 @@ factorize_obj_is_float_nan(PyObject* key)
     }                                                                 \
 }                                                                     \
 
-# define FACTORIZE_INT(npy_type, kat_lookup)                          \
-{                                                                      \
-    for (npy_intp i = 0; i < n; i++) {                                \
-        npy_int64 v = (npy_int64)*(npy_type*)PyArray_GETPTR1(a, i);   \
-        Py_hash_t hash = int_to_hash(v);                             \
-        FACTORIZE_RECORD(lookup_hash_int(&scratch, v, hash, kat_lookup), hash); \
-    }                                                                 \
-}                                                                     \
-
-# define FACTORIZE_UINT(npy_type, kat_lookup)                         \
-{                                                                      \
-    for (npy_intp i = 0; i < n; i++) {                                \
-        npy_uint64 v = (npy_uint64)*(npy_type*)PyArray_GETPTR1(a, i); \
-        Py_hash_t hash = uint_to_hash(v);                            \
-        FACTORIZE_RECORD(lookup_hash_uint(&scratch, v, hash, kat_lookup), hash); \
-    }                                                                 \
-}                                                                     \
-
-// Floats need explicit NaN handling: all NaN collapse to one code and never
-// enter the table (the map compares with `==`, so NaN would otherwise never
-// match itself). +0.0/-0.0 and inf are handled correctly by the normal path.
-# define FACTORIZE_FLOAT(npy_type, kat_lookup, post_deref)            \
-{                                                                      \
-    for (npy_intp i = 0; i < n; i++) {                                \
-        npy_double v = post_deref(*(npy_type*)PyArray_GETPTR1(a, i)); \
-        if (v != v) {                                                 \
-            if (nan_code < 0) {                                       \
-                nan_code = k;                                         \
-                first_index[k] = i;                                  \
-                codes[i] = k;                                        \
-                k++;                                                 \
-            }                                                        \
-            else {                                                   \
-                codes[i] = nan_code;                                 \
-            }                                                        \
-            continue;                                                \
+// Integer/unsigned scalar factorize loop. When the input is C-contiguous, index
+// a typed pointer (`b[i]`, compile-time itemsize) instead of PyArray_GETPTR1's
+// runtime stride multiply -- materially faster, matching INSERT_SCALARS.
+# define FACTORIZE_SCALAR_LOOP(npy_type, value_t, hash_func, lookup_func, kat_lookup) \
+{                                                                     \
+    if (contiguous) {                                                \
+        const npy_type* b = (const npy_type*)PyArray_DATA(a);        \
+        for (npy_intp i = 0; i < n; i++) {                           \
+            value_t v = (value_t)b[i];                               \
+            Py_hash_t hash = hash_func(v);                           \
+            FACTORIZE_RECORD(lookup_func(&scratch, v, hash, kat_lookup), hash); \
         }                                                            \
-        Py_hash_t hash = double_to_hash(v);                         \
-        FACTORIZE_RECORD(lookup_hash_double(&scratch, v, hash, kat_lookup), hash); \
-    }                                                                 \
-}                                                                     \
+    }                                                                \
+    else {                                                           \
+        for (npy_intp i = 0; i < n; i++) {                           \
+            value_t v = (value_t)*(const npy_type*)PyArray_GETPTR1(a, i); \
+            Py_hash_t hash = hash_func(v);                           \
+            FACTORIZE_RECORD(lookup_func(&scratch, v, hash, kat_lookup), hash); \
+        }                                                            \
+    }                                                                \
+}                                                                    \
 
+# define FACTORIZE_INT(npy_type, kat_lookup) \
+    FACTORIZE_SCALAR_LOOP(npy_type, npy_int64, int_to_hash, lookup_hash_int, kat_lookup)
+
+# define FACTORIZE_UINT(npy_type, kat_lookup) \
+    FACTORIZE_SCALAR_LOOP(npy_type, npy_uint64, uint_to_hash, lookup_hash_uint, kat_lookup)
+
+// Per-element float body. All NaN collapse to one code and never enter the table
+// (the map compares with `==`, so NaN would otherwise never match itself);
+// +0.0/-0.0 and inf are handled correctly by the normal path.
+# define FACTORIZE_FLOAT_ELEM(value_expr, kat_lookup)                \
+{                                                                     \
+    npy_double v = (value_expr);                                     \
+    if (v != v) {                                                    \
+        if (nan_code < 0) {                                          \
+            nan_code = k;                                            \
+            first_index[k] = i;                                     \
+            codes[i] = k;                                           \
+            k++;                                                    \
+        }                                                           \
+        else {                                                      \
+            codes[i] = nan_code;                                    \
+        }                                                           \
+    }                                                               \
+    else {                                                          \
+        Py_hash_t hash = double_to_hash(v);                        \
+        FACTORIZE_RECORD(lookup_hash_double(&scratch, v, hash, kat_lookup), hash); \
+    }                                                               \
+}                                                                   \
+
+# define FACTORIZE_FLOAT(npy_type, kat_lookup, post_deref)           \
+{                                                                     \
+    if (contiguous) {                                               \
+        const npy_type* b = (const npy_type*)PyArray_DATA(a);       \
+        for (npy_intp i = 0; i < n; i++) {                          \
+            FACTORIZE_FLOAT_ELEM(post_deref(b[i]), kat_lookup)      \
+        }                                                           \
+    }                                                               \
+    else {                                                         \
+        for (npy_intp i = 0; i < n; i++) {                          \
+            FACTORIZE_FLOAT_ELEM(post_deref(*(const npy_type*)PyArray_GETPTR1(a, i)), kat_lookup) \
+        }                                                           \
+    }                                                               \
+}                                                                   \
+
+// Flexible (unicode/string) loop. In the contiguous case step a running pointer
+// by dt_size (incremental add, no per-element multiply), matching INSERT_FLEXIBLE.
 # define FACTORIZE_FLEXIBLE(char_type, lookup_func, hash_func, get_end_func, dt_size_expr) \
-{                                                                      \
-    Py_ssize_t dt_size = (dt_size_expr);                              \
-    for (npy_intp i = 0; i < n; i++) {                                \
-        char_type* v = (char_type*)PyArray_GETPTR1(a, i);            \
-        Py_ssize_t ksize = get_end_func(v, dt_size) - v;             \
-        Py_hash_t hash = hash_func(v, ksize);                        \
-        FACTORIZE_RECORD(lookup_func(&scratch, v, ksize, hash), hash); \
-    }                                                                 \
-}                                                                     \
+{                                                                     \
+    Py_ssize_t dt_size = (dt_size_expr);                            \
+    if (contiguous) {                                               \
+        char_type* v = (char_type*)PyArray_DATA(a);                 \
+        for (npy_intp i = 0; i < n; i++) {                          \
+            Py_ssize_t ksize = get_end_func(v, dt_size) - v;        \
+            Py_hash_t hash = hash_func(v, ksize);                   \
+            FACTORIZE_RECORD(lookup_func(&scratch, v, ksize, hash), hash); \
+            v += dt_size;                                           \
+        }                                                           \
+    }                                                               \
+    else {                                                         \
+        for (npy_intp i = 0; i < n; i++) {                          \
+            char_type* v = (char_type*)PyArray_GETPTR1(a, i);       \
+            Py_ssize_t ksize = get_end_func(v, dt_size) - v;        \
+            Py_hash_t hash = hash_func(v, ksize);                   \
+            FACTORIZE_RECORD(lookup_func(&scratch, v, ksize, hash), hash); \
+        }                                                           \
+    }                                                               \
+}                                                                   \
 
 // Hash-based factorize: return (uniques, codes) such that
 // array[i] == uniques[codes[i]], in O(n), reusing the AutoMap hash table.
@@ -2707,6 +2744,9 @@ factorize(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     if (grow_table(&scratch, n)) {
         goto fail;
     }
+
+    // Enables the typed-pointer fast path in the scalar/flexible loops below.
+    int contiguous = PyArray_IS_C_CONTIGUOUS(a);
 
     switch (kat) {
         case KAT_INT8:   FACTORIZE_INT(npy_int8,   KAT_INT8);   break;
@@ -2838,8 +2878,10 @@ fail:
 }
 
 # undef FACTORIZE_RECORD
+# undef FACTORIZE_SCALAR_LOOP
 # undef FACTORIZE_INT
 # undef FACTORIZE_UINT
+# undef FACTORIZE_FLOAT_ELEM
 # undef FACTORIZE_FLOAT
 # undef FACTORIZE_FLEXIBLE
 
