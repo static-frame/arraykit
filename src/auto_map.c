@@ -2918,6 +2918,7 @@ fail:
 # undef FACTORIZE_FLOAT
 # undef FACTORIZE_FLEXIBLE
 
+//------------------------------------------------------------------------------
 
 static PyObject *
 fam_repr(FAMObject *self)
