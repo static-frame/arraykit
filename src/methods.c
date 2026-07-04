@@ -1027,7 +1027,8 @@ group_ordering(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     // Determine the number of groups: caller-provided, else max(codes) + 1.
     npy_intp size = 0;
-    if (size_obj != NULL && size_obj != Py_None) {
+    int size_given = (size_obj != NULL && size_obj != Py_None);
+    if (size_given) {
         size = (npy_intp)PyNumber_AsSsize_t(size_obj, PyExc_OverflowError);
         if (size == -1 && PyErr_Occurred()) {
             return NULL;
@@ -1079,10 +1080,12 @@ group_ordering(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     npy_intp *perm = (npy_intp*)PyArray_DATA((PyArrayObject*)perm_arr);
     npy_intp *offsets = (npy_intp*)PyArray_DATA((PyArrayObject*)offsets_arr);
 
-    // Count pass: tally each group into offsets[c + 1], validating the range.
+    // Count pass: tally each group into offsets[c + 1]. When size was inferred
+    // the codes are already known to be in [0, size); only a caller-provided
+    // size needs the range validated here.
     for (npy_intp i = 0; i < n; i++) {
         npy_intp c = codes_buffer[i];
-        if (c < 0 || c >= size) {
+        if (size_given && (c < 0 || c >= size)) {
             PyErr_Format(PyExc_ValueError,
                     "code %zd out of range [0, %zd)",
                     (Py_ssize_t)c, (Py_ssize_t)size);

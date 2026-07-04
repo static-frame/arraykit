@@ -22,6 +22,12 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(perm.tolist(), [0, 1, 2, 3, 4, 5])
         self.assertEqual(offsets.tolist(), [0, 3, 5, 6])
 
+    def test_group_ordering_basic_b(self) -> None:
+        codes = np.array([2, 0, 0, 2, 1, 1, 0, 0, 3, 0], dtype=np.intp)
+        perm, offsets = group_ordering(codes)
+        self.assertEqual(perm.tolist(), [1, 2, 6, 7, 9, 4, 5, 0, 3, 8])
+        self.assertEqual(offsets.tolist(), [0,  5,  7,  9, 10])
+
     def test_group_ordering_interleaved(self) -> None:
         codes = np.array([2, 0, 1, 0, 2, 1], dtype=np.intp)
         perm, offsets = group_ordering(codes)
@@ -37,6 +43,7 @@ class TestUnit(unittest.TestCase):
         perm, offsets = group_ordering(codes)
         self.assertEqual(perm[offsets[0]:offsets[1]].tolist(), [0, 2, 4])
         self.assertEqual(perm[offsets[1]:offsets[2]].tolist(), [1, 3, 5])
+
 
     # ------------------------------------------------------------------
     # parity against numpy oracle
