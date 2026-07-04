@@ -10,5 +10,7 @@ extern PyTypeObject FAMVType;
 extern PyTypeObject FAMType;
 extern PyObject *NonUniqueError;
 
+PyObject *factorize(PyObject *m, PyObject *args, PyObject *kwargs);
+
 
 # endif /* ARRAYKIT_SRC_AUTO_MAP_H_ */
