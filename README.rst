@@ -35,14 +35,20 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.7.0
+............
+
+Added ``group_ordering()``.
+
+
 1.6.0
 ............
-Added ``factorize``.
+Added ``factorize()``.
 
 
 1.5.0
 ............
-Added ``transition_slices_from_group``.
+Added ``transition_slices_from_group()``.
 
 
 1.4.0
