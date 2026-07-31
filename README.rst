@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.9.0
+............
+
+Added ``FrozenAutoMap.get_all_fill()`` and ``TriMap.register_many_from_one()``.
+
+
 1.8.0
 ............
 
