@@ -1131,15 +1131,15 @@ fail:
 // Fill one strided lane in place: walk positions in the fill direction, carrying
 // the most recent non-target value into each target position (subject to `limit`
 // consecutive fills per run). `elem_base`/`elem_stride` address elements in bytes;
-// `tgt_base`/`tgt_stride` address the aligned Boolean target lane. Object arrays
+// `target_base`/`target_stride` address the aligned Boolean target lane. Object arrays
 // duplicate the carried PyObject* with balanced refcounts; all other dtypes memcpy
 // the itemsize bytes. Leading targets (no prior source) are left unchanged.
 static inline void
 AK_fill_lane(
         char *elem_base,
         npy_intp elem_stride,
-        const npy_bool *tgt_base,
-        npy_intp tgt_stride,
+        const npy_bool *target_base,
+        npy_intp target_stride,
         npy_intp length,
         npy_intp itemsize,
         int is_object,
@@ -1151,7 +1151,7 @@ AK_fill_lane(
     for (npy_intp k = 0; k < length; k++) {
         npy_intp pos = forward ? k : (length - 1 - k);
         char *elem = elem_base + pos * elem_stride;
-        if (tgt_base[pos * tgt_stride]) {
+        if (target_base[pos * target_stride]) {
             if (last_valid != NULL && (limit == 0 || count < limit)) {
                 if (is_object) {
                     PyObject **dst = (PyObject**)elem;
@@ -1253,12 +1253,13 @@ fill_directional(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 
     int is_object = PyArray_TYPE(array) == NPY_OBJECT;
     npy_intp itemsize = PyArray_ITEMSIZE((PyArrayObject*)out);
+
     char *out_data = (char*)PyArray_DATA((PyArrayObject*)out);
-    const npy_bool *tgt = (const npy_bool*)PyArray_DATA(target);
+    const npy_bool *target_data = (const npy_bool*)PyArray_DATA(target);
 
     if (ndim == 1) {
         npy_intp n = PyArray_DIM((PyArrayObject*)out, 0);
-        AK_fill_lane(out_data, itemsize, tgt, 1, n,
+        AK_fill_lane(out_data, itemsize, target_data, 1, n,
                 itemsize, is_object, forward, limit);
     }
     else {
@@ -1268,14 +1269,14 @@ fill_directional(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             // fill down each column: elements stride by a full row (cols * itemsize)
             for (npy_intp c = 0; c < cols; c++) {
                 AK_fill_lane(out_data + c * itemsize, cols * itemsize,
-                        tgt + c, cols, rows, itemsize, is_object, forward, limit);
+                        target_data + c, cols, rows, itemsize, is_object, forward, limit);
             }
         }
         else {
             // fill across each row: elements are contiguous
             for (npy_intp r = 0; r < rows; r++) {
                 AK_fill_lane(out_data + r * cols * itemsize, itemsize,
-                        tgt + r * cols, 1, cols, itemsize, is_object, forward, limit);
+                        target_data + r * cols, 1, cols, itemsize, is_object, forward, limit);
             }
         }
     }
