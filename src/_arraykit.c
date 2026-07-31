@@ -78,6 +78,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)group_ordering,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"fill_directional",
+            (PyCFunction)fill_directional,
+            METH_VARARGS | METH_KEYWORDS,
+            NULL},
     {NULL},
 };
 

@@ -1128,6 +1128,163 @@ fail:
     return NULL;
 }
 
+// Fill one strided lane in place: walk positions in the fill direction, carrying
+// the most recent non-target value into each target position (subject to `limit`
+// consecutive fills per run). `elem_base`/`elem_stride` address elements in bytes;
+// `target_base`/`target_stride` address the aligned Boolean target lane. Object arrays
+// duplicate the carried PyObject* with balanced refcounts; all other dtypes memcpy
+// the itemsize bytes. Leading targets (no prior source) are left unchanged.
+static inline void
+AK_fill_lane(
+        char *elem_base,
+        npy_intp elem_stride,
+        const npy_bool *target_base,
+        npy_intp target_stride,
+        npy_intp length,
+        npy_intp itemsize,
+        int is_object,
+        int forward,
+        npy_intp limit)
+{
+    char *last_valid = NULL;
+    npy_intp count = 0;
+    for (npy_intp k = 0; k < length; k++) {
+        npy_intp pos = forward ? k : (length - 1 - k);
+        char *elem = elem_base + pos * elem_stride;
+        if (target_base[pos * target_stride]) {
+            if (last_valid != NULL && (limit == 0 || count < limit)) {
+                if (is_object) {
+                    PyObject **dst = (PyObject**)elem;
+                    PyObject **src = (PyObject**)last_valid;
+                    Py_INCREF(*src);
+                    Py_XDECREF(*dst);
+                    *dst = *src;
+                }
+                else {
+                    memcpy(elem, last_valid, (size_t)itemsize);
+                }
+                count++;
+            }
+            // else: leading target (no source yet) or limit reached; leave as-is
+        }
+        else {
+            last_valid = elem;
+            count = 0;
+        }
+    }
+}
+
+static char *fill_directional_kwarg_names[] = {
+    "array",
+    "target",
+    "forward",
+    "axis",
+    "limit",
+    NULL
+};
+
+// Directional (forward or backward) fill of `array` along `axis`, replacing each
+// position flagged True in the Boolean `target` mask with the last (forward) or
+// next (backward) non-target value. A single O(n) pass per lane; `limit` caps the
+// number of consecutive fills per run (0 == unlimited). The target mask is supplied
+// by the caller (e.g. isna/isfalsy), keeping this dtype- and predicate-agnostic.
+// Returns a new, immutable, C-contiguous array.
+PyObject *
+fill_directional(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *array = NULL;
+    PyArrayObject *target = NULL;
+    int forward = 1;
+    int axis = 0;
+    Py_ssize_t limit = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!O!|$pin:fill_directional",
+            fill_directional_kwarg_names,
+            &PyArray_Type, &array,
+            &PyArray_Type, &target,
+            &forward,
+            &axis,
+            &limit
+            )) {
+        return NULL;
+    }
+
+    int ndim = PyArray_NDIM(array);
+    if (ndim != 1 && ndim != 2) {
+        PyErr_SetString(PyExc_ValueError, "array must be 1- or 2-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(target) != NPY_BOOL) {
+        PyErr_SetString(PyExc_ValueError, "target must be a Boolean array");
+        return NULL;
+    }
+    if (PyArray_NDIM(target) != ndim) {
+        PyErr_SetString(PyExc_ValueError,
+                "target must match the dimensionality of array");
+        return NULL;
+    }
+    for (int i = 0; i < ndim; i++) {
+        if (PyArray_DIM(target, i) != PyArray_DIM(array, i)) {
+            PyErr_SetString(PyExc_ValueError,
+                    "target must match the shape of array");
+            return NULL;
+        }
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(target)) {
+        PyErr_SetString(PyExc_ValueError, "target must be C-contiguous");
+        return NULL;
+    }
+    if (ndim == 2 && axis != 0 && axis != 1) {
+        PyErr_SetString(PyExc_ValueError, "axis must be 0 or 1");
+        return NULL;
+    }
+    if (limit < 0) {
+        PyErr_SetString(PyExc_ValueError, "limit must be non-negative");
+        return NULL;
+    }
+
+    // A C-order copy is the result: non-target positions are already correct, and
+    // its layout aligns element-for-element with the C-contiguous target mask.
+    PyObject *out = PyArray_NewCopy(array, NPY_CORDER);
+    if (!out) {
+        return NULL;
+    }
+
+    int is_object = PyArray_TYPE(array) == NPY_OBJECT;
+    npy_intp itemsize = PyArray_ITEMSIZE((PyArrayObject*)out);
+
+    char *out_data = (char*)PyArray_DATA((PyArrayObject*)out);
+    const npy_bool *target_data = (const npy_bool*)PyArray_DATA(target);
+
+    if (ndim == 1) {
+        npy_intp n = PyArray_DIM((PyArrayObject*)out, 0);
+        AK_fill_lane(out_data, itemsize, target_data, 1, n,
+                itemsize, is_object, forward, limit);
+    }
+    else {
+        npy_intp rows = PyArray_DIM((PyArrayObject*)out, 0);
+        npy_intp cols = PyArray_DIM((PyArrayObject*)out, 1);
+        if (axis == 0) {
+            // fill down each column: elements stride by a full row (cols * itemsize)
+            for (npy_intp c = 0; c < cols; c++) {
+                AK_fill_lane(out_data + c * itemsize, cols * itemsize,
+                        target_data + c, cols, rows, itemsize, is_object, forward, limit);
+            }
+        }
+        else {
+            // fill across each row: elements are contiguous
+            for (npy_intp r = 0; r < rows; r++) {
+                AK_fill_lane(out_data + r * cols * itemsize, itemsize,
+                        target_data + r * cols, 1, cols, itemsize, is_object, forward, limit);
+            }
+        }
+    }
+
+    PyArray_CLEARFLAGS((PyArrayObject*)out, NPY_ARRAY_WRITEABLE);
+    return out;
+}
+
 PyObject *
 dtype_from_element(PyObject *Py_UNUSED(m), PyObject *arg)
 {

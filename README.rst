@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.8.0
+............
+
+Added ``fill_directional()``.
+
+
 1.7.0
 ............
 
