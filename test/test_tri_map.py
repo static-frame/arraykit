@@ -1439,3 +1439,72 @@ class TestUnit(unittest.TestCase):
                 np.datetime64('2005-11'),
             ],
         )
+
+    # ------------------------------------------------------------------
+    # register_many_from_one (bulk one-to-one)
+
+    def test_tri_map_register_many_from_one_a(self) -> None:
+        tm = TriMap(3, 4)
+        tm.register_many_from_one(np.array([2, 0, 3], dtype=np.int64))
+        tm.finalize()
+        self.assertFalse(tm.is_many())
+        src = np.array([10, 20, 30])
+        dst = np.array([100, 200, 300, 400])
+        self.assertEqual(tm.map_src_no_fill(src).tolist(), [10, 20, 30])
+        self.assertEqual(tm.map_dst_no_fill(dst).tolist(), [300, 100, 400])
+
+    def test_tri_map_register_many_from_one_unmatched(self) -> None:
+        # -1 marks an unmatched src -> a src-only row (dst side gets a fill there)
+        tm = TriMap(3, 4)
+        tm.register_many_from_one(np.array([2, -1, 0], dtype=np.int64))
+        tm.finalize()
+        self.assertTrue(tm.src_no_fill())  # every output row has a src value
+        self.assertFalse(tm.dst_no_fill())  # row 1 has no dst -> needs fill
+        dst = np.array([100, 200, 300, 400])
+        self.assertEqual(tm.map_dst_fill(dst, -9, np.dtype(np.int64)).tolist(), [300, -9, 100])
+
+    def test_tri_map_register_many_from_one_is_many(self) -> None:
+        # two src rows matching the same dst -> is_many
+        tm = TriMap(3, 3)
+        tm.register_many_from_one(np.array([0, 0, 1], dtype=np.int64))
+        tm.finalize()
+        self.assertTrue(tm.is_many())
+
+    def test_tri_map_register_many_from_one_equivalence(self) -> None:
+        rng = np.random.RandomState(0)
+        for _ in range(50):
+            src_len = int(rng.randint(1, 12))
+            dst_len = int(rng.randint(1, 10))
+            dst_pos = rng.randint(-1, dst_len, size=src_len).astype(np.int64)
+            tb = TriMap(src_len, dst_len)
+            tb.register_many_from_one(dst_pos)
+            tb.finalize()
+            tl = TriMap(src_len, dst_len)
+            for i in range(src_len):
+                tl.register_one(i, int(dst_pos[i]))
+            tl.finalize()
+            src = np.arange(100, 100 + src_len)
+            dst = np.arange(200, 200 + dst_len)
+            self.assertEqual(tb.is_many(), tl.is_many())
+            self.assertEqual(
+                tb.map_src_no_fill(src).tolist(), tl.map_src_no_fill(src).tolist()
+            )
+            self.assertEqual(
+                tb.map_dst_fill(dst, -1, np.dtype(np.int64)).tolist(),
+                tl.map_dst_fill(dst, -1, np.dtype(np.int64)).tolist(),
+            )
+
+    def test_tri_map_register_many_from_one_errors(self) -> None:
+        with self.assertRaises(ValueError):  # wrong length
+            TriMap(3, 3).register_many_from_one(np.array([0, 1], dtype=np.int64))
+        with self.assertRaises(ValueError):  # wrong dtype
+            TriMap(3, 3).register_many_from_one(np.array([0, 1, 2], dtype=np.int32))
+        with self.assertRaises(ValueError):  # out of bounds dst
+            TriMap(3, 3).register_many_from_one(np.array([0, 1, 9], dtype=np.int64))
+        with self.assertRaises(TypeError):  # not an array
+            TriMap(3, 3).register_many_from_one([0, 1, 2])
+        tm = TriMap(2, 2)
+        tm.register_many_from_one(np.array([0, 1], dtype=np.int64))
+        tm.finalize()
+        with self.assertRaises(RuntimeError):  # post-finalize
+            tm.register_many_from_one(np.array([0, 1], dtype=np.int64))

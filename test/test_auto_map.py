@@ -917,6 +917,109 @@ def test_fam_array_get_all_m3():
 
 
 # -------------------------------------------------------------------------------
+# get_all_fill: input-aligned lookup, -1 for misses (never raises KeyError)
+
+
+def test_fam_array_get_all_fill_int_a():
+    a1 = np.array((10, 20, 30, 40), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    # all present -> identical to get_all
+    keys = np.array([30, 10, 40], dtype=np.int64)
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [2, 0, 3]
+    assert fam.get_all_fill(keys).tolist() == fam.get_all(keys).tolist()
+
+
+def test_fam_array_get_all_fill_int_missing():
+    a1 = np.array((10, 20, 30, 40), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array([30, 99, 10, 77], dtype=np.int64)
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [2, -1, 0, -1]
+
+
+def test_fam_array_get_all_fill_immutable_and_dtype():
+    a1 = np.array((10, 20, 30), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array([10], dtype=np.int64)
+    keys.flags.writeable = False
+    post = fam.get_all_fill(keys)
+    assert not post.flags.writeable
+    assert post.dtype == np.dtype(np.int64)
+
+
+def test_fam_array_get_all_fill_empty():
+    a1 = np.array((10, 20), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array([], dtype=np.int64)
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == []
+
+
+def test_fam_array_get_all_fill_all_missing():
+    a1 = np.array((10, 20), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array([1, 2, 3], dtype=np.int64)
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [-1, -1, -1]
+
+
+def test_fam_array_get_all_fill_kind_mismatch():
+    # int map queried with a float array -> scalar fallback, -1 for misses
+    a1 = np.array((10, 20, 30), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array([10.0, 15.0, 30.0], dtype=np.float64)
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [0, -1, 2]
+
+
+def test_fam_array_get_all_fill_unicode():
+    a1 = np.array(['a', 'bb', 'c'])
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array(['c', 'zz', 'a'])
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [2, -1, 0]
+
+
+def test_fam_array_get_all_fill_bytes():
+    a1 = np.array([b'a', b'bb', b'c'], dtype='S2')
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array([b'c', b'zz', b'a'], dtype='S2')
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [2, -1, 0]
+
+
+def test_fam_array_get_all_fill_datetime():
+    a1 = np.array(['2020-01', '2021-06', '2022-03'], dtype='datetime64[M]')
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    keys = np.array(['2022-03', '1999-12', '2020-01'], dtype='datetime64[M]')
+    keys.flags.writeable = False
+    assert fam.get_all_fill(keys).tolist() == [2, -1, 0]
+
+
+def test_fam_array_get_all_fill_object_list():
+    fam = FrozenAutoMap([('x',), ('y',)])
+    assert fam.get_all_fill([('y',), ('z',), ('x',)]).tolist() == [1, -1, 0]
+
+
+def test_fam_array_get_all_fill_bad_type():
+    a1 = np.array((10, 20), dtype=np.int64)
+    a1.flags.writeable = False
+    fam = FrozenAutoMap(a1)
+    with pytest.raises(TypeError):
+        fam.get_all_fill('a')
+
+
+# -------------------------------------------------------------------------------
 
 
 def test_fam_array_get_any_a1():
