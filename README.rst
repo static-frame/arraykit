@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.10.0
+............
+
+Added ``TriMap.register_pairs()``.
+
+
 1.9.0
 ............
 

@@ -1508,3 +1508,157 @@ class TestUnit(unittest.TestCase):
         tm.finalize()
         with self.assertRaises(RuntimeError):  # post-finalize
             tm.register_many_from_one(np.array([0, 1], dtype=np.int64))
+
+    # ---------------------------------------------------------------------------
+    # register_pairs (bulk arbitrary (src, dst) pairs)
+
+    def test_tri_map_register_pairs_a(self) -> None:
+        # a many-to-many mapping: src 0 -> dst 0 and 1; src 1 -> dst 1
+        tm = TriMap(2, 2)
+        tm.register_pairs(
+            np.array([0, 0, 1], dtype=np.int64),
+            np.array([0, 1, 1], dtype=np.int64),
+        )
+        tm.finalize()
+        self.assertTrue(tm.is_many())
+        self.assertTrue(tm.src_no_fill())
+        self.assertTrue(tm.dst_no_fill())
+        src = np.array([10, 20])
+        dst = np.array([100, 200])
+        self.assertEqual(tm.map_src_no_fill(src).tolist(), [10, 10, 20])
+        self.assertEqual(tm.map_dst_no_fill(dst).tolist(), [100, 200, 200])
+
+    def test_tri_map_register_pairs_unmatched(self) -> None:
+        # -1 on either side marks that side as a fill row
+        tm = TriMap(3, 2)
+        tm.register_pairs(
+            np.array([0, 1, 2], dtype=np.int64),
+            np.array([0, 1, -1], dtype=np.int64),
+        )
+        tm.finalize()
+        self.assertTrue(tm.src_no_fill())  # every row has a src
+        self.assertFalse(tm.dst_no_fill())  # row 2 has no dst
+        dst = np.array([100, 200])
+        self.assertEqual(
+            tm.map_dst_fill(dst, -9, np.dtype(np.int64)).tolist(), [100, 200, -9]
+        )
+
+    def test_tri_map_register_pairs_unmatched_src(self) -> None:
+        # -1 on the src side (as register_unmatched_dst would produce for OUTER)
+        tm = TriMap(2, 3)
+        tm.register_pairs(
+            np.array([0, 1, -1], dtype=np.int64),
+            np.array([0, 1, 2], dtype=np.int64),
+        )
+        tm.finalize()
+        self.assertFalse(tm.src_no_fill())  # row 2 has no src
+        self.assertTrue(tm.dst_no_fill())  # every row has a dst
+        src = np.array([10, 20])
+        self.assertEqual(
+            tm.map_src_fill(src, -9, np.dtype(np.int64)).tolist(), [10, 20, -9]
+        )
+
+    def test_tri_map_register_pairs_is_many(self) -> None:
+        # a single output row per src/dst -> not many
+        tm = TriMap(2, 2)
+        tm.register_pairs(
+            np.array([0, 1], dtype=np.int64),
+            np.array([1, 0], dtype=np.int64),
+        )
+        tm.finalize()
+        self.assertFalse(tm.is_many())
+
+    def test_tri_map_register_pairs_equivalence_loop(self) -> None:
+        # register_pairs == a register_one loop over the same pairs
+        rng = np.random.RandomState(0)
+        for _ in range(50):
+            src_len = int(rng.randint(1, 12))
+            dst_len = int(rng.randint(1, 10))
+            n = int(rng.randint(1, 20))
+            src_pos = rng.randint(-1, src_len, size=n).astype(np.int64)
+            dst_pos = rng.randint(-1, dst_len, size=n).astype(np.int64)
+            tb = TriMap(src_len, dst_len)
+            tb.register_pairs(src_pos, dst_pos)
+            tb.finalize()
+            tl = TriMap(src_len, dst_len)
+            for i in range(n):
+                tl.register_one(int(src_pos[i]), int(dst_pos[i]))
+            tl.finalize()
+            src = np.arange(100, 100 + src_len)
+            dst = np.arange(200, 200 + dst_len)
+            self.assertEqual(tb.is_many(), tl.is_many())
+            self.assertEqual(
+                tb.map_src_fill(src, -1, np.dtype(np.int64)).tolist(),
+                tl.map_src_fill(src, -1, np.dtype(np.int64)).tolist(),
+            )
+            self.assertEqual(
+                tb.map_dst_fill(dst, -1, np.dtype(np.int64)).tolist(),
+                tl.map_dst_fill(dst, -1, np.dtype(np.int64)).tolist(),
+            )
+
+    def test_tri_map_register_pairs_equivalence_many_from_one(self) -> None:
+        # with src = arange(src_len), register_pairs matches register_many_from_one
+        rng = np.random.RandomState(1)
+        for _ in range(20):
+            src_len = int(rng.randint(1, 12))
+            dst_len = int(rng.randint(1, 10))
+            dst_pos = rng.randint(-1, dst_len, size=src_len).astype(np.int64)
+            src_pos = np.arange(src_len, dtype=np.int64)
+            tp = TriMap(src_len, dst_len)
+            tp.register_pairs(src_pos, dst_pos)
+            tp.finalize()
+            tm = TriMap(src_len, dst_len)
+            tm.register_many_from_one(dst_pos)
+            tm.finalize()
+            src = np.arange(100, 100 + src_len)
+            dst = np.arange(200, 200 + dst_len)
+            self.assertEqual(tp.is_many(), tm.is_many())
+            self.assertEqual(
+                tp.map_src_fill(src, -1, np.dtype(np.int64)).tolist(),
+                tm.map_src_fill(src, -1, np.dtype(np.int64)).tolist(),
+            )
+            self.assertEqual(
+                tp.map_dst_fill(dst, -1, np.dtype(np.int64)).tolist(),
+                tm.map_dst_fill(dst, -1, np.dtype(np.int64)).tolist(),
+            )
+
+    def test_tri_map_register_pairs_empty(self) -> None:
+        tm = TriMap(3, 3)
+        tm.register_pairs(
+            np.array([], dtype=np.int64), np.array([], dtype=np.int64)
+        )
+        tm.finalize()
+        self.assertEqual(tm.map_src_no_fill(np.arange(3)).tolist(), [])
+
+    def test_tri_map_register_pairs_errors(self) -> None:
+        with self.assertRaises(ValueError):  # length mismatch
+            TriMap(3, 3).register_pairs(
+                np.array([0, 1], dtype=np.int64), np.array([0], dtype=np.int64)
+            )
+        with self.assertRaises(ValueError):  # wrong dtype
+            TriMap(3, 3).register_pairs(
+                np.array([0, 1], dtype=np.int32), np.array([0, 1], dtype=np.int64)
+            )
+        with self.assertRaises(ValueError):  # 2d
+            TriMap(3, 3).register_pairs(
+                np.array([[0, 1]], dtype=np.int64), np.array([[0, 1]], dtype=np.int64)
+            )
+        with self.assertRaises(ValueError):  # out of bounds src
+            TriMap(3, 3).register_pairs(
+                np.array([9], dtype=np.int64), np.array([0], dtype=np.int64)
+            )
+        with self.assertRaises(ValueError):  # out of bounds dst
+            TriMap(3, 3).register_pairs(
+                np.array([0], dtype=np.int64), np.array([9], dtype=np.int64)
+            )
+        with self.assertRaises(TypeError):  # not an array
+            TriMap(3, 3).register_pairs([0, 1], np.array([0, 1], dtype=np.int64))
+        tm = TriMap(2, 2)
+        tm.register_pairs(
+            np.array([0, 1], dtype=np.int64), np.array([0, 1], dtype=np.int64)
+        )
+        tm.finalize()
+        with self.assertRaises(RuntimeError):  # post-finalize
+            tm.register_pairs(
+                np.array([0], dtype=np.int64), np.array([0], dtype=np.int64)
+            )
