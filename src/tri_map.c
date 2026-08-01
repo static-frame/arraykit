@@ -344,7 +344,8 @@ TriMap_register_pairs(TriMapObject *self, PyObject *args) {
         PyErr_SetString(PyExc_ValueError, "Arrays must be 1-dimensional");
         return NULL;
     }
-    if (!PyArray_IS_C_CONTIGUOUS(src_a) || !PyArray_IS_C_CONTIGUOUS(dst_a)) {
+    if (!PyArray_IS_C_CONTIGUOUS(src_a) || !PyArray_ISALIGNED(src_a)
+            || !PyArray_IS_C_CONTIGUOUS(dst_a) || !PyArray_ISALIGNED(dst_a)) {
         PyErr_SetString(PyExc_ValueError, "Arrays must be contiguous");
         return NULL;
     }
