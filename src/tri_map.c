@@ -310,6 +310,60 @@ TriMap_register_many_from_one(TriMapObject *self, PyObject *arg) {
     Py_RETURN_NONE;
 }
 
+// Bulk pair registration: given two equal-length int64 arrays `src_pos` and `dst_pos`,
+// register the pair (src_pos[i], dst_pos[i]) for each i in a single C loop -- equivalent
+// to calling register_one(src_pos[i], dst_pos[i]) for each i, but without per-element
+// Python overhead. Either position may be -1 to indicate an unmatched (fill) side. This
+// generalizes register_many_from_one (where src is the implicit range 0..src_len) to
+// arbitrary src positions, as needed for many-to-many joins.
+PyObject *
+TriMap_register_pairs(TriMapObject *self, PyObject *args) {
+    PyObject* src_arg;
+    PyObject* dst_arg;
+    if (!PyArg_ParseTuple(args,
+            "OO:register_pairs",
+            &src_arg,
+            &dst_arg)) {
+        return NULL;
+    }
+    if (self->finalized) {
+        PyErr_SetString(PyExc_RuntimeError, "Cannot register post finalization");
+        return NULL;
+    }
+    if (!PyArray_Check(src_arg) || !PyArray_Check(dst_arg)) {
+        PyErr_SetString(PyExc_TypeError, "Must provide arrays");
+        return NULL;
+    }
+    PyArrayObject* src_a = (PyArrayObject*)src_arg;
+    PyArrayObject* dst_a = (PyArrayObject*)dst_arg;
+    if (PyArray_TYPE(src_a) != NPY_INT64 || PyArray_TYPE(dst_a) != NPY_INT64) {
+        PyErr_SetString(PyExc_ValueError, "Arrays must be of type int64");
+        return NULL;
+    }
+    if (PyArray_NDIM(src_a) != 1 || PyArray_NDIM(dst_a) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Arrays must be 1-dimensional");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(src_a) || !PyArray_ISALIGNED(src_a)
+            || !PyArray_IS_C_CONTIGUOUS(dst_a) || !PyArray_ISALIGNED(dst_a)) {
+        PyErr_SetString(PyExc_ValueError, "Arrays must be contiguous");
+        return NULL;
+    }
+    npy_intp n = PyArray_SIZE(src_a);
+    if (n != PyArray_SIZE(dst_a)) {
+        PyErr_SetString(PyExc_ValueError, "Arrays must be the same length");
+        return NULL;
+    }
+    const npy_int64* s = (npy_int64*)PyArray_DATA(src_a);
+    const npy_int64* d = (npy_int64*)PyArray_DATA(dst_a);
+    for (npy_intp i = 0; i < n; i++) {
+        if (AK_TM_register_one(self, (Py_ssize_t)s[i], (Py_ssize_t)d[i])) {
+            return NULL;
+        }
+    }
+    Py_RETURN_NONE;
+}
+
 PyObject *
 TriMap_register_unmatched_dst(TriMapObject *self) {
     if (self->finalized) {
@@ -1400,6 +1454,7 @@ TriMap_map_dst_fill(TriMapObject *self, PyObject *args) {
 static PyMethodDef TriMap_methods[] = {
     {"register_one", (PyCFunction)TriMap_register_one, METH_VARARGS, NULL},
     {"register_many_from_one", (PyCFunction)TriMap_register_many_from_one, METH_O, NULL},
+    {"register_pairs", (PyCFunction)TriMap_register_pairs, METH_VARARGS, NULL},
     {"register_unmatched_dst", (PyCFunction)TriMap_register_unmatched_dst, METH_NOARGS, NULL},
     {"register_many", (PyCFunction)TriMap_register_many, METH_VARARGS, NULL},
     {"finalize", (PyCFunction)TriMap_finalize, METH_NOARGS, NULL},
