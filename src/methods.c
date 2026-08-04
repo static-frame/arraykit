@@ -1222,10 +1222,10 @@ static char *group_reduce_kwarg_names[] = {
     NULL
 };
 
-// Single-pass grouped reduction. Given dense group `codes` in [0, size), a 1D
+// Grouped reduction. Given dense group `codes` in [0, size), a 1D
 // `values` array, and an `op` ('sum'/'prod'/'min'/'max'/'count'), return a length-
 // `size` array of per-group results in code order. Accumulates directly by code in
-// one O(n) pass (no sort, no reorder). 'count' returns int64 group sizes and ignores
+// an O(n) pass after validating codes (no sort, no reorder). 'count' returns int64 group sizes and ignores
 // the values dtype; other ops return the values dtype (float64 or int64). This is
 // the vectorized replacement for a per-group Python reduction loop.
 PyObject *
