@@ -131,8 +131,8 @@ class TestUnit(unittest.TestCase):
             group_reduce(np.array([0, 5], dtype=np.intp), 2, np.array([1.0, 2.0]), 'sum')
         with self.assertRaises(ValueError):  # negative code
             group_reduce(np.array([0, -1], dtype=np.intp), 2, np.array([1.0, 2.0]), 'sum')
-        with self.assertRaises(ValueError):  # codes wrong dtype
-            group_reduce(np.array([0, 1], dtype=np.int32), 2, np.array([1.0, 2.0]), 'sum')
+        with self.assertRaises(ValueError):  # codes wrong dtype (int8 is never intp)
+            group_reduce(np.array([0, 1], dtype=np.int8), 2, np.array([1.0, 2.0]), 'sum')
         with self.assertRaises(ValueError):  # values unsupported dtype
             group_reduce(codes, 2, np.array([1, 2, 3], dtype=np.int32), 'sum')
         with self.assertRaises(ValueError):  # negative size
