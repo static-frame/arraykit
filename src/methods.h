@@ -73,6 +73,9 @@ PyObject *
 group_ordering(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *
+group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
+
+PyObject *
 fill_directional(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *

@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.11.0
+............
+
+Added ``group_reduce()``.
+
+
 1.10.0
 ............
 
