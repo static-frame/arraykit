@@ -1149,17 +1149,17 @@ AK_group_reduce_op_from_str(const char *op, AK_GroupReduceOp *out) {
     return -1;
 }
 
-// Accumulate `n` doubles into `out[size]` per group. NaN propagates for min/max
+// Accumulate `n` float64 into `out[size]` per group. NaN propagates for min/max
 // (matching np.min/np.max, not the nan-skipping variants).
 static void
 AK_group_reduce_f64(
-        const double *v,
+        const npy_float64 *v,
         const npy_intp *codes,
         npy_intp n,
-        double *out,
+        npy_float64 *out,
         npy_intp size,
         AK_GroupReduceOp op) {
-    double init;
+    npy_float64 init;
     switch (op) {
         case GR_PROD: init = 1.0; break;
         case GR_MIN:  init = NPY_INFINITY; break;
@@ -1171,7 +1171,7 @@ AK_group_reduce_f64(
     }
     for (npy_intp i = 0; i < n; i++) {
         npy_intp g = codes[i];
-        double x = v[i];
+        npy_float64 x = v[i];
         switch (op) {
             case GR_SUM:  out[g] += x; break;
             case GR_PROD: out[g] *= x; break;
@@ -1311,9 +1311,9 @@ group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     }
     if (vtype == NPY_DOUBLE) {
         AK_group_reduce_f64(
-                (double*)PyArray_DATA(values),
+                (npy_float64*)PyArray_DATA(values),
                 codes_buffer, n,
-                (double*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+                (npy_float64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
     }
     else {
         AK_group_reduce_i64(
