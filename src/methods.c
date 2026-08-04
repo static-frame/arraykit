@@ -1214,6 +1214,38 @@ AK_group_reduce_i64(
     }
 }
 
+// Accumulate `n` uint64 into `out[size]` per group.
+static void
+AK_group_reduce_u64(
+        const npy_uint64 *v,
+        const npy_intp *codes,
+        npy_intp n,
+        npy_uint64 *out,
+        npy_intp size,
+        AK_GroupReduceOp op) {
+    npy_uint64 init;
+    switch (op) {
+        case GR_PROD: init = 1; break;
+        case GR_MIN:  init = NPY_MAX_UINT64; break;
+        case GR_MAX:  init = 0; break;
+        default:      init = 0; break; // GR_SUM
+    }
+    for (npy_intp g = 0; g < size; g++) {
+        out[g] = init;
+    }
+    for (npy_intp i = 0; i < n; i++) {
+        npy_intp g = codes[i];
+        npy_uint64 x = v[i];
+        switch (op) {
+            case GR_SUM:  out[g] += x; break;
+            case GR_PROD: out[g] *= x; break;
+            case GR_MIN:  if (x < out[g]) out[g] = x; break;
+            case GR_MAX:  if (x > out[g]) out[g] = x; break;
+            default: break;
+        }
+    }
+}
+
 static char *group_reduce_kwarg_names[] = {
     "codes",
     "size",
@@ -1222,12 +1254,17 @@ static char *group_reduce_kwarg_names[] = {
     NULL
 };
 
-// Grouped reduction. Given dense group `codes` in [0, size), a 1D
-// `values` array, and an `op` ('sum'/'prod'/'min'/'max'/'count'), return a length-
-// `size` array of per-group results in code order. Accumulates directly by code in
-// an O(n) pass after validating codes (no sort, no reorder). 'count' returns int64 group sizes and ignores
-// the values dtype; other ops return the values dtype (float64 or int64). This is
-// the vectorized replacement for a per-group Python reduction loop.
+// Grouped reduction. Given dense group `codes` in [0, size), a 1D `values` array, and
+// an `op` ('sum'/'prod'/'min'/'max'/'count'), return a length-`size` array of per-group
+// results in code order. Accumulates directly by code in an O(n) pass after validating
+// codes (no sort, no reorder). Values are accumulated at a 64-bit width by kind: signed
+// integers -> int64, unsigned integers -> uint64, floats -> float64; the result uses
+// that accumulator dtype (the caller casts to a narrower output as needed -- min/max are
+// selected elements so such a cast is lossless). Integer overflow wraps, matching numpy.
+// float16/float32 sum/prod are rejected: accumulating them at float64 would not match
+// numpy's native-width result, so the caller should fall back for those. 'count' returns
+// int64 group sizes and ignores the values dtype. This is the vectorized replacement for
+// a per-group Python reduction loop.
 PyObject *
 group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 {
@@ -1300,27 +1337,68 @@ group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return out_arr;
     }
 
-    if (vtype != NPY_DOUBLE && vtype != NPY_INT64) {
-        PyErr_SetString(PyExc_ValueError,
-                "values must be of type float64 or int64");
-        return NULL;
+    // Choose a 64-bit accumulator by input kind. Integers accumulate exactly at their
+    // signed/unsigned 64-bit width (wrapping on overflow, like numpy); floats at float64.
+    int acc_type;
+    if (PyArray_ISSIGNED(values)) {
+        acc_type = NPY_INT64;
     }
-    PyObject *out_arr = PyArray_EMPTY(1, dims, vtype, 0);
-    if (!out_arr) {
-        return NULL;
+    else if (PyArray_ISUNSIGNED(values)) {
+        acc_type = NPY_UINT64;
     }
-    if (vtype == NPY_DOUBLE) {
-        AK_group_reduce_f64(
-                (npy_float64*)PyArray_DATA(values),
-                codes_buffer, n,
-                (npy_float64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+    else if (vtype == NPY_HALF || vtype == NPY_FLOAT || vtype == NPY_DOUBLE) {
+        acc_type = NPY_DOUBLE;
     }
     else {
-        AK_group_reduce_i64(
-                (npy_int64*)PyArray_DATA(values),
-                codes_buffer, n,
-                (npy_int64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+        PyErr_SetString(PyExc_ValueError,
+                "values must be an integer or float (float16/32/64) dtype");
+        return NULL;
     }
+    // float16/float32 sum/prod cannot be accumulated at float64 without diverging from
+    // numpy's native-width result; the caller falls back to a per-group reduction.
+    if ((op == GR_SUM || op == GR_PROD)
+            && acc_type == NPY_DOUBLE && vtype != NPY_DOUBLE) {
+        PyErr_SetString(PyExc_ValueError,
+                "float16/float32 sum/prod is not supported; cast to float64");
+        return NULL;
+    }
+
+    // upcast the input to the accumulator dtype (no copy when already 64-bit wide)
+    PyArrayObject *v64;
+    if (vtype == acc_type) {
+        Py_INCREF(values);
+        v64 = values;
+    }
+    else {
+        v64 = (PyArrayObject*)PyArray_Cast(values, acc_type);
+        if (v64 == NULL) {
+            return NULL;
+        }
+    }
+
+    PyObject *out_arr = PyArray_EMPTY(1, dims, acc_type, 0);
+    if (!out_arr) {
+        Py_DECREF(v64);
+        return NULL;
+    }
+    switch (acc_type) {
+        case NPY_DOUBLE:
+            AK_group_reduce_f64(
+                    (npy_float64*)PyArray_DATA(v64), codes_buffer, n,
+                    (npy_float64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+            break;
+        case NPY_UINT64:
+            AK_group_reduce_u64(
+                    (npy_uint64*)PyArray_DATA(v64), codes_buffer, n,
+                    (npy_uint64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+            break;
+        default: // NPY_INT64
+            AK_group_reduce_i64(
+                    (npy_int64*)PyArray_DATA(v64), codes_buffer, n,
+                    (npy_int64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+            break;
+    }
+    Py_DECREF(v64);
     PyArray_CLEARFLAGS((PyArrayObject*)out_arr, NPY_ARRAY_WRITEABLE);
     return out_arr;
 }
