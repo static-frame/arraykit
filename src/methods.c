@@ -8,6 +8,7 @@
 # include "numpy/arrayscalars.h"
 # include "numpy/halffloat.h"
 # include <string.h>
+# include <math.h>
 
 # ifdef _WIN32
 #  include <io.h>
@@ -1126,6 +1127,202 @@ fail:
     Py_XDECREF(perm_arr);
     Py_XDECREF(offsets_arr);
     return NULL;
+}
+
+typedef enum {
+    GR_SUM,
+    GR_PROD,
+    GR_MIN,
+    GR_MAX,
+    GR_COUNT,
+} AK_GroupReduceOp;
+
+static int
+AK_group_reduce_op_from_str(const char *op, AK_GroupReduceOp *out) {
+    if (strcmp(op, "sum") == 0)   { *out = GR_SUM;   return 0; }
+    if (strcmp(op, "prod") == 0)  { *out = GR_PROD;  return 0; }
+    if (strcmp(op, "min") == 0)   { *out = GR_MIN;   return 0; }
+    if (strcmp(op, "max") == 0)   { *out = GR_MAX;   return 0; }
+    if (strcmp(op, "count") == 0) { *out = GR_COUNT; return 0; }
+    PyErr_Format(PyExc_ValueError,
+            "unknown op '%s'; expected one of sum, prod, min, max, count", op);
+    return -1;
+}
+
+// Accumulate `n` float64 into `out[size]` per group. NaN propagates for min/max
+// (matching np.min/np.max, not the nan-skipping variants).
+static void
+AK_group_reduce_f64(
+        const npy_float64 *v,
+        const npy_intp *codes,
+        npy_intp n,
+        npy_float64 *out,
+        npy_intp size,
+        AK_GroupReduceOp op) {
+    npy_float64 init;
+    switch (op) {
+        case GR_PROD: init = 1.0; break;
+        case GR_MIN:  init = NPY_INFINITY; break;
+        case GR_MAX:  init = -NPY_INFINITY; break;
+        default:      init = 0.0; break; // GR_SUM
+    }
+    for (npy_intp g = 0; g < size; g++) {
+        out[g] = init;
+    }
+    for (npy_intp i = 0; i < n; i++) {
+        npy_intp g = codes[i];
+        npy_float64 x = v[i];
+        switch (op) {
+            case GR_SUM:  out[g] += x; break;
+            case GR_PROD: out[g] *= x; break;
+            case GR_MIN:  if (isnan(x) || x < out[g]) out[g] = x; break;
+            case GR_MAX:  if (isnan(x) || x > out[g]) out[g] = x; break;
+            default: break;
+        }
+    }
+}
+
+// Accumulate `n` int64 into `out[size]` per group.
+static void
+AK_group_reduce_i64(
+        const npy_int64 *v,
+        const npy_intp *codes,
+        npy_intp n,
+        npy_int64 *out,
+        npy_intp size,
+        AK_GroupReduceOp op) {
+    npy_int64 init;
+    switch (op) {
+        case GR_PROD: init = 1; break;
+        case GR_MIN:  init = NPY_MAX_INT64; break;
+        case GR_MAX:  init = NPY_MIN_INT64; break;
+        default:      init = 0; break; // GR_SUM
+    }
+    for (npy_intp g = 0; g < size; g++) {
+        out[g] = init;
+    }
+    for (npy_intp i = 0; i < n; i++) {
+        npy_intp g = codes[i];
+        npy_int64 x = v[i];
+        switch (op) {
+            case GR_SUM:  out[g] += x; break;
+            case GR_PROD: out[g] *= x; break;
+            case GR_MIN:  if (x < out[g]) out[g] = x; break;
+            case GR_MAX:  if (x > out[g]) out[g] = x; break;
+            default: break;
+        }
+    }
+}
+
+static char *group_reduce_kwarg_names[] = {
+    "codes",
+    "size",
+    "values",
+    "op",
+    NULL
+};
+
+// Grouped reduction. Given dense group `codes` in [0, size), a 1D
+// `values` array, and an `op` ('sum'/'prod'/'min'/'max'/'count'), return a length-
+// `size` array of per-group results in code order. Accumulates directly by code in
+// an O(n) pass after validating codes (no sort, no reorder). 'count' returns int64 group sizes and ignores
+// the values dtype; other ops return the values dtype (float64 or int64). This is
+// the vectorized replacement for a per-group Python reduction loop.
+PyObject *
+group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *codes = NULL;
+    Py_ssize_t size = 0;
+    PyArrayObject *values = NULL;
+    const char *op_name = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!nO!s:group_reduce",
+            group_reduce_kwarg_names,
+            &PyArray_Type, &codes,
+            &size,
+            &PyArray_Type, &values,
+            &op_name
+            )) {
+        return NULL;
+    }
+    AK_GroupReduceOp op;
+    if (AK_group_reduce_op_from_str(op_name, &op)) {
+        return NULL;
+    }
+    if (size < 0) {
+        PyErr_SetString(PyExc_ValueError, "size must be non-negative");
+        return NULL;
+    }
+    if (PyArray_NDIM(codes) != 1 || PyArray_NDIM(values) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Arrays must be 1-dimensional");
+        return NULL;
+    }
+    if (PyArray_TYPE(codes) != NPY_INTP) {
+        PyErr_SetString(PyExc_ValueError, "codes must be of type intp");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(codes) || !PyArray_IS_C_CONTIGUOUS(values)) {
+        PyErr_SetString(PyExc_ValueError, "Arrays must be contiguous");
+        return NULL;
+    }
+    npy_intp n = PyArray_SIZE(codes);
+    if (PyArray_SIZE(values) != n) {
+        PyErr_SetString(PyExc_ValueError,
+                "codes and values must be the same length");
+        return NULL;
+    }
+    const npy_intp *codes_buffer = (npy_intp*)PyArray_DATA(codes);
+    // validate codes are in range before any indexed writes into the output
+    for (npy_intp i = 0; i < n; i++) {
+        npy_intp c = codes_buffer[i];
+        if (c < 0 || c >= size) {
+            PyErr_Format(PyExc_ValueError,
+                    "code %zd out of range [0, %zd)",
+                    (Py_ssize_t)c, (Py_ssize_t)size);
+            return NULL;
+        }
+    }
+
+    npy_intp dims[1] = {size};
+    int vtype = PyArray_TYPE(values);
+
+    if (op == GR_COUNT) {
+        PyObject *out_arr = PyArray_ZEROS(1, dims, NPY_INT64, 0);
+        if (!out_arr) {
+            return NULL;
+        }
+        npy_int64 *out = (npy_int64*)PyArray_DATA((PyArrayObject*)out_arr);
+        for (npy_intp i = 0; i < n; i++) {
+            out[codes_buffer[i]]++;
+        }
+        PyArray_CLEARFLAGS((PyArrayObject*)out_arr, NPY_ARRAY_WRITEABLE);
+        return out_arr;
+    }
+
+    if (vtype != NPY_DOUBLE && vtype != NPY_INT64) {
+        PyErr_SetString(PyExc_ValueError,
+                "values must be of type float64 or int64");
+        return NULL;
+    }
+    PyObject *out_arr = PyArray_EMPTY(1, dims, vtype, 0);
+    if (!out_arr) {
+        return NULL;
+    }
+    if (vtype == NPY_DOUBLE) {
+        AK_group_reduce_f64(
+                (npy_float64*)PyArray_DATA(values),
+                codes_buffer, n,
+                (npy_float64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+    }
+    else {
+        AK_group_reduce_i64(
+                (npy_int64*)PyArray_DATA(values),
+                codes_buffer, n,
+                (npy_int64*)PyArray_DATA((PyArrayObject*)out_arr), size, op);
+    }
+    PyArray_CLEARFLAGS((PyArrayObject*)out_arr, NPY_ARRAY_WRITEABLE);
+    return out_arr;
 }
 
 // Fill one strided lane in place: walk positions in the fill direction, carrying

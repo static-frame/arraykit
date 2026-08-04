@@ -233,6 +233,9 @@ def factorize(
 def group_ordering(
     codes: np.ndarray, *, size: tp.Optional[int] = ...
 ) -> tp.Tuple[np.ndarray, np.ndarray]: ...
+def group_reduce(
+    codes: np.ndarray, size: int, values: np.ndarray, op: str
+) -> np.ndarray: ...
 def fill_directional(
     array: np.ndarray,
     target: np.ndarray,
