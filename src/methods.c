@@ -1466,14 +1466,20 @@ map_object(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     int has_big_int = 0;
     int needs_object = 0;
 
-    for (npy_intp i = 0; i < n; i++) {
+    // 1D: hoist the base pointer and element stride and walk a running pointer, rather
+    // than recomputing PyArray_GETPTR1 each iteration. For a contiguous array the stride
+    // is the itemsize (direct indexing into the flat buffer); a strided slice still works.
+    char *p = (char*)PyArray_DATA(array);
+    npy_intp stride = PyArray_STRIDES(array)[0];
+
+    for (npy_intp i = 0; i < n; i++, p += stride) {
         PyObject *elem;
         if (is_object) {
-            elem = *(PyObject**)PyArray_GETPTR1(array, i);
+            elem = *(PyObject**)p;
             Py_INCREF(elem);
         }
         else {
-            elem = PyArray_ToScalar(PyArray_GETPTR1(array, i), array);
+            elem = PyArray_ToScalar(p, array);
             if (elem == NULL) {
                 goto fail;
             }

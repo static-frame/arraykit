@@ -119,6 +119,19 @@ class TestUnit(unittest.TestCase):
         post = self._check(np.array([], dtype=np.float64), lambda x: str(x))
         self.assertEqual(len(post), 0)
 
+    def test_map_object_strided_non_contiguous(self) -> None:
+        # a strided slice (non-contiguous) must be walked correctly by the running pointer
+        base = np.array([1.0, 99.0, 2.0, 99.0, 3.0])
+        strided = base[::2]
+        self.assertFalse(strided.flags['C_CONTIGUOUS'])
+        post = self._check(strided, lambda x: str(x))
+        self.assertEqual(post.tolist(), ['1.0', '2.0', '3.0'])
+
+    def test_map_object_strided_object(self) -> None:
+        arr = np.array(['a', 'X', 'bb', 'X', 'ccc'], dtype=object)[::2]
+        post = self._check(arr, lambda x: len(x))
+        self.assertEqual(post.tolist(), [1, 2, 3])
+
     def test_map_object_propagates_exception(self) -> None:
         def bad(x):
             raise ValueError('boom')
