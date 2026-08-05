@@ -236,6 +236,7 @@ def group_ordering(
 def group_reduce(
     codes: np.ndarray, size: int, values: np.ndarray, op: str
 ) -> np.ndarray: ...
+def map_object(array: np.ndarray, func: tp.Callable[[tp.Any], tp.Any]) -> np.ndarray: ...
 def fill_directional(
     array: np.ndarray,
     target: np.ndarray,

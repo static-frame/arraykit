@@ -35,6 +35,12 @@ ArrayKit requires the following:
 What is New in ArrayKit
 -------------------------
 
+1.12.0
+............
+
+Added ``map_object()``.
+
+
 1.11.0
 ............
 

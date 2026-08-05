@@ -1403,6 +1403,149 @@ group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     return out_arr;
 }
 
+// int magnitude beyond which a Python int is no longer losslessly coercible to float;
+// mirrors static_frame.core.util.INT_MAX_COERCIBLE_TO_FLOAT
+#define AK_INT_MAX_COERCIBLE_TO_FLOAT 1000000000000000LL
+
+static char *map_object_kwarg_names[] = {
+    "array",
+    "func",
+    NULL
+};
+
+// Apply a Python callable to each element of a 1D array (elements boxed as numpy scalars,
+// matching NumPy/Series iteration) and return a new 1D array, inferring the result dtype
+// with the same rules as static_frame.core.util.prepare_iter_for_array: the result is an
+// object array when the applied values mix strings and non-strings, include a sized object
+// (tuple/list/array), an Enum, or mix a large Python int with a Python float/complex;
+// otherwise NumPy auto-detects the dtype (e.g. str -> '<U', float -> float64). This fuses
+// the per-element apply, the type inspection, and the array build into one C pass.
+PyObject *
+map_object(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyArrayObject *array = NULL;
+    PyObject *func = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O!O:map_object",
+            map_object_kwarg_names,
+            &PyArray_Type, &array,
+            &func
+            )) {
+        return NULL;
+    }
+    if (PyArray_NDIM(array) != 1) {
+        PyErr_SetString(PyExc_ValueError, "array must be 1-dimensional");
+        return NULL;
+    }
+    if (!PyCallable_Check(func)) {
+        PyErr_SetString(PyExc_TypeError, "func must be callable");
+        return NULL;
+    }
+    npy_intp n = PyArray_SIZE(array);
+    int is_object = PyArray_TYPE(array) == NPY_OBJECT;
+
+    PyObject *values = PyList_New(n); // collected results; owns references
+    if (values == NULL) {
+        return NULL;
+    }
+    // enum.Enum for the rare Enum-result case; on failure proceed without the check
+    PyObject *enum_type = NULL;
+    PyObject *enum_mod = PyImport_ImportModule("enum");
+    if (enum_mod != NULL) {
+        enum_type = PyObject_GetAttrString(enum_mod, "Enum");
+        Py_DECREF(enum_mod);
+    }
+    if (enum_type == NULL) {
+        PyErr_Clear();
+    }
+
+    // prepare_iter_for_array inference state
+    int has_str = 0;
+    int has_non_str = 0;
+    int has_inexact = 0;
+    int has_big_int = 0;
+    int needs_object = 0;
+
+    for (npy_intp i = 0; i < n; i++) {
+        PyObject *elem;
+        if (is_object) {
+            elem = *(PyObject**)PyArray_GETPTR1(array, i);
+            Py_INCREF(elem);
+        }
+        else {
+            elem = PyArray_ToScalar(PyArray_GETPTR1(array, i), array);
+            if (elem == NULL) {
+                goto fail;
+            }
+        }
+        PyObject *r = PyObject_CallOneArg(func, elem);
+        Py_DECREF(elem);
+        if (r == NULL) {
+            goto fail;
+        }
+        PyList_SET_ITEM(values, i, r); // steals reference to r
+
+        if (needs_object) {
+            continue; // dtype already resolved; keep collecting only
+        }
+        PyTypeObject *rt = Py_TYPE(r);
+        // exact str/bytes (Python or numpy scalar) -> string; subclasses fall through
+        if (PyUnicode_CheckExact(r) || PyBytes_CheckExact(r)
+                || PyArray_IsScalar(r, Unicode) || PyArray_IsScalar(r, String)) {
+            has_str = 1;
+        }
+        // a sized object (tuple, list, array, SF container, str subclass) -> object
+        else if ((rt->tp_as_sequence && rt->tp_as_sequence->sq_length)
+                || (rt->tp_as_mapping && rt->tp_as_mapping->mp_length)) {
+            needs_object = 1;
+        }
+        else {
+            has_non_str = 1;
+            if (rt == &PyFloat_Type || rt == &PyComplex_Type) {
+                has_inexact = 1;
+            }
+            else if (rt == &PyLong_Type) {
+                int overflow = 0;
+                long long lv = PyLong_AsLongLongAndOverflow(r, &overflow);
+                if (overflow || llabs(lv) > AK_INT_MAX_COERCIBLE_TO_FLOAT) {
+                    has_big_int = 1;
+                }
+            }
+            else if (PyArray_IsScalar(r, Generic)) {
+                ; // any other numpy scalar: non-str, no inexact/big-int, not an Enum
+            }
+            else if (enum_type != NULL && PyObject_IsInstance(r, enum_type) == 1) {
+                needs_object = 1;
+            }
+        }
+        if ((has_str && has_non_str) || (has_big_int && has_inexact)) {
+            needs_object = 1;
+        }
+    }
+    Py_XDECREF(enum_type);
+
+    PyObject *result;
+    if (needs_object) {
+        // build an object array of the collected values
+        result = PyArray_FROM_OTF(values, NPY_OBJECT, NPY_ARRAY_C_CONTIGUOUS);
+    }
+    else {
+        // let NumPy auto-detect the dtype from the values (str -> '<U', float -> f8, ...)
+        result = PyArray_FromAny(values, NULL, 1, 1, NPY_ARRAY_C_CONTIGUOUS, NULL);
+    }
+    Py_DECREF(values);
+    if (result == NULL) {
+        return NULL;
+    }
+    PyArray_CLEARFLAGS((PyArrayObject*)result, NPY_ARRAY_WRITEABLE);
+    return result;
+
+fail:
+    Py_XDECREF(enum_type);
+    Py_DECREF(values);
+    return NULL;
+}
+
 // Fill one strided lane in place: walk positions in the fill direction, carrying
 // the most recent non-target value into each target position (subject to `limit`
 // consecutive fills per run). `elem_base`/`elem_stride` address elements in bytes;
