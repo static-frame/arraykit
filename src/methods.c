@@ -1407,6 +1407,75 @@ group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 // mirrors static_frame.core.util.INT_MAX_COERCIBLE_TO_FLOAT
 #define AK_INT_MAX_COERCIBLE_TO_FLOAT 1000000000000000LL
 
+// running state of the prepare_iter_for_array dtype inference over a series of values
+typedef struct AK_InferState {
+    int has_str;
+    int has_non_str;
+    int has_inexact;
+    int has_big_int;
+    int has_tuple;    // a sized object was seen (tuple/list/array/...)
+    int needs_object; // the resolved dtype must be object rather than auto-detected
+} AK_InferState;
+
+// Classify one value per static_frame.core.util.prepare_iter_for_array's rules, updating
+// `s`. Once `s->needs_object` is set the caller can stop inspecting. `enum_type` is
+// enum.Enum (may be NULL to skip the Enum check).
+static inline void
+AK_infer_value(PyObject *v, PyObject *enum_type, AK_InferState *s)
+{
+    PyTypeObject *vt = Py_TYPE(v);
+    // exact str/bytes (Python or numpy scalar) -> string; subclasses fall through
+    if (PyUnicode_CheckExact(v) || PyBytes_CheckExact(v)
+            || PyArray_IsScalar(v, Unicode) || PyArray_IsScalar(v, String)) {
+        s->has_str = 1;
+    }
+    // a sized object (tuple, list, array, SF container, str subclass) -> object
+    else if ((vt->tp_as_sequence && vt->tp_as_sequence->sq_length)
+            || (vt->tp_as_mapping && vt->tp_as_mapping->mp_length)) {
+        s->has_tuple = 1;
+        s->needs_object = 1;
+    }
+    else {
+        s->has_non_str = 1;
+        if (vt == &PyFloat_Type || vt == &PyComplex_Type) {
+            s->has_inexact = 1;
+        }
+        else if (vt == &PyLong_Type) {
+            int overflow = 0;
+            long long lv = PyLong_AsLongLongAndOverflow(v, &overflow);
+            if (overflow || llabs(lv) > AK_INT_MAX_COERCIBLE_TO_FLOAT) {
+                s->has_big_int = 1;
+            }
+        }
+        else if (PyArray_IsScalar(v, Generic)) {
+            ; // any other numpy scalar: non-str, no inexact/big-int, not an Enum
+        }
+        else if (enum_type != NULL && PyObject_IsInstance(v, enum_type) == 1) {
+            s->needs_object = 1;
+        }
+    }
+    if ((s->has_str && s->has_non_str) || (s->has_big_int && s->has_inexact)) {
+        s->needs_object = 1;
+    }
+}
+
+// Import enum.Enum for the (rare) Enum inference case; returns a new reference or NULL
+// (clearing the error), in which case the Enum check is skipped.
+static PyObject *
+AK_import_enum(void)
+{
+    PyObject *enum_type = NULL;
+    PyObject *enum_mod = PyImport_ImportModule("enum");
+    if (enum_mod != NULL) {
+        enum_type = PyObject_GetAttrString(enum_mod, "Enum");
+        Py_DECREF(enum_mod);
+    }
+    if (enum_type == NULL) {
+        PyErr_Clear();
+    }
+    return enum_type;
+}
+
 static char *map_object_kwarg_names[] = {
     "array",
     "func",
@@ -1449,22 +1518,8 @@ map_object(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         return NULL;
     }
     // enum.Enum for the rare Enum-result case; on failure proceed without the check
-    PyObject *enum_type = NULL;
-    PyObject *enum_mod = PyImport_ImportModule("enum");
-    if (enum_mod != NULL) {
-        enum_type = PyObject_GetAttrString(enum_mod, "Enum");
-        Py_DECREF(enum_mod);
-    }
-    if (enum_type == NULL) {
-        PyErr_Clear();
-    }
-
-    // prepare_iter_for_array inference state
-    int has_str = 0;
-    int has_non_str = 0;
-    int has_inexact = 0;
-    int has_big_int = 0;
-    int needs_object = 0;
+    PyObject *enum_type = AK_import_enum();
+    AK_InferState state = {0, 0, 0, 0, 0, 0};
 
     // 1D: hoist the base pointer and element stride and walk a running pointer, rather
     // than recomputing PyArray_GETPTR1 each iteration. For a contiguous array the stride
@@ -1490,48 +1545,14 @@ map_object(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
             goto fail;
         }
         PyList_SET_ITEM(values, i, r); // steals reference to r
-
-        if (needs_object) {
-            continue; // dtype already resolved; keep collecting only
-        }
-        PyTypeObject *rt = Py_TYPE(r);
-        // exact str/bytes (Python or numpy scalar) -> string; subclasses fall through
-        if (PyUnicode_CheckExact(r) || PyBytes_CheckExact(r)
-                || PyArray_IsScalar(r, Unicode) || PyArray_IsScalar(r, String)) {
-            has_str = 1;
-        }
-        // a sized object (tuple, list, array, SF container, str subclass) -> object
-        else if ((rt->tp_as_sequence && rt->tp_as_sequence->sq_length)
-                || (rt->tp_as_mapping && rt->tp_as_mapping->mp_length)) {
-            needs_object = 1;
-        }
-        else {
-            has_non_str = 1;
-            if (rt == &PyFloat_Type || rt == &PyComplex_Type) {
-                has_inexact = 1;
-            }
-            else if (rt == &PyLong_Type) {
-                int overflow = 0;
-                long long lv = PyLong_AsLongLongAndOverflow(r, &overflow);
-                if (overflow || llabs(lv) > AK_INT_MAX_COERCIBLE_TO_FLOAT) {
-                    has_big_int = 1;
-                }
-            }
-            else if (PyArray_IsScalar(r, Generic)) {
-                ; // any other numpy scalar: non-str, no inexact/big-int, not an Enum
-            }
-            else if (enum_type != NULL && PyObject_IsInstance(r, enum_type) == 1) {
-                needs_object = 1;
-            }
-        }
-        if ((has_str && has_non_str) || (has_big_int && has_inexact)) {
-            needs_object = 1;
+        if (!state.needs_object) {
+            AK_infer_value(r, enum_type, &state);
         }
     }
     Py_XDECREF(enum_type);
 
     PyObject *result;
-    if (needs_object) {
+    if (state.needs_object) {
         // build an object array of the collected values
         result = PyArray_FROM_OTF(values, NPY_OBJECT, NPY_ARRAY_C_CONTIGUOUS);
     }
@@ -1549,6 +1570,104 @@ map_object(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
 fail:
     Py_XDECREF(enum_type);
     Py_DECREF(values);
+    return NULL;
+}
+
+static char *prepare_iter_for_array_kwarg_names[] = {
+    "values",
+    "copy",
+    NULL
+};
+
+// Infer a dtype specifier for the elements of an iterable, matching
+// static_frame.core.util.prepare_iter_for_array: return ``(resolved, has_tuple, values)``
+// where `resolved` is None (let NumPy auto-detect) or the ``object`` type, `has_tuple`
+// marks that a sized object was seen, and `values` is a newly materialized list when
+// `copy` is true (e.g. a generator/dict/set) else the original iterable. The caller
+// decides `copy` (via is_gen_copy_values), keeping the SF-specific type policy out of C.
+PyObject *
+prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
+{
+    PyObject *values = NULL;
+    int copy = 0;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+            "O|p:prepare_iter_for_array",
+            prepare_iter_for_array_kwarg_names,
+            &values,
+            &copy
+            )) {
+        return NULL;
+    }
+    PyObject *enum_type = AK_import_enum();
+    AK_InferState state = {0, 0, 0, 0, 0, 0};
+    PyObject *values_out = NULL; // new list when copy, else a new ref to the original
+
+    if (copy) {
+        // materialize into a list while inspecting (generator/dict/set input)
+        values_out = PyList_New(0);
+        if (values_out == NULL) {
+            goto fail;
+        }
+        PyObject *iter = PyObject_GetIter(values);
+        if (iter == NULL) {
+            goto fail;
+        }
+        PyObject *item;
+        while ((item = PyIter_Next(iter)) != NULL) {
+            if (PyList_Append(values_out, item) != 0) {
+                Py_DECREF(item);
+                Py_DECREF(iter);
+                goto fail;
+            }
+            if (!state.needs_object) {
+                AK_infer_value(item, enum_type, &state);
+            }
+            Py_DECREF(item);
+        }
+        Py_DECREF(iter);
+        if (PyErr_Occurred()) {
+            goto fail;
+        }
+    }
+    else {
+        // inspect only; direct indexing for list/tuple, else the iterator protocol
+        Py_INCREF(values);
+        values_out = values;
+        if (PyList_CheckExact(values) || PyTuple_CheckExact(values)) {
+            Py_ssize_t sz = PySequence_Fast_GET_SIZE(values);
+            for (Py_ssize_t i = 0; i < sz && !state.needs_object; i++) {
+                AK_infer_value(PySequence_Fast_GET_ITEM(values, i), enum_type, &state);
+            }
+        }
+        else {
+            PyObject *iter = PyObject_GetIter(values);
+            if (iter == NULL) {
+                goto fail;
+            }
+            PyObject *item;
+            while (!state.needs_object && (item = PyIter_Next(iter)) != NULL) {
+                AK_infer_value(item, enum_type, &state);
+                Py_DECREF(item);
+            }
+            Py_DECREF(iter);
+            if (PyErr_Occurred()) {
+                goto fail;
+            }
+        }
+    }
+    Py_XDECREF(enum_type);
+
+    PyObject *resolved = state.needs_object
+            ? (PyObject*)&PyBaseObject_Type // the ``object`` builtin -> object dtype
+            : Py_None;
+    PyObject *has_tuple = state.has_tuple ? Py_True : Py_False;
+    PyObject *result = PyTuple_Pack(3, resolved, has_tuple, values_out);
+    Py_DECREF(values_out);
+    return result;
+
+fail:
+    Py_XDECREF(enum_type);
+    Py_XDECREF(values_out);
     return NULL;
 }
 
