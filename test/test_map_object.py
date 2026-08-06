@@ -64,8 +64,9 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(post.dtype, np.dtype(np.float64))
 
     def test_map_object_native_int(self) -> None:
+        # python-int results auto-detect to the platform default int (int32 on Windows)
         post = self._check(np.array([1, 2, 3]), lambda x: int(x) + 1)
-        self.assertEqual(post.dtype, np.dtype(np.int64))
+        self.assertEqual(post.dtype, np.dtype(np.int_))
 
     def test_map_object_tuple_result(self) -> None:
         post = self._check(np.array([1, 2]), lambda x: (int(x), int(x)))
