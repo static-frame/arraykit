@@ -10,6 +10,20 @@ class Color(Enum):
     G = 2
 
 
+class _Hinted:
+    """An iterable exposing a (possibly inexact) __length_hint__."""
+
+    def __init__(self, items, hint):
+        self._items = list(items)
+        self._hint = hint
+
+    def __iter__(self):
+        return iter(self._items)
+
+    def __length_hint__(self):
+        return self._hint
+
+
 # faithful reference: static_frame.core.util.prepare_iter_for_array, given a precomputed
 # copy flag (SF's is_gen_copy_values decision lives in the SF wrapper)
 _INEXACT = (float, complex, np.inexact)
@@ -119,10 +133,37 @@ class TestUnit(unittest.TestCase):
         self._check(lambda: (x for x in []), True)
 
     def test_set_copy(self) -> None:
-        # a set is materialized (order-independent check of contents)
+        # a set is materialized (order-independent check of contents); it has __len__,
+        # so the list is pre-sized
         r = prepare_iter_for_array({1, 2, 3}, True)
         self.assertIsNone(r[0])
         self.assertEqual(sorted(r[2]), [1, 2, 3])
+
+    def test_dict_copy(self) -> None:
+        r = prepare_iter_for_array({'a': 1, 'b': 2}, True)
+        self.assertEqual(sorted(r[2]), ['a', 'b'])
+
+    def test_length_hint_exact(self) -> None:
+        r = self._check(lambda: _Hinted([1, 2, 3], 3), True)
+        self.assertEqual(list(r[2]), [1, 2, 3])
+
+    def test_length_hint_overestimate(self) -> None:
+        # a hint larger than the actual length -> trailing slots dropped
+        r = prepare_iter_for_array(_Hinted([1, 2, 3], 10), True)
+        self.assertEqual(list(r[2]), [1, 2, 3])
+        self.assertEqual(len(r[2]), 3)
+
+    def test_length_hint_underestimate(self) -> None:
+        # a hint smaller than the actual length -> remaining items appended
+        r = prepare_iter_for_array(_Hinted([1, 2, 3, 4, 5], 1), True)
+        self.assertEqual(list(r[2]), [1, 2, 3, 4, 5])
+
+    def test_length_hint_inference_preserved(self) -> None:
+        # inference still resolves object through the pre-sized path
+        r = prepare_iter_for_array(_Hinted([1, (2,)], 5), True)
+        self.assertIs(r[0], object)
+        self.assertTrue(r[1])
+        self.assertEqual(list(r[2]), [1, (2,)])
 
     def test_no_copy_returns_original(self) -> None:
         src = [1, 2, 3]

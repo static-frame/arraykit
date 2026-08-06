@@ -1403,6 +1403,7 @@ group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     return out_arr;
 }
 
+//------------------------------------------------------------------------------
 // int magnitude beyond which a Python int is no longer losslessly coercible to float;
 // mirrors static_frame.core.util.INT_MAX_COERCIBLE_TO_FLOAT
 #define AK_INT_MAX_COERCIBLE_TO_FLOAT 1000000000000000LL
@@ -1459,7 +1460,7 @@ AK_infer_value(PyObject *v, PyObject *enum_type, AK_InferState *s)
     }
 }
 
-// Import enum.Enum for the (rare) Enum inference case; returns a new reference or NULL
+// Import enum.Enum for the Enum inference case; returns a new reference or NULL
 // (clearing the error), in which case the Enum check is skipped.
 static PyObject *
 AK_import_enum(void)
@@ -1603,8 +1604,15 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
     PyObject *values_out = NULL; // new list when copy, else a new ref to the original
 
     if (copy) {
-        // materialize into a list while inspecting (generator/dict/set input)
-        values_out = PyList_New(0);
+        // materialize into a list while inspecting (generator/dict/set input). Pre-size
+        // the list from a length hint when one is available (sets, dicts, sized
+        // iterators) to avoid repeated reallocation; fall back to append growth for a
+        // bare generator (hint 0), and guard against an inexact hint over/under-shooting.
+        Py_ssize_t hint = PyObject_LengthHint(values, 0);
+        if (hint < 0) {
+            goto fail;
+        }
+        values_out = PyList_New(hint);
         if (values_out == NULL) {
             goto fail;
         }
@@ -1612,21 +1620,31 @@ prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs)
         if (iter == NULL) {
             goto fail;
         }
+        Py_ssize_t i = 0;
         PyObject *item;
         while ((item = PyIter_Next(iter)) != NULL) {
-            if (PyList_Append(values_out, item) != 0) {
-                Py_DECREF(item);
-                Py_DECREF(iter);
-                goto fail;
-            }
             if (!state.needs_object) {
                 AK_infer_value(item, enum_type, &state);
             }
-            Py_DECREF(item);
+            if (i < hint) {
+                PyList_SET_ITEM(values_out, i, item); // steals reference
+            }
+            else { // hint underestimated the length
+                int rc = PyList_Append(values_out, item);
+                Py_DECREF(item);
+                if (rc != 0) {
+                    Py_DECREF(iter);
+                    goto fail;
+                }
+            }
+            i++;
         }
         Py_DECREF(iter);
         if (PyErr_Occurred()) {
             goto fail;
+        }
+        if (i < hint) { // hint overestimated: drop the trailing (NULL) slots
+            Py_SET_SIZE(values_out, i);
         }
     }
     else {
@@ -1670,6 +1688,8 @@ fail:
     Py_XDECREF(values_out);
     return NULL;
 }
+
+//------------------------------------------------------------------------------
 
 // Fill one strided lane in place: walk positions in the fill direction, carrying
 // the most recent non-target value into each target position (subject to `limit`
