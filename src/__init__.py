@@ -28,6 +28,8 @@ from ._arraykit import write_array_to_file as write_array_to_file
 from ._arraykit import factorize as factorize
 from ._arraykit import group_ordering as group_ordering
 from ._arraykit import group_reduce as group_reduce
+from ._arraykit import map_object as map_object
+from ._arraykit import prepare_iter_for_array as prepare_iter_for_array
 from ._arraykit import fill_directional as fill_directional
 from ._arraykit import count_iteration as count_iteration
 from ._arraykit import first_true_1d as first_true_1d

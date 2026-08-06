@@ -76,6 +76,12 @@ PyObject *
 group_reduce(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *
+map_object(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
+
+PyObject *
+prepare_iter_for_array(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
+
+PyObject *
 fill_directional(PyObject *Py_UNUSED(m), PyObject *args, PyObject *kwargs);
 
 PyObject *
