@@ -48,8 +48,6 @@ jobs:
       matrix:
         os: ${{ fromJson(needs.matrix_config.outputs.matrix_os) }}
         python:
-            - {minor: 10, req_test: 'requirements-dev-3_11.txt', ft: '0'}
-            - {minor: 11, req_test: 'requirements-dev-3_11.txt', ft: '0'}
             - {minor: 12, req_test: 'requirements-dev-3_12.txt', ft: '0'}
             - {minor: 13, req_test: 'requirements-dev-3_13.txt', ft: '0'}
             - {minor: 14, req_test: 'requirements-dev-3_14.txt', ft: '0'}
@@ -78,7 +76,6 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
-          CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
       - run: pip install pipx
         if: matrix.os == 'macos-15-xlarge'
@@ -90,7 +87,6 @@ jobs:
           CIBW_BUILD: cp3${{ matrix.python.minor }}-macosx_arm64
           CIBW_BEFORE_TEST: pip install -r {project}/${{ matrix.python.req_test }}
           CIBW_TEST_COMMAND: pytest {project}/test
-          CIBW_ENABLE: ${{ matrix.python.ft == '1' && 'cpython-freethreading' || '' }}
 
       - uses: actions/upload-artifact@v4
         with:
