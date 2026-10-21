@@ -28,7 +28,7 @@ Dependencies
 
 ArrayKit requires the following:
 
-- Python>=3.10
+- Python>=3.12
 - numpy>=1.24.3
 
 
