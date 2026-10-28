@@ -47,7 +47,7 @@ static PyMethodDef arraykit_methods[] =  {
     {"parquet_to_arrays",
             (PyCFunction)parquet_to_arrays,
             METH_VARARGS | METH_KEYWORDS,
-            "Read a Parquet file into immutable 1D arrays; requires PyArrow."},
+            "Read a Parquet file into immutable 1D arrays; requires the native backend."},
     {"iterable_str_to_array_1d",
             (PyCFunction)iterable_str_to_array_1d,
             METH_VARARGS | METH_KEYWORDS,

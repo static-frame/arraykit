@@ -1,8 +1,12 @@
 import gc
+from decimal import Decimal
+import importlib.util
 import io
 import os
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest import mock
 
@@ -18,7 +22,11 @@ except ImportError:
     pq = None
 
 
-@unittest.skipIf(pa is None, 'PyArrow is not installed')
+@unittest.skipIf(pa is None, 'PyArrow is not installed for fixture generation')
+@unittest.skipIf(
+    importlib.util.find_spec('arraykit._parquet') is None,
+    'Native Parquet backend is not built',
+)
 class TestUnit(unittest.TestCase):
     @staticmethod
     def to_file(table, **kwargs):
@@ -130,6 +138,22 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(array.tolist(), ['a', 'b', 'a'])
         self.assertEqual(array.dtype, np.dtype(object))
 
+    def test_parquet_to_arrays_nested_float16(self):
+        values = [
+            {'x': 1.5}, {'x': None}, None, {'x': -0.0},
+            {'x': 2**-24}, {'x': float('inf')}, {'x': float('nan')},
+        ]
+        table = pa.table({'a': pa.array(values, type=pa.struct([('x', pa.float16())]))})
+        array = parquet_to_arrays(self.to_file(table, row_group_size=1))[0]
+        self.assertEqual(array.dtype, np.dtype(object))
+        self.assertFalse(array.flags.writeable)
+        self.assertEqual(array[:3].tolist(), values[:3])
+        np.testing.assert_array_equal(
+            [value['x'] for value in array[3:]],
+            [-0.0, 2**-24, float('inf'), float('nan')],
+        )
+        self.assertTrue(np.signbit(array[3]['x']))
+
     def test_parquet_to_arrays_wide_projection(self):
         names = [f'c{i}' for i in range(128)]
         table = pa.table({name: [i] for i, name in enumerate(names)})
@@ -157,16 +181,105 @@ class TestUnit(unittest.TestCase):
                 parquet_to_arrays(Path(directory) / 'missing.parquet')
 
     def test_parquet_to_arrays_native_reader(self):
-        file = self.to_file(pa.table({'a': [1, 2]}))
-        with mock.patch.object(pq, 'read_table', side_effect=AssertionError):
-            with mock.patch.object(pq, 'ParquetFile', side_effect=AssertionError):
-                np.testing.assert_array_equal(parquet_to_arrays(file)[0], [1, 2])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'data.parquet'
+            pq.write_table(pa.table({'a': [1, 2], 'b': ['x', 'y']}), path)
+            code = '''
+import importlib.abc
+import io
+import sys
+
+class NoPyArrow(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'pyarrow' or fullname.startswith('pyarrow.'):
+            raise AssertionError('Reader must not import Python PyArrow')
+        return None
+
+sys.meta_path.insert(0, NoPyArrow())
+from arraykit import parquet_to_arrays
+arrays = parquet_to_arrays(sys.argv[1], columns_select=['b', 'a'])
+assert [a.tolist() for a in arrays] == [['x', 'y'], [1, 2]]
+with open(sys.argv[1], 'rb') as file:
+    arrays = parquet_to_arrays(io.BytesIO(file.read()))
+assert [a.tolist() for a in arrays] == [[1, 2], ['x', 'y']]
+assert not any(name.startswith('pyarrow') for name in sys.modules)
+'''
+            subprocess.run([sys.executable, '-c', code, str(path)], check=True)
+
+    def test_parquet_to_arrays_file_errors(self):
+        class ReadError(io.BytesIO):
+            def read(self, size=-1):
+                raise RuntimeError('custom read error')
+
+        class SeekError(io.BytesIO):
+            def seek(self, offset, whence=0):
+                raise RuntimeError('custom seek error')
+
+        data = self.to_file(pa.table({'a': [1]})).getvalue()
+        for cls, message in (
+            (ReadError, 'custom read error'),
+            (SeekError, 'custom seek error'),
+        ):
+            with self.subTest(cls=cls):
+                with self.assertRaisesRegex(RuntimeError, message):
+                    parquet_to_arrays(cls(data))
+        with self.assertRaises(ValueError):
+            parquet_to_arrays('data.parquet\x00ignored')
+
+    def test_parquet_to_arrays_dates(self):
+        table = pa.table(
+            {
+                'date': pa.array([0, None, 100], type=pa.date32()),
+                'timestamp_ms': pa.array([0, None, 100], type=pa.timestamp('ms')),
+                'timestamp_ns': pa.array([0, None, 100], type=pa.timestamp('ns')),
+            }
+        )
+        arrays = parquet_to_arrays(self.to_file(table, row_group_size=1))
+        for array, expected, unit in zip(
+            arrays, ([0, 'NaT', 100],) * 3, ('D', 'ms', 'ns')
+        ):
+            np.testing.assert_array_equal(
+                array, np.array(expected, dtype=f'datetime64[{unit}]')
+            )
+
+    def test_parquet_to_arrays_nullable_numeric_types(self):
+        types = (
+            pa.int8(), pa.int16(), pa.int32(), pa.int64(),
+            pa.uint8(), pa.uint16(), pa.uint32(), pa.uint64(),
+            pa.float16(), pa.float32(), pa.float64(),
+        )
+        for dtype in types:
+            with self.subTest(dtype=dtype):
+                table = pa.table({'a': pa.array([1, None, 3], type=dtype)})
+                array = parquet_to_arrays(self.to_file(table, row_group_size=1))[0]
+                expected_dtype = (
+                    np.float64 if pa.types.is_integer(dtype) else dtype.to_pandas_dtype()
+                )
+                np.testing.assert_array_equal(array, [1, np.nan, 3])
+                self.assertEqual(array.dtype, np.dtype(expected_dtype))
+
+    def test_parquet_to_arrays_decimal(self):
+        values = [Decimal('1.23'), None, Decimal('-2.50')]
+        table = pa.table({'a': pa.array(values, type=pa.decimal128(8, 2))})
+        array = parquet_to_arrays(self.to_file(table))[0]
+        self.assertEqual(array.tolist(), values)
+        self.assertFalse(array.flags.writeable)
+
+    def test_parquet_to_arrays_short_reads(self):
+        class ShortRead(io.BytesIO):
+            def read(self, size=-1):
+                return super().read(min(size, 7))
+
+        data = self.to_file(pa.table({'a': [1, 2]})).getvalue()
+        file = ShortRead(data)
+        self.assertEqual(parquet_to_arrays(file)[0].tolist(), [1, 2])
+        self.assertFalse(file.closed)
 
 
 class TestOptionalDependency(unittest.TestCase):
-    def test_parquet_to_arrays_missing_pyarrow(self):
-        with mock.patch.dict('sys.modules', {'pyarrow._parquet': None}):
-            with self.assertRaises(ImportError):
+    def test_parquet_to_arrays_missing_backend(self):
+        with mock.patch.dict('sys.modules', {'arraykit._parquet': None}):
+            with self.assertRaisesRegex(ImportError, 'ARRAYKIT_WITH_PARQUET'):
                 parquet_to_arrays(io.BytesIO())
 
 

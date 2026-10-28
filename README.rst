@@ -36,8 +36,29 @@ Reading Parquet
 --------------
 
 ``parquet_to_arrays(file, *, columns_select=None)`` returns a list of immutable,
-one-dimensional NumPy arrays, one per top-level Parquet column. Install the
-optional dependency with ``pip install 'arraykit[parquet]'``.
+one-dimensional NumPy arrays, one per top-level Parquet column. It uses the native
+Arrow and Parquet C++ libraries, not Python PyArrow or ``arrow_python``.
+
+Parquet support is opt-in at build time. Install Arrow/Parquet >=24 development
+libraries and a C++20 compiler, then build ArrayKit from source::
+
+    ARRAYKIT_WITH_PARQUET=1 pip install --no-binary=arraykit arraykit
+
+The build finds libraries using ``pkg-config``. Alternatively set ``ARROW_HOME``
+to a native installation prefix containing ``include`` and ``lib``, or set both
+``ARROW_INCLUDE_DIR`` and ``ARROW_LIBRARY_DIR``. These settings are build-time
+only; the resulting extension must be able to load the same native libraries at
+runtime. Explicit library directories are embedded as runtime search paths on
+Unix. On Windows, make the Arrow DLL directory available to the loader (for
+example with ``os.add_dll_directory()`` before calling the reader). Keep native
+library installations ABI-compatible with the version used to build the extension.
+Locally built wheels with this backend are not portable unless their native
+dependencies are also supplied.
+
+Normal builds still require only NumPy. Calling ``parquet_to_arrays`` without
+the native backend raises ``ImportError`` with build instructions. PyArrow is
+used only to generate fixtures and reference results in optional tests, never
+for loading Parquet in ArrayKit.
 
 ``file`` can be a string, bytes, or path-like filesystem path, or a seekable
 binary file such as an open file or ``io.BytesIO``. Caller-owned files are not
@@ -50,21 +71,24 @@ returns an empty list. Missing or ambiguous names and repeated selections raise
 ``ValueError``. Names select whole top-level columns (including nested columns),
 not dotted paths to nested fields.
 
-The C entry point calls PyArrow's compiled Parquet reader and NumPy conversion
-methods directly, without Python's ``read_table`` / dataset layer, pandas, or
-Python loops over columns or values. PyArrow is still required: this is not a
-standalone C Parquet decoder. Decoding uses Arrow's codecs and column threading.
-Compatible single-chunk numeric data can share Arrow-owned memory; multiple
-chunks, booleans, nulls, and object-valued data can require copies. Performance
-relative to Python PyArrow depends on the file, column types, and selection.
+The native extension reads paths through Arrow's random-access file API.
+Open Python files use binary ``read``, ``seek``, and ``tell`` callbacks; the
+Parquet decoder and array conversion remain native. It releases the GIL during
+reading and decoding. Arrow handles compression and page encodings; ArrayKit
+copies decoded columns directly into NumPy-owned arrays through the C API,
+without a Python Arrow table, pandas, or Python loops over columns or values.
+Performance relative to Python PyArrow depends on the file, column types, and
+selection.
 
-Dtypes and null handling follow PyArrow's ``ChunkedArray.to_numpy()``: numeric
-types are preserved where possible, nullable integers become floating-point
-arrays with ``NaN``, nullable booleans and strings use object arrays with
-``None``, and timestamps use ``datetime64`` with ``NaT``. Large nullable integers
+Dtypes and null handling preserve numeric types where possible; nullable integers
+become floating-point arrays with ``NaN``, nullable booleans and strings use object
+arrays with ``None``, and timestamps use ``datetime64`` with ``NaT``. Large nullable integers
 can lose precision when converted to floating point. Dictionary columns are
-decoded to values, and nested columns use object arrays. Unsupported conversions
-and malformed files propagate PyArrow's exceptions.
+decoded to values, decimal columns use ``decimal.Decimal`` objects, and nested
+struct/list columns use object arrays. Other Arrow types may not have a supported
+NumPy conversion. Unsupported conversions raise ``NotImplementedError``;
+malformed files raise ``ValueError`` or ``OSError``. Exceptions from Python file
+methods are preserved.
 
 
 What is New in ArrayKit
