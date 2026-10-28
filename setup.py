@@ -33,6 +33,7 @@ ext_modules = [
             'src/block_index.c',
             'src/delimited_to_arrays.c',
             'src/methods.c',
+            'src/parquet_to_arrays.c',
             'src/tri_map.c',
             'src/auto_map.c',
         ],

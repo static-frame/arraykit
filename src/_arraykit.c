@@ -10,6 +10,7 @@
 # include "block_index.h"
 # include "delimited_to_arrays.h"
 # include "methods.h"
+# include "parquet_to_arrays.h"
 # include "tri_map.h"
 # include "auto_map.h"
 
@@ -43,6 +44,10 @@ static PyMethodDef arraykit_methods[] =  {
             (PyCFunction)delimited_to_arrays,
             METH_VARARGS | METH_KEYWORDS,
             NULL},
+    {"parquet_to_arrays",
+            (PyCFunction)parquet_to_arrays,
+            METH_VARARGS | METH_KEYWORDS,
+            "Read a Parquet file into immutable 1D arrays; requires PyArrow."},
     {"iterable_str_to_array_1d",
             (PyCFunction)iterable_str_to_array_1d,
             METH_VARARGS | METH_KEYWORDS,

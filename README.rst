@@ -32,6 +32,41 @@ ArrayKit requires the following:
 - numpy>=1.24.3
 
 
+Reading Parquet
+--------------
+
+``parquet_to_arrays(file, *, columns_select=None)`` returns a list of immutable,
+one-dimensional NumPy arrays, one per top-level Parquet column. Install the
+optional dependency with ``pip install 'arraykit[parquet]'``.
+
+``file`` can be a string, bytes, or path-like filesystem path, or a seekable
+binary file such as an open file or ``io.BytesIO``. Caller-owned files are not
+closed; their position can change. Paths identify individual files, not datasets
+or directories.
+
+``columns_select`` can be a list of unique column names. Only those columns are
+decoded, in selection order. ``None`` loads all columns in file order; ``[]``
+returns an empty list. Missing or ambiguous names and repeated selections raise
+``ValueError``. Names select whole top-level columns (including nested columns),
+not dotted paths to nested fields.
+
+The C entry point calls PyArrow's compiled Parquet reader and NumPy conversion
+methods directly, without Python's ``read_table`` / dataset layer, pandas, or
+Python loops over columns or values. PyArrow is still required: this is not a
+standalone C Parquet decoder. Decoding uses Arrow's codecs and column threading.
+Compatible single-chunk numeric data can share Arrow-owned memory; multiple
+chunks, booleans, nulls, and object-valued data can require copies. Performance
+relative to Python PyArrow depends on the file, column types, and selection.
+
+Dtypes and null handling follow PyArrow's ``ChunkedArray.to_numpy()``: numeric
+types are preserved where possible, nullable integers become floating-point
+arrays with ``NaN``, nullable booleans and strings use object arrays with
+``None``, and timestamps use ``datetime64`` with ``NaT``. Large nullable integers
+can lose precision when converted to floating point. Dictionary columns are
+decoded to values, and nested columns use object arrays. Unsupported conversions
+and malformed files propagate PyArrow's exceptions.
+
+
 What is New in ArrayKit
 -------------------------
 

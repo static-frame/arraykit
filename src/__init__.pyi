@@ -1,11 +1,18 @@
 import typing as tp
 import datetime
+import os
 
 import numpy as np  # type: ignore
 
 _T = tp.TypeVar('_T')
 
 __version__: str
+
+def parquet_to_arrays(
+    file: tp.Union[str, bytes, os.PathLike, tp.BinaryIO],
+    *,
+    columns_select: tp.Optional[tp.List[str]] = None,
+) -> tp.List[np.ndarray]: ...
 
 _TLabel = tp.Union[
     tp.Hashable,
