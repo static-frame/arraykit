@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include <datetime.h>
 #define PY_ARRAY_UNIQUE_SYMBOL AK_PARQUET_ARRAY_API
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
@@ -86,19 +87,18 @@ T unwrap(arrow::Result<T> result) {
 
 // Each operation holds the mutex across seek/read, and acquires the GIL only
 // for Python callbacks. Arrow reading itself runs with the GIL released.
+// Lock order is always mutex then GIL: never call into Arrow APIs that may do
+// file I/O while holding the GIL, or a reader thread holding the mutex and
+// waiting for the GIL can deadlock.
 class PythonFile final : public arrow::io::RandomAccessFile {
 public:
     explicit PythonFile(PyObject* file) : file_(Py_NewRef(file)) {}
+    // Errors not reported through restore_error() are discarded: restoring one
+    // here could set an exception on a successful return.
     ~PythonFile() override {
         AcquireGIL gil;
         Py_DECREF(file_);
-        if (error_type_ && !PyErr_Occurred()) {
-            PyErr_Restore(error_type_, error_value_, error_traceback_);
-            error_type_ = error_value_ = error_traceback_ = nullptr;
-        }
-        Py_XDECREF(error_type_);
-        Py_XDECREF(error_value_);
-        Py_XDECREF(error_traceback_);
+        Py_XDECREF(error_);
     }
 
     arrow::Status Close() override { return arrow::Status::OK(); }
@@ -167,15 +167,15 @@ public:
     }
 
     bool restore_error() {
-        if (!error_type_) return false;
-        PyErr_Restore(error_type_, error_value_, error_traceback_);
-        error_type_ = error_value_ = error_traceback_ = nullptr;
+        if (!error_) return false;
+        PyErr_SetRaisedException(error_);
+        error_ = nullptr;
         return true;
     }
 
 private:
     arrow::Status failure() const {
-        if (!error_type_) PyErr_Fetch(&error_type_, &error_value_, &error_traceback_);
+        if (!error_) error_ = PyErr_GetRaisedException();
         else PyErr_Clear();
         return arrow::Status::IOError("Python file operation failed");
     }
@@ -204,18 +204,21 @@ private:
             PyRef value(PyObject_CallMethod(file_, "read", "n",
                     static_cast<Py_ssize_t>(count - total)));
             if (!value.get()) return failure();
-            if (!PyBytes_Check(value.get())) {
-                PyErr_SetString(PyExc_TypeError, "file.read() must return bytes");
+            Py_buffer view;
+            if (PyObject_GetBuffer(value.get(), &view, PyBUF_SIMPLE) < 0) {
+                PyErr_SetString(PyExc_TypeError, "file.read() must return a bytes-like object");
                 return failure();
             }
-            Py_ssize_t size = PyBytes_GET_SIZE(value.get());
+            Py_ssize_t size = view.len;
             if (size > count - total) {
+                PyBuffer_Release(&view);
                 PyErr_SetString(PyExc_ValueError, "file.read() returned too many bytes");
                 return failure();
             }
+            if (size) std::memcpy(static_cast<char*>(out) + total, view.buf,
+                    static_cast<size_t>(size));
+            PyBuffer_Release(&view);
             if (!size) break;
-            std::memcpy(static_cast<char*>(out) + total,
-                    PyBytes_AS_STRING(value.get()), static_cast<size_t>(size));
             total += size;
         }
         return total;
@@ -223,12 +226,38 @@ private:
 
     PyObject* file_;
     mutable std::mutex mutex_;
-    mutable PyObject* error_type_ = nullptr;
-    mutable PyObject* error_value_ = nullptr;
-    mutable PyObject* error_traceback_ = nullptr;
+    mutable PyObject* error_ = nullptr;
 };
 
+PyObject* decimal_type = nullptr;
+
 PyObject* convert_array(const std::shared_ptr<arrow::Array>& array);
+
+PyObject* time_value(int64_t value, arrow::TimeUnit::type unit) {
+    int64_t micros = value;
+    switch (unit) {
+        case arrow::TimeUnit::SECOND: micros = value * 1000000; break;
+        case arrow::TimeUnit::MILLI: micros = value * 1000; break;
+        case arrow::TimeUnit::MICRO: break;
+        case arrow::TimeUnit::NANO:
+            if (value % 1000) {
+                PyErr_Format(PyExc_ValueError,
+                        "time value %lld has non-zero nanoseconds", static_cast<long long>(value));
+                throw PythonError();
+            }
+            micros = value / 1000;
+            break;
+    }
+    if (micros < 0 || micros >= 86400LL * 1000000) {
+        PyErr_Format(PyExc_ValueError, "time value %lld is out of range",
+                static_cast<long long>(value));
+        throw PythonError();
+    }
+    int64_t seconds = micros / 1000000;
+    return PyTime_FromTime(static_cast<int>(seconds / 3600),
+            static_cast<int>(seconds / 60 % 60), static_cast<int>(seconds % 60),
+            static_cast<int>(micros % 1000000));
+}
 
 PyObject* object_value(const std::shared_ptr<arrow::Array>& array, int64_t index) {
     if (array->IsNull(index)) return Py_NewRef(Py_None);
@@ -313,17 +342,29 @@ PyObject* object_value(const std::shared_ptr<arrow::Array>& array, int64_t index
         case arrow::Type::DECIMAL64: {
             auto scalar = unwrap(array->GetScalar(index));
             std::string text = scalar->ToString();
-            PyRef module(checked(PyImport_ImportModule("decimal")));
-            PyRef cls(checked(PyObject_GetAttrString(module.get(), "Decimal")));
             PyRef value(checked(PyUnicode_FromStringAndSize(text.data(), text.size())));
-            return PyObject_CallOneArg(cls.get(), value.get());
+            return PyObject_CallOneArg(decimal_type, value.get());
         }
+        // NumPy scalars keep every unit exactly; PyArray_GETITEM would return
+        // datetime objects for some units and ints for nanoseconds.
         case arrow::Type::TIMESTAMP:
         case arrow::Type::DATE32:
-        case arrow::Type::DATE64: {
+        case arrow::Type::DATE64:
+        case arrow::Type::DURATION: {
             PyRef values(checked(convert_array(array->Slice(index, 1))));
-            return PyArray_GETITEM(reinterpret_cast<PyArrayObject*>(values.get()),
-                    static_cast<char*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(values.get()))));
+            auto values_array = reinterpret_cast<PyArrayObject*>(values.get());
+            return PyArray_Scalar(PyArray_DATA(values_array),
+                    PyArray_DESCR(values_array), values.get());
+        }
+        case arrow::Type::TIME32: {
+            const auto& values = static_cast<const arrow::Time32Array&>(*array);
+            return time_value(values.Value(index),
+                    static_cast<const arrow::Time32Type&>(*array->type()).unit());
+        }
+        case arrow::Type::TIME64: {
+            const auto& values = static_cast<const arrow::Time64Array&>(*array);
+            return time_value(values.Value(index),
+                    static_cast<const arrow::Time64Type&>(*array->type()).unit());
         }
         case arrow::Type::NA:
             return Py_NewRef(Py_None);
@@ -351,6 +392,9 @@ int numpy_type(const arrow::DataType& type, bool nullable) {
         case arrow::Type::TIMESTAMP:
         case arrow::Type::DATE32:
         case arrow::Type::DATE64: return NPY_DATETIME;
+        case arrow::Type::DURATION: return NPY_TIMEDELTA;
+        case arrow::Type::TIME32:
+        case arrow::Type::TIME64:
         case arrow::Type::NA:
         case arrow::Type::STRING:
         case arrow::Type::LARGE_STRING:
@@ -373,18 +417,23 @@ int numpy_type(const arrow::DataType& type, bool nullable) {
     }
 }
 
-PyArray_Descr* datetime_dtype(const arrow::DataType& type) {
+// Timestamp time zones are dropped: values are UTC and become naive datetime64.
+PyArray_Descr* temporal_dtype(const arrow::DataType& type) {
     const char* unit = "D";
     if (type.id() == arrow::Type::DATE64) unit = "ms";
-    else if (type.id() == arrow::Type::TIMESTAMP) {
-        switch (static_cast<const arrow::TimestampType&>(type).unit()) {
+    else if (type.id() == arrow::Type::TIMESTAMP || type.id() == arrow::Type::DURATION) {
+        auto time_unit = type.id() == arrow::Type::TIMESTAMP
+                ? static_cast<const arrow::TimestampType&>(type).unit()
+                : static_cast<const arrow::DurationType&>(type).unit();
+        switch (time_unit) {
             case arrow::TimeUnit::SECOND: unit = "s"; break;
             case arrow::TimeUnit::MILLI: unit = "ms"; break;
             case arrow::TimeUnit::MICRO: unit = "us"; break;
             case arrow::TimeUnit::NANO: unit = "ns"; break;
         }
     }
-    std::string spec = std::string("datetime64[") + unit + "]";
+    const char* kind = type.id() == arrow::Type::DURATION ? "timedelta64[" : "datetime64[";
+    std::string spec = std::string(kind) + unit + "]";
     PyRef value(checked(PyUnicode_FromString(spec.c_str())));
     PyArray_Descr* result = nullptr;
     if (!PyArray_DescrConverter(value.get(), &result)) throw PythonError();
@@ -462,7 +511,8 @@ void copy_chunk(const std::shared_ptr<arrow::Array>& array,
             break;
         }
         case arrow::Type::DATE64:
-        case arrow::Type::TIMESTAMP: {
+        case arrow::Type::TIMESTAMP:
+        case arrow::Type::DURATION: {
             auto target = reinterpret_cast<int64_t*>(data) + offset;
             auto source = array->data()->GetValues<int64_t>(1);
             for (int64_t i = 0; i < array->length(); ++i)
@@ -482,8 +532,8 @@ PyObject* convert_column(const arrow::ChunkedArray& column) {
         throw PythonError();
     }
     npy_intp size = static_cast<npy_intp>(column.length());
-    PyArray_Descr* descriptor = dtype == NPY_DATETIME
-            ? datetime_dtype(*column.type()) : PyArray_DescrFromType(dtype);
+    PyArray_Descr* descriptor = dtype == NPY_DATETIME || dtype == NPY_TIMEDELTA
+            ? temporal_dtype(*column.type()) : PyArray_DescrFromType(dtype);
     if (!descriptor) throw PythonError();
     PyRef result(checked(PyArray_NewFromDescr(&PyArray_Type, descriptor, 1, &size,
             nullptr, nullptr, 0, nullptr)));
@@ -601,8 +651,16 @@ PyObject* read_parquet(PyObject*, PyObject* args, PyObject* kwargs) {
         const auto* parquet_schema = reader->parquet_reader()->metadata()->schema();
         for (int field : fields) {
             const auto* root = parquet_schema->group_node()->field(field).get();
+            size_t count = leaves.size();
             for (int leaf = 0; leaf < parquet_schema->num_columns(); ++leaf) {
                 if (parquet_schema->GetColumnRoot(leaf) == root) leaves.push_back(leaf);
+            }
+            // Columns are matched to fields by position below, so every field
+            // must produce exactly one table column.
+            if (leaves.size() == count) {
+                PyErr_Format(PyExc_NotImplementedError,
+                        "column %s has no leaf columns", root->name().c_str());
+                throw PythonError();
             }
         }
         if (fields.empty()) return PyList_New(0);
@@ -618,7 +676,7 @@ PyObject* read_parquet(PyObject*, PyObject* args, PyObject* kwargs) {
         arrow::Status validation;
         {
             ReleaseGIL released;
-            validation = table->ValidateFull();
+            validation = table->Validate();
         }
         check_status(validation);
         // Parquet returns projected fields in file order, not request order.
@@ -660,5 +718,18 @@ PyModuleDef module = {
 
 PyMODINIT_FUNC PyInit__parquet() {
     if (_import_array() < 0) return nullptr;
-    return PyModule_Create(&module);
+    PyDateTime_IMPORT;
+    if (!PyDateTimeAPI) return nullptr;
+    if (!decimal_type) {
+        PyObject* decimal = PyImport_ImportModule("decimal");
+        if (!decimal) return nullptr;
+        decimal_type = PyObject_GetAttrString(decimal, "Decimal");
+        Py_DECREF(decimal);
+        if (!decimal_type) return nullptr;
+    }
+    PyObject* m = PyModule_Create(&module);
+#ifdef Py_GIL_DISABLED
+    if (m) PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
+#endif
+    return m;
 }

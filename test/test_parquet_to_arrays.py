@@ -1,3 +1,4 @@
+import datetime
 import gc
 from decimal import Decimal
 import importlib.util
@@ -241,6 +242,67 @@ assert not any(name.startswith('pyarrow') for name in sys.modules)
             np.testing.assert_array_equal(
                 array, np.array(expected, dtype=f'datetime64[{unit}]')
             )
+
+    def test_parquet_to_arrays_durations(self):
+        for unit in ('s', 'ms', 'us', 'ns'):
+            with self.subTest(unit=unit):
+                table = pa.table({'a': pa.array([5, None, -3], type=pa.duration(unit))})
+                array = parquet_to_arrays(self.to_file(table, row_group_size=1))[0]
+                self.assertEqual(array.dtype, np.dtype(f'timedelta64[{unit}]'))
+                np.testing.assert_array_equal(
+                    array, np.array([5, 'NaT', -3], dtype=f'timedelta64[{unit}]')
+                )
+                self.assertFalse(array.flags.writeable)
+
+    def test_parquet_to_arrays_times(self):
+        types = (pa.time32('s'), pa.time32('ms'), pa.time64('us'), pa.time64('ns'))
+        for dtype in types:
+            with self.subTest(dtype=dtype):
+                values = [datetime.time(1, 2, 3), None, datetime.time(23, 59, 59)]
+                table = pa.table({'a': pa.array(values, type=dtype)})
+                array = parquet_to_arrays(self.to_file(table))[0]
+                self.assertEqual(array.dtype, np.dtype(object))
+                self.assertEqual(array.tolist(), values)
+        table = pa.table({'a': pa.array([1001], type=pa.time64('ns'))})
+        with self.assertRaisesRegex(ValueError, 'non-zero nanoseconds'):
+            parquet_to_arrays(self.to_file(table))
+
+    def test_parquet_to_arrays_nested_temporal(self):
+        struct = pa.struct([
+            ('ns', pa.timestamp('ns')),
+            ('us', pa.timestamp('us')),
+            ('d', pa.duration('ms')),
+        ])
+        table = pa.table({'s': pa.array(
+            [{'ns': 1, 'us': 2, 'd': 3}, {'ns': None, 'us': None, 'd': None}],
+            type=struct,
+        )})
+        array = parquet_to_arrays(self.to_file(table))[0]
+        self.assertEqual(array[0], {
+            'ns': np.datetime64(1, 'ns'),
+            'us': np.datetime64(2, 'us'),
+            'd': np.timedelta64(3, 'ms'),
+        })
+        self.assertIsInstance(array[0]['ns'], np.datetime64)
+        self.assertEqual(array[0]['ns'].dtype, np.dtype('datetime64[ns]'))
+        self.assertEqual(array[1], {'ns': None, 'us': None, 'd': None})
+
+    def test_parquet_to_arrays_read_bytes_like(self):
+        for wrap in (bytearray, memoryview):
+            class BytesLike(io.BytesIO):
+                def read(self, size=-1, wrap=wrap):
+                    return wrap(super().read(size))
+
+            with self.subTest(wrap=wrap):
+                data = self.to_file(pa.table({'a': [1, 2]})).getvalue()
+                self.assertEqual(parquet_to_arrays(BytesLike(data))[0].tolist(), [1, 2])
+
+        class NotBytes(io.BytesIO):
+            def read(self, size=-1):
+                return 'text'
+
+        with self.assertRaisesRegex(TypeError, 'bytes-like'):
+            parquet_to_arrays(NotBytes(data))
 
     def test_parquet_to_arrays_nullable_numeric_types(self):
         types = (

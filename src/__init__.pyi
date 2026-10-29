@@ -8,12 +8,6 @@ _T = tp.TypeVar('_T')
 
 __version__: str
 
-def parquet_to_arrays(
-    file: tp.Union[str, bytes, os.PathLike, tp.BinaryIO],
-    *,
-    columns_select: tp.Optional[tp.List[str]] = None,
-) -> tp.List[np.ndarray]: ...
-
 _TLabel = tp.Union[
     tp.Hashable,
     int,
@@ -198,6 +192,11 @@ def delimited_to_arrays(
     thousandschar: str = ',',
     decimalchar: str = '.',
 ) -> tp.List[np.array]: ...
+def parquet_to_arrays(
+    file: tp.Union[str, bytes, os.PathLike, tp.BinaryIO],
+    *,
+    columns_select: tp.Optional[tp.List[str]] = None,
+) -> tp.List[np.ndarray]: ...
 def split_after_count(
     string: str,
     *,

@@ -33,7 +33,7 @@ ArrayKit requires the following:
 
 
 Reading Parquet
---------------
+---------------
 
 ``parquet_to_arrays(file, *, columns_select=None)`` returns a list of immutable,
 one-dimensional NumPy arrays, one per top-level Parquet column. It uses the native
@@ -72,8 +72,9 @@ returns an empty list. Missing or ambiguous names and repeated selections raise
 not dotted paths to nested fields.
 
 The native extension reads paths through Arrow's random-access file API.
-Open Python files use binary ``read``, ``seek``, and ``tell`` callbacks; the
-Parquet decoder and array conversion remain native. It releases the GIL during
+Open Python files use binary ``read`` (returning any bytes-like object),
+``seek``, and ``tell`` callbacks; the Parquet decoder and array conversion
+remain native. It releases the GIL during
 reading and decoding. Arrow handles compression and page encodings; ArrayKit
 copies decoded columns directly into NumPy-owned arrays through the C API,
 without a Python Arrow table, pandas, or Python loops over columns or values.
@@ -82,11 +83,15 @@ selection.
 
 Dtypes and null handling preserve numeric types where possible; nullable integers
 become floating-point arrays with ``NaN``, nullable booleans and strings use object
-arrays with ``None``, and timestamps use ``datetime64`` with ``NaT``. Large nullable integers
-can lose precision when converted to floating point. Dictionary columns are
-decoded to values, decimal columns use ``decimal.Decimal`` objects, and nested
-struct/list columns use object arrays. Other Arrow types may not have a supported
-NumPy conversion. Unsupported conversions raise ``NotImplementedError``;
+arrays with ``None``, timestamps and dates use ``datetime64`` with ``NaT``, and
+durations use ``timedelta64`` with ``NaT``. Timestamp time zones are dropped;
+values are UTC. Large nullable integers can lose precision when converted to
+floating point. Dictionary columns are decoded to values, decimal columns use
+``decimal.Decimal`` objects, time-of-day columns use ``datetime.time`` objects
+(nanosecond values that are not whole microseconds raise ``ValueError``), and
+nested struct/list columns use object arrays. Temporal values nested in structs
+use NumPy ``datetime64`` or ``timedelta64`` scalars. Other Arrow types may not
+have a supported NumPy conversion. Unsupported conversions raise ``NotImplementedError``;
 malformed files raise ``ValueError`` or ``OSError``. Exceptions from Python file
 methods are preserved.
 

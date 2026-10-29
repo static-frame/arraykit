@@ -25,6 +25,29 @@ jobs:
           name: dist-sdist
           path: dist/*
 
+  parquet:
+    name: Native Parquet / ubuntu-24.04 / Python 3.14
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-python@master
+        with:
+          python-version: 3.14
+      - run: echo '::add-matcher::.github/problem-matchers/gcc.json'
+      - name: Install Arrow/Parquet C++ libraries
+        run: |
+          wget -q https://packages.apache.org/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get update
+          sudo apt-get install -y libarrow-dev libparquet-dev
+          pkg-config --modversion arrow parquet
+      - run: python -m pip install -r requirements-dev-3_14.txt pyarrow
+      - run: python -m pip install -v .
+        env:
+          ARRAYKIT_WITH_PARQUET: '1'
+      - run: python -c "import arraykit._parquet"
+      - run: python -m pytest test/test_parquet_to_arrays.py test/test_parquet_build.py
+
   matrix_config:
     name: Matrix Runner Config
     runs-on: ubuntu-22.04
